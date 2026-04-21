@@ -1,0 +1,343 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// MULTI-TENANCY
+// ─────────────────────────────────────────────
+
+model Tenant {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  companies    Company[]
+  persons      Person[]
+  users        User[]
+  contacts     Contact[]
+  leads        Lead[]
+  deals        Deal[]
+  proposals    Proposal[]
+  invoices     Invoice[]
+  tasks        Task[]
+  interactions Interaction[]
+  equipment    Equipment[]
+  etlRuns      EtlRun[]
+
+  @@map("tenants")
+}
+
+// ─────────────────────────────────────────────
+// CORE ENTITIES
+// ─────────────────────────────────────────────
+
+// Person = a human being. Persists across employers.
+// Do NOT collapse this into Contact.
+model Person {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  email       String?
+  phone       String?
+  linkedinUrl String?  @map("linkedin_url")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  contacts     Contact[]     // all company relationships this person has had
+  interactions Interaction[]
+  tasks        Task[]        @relation("TaskPerson")
+
+  @@map("persons")
+}
+
+// Company = an organization. Deduplicated on vat_number.
+model Company {
+  id                   Int       @id @default(autoincrement())
+  tenantId             Int       @map("tenant_id")
+  name                 String
+  vatNumber            String?   @map("vat_number")   // 8-digit Hungarian VAT, stripped of branch suffix
+  shortCode            String?   @map("short_code")   // internal code e.g. "ACH", "AGR"
+  status               String?                        // active, inactive, F.A.
+  accountType          String?   @map("account_type") // Customer, Lead, Vendor
+  industryCode         String?   @map("industry_code") // TEÁOR sector A-U
+  country              String?
+  county               String?
+  city                 String?
+  address              String?
+  zipCode              String?   @map("zip_code")
+  website              String?
+  pipelineStatus       String?   @map("pipeline_status") // 0-8 status codes
+  lastInteractionDate  DateTime? @map("last_interaction_date")
+  lastInteractionOwner String?   @map("last_interaction_owner")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  contacts     Contact[]
+  leads        Lead[]
+  deals        Deal[]
+  proposals    Proposal[]
+  invoices     Invoice[]
+  interactions Interaction[]
+  tasks        Task[]        @relation("TaskCompany")
+
+  @@unique([tenantId, vatNumber])
+  @@map("companies")
+}
+
+// Contact = person at company, time-bound state.
+// This is NOT the entity — Person is the entity.
+// ended_at = null means currently works here.
+model Contact {
+  id        Int       @id @default(autoincrement())
+  tenantId  Int       @map("tenant_id")
+  personId  Int       @map("person_id")
+  companyId Int       @map("company_id")
+  role      String?
+  email     String?   // work email, may differ from person.email
+  phone     String?   // work phone
+  isPrimary Boolean   @default(false) @map("is_primary")
+  startedAt DateTime? @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  person  Person  @relation(fields: [personId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+  leads   Lead[]
+
+  @@map("contacts")
+}
+
+// User = Controllabor employee using the system
+model User {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  name      String
+  email     String   @unique
+  role      String   @default("member") // admin, manager, member
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  assignedTasks    Task[]        @relation("TaskAssignee")
+  loggedInteractions Interaction[]
+  assignedLeads    Lead[]        @relation("LeadAssignee")
+  assignedDeals    Deal[]        @relation("DealAssignee")
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// PIPELINE
+// ─────────────────────────────────────────────
+
+model Lead {
+  id              Int       @id @default(autoincrement())
+  tenantId        Int       @map("tenant_id")
+  companyId       Int?      @map("company_id")
+  contactId       Int?      @map("contact_id")
+  assignedToId    Int?      @map("assigned_to_id")
+  source          String?                          // Web, phone, email, referral
+  status          String?                          // New, Contacted, Working, Unqualified
+  subject         String?
+  serviceInterest String?   @map("service_interest")
+  estimatedValue  Decimal?  @map("estimated_value")
+  receivedDate    DateTime? @map("received_date")
+  lostReason      String?   @map("lost_reason")
+  rawSourceFile   String?   @map("raw_source_file")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  company    Company? @relation(fields: [companyId], references: [id])
+  contact    Contact? @relation(fields: [contactId], references: [id])
+  assignedTo User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
+
+  @@map("leads")
+}
+
+model Deal {
+  id                Int       @id @default(autoincrement())
+  tenantId          Int       @map("tenant_id")
+  companyId         Int       @map("company_id")
+  assignedToId      Int?      @map("assigned_to_id")
+  title             String
+  stage             String    @default("prospecting") // prospecting, proposal, negotiation, closed_won, closed_lost
+  value             Decimal?
+  currency          String    @default("HUF")
+  expectedCloseDate DateTime? @map("expected_close_date")
+  lostReason        String?   @map("lost_reason")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  company    Company    @relation(fields: [companyId], references: [id])
+  assignedTo User?      @relation("DealAssignee", fields: [assignedToId], references: [id])
+  proposals  Proposal[]
+  tasks      Task[]     @relation("TaskDeal")
+
+  @@map("deals")
+}
+
+// Proposal = offer document sent. Linked to a Deal.
+model Proposal {
+  id            Int       @id @default(autoincrement())
+  tenantId      Int       @map("tenant_id")
+  companyId     Int       @map("company_id")
+  dealId        Int?      @map("deal_id")
+  result        String?   // closed_won, closed_lost, pending, proposal
+  lostReason    String?   @map("lost_reason")
+  campaign      String?
+  sentDate      DateTime? @map("sent_date")
+  receivedDate  DateTime? @map("received_date")
+  invoiceNumber String?   @map("invoice_number")
+  rawLabel      String?   @map("raw_label")        // original folder/file label from xlsx
+  rawSourceFile String?   @map("raw_source_file")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+  deal    Deal?   @relation(fields: [dealId], references: [id])
+
+  @@map("proposals")
+}
+
+model Invoice {
+  id             Int       @id @default(autoincrement())
+  tenantId       Int       @map("tenant_id")
+  companyId      Int?      @map("company_id")
+  companyName    String?   @map("company_name")    // denormalized — historical records may not link
+  invoiceNumber  String?   @map("invoice_number")
+  netAmount      Decimal?  @map("net_amount")
+  currency       String    @default("HUF")
+  completionDate DateTime? @map("completion_date")
+  issuedDate     DateTime? @map("issued_date")
+  dueDate        DateTime? @map("due_date")
+  year           Int?
+  rawSourceFile  String?   @map("raw_source_file")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@map("invoices")
+}
+
+// ─────────────────────────────────────────────
+// TASKS
+// The heart of the system. Everything is a task.
+// Tasks are atomic — "write email" and "send email" are two tasks.
+// ─────────────────────────────────────────────
+
+model Task {
+  id               Int       @id @default(autoincrement())
+  tenantId         Int       @map("tenant_id")
+  assignedToId     Int?      @map("assigned_to_id")
+  companyId        Int?      @map("company_id")
+  dealId           Int?      @map("deal_id")
+  personId         Int?      @map("person_id")
+  parentTaskId     Int?      @map("parent_task_id")
+  title            String
+  description      String?
+  type             String?   // call, email, meeting, document, field_visit, internal
+  category         String?   // revenue, cost, internal, external
+  status           String    @default("not_started") // not_started, in_progress, done, cancelled
+  dueDate          DateTime? @map("due_date")
+  completedAt      DateTime? @map("completed_at")
+  estimatedMinutes Int?      @map("estimated_minutes") // normaidő — measured against actual
+  actualMinutes    Int?      @map("actual_minutes")
+  isRecurring      Boolean   @default(false) @map("is_recurring")
+  recurrenceRule   String?   @map("recurrence_rule")  // RRULE string e.g. "FREQ=WEEKLY;BYDAY=MO"
+  notifyBefore     Int?      @map("notify_before")    // days before due date to notify
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  assignedTo User?    @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  company    Company? @relation("TaskCompany", fields: [companyId], references: [id])
+  deal       Deal?    @relation("TaskDeal", fields: [dealId], references: [id])
+  person     Person?  @relation("TaskPerson", fields: [personId], references: [id])
+  parentTask Task?    @relation("SubTasks", fields: [parentTaskId], references: [id])
+  subTasks   Task[]   @relation("SubTasks")
+
+  @@map("tasks")
+}
+
+// ─────────────────────────────────────────────
+// INTERACTIONS
+// Append-only. Never update, never delete.
+// ─────────────────────────────────────────────
+
+model Interaction {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int      @map("tenant_id")
+  companyId  Int?     @map("company_id")
+  personId   Int?     @map("person_id")
+  userId     Int?     @map("user_id")   // who logged this
+  type       String?  // call, email, meeting, note, site_visit
+  direction  String?  // inbound, outbound
+  notes      String?
+  outcome    String?  // maps to 0-8 status codes
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+  person  Person?  @relation(fields: [personId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+
+  @@map("interactions")
+}
+
+// ─────────────────────────────────────────────
+// EQUIPMENT
+// NDT instruments — serial numbers auto-populate reports
+// ─────────────────────────────────────────────
+
+model Equipment {
+  id             Int       @id @default(autoincrement())
+  tenantId       Int       @map("tenant_id")
+  name           String
+  serialNumber   String?   @map("serial_number")
+  model          String?
+  manufacturer   String?
+  calibrationDue DateTime? @map("calibration_due")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("equipment")
+}
+
+// ─────────────────────────────────────────────
+// ETL AUDIT
+// ─────────────────────────────────────────────
+
+model EtlRun {
+  id                 Int       @id @default(autoincrement())
+  tenantId           Int       @map("tenant_id")
+  filename           String
+  status             String    // running, success, error
+  companiesLoaded    Int?      @map("companies_loaded")
+  invoicesLoaded     Int?      @map("invoices_loaded")
+  leadsLoaded        Int?      @map("leads_loaded")
+  proposalsLoaded    Int?      @map("proposals_loaded")
+  interactionsLoaded Int?      @map("interactions_loaded")
+  errorMessage       String?   @map("error_message")
+  startedAt          DateTime  @default(now()) @map("started_at")
+  completedAt        DateTime? @map("completed_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("etl_runs")
+}
