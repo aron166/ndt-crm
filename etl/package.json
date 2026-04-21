@@ -1,0 +1,19 @@
+{
+  "name": "ndt-crm-etl",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "load": "ts-node src/load.ts",
+    "lint": "eslint src --ext ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "prisma": "^5.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
