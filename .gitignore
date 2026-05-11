@@ -39,3 +39,9 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# Source data — Zoho exports, customer PII, price catalogs. NEVER commit.
+etl/data/
+etl/source/
+*.xlsx
+*.csv

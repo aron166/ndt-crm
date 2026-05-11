@@ -3,15 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "load": "ts-node src/load.ts",
+    "migrate": "ts-node src/migrate-xlsx.ts",
+    "migrate:dry": "ts-node src/migrate-xlsx.ts --dry-run",
+    "migrate:reset": "ts-node src/migrate-xlsx.ts --reset",
+    "migrate:legacy": "ts-node src/migrate.ts",
+    "validate": "ts-node src/validate.ts",
     "lint": "eslint src --ext ts"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",
+    "dotenv": "^16.0.0",
+    "pg": "^8.11.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.0",
     "prisma": "^5.0.0",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0"
