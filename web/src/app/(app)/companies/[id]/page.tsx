@@ -10,6 +10,7 @@ import {
   TabsContent,
 } from "@/components/ui/tabs";
 import { Building2, MapPin, Globe, Phone, ArrowLeft } from "lucide-react";
+import { LogInteractionButton } from "@/components/LogInteractionButton";
 
 const TENANT_ID = 1;
 
@@ -68,7 +69,13 @@ export default async function CompanyDetailPage({
               )}
             </div>
           </div>
-          <PipelineStatusBadge status={company.pipelineStatus} />
+          <div className="flex items-center gap-2">
+            <LogInteractionButton
+              companyId={company.id}
+              companyName={company.name}
+            />
+            <PipelineStatusBadge status={company.pipelineStatus} />
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
