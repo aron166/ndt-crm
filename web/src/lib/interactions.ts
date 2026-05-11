@@ -20,3 +20,20 @@ export function interactionDirectionLabel(direction: string | null): string {
   if (!direction) return "";
   return INTERACTION_DIRECTION_LABEL[direction] ?? direction;
 }
+
+export interface LogInteractionInput {
+  type?: string;
+  notes?: string;
+  occurredAt?: string;
+  direction?: string;
+  outcome?: string;
+  companyId?: number | null;
+  personId?: number | null;
+}
+
+export function validateInteractionInput(input: LogInteractionInput): string | null {
+  if (!input.type?.trim()) return "Típus kötelező";
+  if (!input.notes?.trim()) return "Megjegyzés kötelező";
+  if (!input.occurredAt) return "Dátum kötelező";
+  return null;
+}
