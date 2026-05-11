@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python)",
+      "Bash(python3 \"C:\\\\Users\\\\Áron\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"B2B CRM field-service industrial data-dense professional\" --design-system -f markdown -p \"NDT CRM\")",
+      "PowerShell(python \"C:\\\\Users\\\\�ron\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"B2B CRM field-service industrial data-dense professional\" --design-system -f markdown -p \"NDT CRM\")",
+      "Read(//c/Users/�ron/.claude/skills/**)",
+      "Read(//c/Users/Áron/peter-wiki/**)",
+      "Bash(mkdir -p \"C:/Users/Áron/workspace/apps\")",
+      "Bash(mkdir -p \"C:/Users/Áron/workspace/packages/ui/src\")",
+      "Bash(mkdir -p \"C:/Users/Áron/workspace/packages/supabase/src\")",
+      "Bash(mkdir -p \"C:/Users/Áron/workspace/packages/email/src\")",
+      "Bash(mkdir -p \"C:/Users/Áron/workspace/packages/ai/src\")",
+      "Read(//c/Users/Áron/.claude/projects/c--Users--ron-workspace/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Áron\\workspace",
+      "C:\\Users\\Áron\\.claude\\projects\\c--Users--ron-workspace\\memory"
+    ]
+  }
+}

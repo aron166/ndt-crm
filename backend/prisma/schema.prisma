@@ -120,12 +120,13 @@ model Contact {
 
 // User = Controllabor employee using the system
 model User {
-  id        Int      @id @default(autoincrement())
-  tenantId  Int      @map("tenant_id")
-  name      String
-  email     String   @unique
-  role      String   @default("member") // admin, manager, member
-  createdAt DateTime @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String   @default("member") // admin, manager, member
+  createdAt    DateTime @default(now()) @map("created_at")
 
   tenant           Tenant        @relation(fields: [tenantId], references: [id])
   assignedTasks    Task[]        @relation("TaskAssignee")

@@ -7,9 +7,17 @@ First tenant: Controllabor Kft. (Hungary). Multi-tenant from day one — other N
 can rent the same system. Owned by a separate entity (working name: Árpil), not Controllabor.
 This separation means Controllabor can be sold with the CRM as an asset, increasing sale value.
 
-**Current phase:** Scaffold + schema design. No UI built yet.
+**Current phase (2026-05-11):** Backend + frontend feature work is functionally complete for companies/persons/contacts/tasks/interactions. Project paused, now resumed standalone (no monorepo). **Active direction change — read STATUS.md before doing anything else.**
+
+Headline:
+1. Docker is being dropped. Use native PostgreSQL locally. Docker Desktop is broken on this machine and won't be fixed.
+2. Stack is migrating to **Next.js App Router + Supabase**. NestJS / Vite / custom JWT auth will be retired. Prisma + the data model + the React UI stay.
+3. Track 1 (run current build natively) is blocking. Track 2 (migrate stack) starts after Track 1 verifies.
+
+See for more context: ProjectOverview.md and STATUS.md
 
 ---
+
 
 ## Business Context
 
@@ -28,17 +36,31 @@ This separation means Controllabor can be sold with the CRM as an asset, increas
 
 ## Stack
 
+**Current (what exists in this repo right now):**
+
 | Layer | Tech | Notes |
 |---|---|---|
-| Frontend | React 18 + Vite + TypeScript | SPA, no SSR needed |
-| Backend | NestJS + TypeScript | Modular, structured, scales |
-| ORM | Prisma | Schema as code, type-safe, migrations |
-| Database | PostgreSQL 15 | |
-| AI queries | Groq SDK (TypeScript) | llama-3.3-70b-versatile |
-| Auth | Better Auth | Session-based |
-| Mobile (later) | Expo (React Native) | Shared types with backend |
-| Local dev | Docker Compose | |
-| Deploy (later) | Railway/Render (backend+DB) + Vercel (frontend) | |
+| Frontend | React 18 + Vite + TypeScript | SPA, no SSR |
+| Backend | NestJS + TypeScript | Modular, DI |
+| ORM | Prisma | Schema as code, type-safe |
+| Database | PostgreSQL 18 (native install, NOT Docker) | Port 5432 — role: crm/crm, db: ndt_crm |
+| AI queries | Groq SDK | llama-3.3-70b-versatile |
+| Auth | Custom JWT + bcrypt in `AuthModule` | To be retired |
+| Local dev | `npm run start:dev` (backend) + `npm run dev` (frontend) | Docker removed |
+
+**Target (Track 2 migration, see STATUS.md):**
+
+| Layer | Tech | Notes |
+|---|---|---|
+| App framework | **Next.js App Router** | Replaces Nest + Vite split. One process, one deploy. |
+| Database | **Supabase** (managed Postgres + RLS) | No more local DB ops. RLS handles multi-tenant isolation. |
+| ORM | Prisma (kept) | Schema portable, point at Supabase connection string |
+| Auth | **Supabase Auth** | Replaces custom JWT/bcrypt |
+| AI | Groq or Claude (per feature) | Decide per feature |
+| Mobile (later) | Expo | Shares Supabase client + types |
+| Deploy | Vercel (Next.js) + Supabase (DB/auth) | |
+
+**One language everywhere: TypeScript.** No Python. ETL is TypeScript scripts.
 
 **One language everywhere: TypeScript.** No Python. ETL is TypeScript scripts.
 
@@ -197,36 +219,35 @@ Task fields that matter:
 
 ## Git Workflow
 
-- `main` — stable, always deployable. No direct commits.
-- `dev` — integration branch. Merge features here first.
-- `feature/xxx` — one branch per feature
-- `fix/xxx` — bug fixes
-- `chore/xxx` — non-functional changes
+Follow `C:\Users\Áron\workspace\VERSION_CONTROL.md` — the single source of truth across all repos. Summary:
 
-**Commit format (Conventional Commits):**
-```
-feat(companies): add VAT number deduplication
-fix(tasks): correct recurrence rule parsing
-chore(deps): update prisma to 5.10
-refactor(persons): extract contact merge logic to service
-```
-
-**PR flow:** feature → dev → (review) → main
+- `main` stable, `dev` integration, work happens on `feature/`/`fix/`/`chore/` branches.
+- Conventional Commits (`feat(scope): ...`). Commit at every logical step, not just session end.
+- Every session ends with: pushed branch + open PR (`gh pr create --base dev`) + STATUS.md log entry with PR link.
+- Self-merge to `dev` after CI green. `dev` → `main` requires Áron's review.
+- Never commit `.env`. Never commit to `main` or `dev` directly.
 
 ---
 
 ## Key Decisions — Do Not Re-Debate
 
-1. **TypeScript everywhere.** No Python. One language = one context = no switching.
-2. **NestJS over Express/Hono.** This has real business logic. Modules + DI pay off.
-3. **Prisma over raw SQL or other ORMs.** Type safety + migrations + great DX.
-4. **SPA (React + Vite) over Next.js.** CRM is a fully authenticated app. No SEO needed. SSR adds complexity with no benefit here.
-5. **Person-centric model.** Person = entity, Contact = state. Never collapse these.
-6. **VAT number as company dedup key.** Names have spelling variants. VAT numbers don't.
-7. **Interactions are append-only.** Never update, never delete. Full history preserved.
-8. **Multi-tenant from day one.** `tenant_id` on every table. Controllabor is tenant 1.
-9. **Tasks are atomic.** "Write email" and "Send email" are two tasks, not one.
-10. **Timestamps on everything.** Every state change is recorded. Non-negotiable.
+**Data & domain (permanent):**
+1. **TypeScript everywhere.** No Python. One language = one context.
+2. **Prisma over raw SQL or other ORMs.** Type safety + migrations + great DX. Survives the stack migration.
+3. **Person-centric model.** Person = entity, Contact = state. Never collapse these.
+4. **VAT number as company dedup key.** Names have spelling variants. VAT numbers don't.
+5. **Interactions are append-only.** Never update, never delete. Full history preserved.
+6. **Multi-tenant from day one.** Every table is tenant-scoped. Controllabor is tenant 1. (Will be enforced via Supabase RLS post-migration instead of `tenant_id` filters in code.)
+7. **Tasks are atomic.** "Write email" and "Send email" are two tasks, not one.
+8. **Timestamps on everything.** Every state change is recorded. Non-negotiable.
+
+**Stack (revised 2026-05-11 — were previously locked, now retired):**
+9. ~~NestJS over Express/Hono.~~ → Migrating to Next.js App Router. Rationale: standalone solo project, no monorepo, one-process deploy beats DI ergonomics here.
+10. ~~SPA (React + Vite) over Next.js.~~ → Migrating to Next.js. The "no SEO needed" argument still holds; the win is killing the backend/frontend split and getting server actions.
+11. ~~Custom auth (Better Auth / JWT).~~ → Supabase Auth. Rationale: deletes a lot of auth code; sessions + magic links out of the box.
+12. ~~Docker Compose for local dev.~~ → Native Postgres locally, Supabase remotely. Rationale: Docker Desktop is unreliable on this machine and the indirection has no payoff for a solo dev.
+
+The React frontend code, Tailwind, shadcn/ui, design tokens, and Prisma schema all carry over to the new stack. The data model does not change.
 
 ---
 
@@ -251,10 +272,10 @@ refactor(persons): extract contact merge logic to service
 | Project scaffold | ✅ Done |
 | Prisma schema | ✅ Done |
 | Docker setup | ✅ Done |
-| NestJS bootstrap | ⬜ Not started |
-| Auth | ⬜ Not started |
-| Companies module | ⬜ Not started |
-| Persons module | ⬜ Not started |
+| NestJS bootstrap | ✅ Done |
+| Auth | ✅ Done |
+| Companies module | ✅ Done |
+| Persons module | ✅ Done |
 | Tasks module | ⬜ Not started |
 | Frontend scaffold | ⬜ Not started |
 | ETL rewrite (TS) | ⬜ Not started |

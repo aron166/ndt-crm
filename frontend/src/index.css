@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 248 250 252;       /* #F8FAFC */
+    --foreground: 15 23 42;          /* #0F172A */
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
+    --primary: 67 56 202;            /* #4338CA indigo-700 */
+    --primary-foreground: 255 255 255;
+    --secondary: 241 245 249;        /* slate-100 */
+    --secondary-foreground: 15 23 42;
+    --muted: 241 245 249;
+    --muted-foreground: 100 116 139; /* slate-500 */
+    --accent: 238 242 255;           /* indigo-50 */
+    --accent-foreground: 67 56 202;
+    --destructive: 220 38 38;
+    --destructive-foreground: 255 255 255;
+    --border: 226 232 240;           /* slate-200 */
+    --input: 226 232 240;
+    --ring: 67 56 202;
+    --radius: 0.375rem;              /* 6px */
+  }
+
+  html {
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans;
+  }
+}
