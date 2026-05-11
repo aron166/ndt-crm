@@ -13,32 +13,28 @@
 
 **Two parallel tracks, in order:**
 
-### Track 1 — Get current build running locally (TODAY, blocking)
-Docker Desktop is broken on this machine (WSL kernel crash on bootstrap, `0xc00000fd`). We are dropping Docker entirely. Backend (NestJS) and frontend (Vite) already run natively with `npm run dev` — only the DB needs replacing.
+### Track 1 — ✅ DONE (2026-05-11)
+Native PostgreSQL 18 installed (port 5432, role `crm`/`crm`, db `ndt_crm`), migrations applied, seed ran, backend started clean, login confirmed, Docker artifacts deleted. The current NestJS + Vite stack is fully runnable locally.
 
-**Steps:**
-1. Install native PostgreSQL 15 for Windows (port 5434, or 5432 with `.env` update)
-2. Create role `crm`/`crm` + database `ndt_crm`
-3. `cd backend && npx prisma migrate deploy && npx prisma db seed`
-4. Confirm `npm run start:dev` (backend) + `npm run dev` (frontend) come up
-5. Log in at http://localhost:5173 with `admin@controllabor.hu` / `admin1234`
-6. Delete `docker-compose.yml`, `backend/Dockerfile.dev`, `frontend/Dockerfile.dev` once verified working
-7. Update root CLAUDE.md "Local dev" row from Docker → native Postgres
+### Track 2 — Migrate to Next.js + Supabase, **deliver features while migrating**
 
-### Track 2 — Migrate stack to Next.js + Supabase (after Track 1 verified)
-The original Nest + self-hosted Postgres + JWT auth choice was correct for a monorepo plan that no longer applies. For a standalone, solo-maintained product the friction is no longer worth it. New target stack:
+**Important reframe (2026-05-11):** Don't migrate first and add features after — that doubles the work. Migrate module-by-module, and bake each missing UI piece into the corresponding migration step. Every step ships a usable, daily-usable improvement to the CRM, not just a refactor.
+
+**Goal of the CRM after this track:** A working operational tool Áron + Péter use daily — logging calls, tracking companies, managing tasks across the *whole portfolio* (NDT + every other Uphill Trade product). See `memory/ndt-crm-ecosystem-role.md` for the ecosystem-hub framing.
+
+**Target stack:**
 
 | Layer | From | To | Why |
 |---|---|---|---|
 | App framework | NestJS backend + Vite frontend (2 processes) | **Next.js App Router** (1 process) | Server actions kill REST boilerplate. One deploy. No CORS. |
-| Database | Self-hosted Postgres (Docker/native) | **Supabase** (managed Postgres + RLS) | Kills local DB ops forever. Free tier sufficient. RLS gives us multi-tenant isolation cheaply. |
-| Auth | Custom JWT + bcrypt in `AuthModule` | **Supabase Auth** | Deletes ~hundreds of lines of auth code. Session + magic link out of the box. |
+| Database | Native Postgres (local only) | **Supabase** (managed Postgres + RLS) | Kills local DB ops. Free tier sufficient. RLS handles multi-tenant isolation. |
+| Auth | Custom JWT + bcrypt in `AuthModule` | **Supabase Auth** | Deletes auth code. Session + magic link out of the box. |
 | ORM | Prisma | **Keep Prisma** (point at Supabase Postgres) | Schema is good. Migrations are good. Portable. |
 | AI | Groq llama-3.3-70b | Keep — or swap to Claude per-feature | Decide per feature. |
 
-**What does NOT change:** the data model (Person ≠ Contact, atomic tasks, append-only interactions, timestamps everywhere), the React + Tailwind + shadcn frontend, TypeScript everywhere.
+**What does NOT change:** data model (Person ≠ Contact, atomic tasks, append-only interactions, timestamps everywhere), the React + Tailwind + shadcn UI, TypeScript everywhere.
 
-**Effort estimate:** 3–5 focused days. Schema port is mechanical. Bulk is Nest controllers → Next route handlers / server actions, and JWT → Supabase Auth.
+**Effort estimate:** 5–7 focused days end-to-end. After ~day 2 the CRM is usable for daily company/person lookups. After ~day 4 it's usable for the full call-logging + task workflow. New features ship continuously during the rewrite, not after.
 
 ---
 
@@ -106,18 +102,39 @@ Both need to be re-applied against Supabase Postgres after Track 2 starts.
 
 ---
 
-## Open Tasks (priority order)
+## Open Tasks (priority order — Track 2 with embedded feature delivery)
 
-1. **[Áron]** ✅ Install PostgreSQL 18 for Windows (port 5432)
-2. **[Nate]** ✅ Create `crm` role + `ndt_crm` DB, run `prisma migrate deploy`, run seed
-3. **[Nate]** ✅ Backend starts clean — login confirmed working (NestApplication started log)
-4. **[Nate]** ✅ Delete Docker artifacts (`docker-compose.yml`, `backend/Dockerfile.dev`)
-5. **[Nate]** ✅ Updated root `CLAUDE.md` stack table + all `.env` files to port 5432
-6. **[Áron]** Create Supabase project (free tier), share connection string + anon key via `.env`
-7. **[Nate]** Scaffold Next.js app in new directory (e.g., `web/`) inside this same repo. Port Prisma schema. Wire Supabase client.
-8. **[Nate]** Port Companies module end-to-end as proof: list + detail page, server actions for CRUD, Supabase Auth gate.
-9. **[Nate]** After proof works → port Persons, Contacts, Tasks, Interactions in that order.
-10. **[Nate]** Then resume Quote feature Phase 2.5 on the new stack.
+### Setup
+1. **[Áron]** ✅ Install PostgreSQL 18 for Windows (port 5432) — done
+2. **[Nate]** ✅ Track 1 (DB + verify current build) — done
+3. **[Áron]** Create Supabase project (free tier), share connection string + anon key via `.env`. Service role key for admin client too.
+4. **[Nate]** Scaffold Next.js App Router app in `web/` inside this repo. Wire `@supabase/ssr` client + server-side auth helpers. Port Prisma schema (untouched) and point `DATABASE_URL` at the Supabase Postgres. Run `prisma migrate deploy` against Supabase.
+
+### Migration + Feature Delivery (each step ships usable value)
+
+5. **[Nate] Step 1 — Companies + Persons migration (no new features yet).**
+   Port the list pages, detail pages, and CRUD as server actions. Replace AuthContext with Supabase Auth (login page + protected layout). Acceptance: Áron can log in, browse all 2300+ companies and persons, and the old Vite SPA can be retired for these flows. **Outcome: CRM is browsable on the new stack.**
+
+6. **[Nate] Step 2 — Tasks page (NEW feature, on new stack).**
+   Port the tasks API to server actions. Build the Tasks page from scratch in Next.js: create/edit/complete tasks, due dates, assignee, estimated vs actual minutes, subtask hierarchy, recurrence. Add a "+ Task" button visible from anywhere (universal create, Pipedrive-style). Acceptance: Áron + Péter can manage their daily task list end-to-end. **Outcome: core workflow tool is live.**
+
+7. **[Nate] Step 3 — Interactions logging UI (NEW feature, on new stack).**
+   Port interactions API. Add a "Log a call / email / meeting / site visit" button on Company detail and Person detail pages. Modal form: type, subject, body, timestamp (default now), participants. Append-only — never edit or delete. Existing migrated interactions show in a timeline. Acceptance: Péter can log a phone call in <15 seconds from a company page. **Outcome: daily call logging works.**
+
+8. **[Nate] Step 4 — Deals pipeline (NEW feature, Pipedrive-inspired).**
+   Port `deals` table to UI. Kanban view: columns = stages, cards = deals, drag to advance stage. Each card shows company, value (HUF), days in stage, next-activity icon. **"No next activity" warning** — deals with no open task turn red. Acceptance: Áron + Péter can see the whole sales pipeline at a glance and the system enforces "every active deal has a next action." **Outcome: sales discipline tool is live.**
+
+9. **[Nate] Step 5 — Ecosystem hub schema + ingestion API (NEW capability).**
+   Add new tables to Prisma schema (one migration): `conversations` (id, tenant_id, agent_id, person_id?, channel, started_at, ended_at), `messages` (conversation_id, role, content, created_at), `agents` (id, name, role, owner), `app_events` (source_app, event_type, payload, created_at). Build `POST /api/events` and `POST /api/conversations` route handlers with service-key auth so VeloQuote, CashFlow, and the agent team can write into the CRM. Surface conversation logs in the Person detail timeline. Acceptance: VeloQuote can post a quote-created event and it shows up in the company's activity feed. **Outcome: the CRM is now the central ledger for the whole portfolio.**
+
+10. **[Nate] Step 6 — Resume Quote Phase 2.5 on the new stack.**
+   Schema: `price_catalog`, `intake_submissions`, `quotes`, `quote_line_items`. Public intake page at `/intake` (no auth). Original roadmap continues.
+
+### Working agreement
+- Every step gets its own `feature/<step-name>` branch.
+- Every step ends with: PR to `dev`, STATUS.md log entry with PR link, self-merge after typecheck passes.
+- Do not start Step N+1 until Step N is merged to `dev` and verified working in Áron's local browser.
+- Follow `C:\Users\Áron\workspace\VERSION_CONTROL.md` — non-negotiable.
 
 ---
 
@@ -136,3 +153,6 @@ Both need to be re-applied against Supabase Postgres after Track 2 starts.
 | 2026-05-11 | direction | Project resumed. Standalone repo (no monorepo). Drop Docker. Plan migration to Next.js + Supabase. | Track 1: native Postgres install + verify current build runs |
 | 2026-05-11 | track-1 | Track 1 complete: crm role + ndt_crm DB created, both migrations applied, seed ran (Tenant 1 + admin user), backend started clean, Docker artifacts deleted, all .env files updated to port 5432. | Track 2: scaffold Next.js app, port Prisma schema, wire Supabase client |
 | 2026-05-11 | etl | Rewrote ETL to read directly from xlsx files (no source DB / Docker needed). Migrated: 1696 companies, 209 proposals, 663 interactions, 2016 invoices. Source: 20240125_accounts.xlsx + 20250228_CLIENTS.xlsx for pipeline status. npm run migrate:reset to re-run. | ETL complete for now — Docker dependency permanently eliminated |
+| 2026-05-11 | track-2 | Scaffolded web/ (Next.js App Router + shadcn + Prisma 7 + Supabase packages). Supabase project live (ref ortqjkzoghrkzypmlvbb, eu-central-1). Blocked: pooler returns "Tenant or user not found" on all connection attempts. Direct host is IPv6-only (unreachable). Next: copy exact connection string from Supabase dashboard (Project Settings → Database → URI → Transaction mode) and retry prisma migrate deploy. |
+| 2026-05-12 | track-2 | Unblocked Supabase connection. Root causes: wrong pooler region (aws-0 → aws-1), stale password, Prisma URL parser truncating username at dot (fix: %2E encoding), Prisma 7 config not loading .env (fix: explicit dotenv in prisma.config.ts). Both migrations applied to Supabase, Prisma client generated. Next: Step 1 — port Companies + Persons to Next.js App Router + wire Supabase Auth. |
+| 2026-05-12 | step-1 | Step 1 complete. Built full Next.js App Router shell: Supabase magic-link auth (login page + proxy.ts + auth/callback), AppShell with collapsible sidebar + topbar, Companies list + detail (tabs: contacts, interactions), Persons list + detail (employment timeline + interactions). ETL retargeted to Supabase: 1696 companies, 2016 invoices, 663 interactions loaded. Server runs clean on localhost:3000. Next: Step 2 — Tasks page (create/edit/complete, universal + Task button). |
