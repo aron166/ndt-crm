@@ -9,6 +9,7 @@ import {
   TabsContent,
 } from "@/components/ui/tabs";
 import { ArrowLeft, Mail, Phone } from "lucide-react";
+import { LogInteractionButton } from "@/components/LogInteractionButton";
 
 const TENANT_ID = 1;
 
@@ -75,6 +76,14 @@ export default async function PersonDetailPage({
                 </Link>
               </p>
             )}
+            <div className="mt-3 mb-1">
+              <LogInteractionButton
+                personId={person.id}
+                companyId={currentContact?.companyId}
+                personName={`${person.lastName} ${person.firstName}`}
+                companyName={currentContact?.company.name}
+              />
+            </div>
             <div className="flex flex-wrap gap-4 mt-3">
               {(person.email || currentContact?.email) && (
                 <a
