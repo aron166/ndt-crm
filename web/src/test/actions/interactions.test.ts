@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateInteractionInput } from "@/app/actions/interactions";
+import { validateInteractionInput } from "@/lib/interactions";
 
 describe("validateInteractionInput", () => {
   const valid = {
@@ -13,30 +13,18 @@ describe("validateInteractionInput", () => {
   });
 
   it("requires type", () => {
-    expect(validateInteractionInput({ ...valid, type: "" })).toBe(
-      "Típus kötelező"
-    );
-    expect(validateInteractionInput({ ...valid, type: undefined })).toBe(
-      "Típus kötelező"
-    );
+    expect(validateInteractionInput({ ...valid, type: "" })).toBe("Típus kötelező");
+    expect(validateInteractionInput({ ...valid, type: undefined })).toBe("Típus kötelező");
   });
 
   it("requires notes", () => {
-    expect(validateInteractionInput({ ...valid, notes: "" })).toBe(
-      "Megjegyzés kötelező"
-    );
-    expect(validateInteractionInput({ ...valid, notes: "   " })).toBe(
-      "Megjegyzés kötelező"
-    );
+    expect(validateInteractionInput({ ...valid, notes: "" })).toBe("Megjegyzés kötelező");
+    expect(validateInteractionInput({ ...valid, notes: "   " })).toBe("Megjegyzés kötelező");
   });
 
   it("requires occurredAt", () => {
-    expect(validateInteractionInput({ ...valid, occurredAt: "" })).toBe(
-      "Dátum kötelező"
-    );
-    expect(validateInteractionInput({ ...valid, occurredAt: undefined })).toBe(
-      "Dátum kötelező"
-    );
+    expect(validateInteractionInput({ ...valid, occurredAt: "" })).toBe("Dátum kötelező");
+    expect(validateInteractionInput({ ...valid, occurredAt: undefined })).toBe("Dátum kötelező");
   });
 
   it("accepts optional direction and outcome", () => {

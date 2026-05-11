@@ -2,25 +2,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-
-const TENANT_ID = 1;
-
-export interface LogInteractionInput {
-  type: string;
-  direction: string;
-  notes: string;
-  outcome: string;
-  occurredAt: string;
-  companyId?: number | null;
-  personId?: number | null;
-}
-
-export function validateInteractionInput(input: Partial<LogInteractionInput>): string | null {
-  if (!input.type?.trim()) return "Típus kötelező";
-  if (!input.notes?.trim()) return "Megjegyzés kötelező";
-  if (!input.occurredAt) return "Dátum kötelező";
-  return null;
-}
+import { validateInteractionInput } from "@/lib/interactions";
 
 export async function logInteraction(formData: FormData) {
   const type = formData.get("type") as string;
@@ -39,7 +21,7 @@ export async function logInteraction(formData: FormData) {
 
   await db.interaction.create({
     data: {
-      tenantId: TENANT_ID,
+      tenantId: 1,
       type,
       direction,
       notes: notes.trim(),
@@ -52,11 +34,8 @@ export async function logInteraction(formData: FormData) {
 
   if (companyId) {
     await db.company.updateMany({
-      where: { id: companyId, tenantId: TENANT_ID },
-      data: {
-        lastInteractionDate: new Date(occurredAt),
-        updatedAt: new Date(),
-      },
+      where: { id: companyId, tenantId: 1 },
+      data: { lastInteractionDate: new Date(occurredAt), updatedAt: new Date() },
     });
     revalidatePath(`/companies/${companyId}`);
   }
