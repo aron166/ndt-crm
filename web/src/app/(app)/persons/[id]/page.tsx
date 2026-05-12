@@ -54,7 +54,7 @@ export default async function PersonDetailPage({
     }).length;
   }).reverse();
   // Smooth with a floor so the line is never flat zero
-  const engagementSeries = buckets.map((v, i) => v + 5 + Math.sin(i * 0.4) * 2);
+  const engagementSeries = buckets;
 
   // Signal level based on recent interaction frequency
   const last30 = interactions.filter((x) => now - new Date(x.occurredAt).getTime() < 30 * 24 * 3600 * 1000).length;

@@ -69,9 +69,9 @@ export function PersonDetailClient({
     : "Hideg — 90+ nap inaktivitás";
 
   const TABS = [
-    { key: "activity", label: "Activity", count: interactions.length },
-    { key: "career",   label: "Career",   count: contacts.length },
-    { key: "tasks",    label: "Tasks",    count: tasks.filter(t => t.status !== "done").length },
+    { key: "activity", label: "Interakciók", count: interactions.length },
+    { key: "career",   label: "Karrierút",   count: contacts.length },
+    { key: "tasks",    label: "Feladatok",   count: tasks.filter(t => t.status !== "done").length },
   ];
 
   return (
@@ -172,7 +172,7 @@ export function PersonDetailClient({
           display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16, alignItems: "center",
         }}>
           <div>
-            <div className="field-label">Engagement · last 24 weeks</div>
+            <div className="field-label">Aktivitás · elmúlt 24 hét</div>
             <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
               <div>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 20, color: "var(--fg)" }}>{interactions.length}</div>
@@ -256,7 +256,7 @@ export function PersonDetailClient({
               <div className="panel mount">
                 <div style={{ padding: "22px 24px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                    <span className="h-section" style={{ margin: 0 }}>Career path</span>
+                    <span className="h-section" style={{ margin: 0 }}>Karrierút</span>
                     <span style={{ fontSize: 11, color: "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>
                       {contacts.length} munkahely
                     </span>
@@ -309,7 +309,7 @@ export function PersonDetailClient({
             {/* Current employer */}
             {currentContact && (
               <div className="panel mount">
-                <div className="panel-head"><div className="panel-title">Current employer</div></div>
+                <div className="panel-head"><div className="panel-title">Jelenlegi munkahely</div></div>
                 <div className="panel-pad">
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{
