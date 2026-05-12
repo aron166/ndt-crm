@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
-import { LogOut, User, Plus, Bell, Search } from "lucide-react";
+import { DealModal } from "@/app/(app)/deals/DealModal";
+import { LogOut, User, Plus, Bell, Search, ChevronDown } from "lucide-react";
 
 // ── Breadcrumb labels ─────────────────────────────────────────
 const CRUMB: Record<string, string> = {
@@ -58,16 +59,24 @@ function SignalBars() {
   );
 }
 
+interface PipelineStub {
+  id: number;
+  stages: { id: number; name: string; color: string; isTerminalWon: boolean; isTerminalLost: boolean; probability: number; position: number }[];
+}
+
 interface TopbarProps {
   collapsed: boolean;
   email: string;
+  defaultPipeline: PipelineStub | null;
 }
 
-export function Topbar({ collapsed, email }: TopbarProps) {
+export function Topbar({ collapsed, email, defaultPipeline }: TopbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const crumbs = useCrumb(pathname);
   const [taskOpen, setTaskOpen] = useState(false);
+  const [dealOpen, setDealOpen] = useState(false);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -80,10 +89,14 @@ export function Topbar({ collapsed, email }: TopbarProps) {
 
   return (
     <>
-      <TaskModal
-        open={taskOpen}
-        onClose={() => { setTaskOpen(false); router.refresh(); }}
-      />
+      <TaskModal open={taskOpen} onClose={() => { setTaskOpen(false); router.refresh(); }} />
+      {defaultPipeline && (
+        <DealModal
+          open={dealOpen}
+          onClose={() => { setDealOpen(false); router.refresh(); }}
+          pipeline={defaultPipeline}
+        />
+      )}
 
       <header
         className="fixed top-0 right-0 z-20 flex items-center gap-4 px-6 transition-all duration-200"
@@ -164,24 +177,42 @@ export function Topbar({ collapsed, email }: TopbarProps) {
             <Bell className="size-4" />
           </button>
 
-          {/* + New */}
-          <button
-            onClick={() => setTaskOpen(true)}
-            className="flex items-center gap-1.5 rounded font-medium transition-all"
-            style={{
-              height: 32, padding: "0 12px",
-              fontSize: 13,
-              background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
-              color: "white",
-              boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6)",
-              border: "1px solid var(--indigo-dim)",
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
-            onMouseOut={(e) => (e.currentTarget.style.filter = "none")}
-          >
-            <Plus className="size-3.5" />
-            Új
-          </button>
+          {/* + New split button */}
+          <div className="flex items-stretch" style={{ borderRadius: 6, overflow: "hidden" }}>
+            <button
+              onClick={() => setTaskOpen(true)}
+              className="flex items-center gap-1.5 font-medium transition-all"
+              style={{
+                height: 32, padding: "0 12px", fontSize: 13,
+                background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
+                color: "white", border: "1px solid var(--indigo-dim)",
+                borderRight: "none", borderRadius: "6px 0 0 6px",
+                boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6)",
+              }}
+              onMouseOver={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
+              onMouseOut={(e) => (e.currentTarget.style.filter = "none")}
+            >
+              <Plus className="size-3.5" />
+              Feladat
+            </button>
+            <div style={{ width: 1, background: "oklch(0.56 0.18 278)" }} />
+            <button
+              onClick={() => defaultPipeline ? setDealOpen(true) : router.push("/deals/setup")}
+              className="flex items-center gap-1 font-medium transition-all"
+              style={{
+                height: 32, padding: "0 8px", fontSize: 13,
+                background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
+                color: "white", border: "1px solid var(--indigo-dim)",
+                borderLeft: "none", borderRadius: "0 6px 6px 0",
+                boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6)",
+              }}
+              title="Új deal"
+              onMouseOver={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
+              onMouseOut={(e) => (e.currentTarget.style.filter = "none")}
+            >
+              Deal
+            </button>
+          </div>
 
           {/* User menu */}
           <DropdownMenu>
