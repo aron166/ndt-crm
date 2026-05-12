@@ -81,18 +81,16 @@ export default async function TasksPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Feladatok</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+      <div className="flex items-center justify-between mb-5">
+        <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
+          Feladatok
+          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", fontWeight: 400 }}>
             {openCount} nyitott
             {overdueCount > 0 && (
-              <span className="ml-2 text-red-600 font-medium">
-                · {overdueCount} lejárt ⚠
-              </span>
+              <span style={{ color: "var(--coral)", marginLeft: 6 }}>· {overdueCount} lejárt</span>
             )}
-          </p>
-        </div>
+          </span>
+        </h1>
         <div className="flex items-center gap-2">
           <ViewToggle view={view} statusFilter={statusFilter} dueFilter={dueFilter} />
           <NewTaskButton />
@@ -101,8 +99,8 @@ export default async function TasksPage({
 
       {view === "list" && (
         <>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-0.5" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: 2 }}>
               {[
                 { key: "open", label: "Nyitott" },
                 { key: "done", label: "Kész" },
@@ -111,18 +109,19 @@ export default async function TasksPage({
                 <Link
                   key={key}
                   href={`/tasks?status=${key}&due=${dueFilter}&view=list`}
-                  className={`px-3 py-1 rounded-md text-sm transition-colors ${
-                    statusFilter === key
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
+                  className="font-mono-ndt rounded"
+                  style={{
+                    fontSize: 11, padding: "3px 10px",
+                    background: statusFilter === key ? "var(--bg-hover)" : "transparent",
+                    color: statusFilter === key ? "var(--fg)" : "var(--fg-mute)",
+                  }}
                 >
                   {label}
                 </Link>
               ))}
             </div>
 
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
+            <div className="flex items-center gap-0.5" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: 2 }}>
               {[
                 { key: "all",     label: "Összes" },
                 { key: "overdue", label: "Lejárt" },
@@ -132,11 +131,12 @@ export default async function TasksPage({
                 <Link
                   key={key}
                   href={`/tasks?status=${statusFilter}&due=${key}&view=list`}
-                  className={`px-3 py-1 rounded-md text-sm transition-colors ${
-                    dueFilter === key
-                      ? "bg-slate-900 text-white"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
+                  className="font-mono-ndt rounded"
+                  style={{
+                    fontSize: 11, padding: "3px 10px",
+                    background: dueFilter === key ? "var(--bg-hover)" : "transparent",
+                    color: dueFilter === key ? "var(--fg)" : "var(--fg-mute)",
+                  }}
                 >
                   {label}
                 </Link>
