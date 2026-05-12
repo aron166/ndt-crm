@@ -13,6 +13,8 @@ interface SearchParams {
   page?: string;
   fa?: string;
   tag?: string;
+  never_contacted?: string;
+  pipeline_status?: string;
 }
 
 // deterministic avatar color per company id
@@ -34,6 +36,8 @@ export default async function CompaniesPage({
   const page = Math.max(1, parseInt(params.page ?? "1", 10));
   const includeFA = params.fa === "1";
   const tagName = params.tag?.trim() ?? "";
+  const neverContacted = params.never_contacted === "1";
+  const pipelineStatus = params.pipeline_status?.trim() ?? "";
 
   let tagFilterIds: number[] | undefined;
   if (tagName) {
@@ -47,6 +51,8 @@ export default async function CompaniesPage({
   const where = {
     tenantId: TENANT_ID,
     ...(tagFilterIds !== undefined ? { id: { in: tagFilterIds } } : {}),
+    ...(neverContacted ? { lastInteractionDate: null } : {}),
+    ...(pipelineStatus ? { pipelineStatus } : {}),
     ...(search
       ? {
           OR: [
@@ -71,8 +77,23 @@ export default async function CompaniesPage({
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  const PIPELINE_LABELS: Record<string, string> = {
+    "0": "KUKA", "1": "Nem hívtuk", "2": "Hívtuk - nem válasz",
+    "3": "Hívtuk - érdekli", "4": "Hívtuk - nem kell", "5": "Hívtuk - kéri",
+    "6": "Függőben", "7": "Lezárt elveszett", "8": "Lezárt nyert",
+  };
+
   return (
     <div className="mount">
+      {/* Drill-through filter banner */}
+      {(neverContacted || pipelineStatus) && (
+        <div className="mount mb-4 flex items-center gap-2 rounded-lg" style={{ padding: "8px 14px", background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", fontSize: 12, color: "var(--fg-soft)" }}>
+          <span style={{ color: "var(--indigo)" }}>Szűrő aktív:</span>
+          {neverContacted && <span className="font-mono-ndt" style={{ color: "var(--amber)" }}>Soha nem kontaktált</span>}
+          {pipelineStatus && <span className="font-mono-ndt" style={{ color: "var(--sky)" }}>Pipeline: {PIPELINE_LABELS[pipelineStatus] ?? pipelineStatus}</span>}
+          <Link href="/companies" style={{ marginLeft: "auto", color: "var(--fg-faint)" }}>Szűrő törlése ×</Link>
+        </div>
+      )}
       {/* Page header */}
       <div className="flex items-end justify-between gap-4 mb-6">
         <div>

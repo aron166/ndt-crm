@@ -30,13 +30,13 @@ export function AnalyticsClient({
   const monthSeries = revenueByMonth.map((r) => r.total / 1_000_000);
   const monthLabels = revenueByMonth.map((r) => r.month.slice(2));
 
-  const entityLinks = [
-    { label: "Összes cég",                href: "/companies",   count: totalCompanies.toLocaleString("hu-HU") },
-    { label: "Soha nem kontaktált",        href: "/companies",   count: neverContacted.toLocaleString("hu-HU") },
-    { label: "Összes személy",            href: "/persons",     count: totalPersons.toLocaleString("hu-HU") },
-    { label: "Nyitott feladatok",         href: "/tasks",       count: openTasks > 0 ? openTasks.toLocaleString("hu-HU") : "—" },
-    { label: "Aktív dealek",             href: "/deals",       count: openDeals > 0 ? openDeals.toLocaleString("hu-HU") : "—" },
-    { label: "Pipeline beállítás",        href: "/deals/setup", count: "→" },
+  const entityLinks: { label: string; href: string; count: string; accent?: string }[] = [
+    { label: "Összes cég",                href: "/companies",                   count: totalCompanies.toLocaleString("hu-HU") },
+    { label: "Soha nem kontaktált",       href: "/companies?never_contacted=1", count: neverContacted.toLocaleString("hu-HU"), accent: "var(--amber)" },
+    { label: "Összes személy",            href: "/persons",                     count: totalPersons.toLocaleString("hu-HU") },
+    { label: "Nyitott feladatok",         href: "/tasks?status=open",           count: openTasks > 0 ? openTasks.toLocaleString("hu-HU") : "—" },
+    { label: "Aktív dealek",             href: "/deals",                       count: openDeals > 0 ? openDeals.toLocaleString("hu-HU") : "—" },
+    { label: "Összes számla",            href: "/analytics/invoices",          count: "→", accent: "var(--mint)" },
   ];
 
   return (
@@ -91,7 +91,7 @@ export function AnalyticsClient({
           </div>
           <div style={{ padding: 20 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {entityLinks.map(({ label, href, count }) => (
+              {entityLinks.map(({ label, href, count, accent }) => (
                 <a
                   key={label}
                   href={href}
@@ -107,12 +107,9 @@ export function AnalyticsClient({
                   onMouseOut={(e) => { e.currentTarget.style.borderColor = "var(--line-soft)"; e.currentTarget.style.background = "var(--bg-0)"; }}
                 >
                   <span>{label}</span>
-                  <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--indigo)" }}>{count}</span>
+                  <span className="font-mono-ndt" style={{ fontSize: 11, color: accent ?? "var(--indigo)" }}>{count}</span>
                 </a>
               ))}
-            </div>
-            <div style={{ marginTop: 20, padding: 16, border: "1px dashed var(--line-soft)", borderRadius: 8, fontSize: 12, color: "var(--fg-faint)", textAlign: "center" }}>
-              Hamarosan: egyéni lekérdezés-készítő, exportálás CSV-be, mentett nézetek
             </div>
           </div>
         </div>

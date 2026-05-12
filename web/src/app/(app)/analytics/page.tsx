@@ -188,7 +188,10 @@ export default async function AnalyticsPage({
           <div className="k-label">Cégek</div>
           <div className="k-value font-mono-ndt">{totalCompanies.toLocaleString("hu-HU")}</div>
           <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>
-            {contacted.toLocaleString("hu-HU")} érintett · {neverContacted.toLocaleString("hu-HU")} soha
+            {contacted.toLocaleString("hu-HU")} érintett ·{" "}
+            <Link href="/companies?never_contacted=1" style={{ color: "var(--amber)", textDecoration: "none" }} onClick={(e) => e.stopPropagation()}>
+              {neverContacted.toLocaleString("hu-HU")} soha
+            </Link>
           </div>
           <div className="k-spark">
             <Sparkline data={pipelineItems.map((p) => p.count)} width={80} height={28} color="var(--indigo)" />
@@ -203,7 +206,7 @@ export default async function AnalyticsPage({
           </div>
         </Link>
 
-        <div className="kpi" style={{ "--accent": "var(--mint)" } as React.CSSProperties}>
+        <Link href="/analytics/invoices" className="kpi" style={{ "--accent": "var(--mint)" } as React.CSSProperties}>
           <div className="k-label">Összbevétel (HUF)</div>
           <div className="k-value font-mono-ndt" style={{ fontSize: 22 }}>
             {(totalRevenue / 1_000_000).toFixed(1)}M
@@ -212,7 +215,7 @@ export default async function AnalyticsPage({
           <div className="k-spark">
             <Sparkline data={revenueSeries.slice(-12)} width={80} height={28} color="var(--mint)" />
           </div>
-        </div>
+        </Link>
 
         <Link href={`/analytics?range=${range}#interactions`} className="kpi" style={{ "--accent": "var(--amber)" } as React.CSSProperties}>
           <div className="k-label">Interakciók ({range.toUpperCase()})</div>
@@ -271,12 +274,17 @@ export default async function AnalyticsPage({
           <AreaChart data={revenueSeries} height={200} color="var(--indigo)" />
           <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}>
             {revenueByYear.map((r) => (
-              <div key={r.year} style={{ textAlign: "center", flexShrink: 0, minWidth: 44 }}>
+              <Link
+                key={r.year}
+                href={`/analytics/invoices?year=${r.year}`}
+                style={{ textAlign: "center", flexShrink: 0, minWidth: 44, textDecoration: "none" }}
+                title={`Számlák: ${r.year}`}
+              >
                 <div className="font-mono-ndt" style={{ fontSize: 11, color: "var(--mint)", fontWeight: 500 }}>
                   {(r.total / 1_000_000).toFixed(0)}M
                 </div>
                 <div style={{ fontSize: 10, color: "var(--fg-faint)" }}>{r.year}</div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
