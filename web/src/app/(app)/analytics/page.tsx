@@ -48,6 +48,7 @@ export default async function AnalyticsPage({
     neverContacted,
     recentInteractions,
     openTasks,
+    openDeals,
     pipelineDistribution,
   ] = await Promise.all([
     db.company.count({ where: { tenantId: TENANT_ID } }),
@@ -66,6 +67,12 @@ export default async function AnalyticsPage({
         tenantId: TENANT_ID,
         status: { in: ["created", "in_progress"] },
         parentTaskId: null,
+      },
+    }),
+    db.deal.count({
+      where: {
+        tenantId: TENANT_ID,
+        stage: { isTerminalWon: false, isTerminalLost: false },
       },
     }),
     db.$queryRaw<{ status: string | null; count: bigint }[]>`
@@ -175,8 +182,8 @@ export default async function AnalyticsPage({
         </div>
       </div>
 
-      {/* KPI Strip */}
-      <div className="kpi-grid mount mount-1">
+      {/* KPI Strip — inline grid so no missing CSS class dependency */}
+      <div className="mount mount-1" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
         <Link href="/companies" className="kpi" style={{ "--accent": "var(--indigo)" } as React.CSSProperties}>
           <div className="k-label">Cégek</div>
           <div className="k-value font-mono-ndt">{totalCompanies.toLocaleString("hu-HU")}</div>
@@ -356,6 +363,11 @@ export default async function AnalyticsPage({
       {/* Data explorer — client-side filterable tables */}
       <AnalyticsClient
         revenueByMonth={serializeDates(revenueByMonth)}
+        totalCompanies={totalCompanies}
+        totalPersons={totalPersons}
+        neverContacted={neverContacted}
+        openTasks={openTasks}
+        openDeals={openDeals}
       />
     </div>
   );
