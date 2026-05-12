@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Sparkline } from "@/components/viz/Sparkline";
 import { SignalMeter } from "@/components/viz/SignalMeter";
 import { LogInteractionButton } from "@/components/LogInteractionButton";
-import { EntityTags } from "@/components/tags/EntityTags";
+import { TagInput } from "@/components/tags/TagInput";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { AuditLogTab } from "@/components/AuditLogTab";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
@@ -52,11 +52,12 @@ interface Props {
   signalLevel: number;
   avatarColor: string;
   initials: string;
+  initialTags: { id: number; name: string; color: string }[];
 }
 
 export function PersonDetailClient({
   person, contacts, interactions, tasks,
-  engagementSeries, signalLevel, avatarColor, initials,
+  engagementSeries, signalLevel, avatarColor, initials, initialTags,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("activity");
@@ -192,7 +193,7 @@ export function PersonDetailClient({
 
         {/* Tags */}
         <div style={{ marginTop: 14 }}>
-          <EntityTags type="person" id={person.id} />
+          <TagInput taggableType="person" taggableId={person.id} initialTags={initialTags} />
         </div>
       </div>
 
