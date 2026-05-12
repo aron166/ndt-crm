@@ -258,10 +258,10 @@
 
 /* Animations */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0);   filter: blur(0);   }
 }
-.mount   { animation: fadeUp 0.30s cubic-bezier(.2,.7,.2,1) both; }
+.mount   { animation: fadeUp 0.40s cubic-bezier(0.32, 0.72, 0, 1) both; }
 .mount-1 { animation-delay: 0.05s; }
 .mount-2 { animation-delay: 0.10s; }
 .mount-3 { animation-delay: 0.15s; }
@@ -338,18 +338,22 @@
   border: 1px solid var(--line);
   background: var(--bg-1);
   color: var(--fg);
-  transition: all 0.15s;
+  /* Spring-curve easing — no linear/ease-in-out */
+  transition: all 280ms cubic-bezier(0.32, 0.72, 0, 1);
   white-space: nowrap;
   cursor: pointer;
+  will-change: transform;
 }
-.btn:hover { background: var(--bg-2); border-color: var(--line-strong); }
+.btn:hover { background: var(--bg-2); border-color: var(--line-strong); transform: translateY(-1px); }
+/* Tactile feedback: physical push on :active */
+.btn:active { transform: translateY(0) scale(0.98); transition-duration: 80ms; }
 .btn.primary {
   background: linear-gradient(180deg, oklch(0.66 0.19 278), oklch(0.56 0.18 278));
   border-color: oklch(0.56 0.18 278);
   color: white;
   box-shadow: 0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6);
 }
-.btn.primary:hover { filter: brightness(1.08); }
+.btn.primary:hover { filter: brightness(1.1); box-shadow: 0 0 0 1px oklch(0.66 0.19 278 / 0.5), 0 6px 20px -4px oklch(0.66 0.19 278 / 0.7); }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--fg-soft); }
 .btn.ghost:hover { background: var(--bg-1); color: var(--fg); }
 .btn.sm { height: 26px; padding: 0 10px; font-size: 12px; }
@@ -359,6 +363,8 @@
   border: 1px solid var(--line-soft);
   border-radius: var(--r-md);
   position: relative;
+  /* Inner top-edge highlight — simulates physical panel depth */
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.06);
 }
 .panel-pad { padding: 20px; }
 .panel-head {

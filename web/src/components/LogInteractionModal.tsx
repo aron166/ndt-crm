@@ -21,11 +21,11 @@ import {
 import { logInteraction } from "@/app/actions/interactions";
 
 const TYPES = [
-  { value: "call", label: "📞 Telefonhívás" },
-  { value: "email", label: "✉️ Email" },
-  { value: "meeting", label: "🤝 Találkozó" },
-  { value: "site_visit", label: "🏭 Helyszíni látogatás" },
-  { value: "note", label: "📝 Megjegyzés" },
+  { value: "call",       label: "Telefonhívás" },
+  { value: "email",      label: "Email" },
+  { value: "meeting",    label: "Találkozó" },
+  { value: "site_visit", label: "Helyszíni látogatás" },
+  { value: "note",       label: "Megjegyzés" },
 ];
 
 const DIRECTIONS = [
