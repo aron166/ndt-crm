@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { LogInteractionButton } from "@/components/LogInteractionButton";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
+import { EntityTags } from "@/components/tags/EntityTags";
 
 const TENANT_ID = 1;
 
@@ -104,6 +105,11 @@ export default async function PersonDetailPage({
             personName={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
             companyName={currentContact?.company.name}
           />
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <p className="text-xs text-slate-400 mb-2">Tags</p>
+          <EntityTags type="person" id={person.id} />
         </div>
       </div>
 
