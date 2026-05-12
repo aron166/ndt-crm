@@ -8,7 +8,7 @@ import { SignalMeter } from "@/components/viz/SignalMeter";
 import { LogInteractionButton } from "@/components/LogInteractionButton";
 import { TagInput } from "@/components/tags/TagInput";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
-import { AuditLogTab } from "@/components/AuditLogTab";
+import { AuditLogEntries } from "@/components/AuditLogTab";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
@@ -53,11 +53,12 @@ interface Props {
   avatarColor: string;
   initials: string;
   initialTags: { id: number; name: string; color: string }[];
+  auditEntries: Parameters<typeof AuditLogEntries>[0]["entries"];
 }
 
 export function PersonDetailClient({
   person, contacts, interactions, tasks,
-  engagementSeries, signalLevel, avatarColor, initials, initialTags,
+  engagementSeries, signalLevel, avatarColor, initials, initialTags, auditEntries,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("activity");
@@ -356,7 +357,7 @@ export function PersonDetailClient({
             <div className="panel mount">
               <div className="panel-head"><div className="panel-title">History</div></div>
               <div style={{ padding: "12px 16px", maxHeight: 300, overflowY: "auto" }}>
-                <AuditLogTab type="person" id={person.id} />
+                <AuditLogEntries entries={auditEntries} />
               </div>
             </div>
           </div>
