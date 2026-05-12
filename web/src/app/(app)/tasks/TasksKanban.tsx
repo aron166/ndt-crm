@@ -142,17 +142,22 @@ function KanbanCard({
         )}
       </div>
 
-      {/* Title */}
-      <p
+      {/* Title — links to task detail, stops drag propagation so click works */}
+      <Link
+        href={`/tasks/${task.id}`}
         style={{
+          display: "block",
           fontSize: 13, fontWeight: 500, lineHeight: 1.35,
           color: task.status === "done" ? "var(--fg-faint)" : "var(--fg)",
           textDecoration: task.status === "done" ? "line-through" : "none",
           marginBottom: 8,
         }}
+        onClick={(e) => e.stopPropagation()}
+        onMouseOver={(e) => { if (task.status !== "done") e.currentTarget.style.color = "var(--indigo)"; }}
+        onMouseOut={(e) => { e.currentTarget.style.color = task.status === "done" ? "var(--fg-faint)" : "var(--fg)"; }}
       >
         {task.title}
-      </p>
+      </Link>
 
       {/* Person + company */}
       {(personName || task.company) && (
