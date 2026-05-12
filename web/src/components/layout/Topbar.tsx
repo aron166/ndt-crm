@@ -68,9 +68,10 @@ interface TopbarProps {
   collapsed: boolean;
   email: string;
   defaultPipeline: PipelineStub | null;
+  onSearchOpen: () => void;
 }
 
-export function Topbar({ collapsed, email, defaultPipeline }: TopbarProps) {
+export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: TopbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const crumbs = useCrumb(pathname);
@@ -126,15 +127,17 @@ export function Topbar({ collapsed, email, defaultPipeline }: TopbarProps) {
           ))}
         </nav>
 
-        {/* ⌘K command bar */}
-        <div
-          className="flex-1 max-w-sm mx-auto flex items-center gap-2.5 px-3 rounded-lg cursor-text transition-colors"
+        {/* ⌘K command bar — click to open palette */}
+        <button
+          onClick={onSearchOpen}
+          className="flex-1 max-w-sm mx-auto flex items-center gap-2.5 px-3 rounded-lg transition-colors"
           style={{
             height: 34,
             background: "var(--bg-panel)",
             border: "1px solid var(--line-soft)",
             fontSize: 13,
             color: "var(--fg-mute)",
+            cursor: "text",
           }}
           onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--line)")}
           onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--line-soft)")}
@@ -152,7 +155,7 @@ export function Topbar({ collapsed, email, defaultPipeline }: TopbarProps) {
           >
             ⌘K
           </span>
-        </div>
+        </button>
 
         {/* Right cluster */}
         <div className="flex items-center gap-2">
