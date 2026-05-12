@@ -30,6 +30,7 @@ model Tenant {
   etlRuns      EtlRun[]
   tags         Tag[]
   auditLogs    AuditLog[]
+  pipelines    Pipeline[]
 
   @@map("tenants")
 }
@@ -56,6 +57,7 @@ model Person {
   contacts     Contact[]     // all company relationships this person has had
   interactions Interaction[]
   tasks        Task[]        @relation("TaskPerson")
+  deals        Deal[]        @relation("DealPerson")
 
   @@map("persons")
 }
@@ -166,26 +168,90 @@ model Lead {
   @@map("leads")
 }
 
+// ─────────────────────────────────────────────
+// PIPELINES
+// ─────────────────────────────────────────────
+
+model Pipeline {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  name        String
+  description String?
+  isArchived  Boolean  @default(false) @map("is_archived")
+  position    Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id])
+  stages       PipelineStage[]
+  deals        Deal[]
+  customFields PipelineCustomField[]
+
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id            Int     @id @default(autoincrement())
+  pipelineId    Int     @map("pipeline_id")
+  name          String
+  color         String  @default("#6366f1")
+  probability   Int     @default(50)           // 0–100 — used for weighted forecast
+  position      Int     @default(0)
+  isTerminalWon  Boolean @default(false) @map("is_terminal_won")
+  isTerminalLost Boolean @default(false) @map("is_terminal_lost")
+  wipLimit      Int?    @map("wip_limit")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals    Deal[]
+
+  @@map("pipeline_stages")
+}
+
+model PipelineCustomField {
+  id         Int     @id @default(autoincrement())
+  pipelineId Int     @map("pipeline_id")
+  key        String
+  label      String
+  type       String  // text | number | date | single_select | multi_select | person | company
+  required   Boolean @default(false)
+  position   Int     @default(0)
+  options    Json?   // for select types: ["Option A", "Option B"]
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@unique([pipelineId, key])
+  @@map("pipeline_custom_fields")
+}
+
 model Deal {
   id                Int       @id @default(autoincrement())
   tenantId          Int       @map("tenant_id")
+  pipelineId        Int?      @map("pipeline_id")
+  stageId           Int?      @map("stage_id")
   companyId         Int       @map("company_id")
+  personId          Int?      @map("person_id")     // primary contact
   assignedToId      Int?      @map("assigned_to_id")
   title             String
-  stage             String    @default("prospecting") // prospecting, proposal, negotiation, closed_won, closed_lost
   value             Decimal?
   currency          String    @default("HUF")
   expectedCloseDate DateTime? @map("expected_close_date")
   lostReason        String?   @map("lost_reason")
+  position          Int       @default(0)            // order within stage
+  customFields      Json?     @map("custom_fields")  // JSONB values keyed by PipelineCustomField.key
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  tenant     Tenant     @relation(fields: [tenantId], references: [id])
-  company    Company    @relation(fields: [companyId], references: [id])
-  assignedTo User?      @relation("DealAssignee", fields: [assignedToId], references: [id])
+  tenant     Tenant         @relation(fields: [tenantId], references: [id])
+  pipeline   Pipeline?      @relation(fields: [pipelineId], references: [id])
+  stage      PipelineStage? @relation(fields: [stageId], references: [id])
+  company    Company        @relation(fields: [companyId], references: [id])
+  person     Person?        @relation("DealPerson", fields: [personId], references: [id])
+  assignedTo User?          @relation("DealAssignee", fields: [assignedToId], references: [id])
   proposals  Proposal[]
-  tasks      Task[]     @relation("TaskDeal")
+  tasks      Task[]         @relation("TaskDeal")
 
+  @@index([pipelineId, stageId, position])
   @@map("deals")
 }
 

@@ -5,6 +5,26 @@
 
 ---
 
+## 🔴 Read First — CRM Logic Briefing (2026-05-12)
+
+Kai posted `BRIEFING_2026-05-12.md` at the repo root. **Read it before starting Step 4** (Deals kanban). It:
+- Names four concepts the current plan under-reflects: person permanence + employment as a state, microtask attributes (executor + cost + revenue + skill), the precondition engine, NDT cost codes (KID / MRD / DOD / SZD / VIZSGALAT)
+- **Rewrites Step 4 entirely** — fully customizable pipelines with user-defined stages, custom fields, saved views, weighted forecast, stale-deal warnings, bulk actions, multi-pipeline views
+- Adds two future steps (4.5 — Skill/Equipment Precondition Engine; 4.7 — NDT Cost Codes + Field Time Tracking). Don't build them yet; don't block them schema-wise.
+
+**Step 2 schema addendum (since Step 2 shipped 2026-05-12 before this briefing landed):**
+Add a small follow-up migration before Step 4 starts that introduces the columns the briefing names on `tasks`: `category` enum (revenue_generating | non_revenue), `executor_type` enum (human | ai_agent | robot, default human), `skill_required_id` (nullable FK, target table added later in Step 4.5), `cost_code` enum (KID | MRD | DOD | SZD | VIZSGALAT, nullable), `set_membership` (text array or junction table — Péter's "halmazok"), and either rename the existing status enum values or add a mapping to Péter's vocabulary (`created → in_progress → done`). No UI needed yet — the goal is to avoid a second migration churn when 4.5/4.7 land. Land this as `feature/step-2-schema-addendum`.
+
+**Decisions resolved by Áron (2026-05-12):**
+- **NDT Brokerage is a separate product, not a pipeline here.** Don't model it. Don't reserve schema for it.
+- **Custom field storage: JSONB on the deal row** with `pipeline_custom_fields` definition table + GIN index on `deals.custom_fields`. Same pattern when person/company custom fields land.
+- **Geolocation in scope** for Step 4.7 + the CRM needs an integrations layer (Google Maps first; Calendar, Twilio, Resend, NAV/SZAMLAZZ likely to follow). Build the pattern in 4.7 so other integrations slot in without core changes. Full spec in `BRIEFING_2026-05-12.md` under "NEW — Step 4.7 expanded".
+
+**Step 3 enhancement (in progress):**
+Confirm that the Person model supports proper time-bounded employment (`person_id, company_id, role, valid_from, valid_to` with `valid_to` nullable and multiple historical rows allowed) and versioned contact data per employment (email/phone/title with their own validity intervals). The current "employment timeline" UI from Step 1 implies the schema is partway there — verify a 2023 conversation thread can still resolve to the 2023 email address. If the schema doesn't support that, raise it before Step 3 ships.
+
+---
+
 ## Current State (2026-05-11 — direction reset)
 
 **Project resumed after weeks of pause.** This repo is now **standalone** — forget the monorepo plan in `C:\Users\Áron\workspace`. This is the live CRM and will stay here.
@@ -121,13 +141,33 @@ Both need to be re-applied against Supabase Postgres after Track 2 starts.
 7. **[Nate] Step 3 — Interactions logging UI (NEW feature, on new stack).**
    Port interactions API. Add a "Log a call / email / meeting / site visit" button on Company detail and Person detail pages. Modal form: type, subject, body, timestamp (default now), participants. Append-only — never edit or delete. Existing migrated interactions show in a timeline. Acceptance: Péter can log a phone call in <15 seconds from a company page. **Outcome: daily call logging works.**
 
-8. **[Nate] Step 4 — Deals pipeline (NEW feature, Pipedrive-inspired).**
-   Port `deals` table to UI. Kanban view: columns = stages, cards = deals, drag to advance stage. Each card shows company, value (HUF), days in stage, next-activity icon. **"No next activity" warning** — deals with no open task turn red. Acceptance: Áron + Péter can see the whole sales pipeline at a glance and the system enforces "every active deal has a next action." **Outcome: sales discipline tool is live.**
+7.7. **[Nate] Step 3.7 — Redesign pass to Árpil mockup (NEW 2026-05-12).**
+   Áron shipped a full coded mockup at `ndt-crm/redesign/` (shell + dashboard + companies + persons + tasks + ui primitives + 781-line styles.css + goal screenshots). Previous translation landed tokens but lost the bespoke industrial look — see `ndt-crm/redesign/REDESIGN_BRIEF.md` for the diagnosis and the four-phase fix. **Phases (one PR each):** (1) port `styles.css` lines 80–781 into `globals.css` under `@layer components`; (2) rebuild shell (Sidebar/Topbar/StatusBar) to match `shell.jsx` exactly; (3) build viz components (Sparkline / AreaChart / BarChart / Donut / StackBar / Oscilloscope / LiveClock) from `ui.jsx`; (4) page-by-page port (dashboard → tasks → companies → persons), each PR with a screenshot diff against `goal.png` / `goal1.png`. Runs in parallel with Step 3 to the extent files don't conflict. Don't refactor the mockup CSS into Tailwind utility chains. Don't introduce a chart library. Honor the mockup as source of truth.
+
+7.5. **[Nate] Step 3.5 — Cross-entity tags (NEW 2026-05-12).**
+   `tags` table (id, tenant_id, name, color) + polymorphic `taggings` join (tag_id, taggable_type, taggable_id) covering company / person / deal / task / interaction. Tag chip UI, autocomplete-create, tag-filter on every list page. Acceptance: one tag applied to a company + deal + task surfaces all three in one tag query. Full spec in `BRIEFING_2026-05-12.md` "Immediate additions".
+
+7.6. **[Nate] Step 3.6 — Audit log (NEW 2026-05-12).**
+   `audit_log` table + Postgres triggers on every business table (companies, persons, deals, tasks, interactions, employments, taggings, custom_fields) writing before/after JSONB diff. Resolves actor from Supabase Auth (user) or service-key path (agent). "History" tab on every detail page. Acceptance: any field change on any entity shows up in the audit log with who/when/before/after.
+
+8. **[Nate] Step 4 — Fully Customizable Pipelines + shared Kanban (EXTENDED 2026-05-12).**
+   See full brief in `BRIEFING_2026-05-12.md`. Summary: user-defined pipelines (N per tenant), user-defined stages per pipeline (name, color, probability %, optional WIP limit), user-defined custom fields per pipeline (text / number / date / single-select / multi-select / person / company), drag-drop kanban with optimistic update + activity-log entry on every move, **weighted forecast** (Σ deal_value × stage.probability), **saved views** (per user, filter + sort + column visibility, shareable Y/N), **stale-deal red flag** (any non-terminal deal with no open task linked), **universal "+ Deal" quick-create** mirroring "+ Task", **bulk actions** (move N deals, change owner, archive), **multi-pipeline cross-view** ("all my deals over 5M HUF this quarter, any pipeline").
+   **Kanban primitive is reusable.** Build it once; instantiate twice: (a) Deals view with user-defined stages per pipeline, (b) Tasks view with status columns (`created → in_progress → done`), filterable by category / executor_type. Tasks page keeps list as default; kanban is a toggle. Both views support the tag filter from Step 3.5.
+   Acceptance: Áron creates a second pipeline ("BirdsView Pilots") with its own stages and custom fields with no code change; drag-drop, weighted forecast, saved views, stale flag, tasks-kanban toggle all work; audit log records every move. **Outcome: a real CRM, not a generic kanban clone.**
+
+8.6. **[Nate] Step 4.6 — Global search Cmd+K / Ctrl+K (NEW 2026-05-12).**
+   Enable `pg_trgm` on Supabase + GIN trigram indexes on company.name, person.name+email, deal.title, task.title, interaction subject+body, tags.name. Server action `globalSearch(query, limit)` returns grouped result with similarity scores. UI: Cmd+K overlay, type-ahead, grouped + collapsible results, keyboard navigation. Scoped variants from detail pages ("search in this company"). Acceptance: typing "MÁV" returns matched companies / persons / deals / tasks / interactions / tags in <200ms on the existing dataset. Full spec in briefing.
+
+8.8. **[Nate] Step 4.8 — Analytics / KPI page (PROMOTED 2026-05-12, was Step 5.5).**
+   Lives at `/analytics`. v1 cards: pipeline velocity (avg days/stage from audit log), stage conversion rate, deal age distribution, weighted-forecast trendline, task completion (on-time vs overdue), interaction frequency. Time range selector (7d / 30d / 90d / quarter / YTD). Filter by tag / pipeline / owner / custom field. Click any card → drill-down list (reuses saved views from Step 4). v2 cards plug in once ecosystem-hub events (Step 5) start flowing. Acceptance: Áron opens /analytics, sees 6 live cards filled from real CRM data, drills into one and lands on the contributing records.
 
 9. **[Nate] Step 5 — Ecosystem hub schema + ingestion API (NEW capability).**
    Add new tables to Prisma schema (one migration): `conversations` (id, tenant_id, agent_id, person_id?, channel, started_at, ended_at), `messages` (conversation_id, role, content, created_at), `agents` (id, name, role, owner), `app_events` (source_app, event_type, payload, created_at). Build `POST /api/events` and `POST /api/conversations` route handlers with service-key auth so VeloQuote, CashFlow, and the agent team can write into the CRM. Surface conversation logs in the Person detail timeline. Acceptance: VeloQuote can post a quote-created event and it shows up in the company's activity feed. **Outcome: the CRM is now the central ledger for the whole portfolio.**
 
-10. **[Nate] Step 6 — Resume Quote Phase 2.5 on the new stack.**
+9.5. **[Nate] Step 6 — Cost codes + Integrations layer + Google Maps + Geolocation (MOVED LATER 2026-05-12, was Step 4.7).**
+   Áron explicitly deferred this behind Analytics + Ecosystem Hub. Spec unchanged — see `BRIEFING_2026-05-12.md` "Step 6" section. NDT cost codes (KID / MRD / DOD / SZD / VIZSGALAT), integration pattern (`integrations` + `integration_credentials` + `/lib/integrations/<slug>.ts`), Google Maps as first integration (geocode, distance, withinRadius, map widget), per-call logging + budget caps, geolocation 100m field-visit trigger.
+
+10. **[Nate] Step 7 — Resume Quote Phase 2.5 on the new stack.**
    Schema: `price_catalog`, `intake_submissions`, `quotes`, `quote_line_items`. Public intake page at `/intake` (no auth). Original roadmap continues.
 
 ### Working agreement
@@ -155,5 +195,6 @@ Both need to be re-applied against Supabase Postgres after Track 2 starts.
 | 2026-05-11 | etl | Rewrote ETL to read directly from xlsx files (no source DB / Docker needed). Migrated: 1696 companies, 209 proposals, 663 interactions, 2016 invoices. Source: 20240125_accounts.xlsx + 20250228_CLIENTS.xlsx for pipeline status. npm run migrate:reset to re-run. | ETL complete for now — Docker dependency permanently eliminated |
 | 2026-05-11 | track-2 | Scaffolded web/ (Next.js App Router + shadcn + Prisma 7 + Supabase packages). Supabase project live (ref ortqjkzoghrkzypmlvbb, eu-central-1). Blocked: pooler returns "Tenant or user not found" on all connection attempts. Direct host is IPv6-only (unreachable). Next: copy exact connection string from Supabase dashboard (Project Settings → Database → URI → Transaction mode) and retry prisma migrate deploy. |
 | 2026-05-12 | track-2 | Unblocked Supabase connection. Root causes: wrong pooler region (aws-0 → aws-1), stale password, Prisma URL parser truncating username at dot (fix: %2E encoding), Prisma 7 config not loading .env (fix: explicit dotenv in prisma.config.ts). Both migrations applied to Supabase, Prisma client generated. Next: Step 1 — port Companies + Persons to Next.js App Router + wire Supabase Auth. |
+| 2026-05-12 | step-4 | Step 4 complete (MVP). Pipelines + stages schema, Deal model with pipelineId/stageId/personId/position/customFields(JSONB). Default NDT Sales pipeline seeded (5 stages). Deals kanban with drag-drop, stale-deal warning (red border if no open task), weighted forecast in header, per-column value totals. Deal create/edit modal with company/person search. Pipeline setup page (create stages, colors, probability%). Universal Feladat/Deal split button in topbar. serializeDates now handles Prisma Decimal. Deferred: saved views, multi-pipeline cross-view, bulk actions, custom fields UI. Next: Step 4.6 (Cmd+K global search) then Step 4.8 (analytics). |
 | 2026-05-12 | step-2 | Step 2 complete. Tasks page: list with open/done/all + overdue/today/week filters, inline complete toggle, create/edit modal, subtask hierarchy on detail page. Universal "+ Feladat" button in topbar visible from every page. Server actions: createTask, updateTask, completeTask, reopenTask, deleteTask. Next: Step 3 — Interaction logging UI (log call/email/meeting from company + person pages). |
 | 2026-05-12 | step-1 | Step 1 complete. Built full Next.js App Router shell: Supabase magic-link auth (login page + proxy.ts + auth/callback), AppShell with collapsible sidebar + topbar, Companies list + detail (tabs: contacts, interactions), Persons list + detail (employment timeline + interactions). ETL retargeted to Supabase: 1696 companies, 2016 invoices, 663 interactions loaded. Server runs clean on localhost:3000. Next: Step 2 — Tasks page (create/edit/complete, universal + Task button). |
