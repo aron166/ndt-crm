@@ -108,7 +108,7 @@ export default async function CompaniesPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <CompaniesSearch search={search} includeFA={includeFA} />
+          <CompaniesSearch search={search} includeFA={includeFA} neverContacted={neverContacted} pipelineStatus={pipelineStatus || undefined} />
           <TagFilter activeTagName={tagName || undefined} />
         </div>
       </div>
