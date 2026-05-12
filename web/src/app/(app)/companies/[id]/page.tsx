@@ -9,6 +9,7 @@ import { Building2, MapPin, Globe, ArrowLeft } from "lucide-react";
 import { CompanyContactsTable } from "./CompanyContactsTable";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { EntityTags } from "@/components/tags/EntityTags";
+import { AuditLogTab } from "@/components/AuditLogTab";
 
 const TENANT_ID = 1;
 
@@ -122,6 +123,7 @@ export default async function CompanyDetailPage({
             Interakciók ({interactions.length})
           </TabsTrigger>
           <TabsTrigger value="deals">Deals</TabsTrigger>
+          <TabsTrigger value="history">Előzmények</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contacts" className="mt-4">
@@ -173,6 +175,10 @@ export default async function CompanyDetailPage({
 
         <TabsContent value="deals" className="mt-4">
           <p className="text-sm text-slate-400 py-6 text-center">Hamarosan — Step 4.</p>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          <AuditLogTab type="company" id={company.id} />
         </TabsContent>
       </Tabs>
     </div>
