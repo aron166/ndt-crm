@@ -36,12 +36,12 @@ interface TaskModalProps {
 }
 
 const TYPES = [
-  { value: "call",       label: "📞 Hívás" },
-  { value: "email",      label: "✉️ Email" },
-  { value: "meeting",    label: "🤝 Találkozó" },
-  { value: "document",   label: "📄 Dokumentum" },
-  { value: "field_visit",label: "🏭 Helyszíni munka" },
-  { value: "internal",   label: "⚙️ Belső" },
+  { value: "call",        label: "Hívás" },
+  { value: "email",       label: "Email" },
+  { value: "meeting",     label: "Találkozó" },
+  { value: "document",    label: "Dokumentum" },
+  { value: "field_visit", label: "Helyszíni munka" },
+  { value: "internal",    label: "Belső" },
 ];
 
 const STATUSES = [
