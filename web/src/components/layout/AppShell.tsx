@@ -30,7 +30,7 @@ export function AppShell({ children, email, overdueCount = 0 }: AppShellProps) {
           "relative z-10 transition-all duration-200 overflow-y-auto",
           collapsed ? "pl-14" : "pl-[240px]"
         )}
-        style={{ paddingTop: 60, paddingBottom: 26, minHeight: "100vh" }}
+        style={{ paddingTop: 60, paddingBottom: 26, height: "100dvh", overflowY: "auto" }}
       >
         <div className="max-w-[1400px] mx-auto px-6 py-6">
           {children}
