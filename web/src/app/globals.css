@@ -48,83 +48,254 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ── Dark industrial palette — NDT CRM ────────────────────── */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+  /* Surfaces */
+  --bg-page:    oklch(0.155 0.012 255);
+  --bg-panel:   oklch(0.190 0.014 255);
+  --bg-raised:  oklch(0.225 0.014 255);
+  --bg-hover:   oklch(0.265 0.016 255);
+  --bg-sidebar: oklch(0.135 0.014 258);
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Borders */
+  --line:        oklch(0.30 0.014 255 / 0.55);
+  --line-soft:   oklch(0.30 0.014 255 / 0.30);
+  --line-strong: oklch(0.40 0.018 255 / 0.80);
+
+  /* Text */
+  --fg:       oklch(0.97 0.005 255);
+  --fg-soft:  oklch(0.82 0.008 255);
+  --fg-mute:  oklch(0.62 0.012 255);
+  --fg-faint: oklch(0.48 0.014 255);
+
+  /* Accents */
+  --indigo:      oklch(0.66 0.19 278);
+  --indigo-dim:  oklch(0.56 0.18 278);
+  --indigo-soft: oklch(0.66 0.19 278 / 0.18);
+  --indigo-line: oklch(0.66 0.19 278 / 0.40);
+  --amber:       oklch(0.80 0.15 75);
+  --amber-soft:  oklch(0.80 0.15 75 / 0.16);
+  --mint:        oklch(0.80 0.13 165);
+  --mint-soft:   oklch(0.80 0.13 165 / 0.14);
+  --coral:       oklch(0.72 0.18 25);
+  --coral-soft:  oklch(0.72 0.18 25 / 0.14);
+  --sky:         oklch(0.78 0.12 230);
+
+  /* shadcn token mapping → dark industrial */
+  --background: var(--bg-page);
+  --foreground: var(--fg);
+  --card: var(--bg-panel);
+  --card-foreground: var(--fg);
+  --popover: oklch(0.20 0.015 255);
+  --popover-foreground: var(--fg);
+  --primary: var(--indigo);
+  --primary-foreground: oklch(0.97 0.005 255);
+  --secondary: var(--bg-raised);
+  --secondary-foreground: var(--fg-soft);
+  --muted: var(--bg-raised);
+  --muted-foreground: var(--fg-mute);
+  --accent: var(--bg-hover);
+  --accent-foreground: var(--fg);
+  --destructive: var(--coral);
+  --border: var(--line-soft);
+  --input: var(--line);
+  --ring: var(--indigo);
+
+  --chart-1: var(--indigo);
+  --chart-2: var(--mint);
+  --chart-3: var(--amber);
+  --chart-4: var(--coral);
+  --chart-5: var(--sky);
+
+  --radius: 0.5rem;
+
+  --sidebar: var(--bg-sidebar);
+  --sidebar-foreground: var(--fg-soft);
+  --sidebar-primary: var(--indigo);
+  --sidebar-primary-foreground: var(--fg);
+  --sidebar-accent: var(--bg-hover);
+  --sidebar-accent-foreground: var(--fg);
+  --sidebar-border: var(--line-soft);
+  --sidebar-ring: var(--indigo);
+
+  /* Font stacks */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono-ndt: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Shadows */
+  --shadow-card: 0 1px 0 0 oklch(0.30 0.014 255 / 0.4) inset, 0 12px 32px -20px rgba(0,0,0,0.8);
+  --glow-indigo: 0 0 0 1px oklch(0.66 0.19 278 / 0.5), 0 0 32px -4px oklch(0.66 0.19 278 / 0.35);
+  --glow-amber:  0 0 24px -4px oklch(0.80 0.15 75 / 0.5);
+  --glow-mint:   0 0 12px -2px oklch(0.80 0.13 165 / 0.5);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
-    @apply font-sans;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    letter-spacing: -0.005em;
+    font-family: var(--font-sans);
   }
+
+  body {
+    background: var(--bg-page);
+    color: var(--fg);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* Dot grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      oklch(0.35 0.014 255 / 0.18) 1px,
+      transparent 0
+    );
+    background-size: 24px 24px;
+    mask-image: radial-gradient(ellipse 70% 60% at 60% 30%, black 30%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Styled scrollbars */
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: oklch(0.32 0.014 255 / 0.6);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.40 0.014 255 / 0.8);
+  }
+
+  ::selection { background: var(--indigo-soft); color: var(--fg); }
+
+  /* Mono utility */
+  .font-mono-ndt { font-family: var(--font-mono-ndt); font-feature-settings: 'tnum', 'zero'; }
+  .tabular { font-variant-numeric: tabular-nums; }
 }
+
+/* Mount animation */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.mount { animation: fadeUp 0.3s cubic-bezier(.2,.7,.2,1) both; }
+.mount-1 { animation-delay: 0.05s; }
+.mount-2 { animation-delay: 0.10s; }
+.mount-3 { animation-delay: 0.15s; }
+.mount-4 { animation-delay: 0.20s; }
+
+/* Signal bar animation */
+@keyframes sigpulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+/* Pulse dot */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.75); }
+}
+
+/* Sparkline draw-in */
+@keyframes drawIn {
+  from { stroke-dashoffset: var(--dashlen, 1000); }
+  to   { stroke-dashoffset: 0; }
+}
+.spark-path {
+  stroke-dasharray: var(--dashlen, 1000);
+  stroke-dashoffset: var(--dashlen, 1000);
+  animation: drawIn 1.6s cubic-bezier(.2,.7,.2,1) forwards;
+}
+
+/* ── Dark theme overrides — remap hardcoded Tailwind slate/white classes ── */
+@layer utilities {
+  /* Surfaces */
+  .bg-white       { background-color: var(--bg-panel) !important; }
+  .bg-slate-50    { background-color: var(--bg-page) !important; }
+  .bg-slate-100   { background-color: var(--bg-raised) !important; }
+  .bg-slate-900   { background-color: var(--fg) !important; }
+
+  /* Text */
+  .text-slate-900 { color: var(--fg) !important; }
+  .text-slate-800 { color: var(--fg) !important; }
+  .text-slate-700 { color: var(--fg-soft) !important; }
+  .text-slate-600 { color: var(--fg-soft) !important; }
+  .text-slate-500 { color: var(--fg-mute) !important; }
+  .text-slate-400 { color: var(--fg-faint) !important; }
+
+  /* Borders */
+  .border-slate-200 { border-color: var(--line-soft) !important; }
+  .border-slate-100 { border-color: var(--line-soft) !important; }
+
+  /* Hover backgrounds */
+  .hover\:bg-slate-50:hover  { background-color: var(--bg-raised) !important; }
+  .hover\:bg-slate-100:hover { background-color: var(--bg-hover) !important; }
+
+  /* Indigo overrides — keep using our CSS var */
+  .bg-indigo-50    { background-color: var(--indigo-soft) !important; }
+  .bg-indigo-100   { background-color: var(--indigo-soft) !important; }
+  .text-indigo-600 { color: var(--indigo) !important; }
+  .hover\:text-indigo-600:hover { color: var(--indigo) !important; }
+  .border-indigo-300 { border-color: var(--indigo-line) !important; }
+
+  /* Green/mint overrides */
+  .bg-green-50   { background-color: var(--mint-soft) !important; }
+  .text-green-700 { color: var(--mint) !important; }
+
+  /* Red/coral overrides */
+  .bg-red-50   { background-color: var(--coral-soft) !important; }
+  .text-red-600 { color: var(--coral) !important; }
+  .text-red-500 { color: var(--coral) !important; }
+
+  /* Amber overrides */
+  .bg-amber-50   { background-color: var(--amber-soft) !important; }
+  .text-amber-600 { color: var(--amber) !important; }
+
+  /* Blue overrides */
+  .bg-blue-50    { background-color: oklch(0.66 0.19 240 / 0.14) !important; }
+  .text-blue-700 { color: var(--sky) !important; }
+  .text-blue-600 { color: var(--sky) !important; }
+
+  /* Emerald / sky */
+  .bg-emerald-50   { background-color: var(--mint-soft) !important; }
+  .text-emerald-600 { color: var(--mint) !important; }
+}
+
+/* ── Component-level dark styles ─────────────────────────────── */
+
+/* Tables */
+.tbl-dark thead tr {
+  background: oklch(0.20 0.014 255 / 0.5) !important;
+  border-bottom-color: var(--line-soft) !important;
+}
+.tbl-dark th {
+  color: var(--fg-faint) !important;
+}
+.tbl-dark tbody tr:hover {
+  background: oklch(0.66 0.19 278 / 0.05) !important;
+}
+
+/* Input focus rings in dark */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--indigo-line) !important;
+  box-shadow: 0 0 0 3px var(--indigo-soft) !important;
+}
+
+/* Checkbox */
+input[type="checkbox"] {
+  accent-color: var(--indigo);
+}
+
+/* Line through text on dark */
+.line-through { text-decoration-color: var(--fg-faint); }

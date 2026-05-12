@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,10 +15,8 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-
     if (error) {
       setError("Hibás email cím vagy jelszó.");
       setLoading(false);
@@ -31,52 +27,132 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600 mb-4">
-            <span className="text-white font-bold text-xl">C</span>
+    <div
+      className="min-h-screen flex items-center justify-center relative"
+      style={{ background: "var(--bg-page)" }}
+    >
+      {/* Dot grid inherited from body */}
+
+      {/* Glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(900px 600px at 50% 40%, oklch(0.66 0.19 278 / 0.08), transparent 65%)",
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-sm px-4">
+        {/* Brand mark */}
+        <div className="flex flex-col items-center mb-8">
+          <div
+            className="flex items-center justify-center rounded-xl mb-4"
+            style={{
+              width: 44, height: 44,
+              background: "linear-gradient(135deg, var(--indigo) 0%, oklch(0.56 0.18 295) 100%)",
+              boxShadow: "var(--glow-indigo)",
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M3 12 C7 4, 11 20, 15 12 S 21 4, 21 12" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/>
+            </svg>
           </div>
-          <h1 className="text-2xl font-semibold text-slate-900">NDT CRM</h1>
-          <p className="text-sm text-slate-500 mt-1">Controllabor Kft.</p>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>
+            NDT CRM
+          </h1>
+          <p style={{ fontSize: 11, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>
+            Controllabor · EU
+          </p>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h2 className="font-semibold text-slate-900 mb-5">Bejelentkezés</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Card */}
+        <div
+          className="rounded-xl p-6"
+          style={{
+            background: "var(--bg-panel)",
+            border: "1px solid var(--line-soft)",
+            boxShadow: "var(--shadow-card)",
+          }}
+        >
+          <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", marginBottom: 16 }}>
+            Bejelentkezés
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 6 }}>
                 Email
               </label>
-              <Input
+              <input
                 type="email"
-                placeholder="email@controllabor.hu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@controllabor.hu"
                 required
                 autoFocus
+                style={{
+                  width: "100%", height: 36, padding: "0 12px",
+                  background: "var(--bg-raised)", border: "1px solid var(--line)",
+                  borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none",
+                  fontFamily: "inherit",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "var(--indigo-line)";
+                  e.target.style.boxShadow = "0 0 0 3px var(--indigo-soft)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "var(--line)";
+                  e.target.style.boxShadow = "none";
+                }}
               />
             </div>
+
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 6 }}>
                 Jelszó
               </label>
-              <Input
+              <input
                 type="password"
-                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
                 required
+                style={{
+                  width: "100%", height: 36, padding: "0 12px",
+                  background: "var(--bg-raised)", border: "1px solid var(--line)",
+                  borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none",
+                  fontFamily: "inherit",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "var(--indigo-line)";
+                  e.target.style.boxShadow = "0 0 0 3px var(--indigo-soft)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "var(--line)";
+                  e.target.style.boxShadow = "none";
+                }}
               />
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button
+
+            {error && (
+              <p style={{ fontSize: 12, color: "var(--coral)" }}>{error}</p>
+            )}
+
+            <button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
               disabled={loading}
+              style={{
+                width: "100%", height: 36, marginTop: 4,
+                background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
+                border: "1px solid var(--indigo-dim)",
+                borderRadius: 6, color: "white", fontSize: 13, fontWeight: 500,
+                cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1,
+                boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6)",
+                fontFamily: "inherit",
+              }}
             >
               {loading ? "Bejelentkezés..." : "Bejelentkezés"}
-            </Button>
+            </button>
           </form>
         </div>
       </div>
