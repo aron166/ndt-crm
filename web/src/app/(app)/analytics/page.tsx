@@ -184,19 +184,21 @@ export default async function AnalyticsPage({
 
       {/* KPI Strip — inline grid so no missing CSS class dependency */}
       <div className="mount mount-1" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        <Link href="/companies" className="kpi" style={{ "--accent": "var(--indigo)" } as React.CSSProperties}>
-          <div className="k-label">Cégek</div>
-          <div className="k-value font-mono-ndt">{totalCompanies.toLocaleString("hu-HU")}</div>
+        <div className="kpi" style={{ "--accent": "var(--indigo)" } as React.CSSProperties}>
+          <Link href="/companies" className="k-label" style={{ textDecoration: "none" }}>Cégek</Link>
+          <Link href="/companies" className="k-value font-mono-ndt" style={{ textDecoration: "none" }}>
+            {totalCompanies.toLocaleString("hu-HU")}
+          </Link>
           <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>
             {contacted.toLocaleString("hu-HU")} érintett ·{" "}
-            <Link href="/companies?never_contacted=1" style={{ color: "var(--amber)", textDecoration: "none" }} onClick={(e) => e.stopPropagation()}>
+            <Link href="/companies?never_contacted=1" style={{ color: "var(--amber)", textDecoration: "none" }}>
               {neverContacted.toLocaleString("hu-HU")} soha
             </Link>
           </div>
           <div className="k-spark">
             <Sparkline data={pipelineItems.map((p) => p.count)} width={80} height={28} color="var(--indigo)" />
           </div>
-        </Link>
+        </div>
 
         <Link href="/persons" className="kpi" style={{ "--accent": "var(--sky)" } as React.CSSProperties}>
           <div className="k-label">Személyek</div>
