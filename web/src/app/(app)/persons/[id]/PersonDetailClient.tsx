@@ -29,6 +29,15 @@ interface Task {
   description: string | null; companyId: number | null; personId: number | null;
   parentTaskId: number | null; _count: { subTasks: number };
 }
+interface ConversationMessage {
+  id: number; role: string; content: string; createdAt: string | Date;
+}
+interface Conversation {
+  id: number; channel: string; summary: string | null;
+  startedAt: string | Date; endedAt: string | Date | null;
+  agent: { id: number; name: string; role: string; owner: string | null } | null;
+  messages: ConversationMessage[];
+}
 interface Person {
   id: number; firstName: string | null; lastName: string | null;
   email: string | null; phone: string | null; notes: string | null;
@@ -48,6 +57,7 @@ interface Props {
   contacts: Contact[];
   interactions: Interaction[];
   tasks: Task[];
+  conversations: Conversation[];
   engagementSeries: number[];
   signalLevel: number;
   avatarColor: string;
@@ -57,7 +67,7 @@ interface Props {
 }
 
 export function PersonDetailClient({
-  person, contacts, interactions, tasks,
+  person, contacts, interactions, tasks, conversations,
   engagementSeries, signalLevel, avatarColor, initials, initialTags, auditEntries,
 }: Props) {
   const router = useRouter();
@@ -70,9 +80,12 @@ export function PersonDetailClient({
     : "Hideg — 90+ nap inaktivitás";
 
   const TABS = [
-    { key: "activity", label: "Interakciók", count: interactions.length },
-    { key: "career",   label: "Karrierút",   count: contacts.length },
-    { key: "tasks",    label: "Feladatok",   count: tasks.filter(t => t.status !== "done").length },
+    { key: "activity",      label: "Interakciók",  count: interactions.length },
+    { key: "career",        label: "Karrierút",    count: contacts.length },
+    { key: "tasks",         label: "Feladatok",    count: tasks.filter(t => t.status !== "done").length },
+    ...(conversations.length > 0
+      ? [{ key: "conversations", label: "AI Beszélgetések", count: conversations.length }]
+      : []),
   ];
 
   return (
@@ -301,6 +314,52 @@ export function PersonDetailClient({
                   companyId={currentContact?.companyId}
                   companyName={currentContact?.company.name}
                 />
+              </div>
+            )}
+
+            {/* Conversations */}
+            {tab === "conversations" && (
+              <div className="panel mount space-y-4" style={{ padding: "18px 22px" }}>
+                {conversations.map((conv) => (
+                  <div key={conv.id} style={{ borderBottom: "1px solid var(--line-soft)", paddingBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--violet)", boxShadow: "0 0 6px var(--violet)", flexShrink: 0 }} />
+                      <span style={{ fontWeight: 500, color: "var(--fg)", fontSize: 13 }}>
+                        {conv.summary ?? conv.channel}
+                      </span>
+                      {conv.agent && (
+                        <span className="badge-ds" style={{ background: "var(--violet-soft, oklch(0.26 0.05 290))", color: "var(--violet)", border: "1px solid oklch(0.45 0.12 290)", fontSize: 10 }}>
+                          {conv.agent.name} · {conv.agent.owner ?? conv.agent.role}
+                        </span>
+                      )}
+                      <span className="font-mono-ndt" style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-faint)" }}>
+                        {formatDateTime(conv.startedAt)}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {conv.messages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 6,
+                            fontSize: 12,
+                            lineHeight: 1.5,
+                            background: msg.role === "user" ? "var(--bg-0)" : "oklch(0.24 0.04 290 / 0.5)",
+                            color: msg.role === "user" ? "var(--fg-soft)" : "var(--fg)",
+                            marginLeft: msg.role === "user" ? 0 : 16,
+                            border: "1px solid var(--line-soft)",
+                          }}
+                        >
+                          <span className="font-mono-ndt" style={{ fontSize: 9, color: "var(--fg-faint)", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                            {msg.role}
+                          </span>
+                          {msg.content}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

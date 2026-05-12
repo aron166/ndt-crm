@@ -32,11 +32,18 @@ interface Task {
   parentTaskId: number | null; _count: { subTasks: number };
 }
 
+interface AppEvent {
+  id: number; sourceApp: string; eventType: string;
+  payload: unknown; createdAt: string | Date;
+  agent: { id: number; name: string; owner: string | null } | null;
+}
+
 interface Props {
   company: { id: number; name: string; vatNumber: string | null; city: string | null; county: string | null; website: string | null; pipelineStatus: string | null; lastInteractionDate: string | Date | null; createdAt: Date };
   contacts: Contact[];
   interactions: Interaction[];
   tasks: Task[];
+  appEvents: AppEvent[];
   revenueSeries: number[];
   engagementBreakdown: { label: string; value: number; color: string }[];
   kpis: { label: string; value: string | number; accent: string }[];
@@ -56,7 +63,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export function CompanyDetailClient({
-  company, contacts, interactions, tasks, revenueSeries,
+  company, contacts, interactions, tasks, appEvents, revenueSeries,
   engagementBreakdown, kpis, avatarColor, initials, initialTags, auditEntries,
 }: Props) {
   const router = useRouter();
@@ -72,11 +79,12 @@ export function CompanyDetailClient({
   }
 
   const TABS = [
-    { key: "overview",      label: "Áttekintés" },
-    { key: "contacts",      label: `Contacts · ${contacts.filter(c => !c.endedAt).length}` },
-    { key: "activity",      label: `Activity · ${interactions.length}` },
-    { key: "tasks",         label: `Tasks · ${tasks.filter(t => t.status !== "done").length}` },
-    { key: "history",       label: "Előzmények" },
+    { key: "overview",   label: "Áttekintés" },
+    { key: "contacts",   label: `Contacts · ${contacts.filter(c => !c.endedAt).length}` },
+    { key: "activity",   label: `Activity · ${interactions.length}` },
+    { key: "tasks",      label: `Tasks · ${tasks.filter(t => t.status !== "done").length}` },
+    ...(appEvents.length > 0 ? [{ key: "events", label: `Események · ${appEvents.length}` }] : []),
+    { key: "history",    label: "Előzmények" },
   ];
 
   return (
@@ -309,6 +317,37 @@ export function CompanyDetailClient({
       {tab === "tasks" && (
         <div style={{ marginTop: 16 }}>
           <ContextTasksTab tasks={tasks} companyId={company.id} companyName={company.name} />
+        </div>
+      )}
+
+      {/* App Events */}
+      {tab === "events" && (
+        <div className="panel mount" style={{ marginTop: 16, padding: "18px 22px" }}>
+          <div className="tl">
+            {appEvents.map((ev) => (
+              <div key={ev.id} className="tl-item" style={{ "--accent": "var(--sky)" } as React.CSSProperties}>
+                <div className="tl-dot" />
+                <div className="tl-head">
+                  <span className="who">
+                    <span className="font-mono-ndt" style={{ color: "var(--sky)", fontWeight: 500 }}>{ev.eventType}</span>
+                    <span style={{ color: "var(--fg-faint)", margin: "0 6px" }}>·</span>
+                    <span style={{ color: "var(--fg-mute)" }}>{ev.sourceApp}</span>
+                    {ev.agent && (
+                      <>
+                        <span style={{ color: "var(--fg-faint)", margin: "0 6px" }}>via</span>
+                        <span style={{ color: "var(--fg-soft)" }}>{ev.agent.name}</span>
+                      </>
+                    )}
+                  </span>
+                  <span className="when">{formatDateTime(ev.createdAt)}</span>
+                </div>
+                <div className="tl-body" style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-faint)" }}>
+                  {JSON.stringify(ev.payload, null, 0).slice(0, 120)}
+                  {JSON.stringify(ev.payload).length > 120 ? "…" : ""}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
