@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { PersonsSearch } from "./PersonsSearch";
+import { TagFilter } from "@/components/tags/TagFilter";
 
 const PAGE_SIZE = 25;
 const TENANT_ID = 1;
@@ -8,6 +9,7 @@ const TENANT_ID = 1;
 interface SearchParams {
   search?: string;
   page?: string;
+  tag?: string;
 }
 
 export default async function PersonsPage({
@@ -18,8 +20,19 @@ export default async function PersonsPage({
   const params = await searchParams;
   const search = params.search?.trim() ?? "";
   const page = Math.max(1, parseInt(params.page ?? "1", 10));
+  const tagName = params.tag?.trim() ?? "";
+
+  let tagFilterIds: number[] | undefined;
+  if (tagName) {
+    const tag = await db.tag.findFirst({
+      where: { tenantId: TENANT_ID, name: { equals: tagName, mode: "insensitive" } },
+      include: { taggings: { where: { taggableType: "person" }, select: { taggableId: true } } },
+    });
+    tagFilterIds = tag?.taggings.map((t) => t.taggableId) ?? [];
+  }
 
   const where = {
+    ...(tagFilterIds !== undefined ? { id: { in: tagFilterIds } } : {}),
     tenantId: TENANT_ID,
     ...(search
       ? {
@@ -62,7 +75,10 @@ export default async function PersonsPage({
         </div>
       </div>
 
-      <PersonsSearch search={search} />
+      <div className="flex items-center gap-3">
+        <PersonsSearch search={search} />
+        <TagFilter activeTagName={tagName || undefined} />
+      </div>
 
       <div className="mt-4 bg-white rounded-xl border border-slate-200 overflow-hidden">
         <table className="w-full text-sm">
