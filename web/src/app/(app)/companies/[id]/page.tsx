@@ -24,7 +24,7 @@ export default async function CompanyDetailPage({
   const companyId = parseInt(id, 10);
   if (isNaN(companyId)) notFound();
 
-  const [company, contacts, interactions, tasks, invoices, initialTags, auditEntries] = await Promise.all([
+  const [company, contacts, interactions, tasks, invoices, appEvents, initialTags, auditEntries] = await Promise.all([
     db.company.findFirst({ where: { id: companyId, tenantId: TENANT_ID } }),
     db.contact.findMany({
       where: { companyId, tenantId: TENANT_ID },
@@ -47,6 +47,12 @@ export default async function CompanyDetailPage({
       select: { netAmount: true, issuedDate: true },
       orderBy: { issuedDate: "asc" },
       take: 24,
+    }),
+    db.appEvent.findMany({
+      where: { companyId, tenantId: TENANT_ID },
+      include: { agent: { select: { id: true, name: true, owner: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 30,
     }),
     getTagsForEntity("company", companyId),
     getEntityHistory("company", companyId),
@@ -107,6 +113,7 @@ export default async function CompanyDetailPage({
         contacts={serializeDates(contacts)}
         interactions={serializeDates(interactions)}
         tasks={serializeDates(tasks)}
+        appEvents={serializeDates(appEvents)}
         revenueSeries={revenueSeries}
         engagementBreakdown={engagementBreakdown}
         kpis={kpis}
