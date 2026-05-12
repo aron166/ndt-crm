@@ -15,7 +15,7 @@ interface Task {
   title: string;
   type: string | null;
   status: string;
-  dueDate: Date | null;
+  dueDate: string | Date | null;
   estimatedMinutes: number | null;
   description: string | null;
   category: string | null;
@@ -33,7 +33,7 @@ interface ContextTasksTabProps {
   personName?: string;
 }
 
-function isOverdue(dueDate: Date | null, status: string) {
+function isOverdue(dueDate: string | Date | null, status: string) {
   if (!dueDate || status === "done" || status === "cancelled") return false;
   return new Date(dueDate) < new Date(new Date().toDateString());
 }
@@ -74,7 +74,7 @@ export function ContextTasksTab({
                 title: editTask.title,
                 type: editTask.type,
                 status: editTask.status,
-                dueDate: editTask.dueDate?.toISOString(),
+                dueDate: editTask.dueDate instanceof Date ? editTask.dueDate.toISOString() : editTask.dueDate ?? undefined,
                 estimatedMinutes: editTask.estimatedMinutes,
                 description: editTask.description,
                 companyId: editTask.companyId,
