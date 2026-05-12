@@ -293,8 +293,9 @@
 }
 
 /* ── Table / list row hover (server-component safe CSS-only approach) ── */
-.tbl-row { transition: background 0.12s; }
-.tbl-row:hover { background: oklch(0.66 0.19 278 / 0.05) !important; cursor: pointer; }
+.tbl-row { transition: background 0.10s; }
+.tbl-row:hover { background: oklch(0.66 0.19 278 / 0.07) !important; cursor: pointer; }
+.tbl-row:hover .tbl-link { color: var(--indigo); }
 
 .tbl-link { color: var(--fg); font-weight: 500; }
 .tbl-link:hover { color: var(--indigo); }

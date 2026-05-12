@@ -40,3 +40,24 @@ export function fullName(
 ): string {
   return [firstName, lastName].filter(Boolean).join(" ") || "—";
 }
+
+export function formatRelativeTime(date: Date | string | null | undefined): string {
+  if (!date) return "—";
+  const diffMs = Date.now() - new Date(date).getTime();
+  const days = Math.floor(diffMs / 86400000);
+  if (days <= 0)  return "ma";
+  if (days === 1) return "tegnap";
+  if (days < 7)   return `${days} napja`;
+  if (days < 30)  return `${Math.floor(days / 7)} hete`;
+  if (days < 365) return `${Math.floor(days / 30)} hónapja`;
+  const years = Math.floor(days / 365);
+  return `${years} éve`;
+}
+
+export function contactFreshness(date: Date | string | null | undefined): string {
+  if (!date) return "coral";
+  const days = Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+  if (days < 30)  return "mint";
+  if (days < 90)  return "mute";
+  return "amber";
+}
