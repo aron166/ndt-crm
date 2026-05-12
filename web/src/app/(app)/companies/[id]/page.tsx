@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { CompanyDetailClient } from "./CompanyDetailClient";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { getTagsForEntity } from "@/app/actions/tags";
+import { getEntityHistory } from "@/app/actions/audit";
 
 const TENANT_ID = 1;
 
@@ -22,7 +23,7 @@ export default async function CompanyDetailPage({
   const companyId = parseInt(id, 10);
   if (isNaN(companyId)) notFound();
 
-  const [company, contacts, interactions, tasks, invoices, initialTags] = await Promise.all([
+  const [company, contacts, interactions, tasks, invoices, initialTags, auditEntries] = await Promise.all([
     db.company.findFirst({ where: { id: companyId, tenantId: TENANT_ID } }),
     db.contact.findMany({
       where: { companyId, tenantId: TENANT_ID },
@@ -47,6 +48,7 @@ export default async function CompanyDetailPage({
       take: 24,
     }),
     getTagsForEntity("company", companyId),
+    getEntityHistory("company", companyId),
   ]);
 
   if (!company) notFound();
@@ -110,6 +112,7 @@ export default async function CompanyDetailPage({
         avatarColor={avatarColor}
         initials={initials}
         initialTags={initialTags}
+        auditEntries={auditEntries}
       />
     </div>
   );
