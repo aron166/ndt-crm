@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   DropdownMenu,
@@ -10,8 +10,53 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Plus } from "lucide-react";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
+import { LogOut, User, Plus, Bell, Search } from "lucide-react";
+
+// ── Breadcrumb labels ─────────────────────────────────────────
+const CRUMB: Record<string, string> = {
+  "/":          "Dashboard",
+  "/tasks":     "Feladatok",
+  "/persons":   "Személyek",
+  "/companies": "Cégek",
+  "/deals":     "Pipeline",
+  "/invoices":  "Számlák",
+  "/settings":  "Beállítások",
+  "/analytics": "Analytics",
+};
+
+function useCrumb(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 0) return [{ label: "Dashboard", href: "/" }];
+
+  const crumbs: { label: string; href: string }[] = [];
+  let path = "";
+  for (const seg of segments) {
+    path += "/" + seg;
+    const label = CRUMB[path] ?? (seg.match(/^\d+$/) ? `#${seg}` : seg);
+    crumbs.push({ label, href: path });
+  }
+  return crumbs;
+}
+
+// ── Signal bars (live sync indicator) ────────────────────────
+function SignalBars() {
+  return (
+    <div className="flex items-end gap-[2px]" style={{ height: 14, width: 20 }}>
+      {[30, 55, 80, 100, 70].map((h, i) => (
+        <span
+          key={i}
+          className="flex-1 rounded-[1px]"
+          style={{
+            height: `${h}%`,
+            background: "var(--mint)",
+            animation: `sigpulse 1.6s ease-in-out ${i * 0.2}s infinite`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 interface TopbarProps {
   collapsed: boolean;
@@ -20,7 +65,9 @@ interface TopbarProps {
 
 export function Topbar({ collapsed, email }: TopbarProps) {
   const router = useRouter();
-  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const pathname = usePathname();
+  const crumbs = useCrumb(pathname);
+  const [taskOpen, setTaskOpen] = useState(false);
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -33,52 +80,149 @@ export function Topbar({ collapsed, email }: TopbarProps) {
 
   return (
     <>
-      <header
-        className="fixed top-0 right-0 h-14 bg-white border-b border-slate-200 flex items-center gap-3 justify-end px-4 z-20 transition-all duration-200"
-        style={{ left: collapsed ? "3.5rem" : "15rem" }}
-      >
-        <button
-          onClick={() => setTaskModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
-          title="Új feladat (gyors)"
-        >
-          <Plus className="size-4" />
-          <span className="hidden sm:block">Feladat</span>
-        </button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors">
-            <span className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-semibold">
-              {initials}
-            </span>
-            <span className="text-sm text-slate-600 hidden sm:block">
-              {email}
-            </span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem className="gap-2 text-slate-600">
-              <User className="size-4" />
-              Profil
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="gap-2 text-red-600 focus:text-red-600"
-              onClick={handleSignOut}
-            >
-              <LogOut className="size-4" />
-              Kijelentkezés
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </header>
-
       <TaskModal
-        open={taskModalOpen}
-        onClose={() => {
-          setTaskModalOpen(false);
-          router.refresh();
-        }}
+        open={taskOpen}
+        onClose={() => { setTaskOpen(false); router.refresh(); }}
       />
+
+      <header
+        className="fixed top-0 right-0 z-20 flex items-center gap-4 px-6 transition-all duration-200"
+        style={{
+          left: collapsed ? "3.5rem" : "240px",
+          height: 60,
+          background: "oklch(0.155 0.012 255 / 0.85)",
+          backdropFilter: "blur(12px)",
+          borderBottom: "1px solid var(--line-soft)",
+        }}
+      >
+        {/* Breadcrumbs */}
+        <nav className="flex items-center gap-2 text-sm" style={{ color: "var(--fg-mute)" }}>
+          <span style={{ color: "var(--fg-faint)" }}>NDT CRM</span>
+          {crumbs.map((c, i) => (
+            <span key={c.href} className="flex items-center gap-2">
+              <span style={{ color: "var(--fg-faint)" }}>/</span>
+              <span
+                style={{
+                  color: i === crumbs.length - 1 ? "var(--fg)" : "var(--fg-mute)",
+                  fontWeight: i === crumbs.length - 1 ? 500 : 400,
+                }}
+              >
+                {c.label}
+              </span>
+            </span>
+          ))}
+        </nav>
+
+        {/* ⌘K command bar */}
+        <div
+          className="flex-1 max-w-sm mx-auto flex items-center gap-2.5 px-3 rounded-lg cursor-text transition-colors"
+          style={{
+            height: 34,
+            background: "var(--bg-panel)",
+            border: "1px solid var(--line-soft)",
+            fontSize: 13,
+            color: "var(--fg-mute)",
+          }}
+          onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--line)")}
+          onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--line-soft)")}
+        >
+          <Search style={{ width: 13, height: 13, opacity: 0.6 }} />
+          <span>Ugrás személyhez, céghez, feladathoz...</span>
+          <span
+            className="ml-auto font-mono-ndt rounded"
+            style={{
+              fontSize: 10, padding: "1px 5px",
+              background: "var(--bg-raised)",
+              border: "1px solid var(--line-soft)",
+              color: "var(--fg-mute)",
+            }}
+          >
+            ⌘K
+          </span>
+        </div>
+
+        {/* Right cluster */}
+        <div className="flex items-center gap-2">
+          {/* Live sync signal */}
+          <div title="Live · Supabase synced">
+            <SignalBars />
+          </div>
+
+          {/* Bell */}
+          <button
+            className="flex items-center justify-center rounded transition-colors"
+            style={{ width: 34, height: 34, color: "var(--fg-soft)", border: "1px solid transparent" }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = "var(--bg-panel)";
+              e.currentTarget.style.borderColor = "var(--line-soft)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.borderColor = "transparent";
+            }}
+          >
+            <Bell className="size-4" />
+          </button>
+
+          {/* + New */}
+          <button
+            onClick={() => setTaskOpen(true)}
+            className="flex items-center gap-1.5 rounded font-medium transition-all"
+            style={{
+              height: 32, padding: "0 12px",
+              fontSize: 13,
+              background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
+              color: "white",
+              boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6)",
+              border: "1px solid var(--indigo-dim)",
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
+            onMouseOut={(e) => (e.currentTarget.style.filter = "none")}
+          >
+            <Plus className="size-3.5" />
+            Új
+          </button>
+
+          {/* User menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex items-center gap-2 px-2 py-1 rounded-lg transition-colors"
+              style={{ color: "var(--fg-soft)" }}
+              onMouseOver={(e) => (e.currentTarget.style.background = "var(--bg-panel)")}
+              onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              <span
+                className="flex items-center justify-center rounded-full text-xs font-semibold font-mono-ndt shrink-0"
+                style={{
+                  width: 28, height: 28,
+                  background: "var(--indigo)",
+                  color: "white",
+                  boxShadow: "0 0 0 2px oklch(0.66 0.19 278 / 0.25)",
+                }}
+              >
+                {initials}
+              </span>
+              <span className="text-sm hidden sm:block" style={{ color: "var(--fg-mute)" }}>
+                {email}
+              </span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem className="gap-2">
+                <User className="size-4" />
+                Profil
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2 text-red-400 focus:text-red-400"
+                onClick={handleSignOut}
+              >
+                <LogOut className="size-4" />
+                Kijelentkezés
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
     </>
   );
 }

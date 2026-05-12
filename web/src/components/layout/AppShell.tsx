@@ -3,14 +3,16 @@
 import { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { StatusBar } from "./StatusBar";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
   children: React.ReactNode;
   email: string;
+  overdueCount?: number;
 }
 
-export function AppShell({ children, email }: AppShellProps) {
+export function AppShell({ children, email, overdueCount = 0 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -22,14 +24,20 @@ export function AppShell({ children, email }: AppShellProps) {
     <>
       <Sidebar collapsed={collapsed} onToggle={setCollapsed} />
       <Topbar collapsed={collapsed} email={email} />
+
       <main
         className={cn(
-          "pt-14 min-h-screen bg-slate-50 transition-all duration-200",
-          collapsed ? "pl-14" : "pl-60"
+          "relative z-10 transition-all duration-200 overflow-y-auto",
+          collapsed ? "pl-14" : "pl-[240px]"
         )}
+        style={{ paddingTop: 60, paddingBottom: 26, minHeight: "100vh" }}
       >
-        <div className="max-w-[1280px] mx-auto p-6">{children}</div>
+        <div className="max-w-[1400px] mx-auto px-6 py-6">
+          {children}
+        </div>
       </main>
+
+      <StatusBar collapsed={collapsed} overdueCount={overdueCount} />
     </>
   );
 }
