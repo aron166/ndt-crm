@@ -286,3 +286,30 @@
   stroke-dashoffset: var(--dashlen, 1000);
   animation: drawIn 1.6s cubic-bezier(.2,.7,.2,1) forwards;
 }
+
+/* ── Table / list row hover (server-component safe CSS-only approach) ── */
+.tbl-row { transition: background 0.12s; }
+.tbl-row:hover { background: oklch(0.66 0.19 278 / 0.05) !important; cursor: pointer; }
+
+.tbl-link { color: var(--fg); font-weight: 500; }
+.tbl-link:hover { color: var(--indigo); }
+
+.tbl-link-muted { color: var(--fg-soft); }
+.tbl-link-muted:hover { color: var(--indigo); }
+
+.tbl-link-faint { color: var(--fg-mute); }
+.tbl-link-faint:hover { color: var(--indigo); }
+
+/* Action button row hover */
+.action-btn { padding: 4px; border-radius: 4px; color: var(--fg-faint); cursor: pointer; transition: background 0.12s, color 0.12s; }
+.action-btn:hover { background: var(--bg-hover); color: var(--fg); }
+.action-btn-danger:hover { background: var(--coral-soft); color: var(--coral); }
+
+/* Complete circle button */
+.complete-btn {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: transparent; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.complete-btn:hover { border-color: var(--mint); background: var(--mint-soft); }

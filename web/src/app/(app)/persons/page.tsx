@@ -135,47 +135,27 @@ export default async function PersonsPage({
               return (
                 <tr
                   key={p.id}
-                  className="mount"
-                  style={{
-                    animationDelay: `${idx * 20}ms`,
-                    borderBottom: "1px solid var(--line-soft)",
-                    transition: "background 0.12s",
-                    cursor: "pointer",
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "oklch(0.66 0.19 278 / 0.05)")}
-                  onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                  className="tbl-row mount"
+                  style={{ animationDelay: `${idx * 20}ms`, borderBottom: "1px solid var(--line-soft)" }}
                 >
                   <td style={{ padding: "10px 16px", width: 48 }}>
                     <Link href={`/persons/${p.id}`}>
                       <div
                         className="font-mono-ndt flex items-center justify-center rounded-full"
-                        style={{
-                          width: 32, height: 32, fontSize: 11, fontWeight: 600,
-                          background: avatarBg(p.id), color: "white",
-                        }}
+                        style={{ width: 32, height: 32, fontSize: 11, fontWeight: 600, background: avatarBg(p.id), color: "white" }}
                       >
                         {initials}
                       </div>
                     </Link>
                   </td>
                   <td style={{ padding: "10px 16px" }}>
-                    <Link
-                      href={`/persons/${p.id}`}
-                      style={{ color: "var(--fg)", fontWeight: 500 }}
-                      onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-                      onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
-                    >
+                    <Link href={`/persons/${p.id}`} className="tbl-link">
                       {p.lastName} {p.firstName}
                     </Link>
                   </td>
                   <td style={{ padding: "10px 16px" }}>
                     {currentContact ? (
-                      <Link
-                        href={`/companies/${currentContact.company.id}`}
-                        style={{ color: "var(--fg-soft)" }}
-                        onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-                        onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-soft)")}
-                      >
+                      <Link href={`/companies/${currentContact.company.id}`} className="tbl-link-muted">
                         {currentContact.company.name}
                       </Link>
                     ) : (
@@ -184,10 +164,7 @@ export default async function PersonsPage({
                   </td>
                   <td style={{ padding: "10px 16px" }}>
                     {p.email ? (
-                      <a href={`mailto:${p.email}`} style={{ color: "var(--fg-mute)", fontFamily: "var(--font-geist-mono)", fontSize: 12 }}
-                        onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-                        onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}
-                      >
+                      <a href={`mailto:${p.email}`} className="tbl-link-faint font-mono-ndt" style={{ fontSize: 12 }}>
                         {p.email}
                       </a>
                     ) : (
