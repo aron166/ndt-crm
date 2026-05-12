@@ -2,13 +2,14 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { audit } from "@/lib/audit";
 
 const TENANT_ID = 1;
 
 export async function addContact(formData: FormData) {
-  const personId = parseInt(formData.get("personId") as string, 10);
+  const personId  = parseInt(formData.get("personId") as string, 10);
   const companyId = parseInt(formData.get("companyId") as string, 10);
-  const role = (formData.get("role") as string)?.trim() || null;
+  const role      = (formData.get("role") as string)?.trim() || null;
 
   if (!personId || !companyId) return { error: "Személy és cég kötelező" };
 
@@ -17,9 +18,10 @@ export async function addContact(formData: FormData) {
   });
   if (existing) return { error: "Ez a kapcsolat már létezik" };
 
-  await db.contact.create({
+  const contact = await db.contact.create({
     data: { tenantId: TENANT_ID, personId, companyId, role, isPrimary: false },
   });
+  await audit("contact", contact.id, "create", null, { personId, companyId, role });
 
   revalidatePath(`/companies/${companyId}`);
   revalidatePath(`/persons/${personId}`);
@@ -46,10 +48,12 @@ export async function createPersonAndLink(formData: FormData) {
       phone: phone ?? undefined,
     },
   });
+  await audit("person", person.id, "create", null, { firstName: person.firstName, lastName: person.lastName, email, companyId });
 
-  await db.contact.create({
+  const contact = await db.contact.create({
     data: { tenantId: TENANT_ID, personId: person.id, companyId, role, isPrimary: false },
   });
+  await audit("contact", contact.id, "create", null, { personId: person.id, companyId, role });
 
   revalidatePath(`/companies/${companyId}`);
   return { success: true, personId: person.id };
@@ -60,6 +64,7 @@ export async function closeContact(contactId: number, companyId: number, personI
     where: { id: contactId, tenantId: TENANT_ID },
     data: { endedAt: new Date() },
   });
+  await audit("contact", contactId, "update", { endedAt: null }, { endedAt: new Date().toISOString() });
   revalidatePath(`/companies/${companyId}`);
   revalidatePath(`/persons/${personId}`);
 }

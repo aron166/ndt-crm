@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { validateInteractionInput } from "@/lib/interactions";
+import { audit } from "@/lib/audit";
 
 export async function logInteraction(formData: FormData) {
   const type = formData.get("type") as string;
@@ -19,7 +20,7 @@ export async function logInteraction(formData: FormData) {
   const companyId = companyIdStr ? parseInt(companyIdStr, 10) : null;
   const personId = personIdStr ? parseInt(personIdStr, 10) : null;
 
-  await db.interaction.create({
+  const interaction = await db.interaction.create({
     data: {
       tenantId: 1,
       type,
@@ -31,6 +32,8 @@ export async function logInteraction(formData: FormData) {
       personId,
     },
   });
+  await audit("interaction", interaction.id, "create", null,
+    { type, direction, companyId, personId, occurredAt });
 
   if (companyId) {
     await db.company.updateMany({
