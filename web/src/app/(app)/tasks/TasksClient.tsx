@@ -95,36 +95,25 @@ export function TasksClient({ tasks }: TasksClientProps) {
         }
       />
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-xl overflow-hidden" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50">
-              <th className="w-8 px-3 py-3" />
-              <th className="text-left px-4 py-3 font-medium text-slate-500">
-                Feladat
-              </th>
-              <th className="text-left px-4 py-3 font-medium text-slate-500 hidden md:table-cell">
-                Típus
-              </th>
-              <th className="text-left px-4 py-3 font-medium text-slate-500 hidden lg:table-cell">
-                Határidő
-              </th>
-              <th className="text-left px-4 py-3 font-medium text-slate-500 hidden lg:table-cell">
-                Cég / Személy
-              </th>
-              <th className="text-left px-4 py-3 font-medium text-slate-500">
-                Státusz
-              </th>
-              <th className="px-4 py-3 w-24" />
+            <tr>
+              {["", "Feladat", "Típus", "Határidő", "Cég / Személy", "Státusz", ""].map((h, i) => (
+                <th key={i} style={{
+                  textAlign: "left", padding: i === 0 ? "10px 12px" : "10px 16px",
+                  fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em",
+                  color: "var(--fg-faint)", borderBottom: "1px solid var(--line-soft)",
+                  background: "oklch(0.20 0.014 255 / 0.5)",
+                  display: i >= 2 && i <= 4 ? undefined : undefined,
+                }}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {tasks.length === 0 && (
               <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-12 text-center text-slate-400"
-                >
+                <td colSpan={7} style={{ padding: "48px 16px", textAlign: "center", color: "var(--fg-faint)" }}>
                   Nincs feladat ebben a nézetben.
                 </td>
               </tr>
@@ -135,112 +124,80 @@ export function TasksClient({ tasks }: TasksClientProps) {
               return (
                 <tr
                   key={t.id}
-                  className={cn(
-                    "border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors",
-                    t.status === "done" && "opacity-60"
-                  )}
+                  style={{ borderBottom: "1px solid var(--line-soft)", transition: "background 0.12s", opacity: t.status === "done" ? 0.6 : 1 }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "oklch(0.66 0.19 278 / 0.05)")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
                 >
-                  <td className="px-3 py-3">
+                  <td style={{ padding: "8px 12px", width: 36 }}>
                     {t.status !== "done" ? (
                       <button
                         onClick={() => handleComplete(t.id)}
-                        className="w-5 h-5 rounded-full border-2 border-slate-300 hover:border-green-500 hover:bg-green-50 transition-colors flex items-center justify-center"
+                        style={{ width: 18, height: 18, borderRadius: "50%", border: "1.5px solid var(--line)", background: "transparent", cursor: "pointer", transition: "border-color .15s" }}
+                        onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--mint)")}
+                        onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--line)")}
                         title="Kész"
                       />
                     ) : (
-                      <CheckCircle2 className="size-5 text-green-500" />
+                      <CheckCircle2 style={{ width: 18, height: 18, color: "var(--mint)" }} />
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td style={{ padding: "8px 16px" }}>
                     <Link
                       href={`/tasks/${t.id}`}
-                      className={cn(
-                        "font-medium hover:text-indigo-600 transition-colors",
-                        t.status === "done"
-                          ? "line-through text-slate-400"
-                          : "text-slate-900"
-                      )}
+                      style={{ fontWeight: 500, color: t.status === "done" ? "var(--fg-faint)" : "var(--fg)", textDecoration: t.status === "done" ? "line-through" : "none" }}
+                      onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
+                      onMouseOut={(e) => (e.currentTarget.style.color = t.status === "done" ? "var(--fg-faint)" : "var(--fg)")}
                     >
                       {t.title}
                     </Link>
                     {t._count.subTasks > 0 && (
-                      <span className="ml-2 text-xs text-slate-400">
-                        {t._count.subTasks} alfeladat
+                      <span className="font-mono-ndt" style={{ marginLeft: 8, fontSize: 10, color: "var(--fg-faint)" }}>
+                        ↳ {t._count.subTasks}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-xs text-slate-500 capitalize">
+                  <td style={{ padding: "8px 16px" }}>
+                    <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-mute)", textTransform: "capitalize" }}>
                       {(t.type ?? "").replace("_", " ")}
                     </span>
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell">
-                    <span
-                      className={cn(
-                        "text-xs",
-                        overdue
-                          ? "text-red-600 font-semibold"
-                          : today
-                            ? "text-amber-600 font-semibold"
-                            : "text-slate-500"
-                      )}
-                    >
-                      {t.dueDate ? formatDate(t.dueDate) : "—"}
-                      {overdue && " ⚠"}
+                  <td style={{ padding: "8px 16px" }}>
+                    <span className="font-mono-ndt" style={{ fontSize: 11, color: overdue ? "var(--coral)" : today ? "var(--amber)" : "var(--fg-faint)", fontWeight: overdue || today ? 600 : 400 }}>
+                      {t.dueDate ? formatDate(t.dueDate) : "—"}{overdue && " ⚠"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-xs text-slate-500">
-                    {t.company && (
-                      <Link
-                        href={`/companies/${t.company.id}`}
-                        className="hover:text-indigo-600"
-                      >
-                        {t.company.name}
-                      </Link>
-                    )}
-                    {t.person && (
-                      <span>
-                        {t.company && " · "}
-                        <Link
-                          href={`/persons/${t.person.id}`}
-                          className="hover:text-indigo-600"
-                        >
-                          {t.person.lastName} {t.person.firstName}
-                        </Link>
-                      </span>
-                    )}
-                    {!t.company && !t.person && "—"}
+                  <td style={{ padding: "8px 16px", fontSize: 12, color: "var(--fg-mute)" }}>
+                    {t.company && <Link href={`/companies/${t.company.id}`} style={{ color: "var(--fg-mute)" }} onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")} onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}>{t.company.name}</Link>}
+                    {t.person && <span>{t.company && " · "}<Link href={`/persons/${t.person.id}`} style={{ color: "var(--fg-faint)" }} onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")} onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}>{t.person.lastName} {t.person.firstName}</Link></span>}
+                    {!t.company && !t.person && <span style={{ color: "var(--fg-faint)" }}>—</span>}
                   </td>
-                  <td className="px-4 py-3">
+                  <td style={{ padding: "8px 16px" }}>
                     <TaskStatusBadge status={t.status} />
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button
-                        onClick={() => {
-                          setEditTask(t);
-                          setModalOpen(true);
-                        }}
-                        className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
-                        title="Szerkesztés"
-                      >
-                        <Pencil className="size-3.5" />
+                  <td style={{ padding: "8px 12px" }}>
+                    <div className="flex items-center gap-0.5 justify-end">
+                      <button onClick={() => { setEditTask(t); setModalOpen(true); }}
+                        style={{ padding: 4, borderRadius: 4, color: "var(--fg-faint)", cursor: "pointer" }}
+                        onMouseOver={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--fg)"; }}
+                        onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-faint)"; }}
+                        title="Szerkesztés">
+                        <Pencil style={{ width: 13, height: 13 }} />
                       </button>
                       {t.status === "done" && (
-                        <button
-                          onClick={() => handleReopen(t.id)}
-                          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
-                          title="Újranyitás"
-                        >
-                          <RotateCcw className="size-3.5" />
+                        <button onClick={() => handleReopen(t.id)}
+                          style={{ padding: 4, borderRadius: 4, color: "var(--fg-faint)", cursor: "pointer" }}
+                          onMouseOver={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--fg)"; }}
+                          onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-faint)"; }}
+                          title="Újranyitás">
+                          <RotateCcw style={{ width: 13, height: 13 }} />
                         </button>
                       )}
-                      <button
-                        onClick={() => handleDelete(t.id)}
-                        className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-600"
-                        title="Törlés"
-                      >
-                        <Trash2 className="size-3.5" />
+                      <button onClick={() => handleDelete(t.id)}
+                        style={{ padding: 4, borderRadius: 4, color: "var(--fg-faint)", cursor: "pointer" }}
+                        onMouseOver={(e) => { e.currentTarget.style.background = "var(--coral-soft)"; e.currentTarget.style.color = "var(--coral)"; }}
+                        onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-faint)"; }}
+                        title="Törlés">
+                        <Trash2 style={{ width: 13, height: 13 }} />
                       </button>
                     </div>
                   </td>
