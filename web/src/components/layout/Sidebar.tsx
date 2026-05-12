@@ -117,40 +117,46 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         }}
       />
 
-      {/* Brand */}
+      {/* Brand header — full when expanded, toggle-only when collapsed */}
       <div
-        className="relative z-10 flex items-center gap-2.5 px-4 shrink-0"
-        style={{ height: 60, borderBottom: "1px solid var(--line-soft)" }}
+        className="relative z-10 shrink-0 flex items-center"
+        style={{
+          height: 60,
+          borderBottom: "1px solid var(--line-soft)",
+          padding: collapsed ? "0" : "0 16px",
+          justifyContent: collapsed ? "center" : "flex-start",
+          gap: 10,
+        }}
       >
-        {/* Oscilloscope mark */}
-        <div
-          className="shrink-0 flex items-center justify-center rounded-md"
-          style={{
-            width: 28, height: 28,
-            background: "linear-gradient(135deg, var(--indigo) 0%, oklch(0.56 0.18 295) 100%)",
-            boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.5), 0 6px 20px -4px oklch(0.66 0.19 278 / 0.4)",
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M3 12 C7 4, 11 20, 15 12 S 21 4, 21 12" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/>
-          </svg>
-        </div>
-
         {!collapsed && (
-          <div className="flex-1 min-w-0">
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>
-              NDT CRM
+          <>
+            <div
+              className="shrink-0 flex items-center justify-center rounded-md"
+              style={{
+                width: 28, height: 28,
+                background: "linear-gradient(135deg, var(--indigo) 0%, oklch(0.56 0.18 295) 100%)",
+                boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.5), 0 6px 20px -4px oklch(0.66 0.19 278 / 0.4)",
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M3 12 C7 4, 11 20, 15 12 S 21 4, 21 12" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/>
+              </svg>
             </div>
-            <div style={{ fontSize: 10, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-              Controllabor
+            <div className="flex-1 min-w-0">
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>NDT CRM</div>
+              <div style={{ fontSize: 10, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Controllabor</div>
             </div>
-          </div>
+          </>
         )}
 
         <button
           onClick={toggle}
-          className="shrink-0 flex items-center justify-center rounded transition-colors"
-          style={{ width: 24, height: 24, color: "var(--fg-faint)" }}
+          className="flex items-center justify-center rounded transition-colors"
+          style={{
+            width: 28, height: 28, flexShrink: 0,
+            color: "var(--fg-faint)",
+            marginLeft: collapsed ? 0 : "auto",
+          }}
           onMouseOver={(e) => (e.currentTarget.style.color = "var(--fg)")}
           onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}
         >
