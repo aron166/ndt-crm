@@ -5,6 +5,7 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { TaskDetailClient } from "./TaskDetailClient";
 import { EntityTags } from "@/components/tags/EntityTags";
+import { AuditLogTab } from "@/components/AuditLogTab";
 import { ArrowLeft, Clock, Building2, User } from "lucide-react";
 
 const TENANT_ID = 1;
@@ -144,6 +145,18 @@ export default async function TaskDetailPage({
       </div>
 
       <TaskDetailClient task={task} />
+
+      <div className="mt-4">
+        <details className="group">
+          <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-600 list-none flex items-center gap-1">
+            <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+            Előzmények
+          </summary>
+          <div className="mt-3">
+            <AuditLogTab type="task" id={task.id} />
+          </div>
+        </details>
+      </div>
     </div>
   );
 }

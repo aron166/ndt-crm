@@ -29,6 +29,7 @@ model Tenant {
   equipment    Equipment[]
   etlRuns      EtlRun[]
   tags         Tag[]
+  auditLogs    AuditLog[]
 
   @@map("tenants")
 }
@@ -378,4 +379,28 @@ model Tagging {
   @@unique([tagId, taggableType, taggableId])
   @@index([taggableType, taggableId])
   @@map("taggings")
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG
+// Append-only. Every create/update/delete on business entities.
+// actor_user_id = Supabase Auth UUID (nullable for system/agent actions)
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  actorUserId  String?  @map("actor_user_id")  // Supabase Auth UUID
+  actorAgentId String?  @map("actor_agent_id") // Step 5: agent identity
+  action       String   // create | update | delete
+  entityType   String   @map("entity_type")
+  entityId     Int      @map("entity_id")
+  changes      Json     // { before: {...} | null, after: {...} | null }
+  occurredAt   DateTime @default(now()) @map("occurred_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([tenantId, occurredAt])
+  @@map("audit_log")
 }
