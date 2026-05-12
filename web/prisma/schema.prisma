@@ -16,21 +16,23 @@ model Tenant {
   slug      String   @unique
   createdAt DateTime @default(now()) @map("created_at")
 
-  companies    Company[]
-  persons      Person[]
-  users        User[]
-  contacts     Contact[]
-  leads        Lead[]
-  deals        Deal[]
-  proposals    Proposal[]
-  invoices     Invoice[]
-  tasks        Task[]
-  interactions Interaction[]
-  equipment    Equipment[]
-  etlRuns      EtlRun[]
-  tags         Tag[]
-  auditLogs    AuditLog[]
-  pipelines    Pipeline[]
+  companies     Company[]
+  persons       Person[]
+  users         User[]
+  contacts      Contact[]
+  leads         Lead[]
+  deals         Deal[]
+  proposals     Proposal[]
+  invoices      Invoice[]
+  tasks         Task[]
+  interactions  Interaction[]
+  equipment     Equipment[]
+  etlRuns       EtlRun[]
+  tags          Tag[]
+  auditLogs     AuditLog[]
+  pipelines     Pipeline[]
+  conversations Conversation[]
+  appEvents     AppEvent[]
 
   @@map("tenants")
 }
@@ -53,11 +55,13 @@ model Person {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  contacts     Contact[]     // all company relationships this person has had
-  interactions Interaction[]
-  tasks        Task[]        @relation("TaskPerson")
-  deals        Deal[]        @relation("DealPerson")
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  contacts      Contact[]      // all company relationships this person has had
+  interactions  Interaction[]
+  tasks         Task[]         @relation("TaskPerson")
+  deals         Deal[]         @relation("DealPerson")
+  conversations Conversation[]
+  appEvents     AppEvent[]
 
   @@map("persons")
 }
@@ -84,14 +88,16 @@ model Company {
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  contacts     Contact[]
-  leads        Lead[]
-  deals        Deal[]
-  proposals    Proposal[]
-  invoices     Invoice[]
-  interactions Interaction[]
-  tasks        Task[]        @relation("TaskCompany")
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  contacts      Contact[]
+  leads         Lead[]
+  deals         Deal[]
+  proposals     Proposal[]
+  invoices      Invoice[]
+  interactions  Interaction[]
+  tasks         Task[]         @relation("TaskCompany")
+  conversations Conversation[]
+  appEvents     AppEvent[]
 
   @@unique([tenantId, vatNumber])
   @@map("companies")
@@ -469,4 +475,82 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([tenantId, occurredAt])
   @@map("audit_log")
+}
+
+// ─────────────────────────────────────────────
+// ECOSYSTEM HUB
+// Central ledger for the whole Uphill Trade portfolio.
+// VeloQuote, BirdsView, CashFlow, and the agent team
+// write into these tables via the ingestion API.
+// ─────────────────────────────────────────────
+
+model Agent {
+  id        Int      @id @default(autoincrement())
+  name      String
+  role      String   // sales_assistant, intake_bot, mira_cmo, nate_dev
+  owner     String?  // veloQuote, birdsview, cashflow, ndt-crm
+  createdAt DateTime @default(now()) @map("created_at")
+
+  conversations Conversation[]
+  appEvents     AppEvent[]
+
+  @@map("agents")
+}
+
+model Conversation {
+  id        Int       @id @default(autoincrement())
+  tenantId  Int       @map("tenant_id")
+  agentId   Int?      @map("agent_id")
+  personId  Int?      @map("person_id")
+  companyId Int?      @map("company_id")
+  channel   String    // web_chat, phone, email, intake_form
+  summary   String?
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  agent    Agent?    @relation(fields: [agentId], references: [id])
+  person   Person?   @relation(fields: [personId], references: [id])
+  company  Company?  @relation(fields: [companyId], references: [id])
+  messages Message[]
+
+  @@index([tenantId, personId])
+  @@index([tenantId, companyId])
+  @@map("conversations")
+}
+
+model Message {
+  id             Int      @id @default(autoincrement())
+  conversationId Int      @map("conversation_id")
+  role           String   // user, assistant, system
+  content        String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+model AppEvent {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int      @map("tenant_id")
+  agentId    Int?     @map("agent_id")
+  personId   Int?     @map("person_id")
+  companyId  Int?     @map("company_id")
+  sourceApp  String   @map("source_app")  // veloQuote, birdsview, cashflow
+  eventType  String   @map("event_type")  // quote.created, lead.submitted, proposal.sent
+  payload    Json
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  agent   Agent?   @relation(fields: [agentId], references: [id])
+  person  Person?  @relation(fields: [personId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@index([tenantId, sourceApp])
+  @@index([tenantId, eventType])
+  @@index([tenantId, companyId])
+  @@index([tenantId, personId])
+  @@map("app_events")
 }
