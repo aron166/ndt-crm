@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PersonDetailClient } from "./PersonDetailClient";
 import { getTagsForEntity } from "@/app/actions/tags";
+import { getEntityHistory } from "@/app/actions/audit";
 
 const TENANT_ID = 1;
 
@@ -21,7 +22,7 @@ export default async function PersonDetailPage({
   const personId = parseInt(id, 10);
   if (isNaN(personId)) notFound();
 
-  const [person, contacts, interactions, tasks, initialTags] = await Promise.all([
+  const [person, contacts, interactions, tasks, initialTags, auditEntries] = await Promise.all([
     db.person.findFirst({ where: { id: personId, tenantId: TENANT_ID } }),
     db.contact.findMany({
       where: { personId, tenantId: TENANT_ID },
@@ -39,6 +40,7 @@ export default async function PersonDetailPage({
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
     }),
     getTagsForEntity("person", personId),
+    getEntityHistory("person", personId),
   ]);
 
   if (!person) notFound();
@@ -87,6 +89,7 @@ export default async function PersonDetailPage({
         avatarColor={avatarColor}
         initials={initials}
         initialTags={initialTags}
+        auditEntries={auditEntries}
       />
     </div>
   );
