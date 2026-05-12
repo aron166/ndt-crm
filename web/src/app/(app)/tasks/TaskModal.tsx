@@ -2,22 +2,15 @@
 
 import { useRef, useState, useTransition } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { EntitySearch } from "@/components/EntitySearch";
 import { createTask, updateTask } from "@/app/actions/tasks";
 
 interface TaskFormData {
@@ -30,7 +23,9 @@ interface TaskFormData {
   estimatedMinutes?: number | null;
   description?: string | null;
   companyId?: number | null;
+  companyName?: string | null;
   personId?: number | null;
+  personName?: string | null;
   parentTaskId?: number | null;
 }
 
@@ -41,26 +36,19 @@ interface TaskModalProps {
 }
 
 const TYPES = [
-  { value: "call", label: "Hívás" },
-  { value: "email", label: "Email" },
-  { value: "meeting", label: "Találkozó" },
-  { value: "document", label: "Dokumentum" },
-  { value: "field_visit", label: "Helyszíni munka" },
-  { value: "internal", label: "Belső" },
-];
-
-const CATEGORIES = [
-  { value: "revenue", label: "Bevétel" },
-  { value: "cost", label: "Kiadás" },
-  { value: "internal", label: "Belső" },
-  { value: "external", label: "Külső" },
+  { value: "call",       label: "📞 Hívás" },
+  { value: "email",      label: "✉️ Email" },
+  { value: "meeting",    label: "🤝 Találkozó" },
+  { value: "document",   label: "📄 Dokumentum" },
+  { value: "field_visit",label: "🏭 Helyszíni munka" },
+  { value: "internal",   label: "⚙️ Belső" },
 ];
 
 const STATUSES = [
-  { value: "not_started", label: "Nem kezdett" },
+  { value: "created",     label: "Kiírva" },
   { value: "in_progress", label: "Folyamatban" },
-  { value: "done", label: "Kész" },
-  { value: "cancelled", label: "Törölve" },
+  { value: "done",        label: "Elvégezve" },
+  { value: "cancelled",   label: "Törölve" },
 ];
 
 export function TaskModal({ open, onClose, initial }: TaskModalProps) {
@@ -70,8 +58,13 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [type, setType] = useState(initial?.type ?? "internal");
-  const [category, setCategory] = useState(initial?.category ?? "internal");
-  const [status, setStatus] = useState(initial?.status ?? "not_started");
+  const [status, setStatus] = useState(initial?.status ?? "created");
+  const [company, setCompany] = useState<{ id: number; label: string } | null>(
+    initial?.companyId ? { id: initial.companyId, label: initial.companyName ?? "" } : null
+  );
+  const [person, setPerson] = useState<{ id: number; label: string; sub?: string } | null>(
+    initial?.personId ? { id: initial.personId, label: initial.personName ?? "" } : null
+  );
 
   function handleClose() {
     setError(null);
@@ -84,15 +77,16 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
     if (!form) return;
 
     const data = new FormData(form);
-    data.set("type", type);
-    data.set("category", category);
-    data.set("status", status);
+    data.set("type", type ?? "internal");
+    data.set("status", status ?? "created");
+    if (company) data.set("companyId", String(company.id));
+    if (person)  data.set("personId", String(person.id));
+    if (initial?.parentTaskId) data.set("parentTaskId", String(initial.parentTaskId));
 
     startTransition(async () => {
       const result = isEdit
         ? await updateTask(initial!.id!, data)
         : await createTask(data);
-
       if (result?.error) {
         setError(result.error);
       } else {
@@ -106,20 +100,18 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
     ? new Date(initial.dueDate).toISOString().split("T")[0]
     : "";
 
+  const contextLocked = !!(initial?.companyId || initial?.personId);
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Feladat szerkesztése" : "Új feladat"}
-          </DialogTitle>
+          <DialogTitle>{isEdit ? "Feladat szerkesztése" : "Új feladat"}</DialogTitle>
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Cím *
-            </label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Cím *</label>
             <Input
               name="title"
               defaultValue={initial?.title}
@@ -131,54 +123,23 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Típus
-              </label>
-              <Select value={type} onValueChange={(v) => v && setType(v)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Típus</label>
+              <Select value={type ?? "internal"} onValueChange={(v) => v && setType(v)}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
+                  {TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Kategória
-              </label>
-              <Select value={category} onValueChange={(v) => v && setCategory(v)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>
-                      {c.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Határidő</label>
+              <Input type="date" name="dueDate" defaultValue={dueDateValue} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Határidő
-              </label>
-              <Input type="date" name="dueDate" defaultValue={dueDateValue} />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Tervezett perc
-              </label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Tervezett perc</label>
               <Input
                 type="number"
                 name="estimatedMinutes"
@@ -187,63 +148,56 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
                 min={1}
               />
             </div>
+            {isEdit && (
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Státusz</label>
+                <Select value={status ?? "created"} onValueChange={(v) => v && setStatus(v)}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
-          {isEdit && (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Státusz
-              </label>
-              <Select value={status} onValueChange={(v) => v && setStatus(v)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Leírás
-            </label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Leírás</label>
             <Textarea
               name="description"
               defaultValue={initial?.description ?? ""}
               placeholder="Megjegyzések..."
-              rows={3}
+              rows={2}
             />
           </div>
 
-          {initial?.companyId && (
-            <input type="hidden" name="companyId" value={initial.companyId} />
-          )}
-          {initial?.personId && (
-            <input type="hidden" name="personId" value={initial.personId} />
-          )}
-          {initial?.parentTaskId && (
-            <input
-              type="hidden"
-              name="parentTaskId"
-              value={initial.parentTaskId}
-            />
-          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Cég</label>
+              <EntitySearch
+                endpoint="/api/search/companies"
+                placeholder="Keresés..."
+                value={company}
+                onChange={setCompany}
+                disabled={contextLocked && !!initial?.companyId}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Személy</label>
+              <EntitySearch
+                endpoint="/api/search/persons"
+                placeholder="Keresés..."
+                value={person}
+                onChange={setPerson}
+                disabled={contextLocked && !!initial?.personId}
+              />
+            </div>
+          </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={isPending}
-            >
+            <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
               Mégse
             </Button>
             <Button

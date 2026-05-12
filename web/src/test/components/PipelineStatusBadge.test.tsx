@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 
 describe("PipelineStatusBadge", () => {
-  it("renders the correct label for status 1", () => {
+  it("renders the correct label for pipeline status 1", () => {
     render(<PipelineStatusBadge status={1} />);
     expect(screen.getByText("Nem hívtuk")).toBeTruthy();
   });
