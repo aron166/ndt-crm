@@ -71,11 +71,11 @@ export function CompanyDetailClient({
   }
 
   const TABS = [
-    { key: "overview",      label: "Overview" },
+    { key: "overview",      label: "Áttekintés" },
     { key: "contacts",      label: `Contacts · ${contacts.filter(c => !c.endedAt).length}` },
     { key: "activity",      label: `Activity · ${interactions.length}` },
     { key: "tasks",         label: `Tasks · ${tasks.filter(t => t.status !== "done").length}` },
-    { key: "history",       label: "History" },
+    { key: "history",       label: "Előzmények" },
   ];
 
   return (
@@ -130,9 +130,9 @@ export function CompanyDetailClient({
           {/* Actions */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
             <button className="btn primary" onClick={() => { setLogPerson(contacts.find(c => !c.endedAt) ?? null); setLogOpen(true); }}>
-              <Phone style={{ width: 13, height: 13 }} /> Log interaction
+              <Phone style={{ width: 13, height: 13 }} /> Naplózás
             </button>
-            <button className="btn" onClick={() => setAddOpen(true)}>+ New contact</button>
+            <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
           </div>
         </div>
 
@@ -161,10 +161,16 @@ export function CompanyDetailClient({
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginTop: 16 }}>
           <div className="panel mount">
             <div className="panel-head">
-              <div className="panel-title">Revenue trajectory · 24m</div>
+              <div className="panel-title">Forgalom · 24 hónap</div>
             </div>
             <div style={{ padding: 18 }}>
-              <AreaChart data={revenueSeries} height={180} color="var(--indigo)" />
+              {revenueSeries.length >= 2 ? (
+                <AreaChart data={revenueSeries} height={180} color="var(--indigo)" />
+              ) : (
+                <div style={{ height: 180, display: "grid", placeItems: "center", color: "var(--fg-faint)", fontSize: 13 }}>
+                  Nincs elegendő számladat a grafikonhoz.
+                </div>
+              )}
               <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
                 {company.lastInteractionDate && (
                   <div>
@@ -185,7 +191,7 @@ export function CompanyDetailClient({
           </div>
 
           <div className="panel mount">
-            <div className="panel-head"><div className="panel-title">Engagement split</div></div>
+            <div className="panel-head"><div className="panel-title">Interakció típusok</div></div>
             <div className="panel-pad">
               <StackBar segments={engagementBreakdown} />
               <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
