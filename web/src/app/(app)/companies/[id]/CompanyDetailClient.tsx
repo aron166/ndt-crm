@@ -8,7 +8,7 @@ import { StackBar } from "@/components/viz/StackBar";
 import { LogInteractionModal } from "@/components/LogInteractionModal";
 import { AddContactModal } from "./AddContactModal";
 import { closeContact } from "@/app/actions/contacts";
-import { EntityTags } from "@/components/tags/EntityTags";
+import { TagInput } from "@/components/tags/TagInput";
 import { AuditLogTab } from "@/components/AuditLogTab";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
@@ -42,6 +42,7 @@ interface Props {
   kpis: { label: string; value: string | number; accent: string }[];
   avatarColor: string;
   initials: string;
+  initialTags: { id: number; name: string; color: string }[];
 }
 
 const TYPE_COLOR: Record<string, string> = {
@@ -55,7 +56,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export function CompanyDetailClient({
   company, contacts, interactions, tasks, revenueSeries,
-  engagementBreakdown, kpis, avatarColor, initials,
+  engagementBreakdown, kpis, avatarColor, initials, initialTags,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("overview");
@@ -122,7 +123,7 @@ export function CompanyDetailClient({
             </div>
             {/* Tags */}
             <div style={{ marginTop: 12 }}>
-              <EntityTags type="company" id={company.id} />
+              <TagInput taggableType="company" taggableId={company.id} initialTags={initialTags} />
             </div>
           </div>
 
