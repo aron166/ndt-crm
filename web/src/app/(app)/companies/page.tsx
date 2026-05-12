@@ -2,7 +2,6 @@ import { db } from "@/lib/db";
 import Link from "next/link";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { formatDate } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
 import { CompaniesSearch } from "./CompaniesSearch";
 import { TagFilter } from "@/components/tags/TagFilter";
 
@@ -16,6 +15,15 @@ interface SearchParams {
   tag?: string;
 }
 
+// deterministic avatar color per company id
+function avatarBg(id: number) {
+  const palette = [
+    "oklch(0.66 0.19 278)", "oklch(0.80 0.13 165)", "oklch(0.80 0.15 75)",
+    "oklch(0.78 0.12 230)", "oklch(0.72 0.16 305)", "oklch(0.72 0.18 25)",
+  ];
+  return palette[id % palette.length];
+}
+
 export default async function CompaniesPage({
   searchParams,
 }: {
@@ -27,7 +35,6 @@ export default async function CompaniesPage({
   const includeFA = params.fa === "1";
   const tagName = params.tag?.trim() ?? "";
 
-  // If filtering by tag, resolve company IDs first
   let tagFilterIds: number[] | undefined;
   if (tagName) {
     const tag = await db.tag.findFirst({
@@ -65,93 +72,138 @@ export default async function CompaniesPage({
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="mount">
+      {/* Page header */}
+      <div className="flex items-end justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Cégek</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{total} találat</p>
+          <h1 className="flex items-center gap-3" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.02em", margin: 0 }}>
+            Cégek
+            <span className="font-mono-ndt" style={{ fontSize: 13, color: "var(--fg-mute)", fontWeight: 400 }}>
+              · {total.toLocaleString("hu-HU")}
+            </span>
+          </h1>
+          <p style={{ fontSize: 13, color: "var(--fg-mute)", marginTop: 4 }}>
+            VAT-szám alapján deduplikálva. Személy-történet megmarad munkáltatóváltáskor.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <CompaniesSearch search={search} includeFA={includeFA} />
+          <TagFilter activeTagName={tagName || undefined} />
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <CompaniesSearch search={search} includeFA={includeFA} />
-        <TagFilter activeTagName={tagName || undefined} />
-      </div>
-
-      <div className="mt-4 bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
+      {/* Table */}
+      <div
+        className="rounded-xl overflow-hidden mount mount-1"
+        style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)" }}
+      >
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50">
-              <th className="text-left px-4 py-3 font-medium text-slate-500">
-                Cég neve
-              </th>
-              <th className="text-left px-4 py-3 font-medium text-slate-500 hidden md:table-cell">
-                Státusz
-              </th>
-              <th className="text-left px-4 py-3 font-medium text-slate-500 hidden lg:table-cell">
-                Város
-              </th>
-              <th className="text-left px-4 py-3 font-medium text-slate-500 hidden lg:table-cell">
-                Pipeline
-              </th>
-              <th className="text-left px-4 py-3 font-medium text-slate-500 hidden xl:table-cell">
-                Utolsó interakció
-              </th>
+            <tr>
+              {["", "Cég neve", "Terület", "Pipeline", "Utolsó interakció", "Adószám"].map((h, i) => (
+                <th
+                  key={i}
+                  style={{
+                    textAlign: i > 3 ? "right" : "left",
+                    padding: "10px 16px",
+                    fontSize: 10, fontWeight: 600,
+                    textTransform: "uppercase", letterSpacing: "0.1em",
+                    color: "var(--fg-faint)",
+                    borderBottom: "1px solid var(--line-soft)",
+                    background: "oklch(0.20 0.014 255 / 0.5)",
+                    position: "sticky", top: 0, zIndex: 1,
+                  }}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {companies.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={6} style={{ padding: "48px 16px", textAlign: "center", color: "var(--fg-faint)" }}>
                   Nincs találat.
                 </td>
               </tr>
             )}
-            {companies.map((c) => (
-              <tr
-                key={c.id}
-                className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
-              >
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/companies/${c.id}`}
-                    className="font-medium text-slate-900 hover:text-indigo-600 transition-colors"
-                  >
-                    {c.name}
-                  </Link>
-                  {c.vatNumber && (
-                    <p className="text-xs text-slate-400">{c.vatNumber}</p>
-                  )}
-                </td>
-                <td className="px-4 py-3 hidden md:table-cell">
-                  <span className="text-slate-500 text-xs">{c.status ?? "—"}</span>
-                </td>
-                <td className="px-4 py-3 hidden lg:table-cell text-slate-600">
-                  {c.city ?? "—"}
-                </td>
-                <td className="px-4 py-3 hidden lg:table-cell">
-                  <PipelineStatusBadge status={c.pipelineStatus} />
-                </td>
-                <td className="px-4 py-3 hidden xl:table-cell text-slate-500 text-xs">
-                  {formatDate(c.lastInteractionDate)}
-                </td>
-              </tr>
-            ))}
+            {companies.map((c, idx) => {
+              const initials = c.name.slice(0, 2).toUpperCase();
+              return (
+                <tr
+                  key={c.id}
+                  className="mount"
+                  style={{
+                    animationDelay: `${idx * 20}ms`,
+                    borderBottom: "1px solid var(--line-soft)",
+                    transition: "background 0.12s",
+                    cursor: "pointer",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "oklch(0.66 0.19 278 / 0.05)")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <td style={{ padding: "10px 16px", width: 48 }}>
+                    <Link href={`/companies/${c.id}`}>
+                      <div
+                        className="font-mono-ndt flex items-center justify-center rounded-lg"
+                        style={{
+                          width: 32, height: 32, fontSize: 11, fontWeight: 600,
+                          background: avatarBg(c.id), color: "var(--fg)",
+                        }}
+                      >
+                        {initials}
+                      </div>
+                    </Link>
+                  </td>
+                  <td style={{ padding: "10px 16px" }}>
+                    <Link href={`/companies/${c.id}`} style={{ color: "var(--fg)", fontWeight: 500 }}
+                      onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
+                      onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
+                    >
+                      {c.name}
+                    </Link>
+                    {c.vatNumber && (
+                      <div className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 2 }}>
+                        {c.vatNumber}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding: "10px 16px" }}>
+                    <span style={{ color: "var(--fg-soft)" }}>{c.city ?? "—"}</span>
+                    {c.county && <div style={{ fontSize: 11, color: "var(--fg-faint)" }}>{c.county}</div>}
+                  </td>
+                  <td style={{ padding: "10px 16px" }}>
+                    <PipelineStatusBadge status={c.pipelineStatus} />
+                  </td>
+                  <td style={{ padding: "10px 16px", textAlign: "right" }}>
+                    <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+                      {formatDate(c.lastInteractionDate)}
+                    </span>
+                  </td>
+                  <td style={{ padding: "10px 16px", textAlign: "right" }}>
+                    <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+                      {c.vatNumber ?? "—"}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
+      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
+        <div className="flex items-center justify-between mt-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
           <span>
-            {(page - 1) * PAGE_SIZE + 1}–
-            {Math.min(page * PAGE_SIZE, total)} / {total}
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} / {total}
           </span>
           <div className="flex gap-2">
             {page > 1 && (
               <Link
                 href={`/companies?search=${search}&page=${page - 1}&fa=${includeFA ? "1" : "0"}`}
-                className="px-3 py-1 rounded border border-slate-200 hover:bg-slate-100"
+                className="rounded"
+                style={{ padding: "4px 12px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", color: "var(--fg-soft)" }}
               >
                 ← Előző
               </Link>
@@ -159,7 +211,8 @@ export default async function CompaniesPage({
             {page < totalPages && (
               <Link
                 href={`/companies?search=${search}&page=${page + 1}&fa=${includeFA ? "1" : "0"}`}
-                className="px-3 py-1 rounded border border-slate-200 hover:bg-slate-100"
+                className="rounded"
+                style={{ padding: "4px 12px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", color: "var(--fg-soft)" }}
               >
                 Következő →
               </Link>
