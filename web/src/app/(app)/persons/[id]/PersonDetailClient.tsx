@@ -16,16 +16,16 @@ import { Mail, Phone, MapPin, ExternalLink } from "lucide-react";
 
 interface Contact {
   id: number; companyId: number; role: string | null;
-  startedAt: Date | null; endedAt: Date | null;
+  startedAt: string | Date | null; endedAt: string | Date | null;
   company: { id: number; name: string; vatNumber: string | null; city: string | null; pipelineStatus: string | null };
 }
 interface Interaction {
   id: number; type: string | null; direction: string | null;
-  notes: string | null; outcome: string | null; occurredAt: Date;
+  notes: string | null; outcome: string | null; occurredAt: string | Date;
 }
 interface Task {
   id: number; title: string; type: string | null; category: string | null;
-  status: string; dueDate: Date | null; estimatedMinutes: number | null;
+  status: string; dueDate: string | Date | null; estimatedMinutes: number | null;
   description: string | null; companyId: number | null; personId: number | null;
   parentTaskId: number | null; _count: { subTasks: number };
 }
