@@ -116,6 +116,27 @@ export async function reopenTask(id: number) {
   if (before?.personId)  revalidatePath(`/persons/${before.personId}`);
 }
 
+export async function moveTask(id: number, newStatus: string) {
+  const task = await db.task.findFirst({
+    where: { id, tenantId: TENANT_ID },
+    select: { status: true, companyId: true, personId: true },
+  });
+  if (!task) return;
+
+  await db.task.updateMany({
+    where: { id, tenantId: TENANT_ID },
+    data: {
+      status: newStatus,
+      completedAt: newStatus === "done" ? new Date() : null,
+      updatedAt: new Date(),
+    },
+  });
+  await audit("task", id, "update", { status: task.status }, { status: newStatus });
+  revalidatePath("/tasks");
+  if (task.companyId) revalidatePath(`/companies/${task.companyId}`);
+  if (task.personId)  revalidatePath(`/persons/${task.personId}`);
+}
+
 export async function deleteTask(id: number) {
   const task = await db.task.findFirst({
     where: { id, tenantId: TENANT_ID },
