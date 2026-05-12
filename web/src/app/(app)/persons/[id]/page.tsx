@@ -23,7 +23,7 @@ export default async function PersonDetailPage({
   const personId = parseInt(id, 10);
   if (isNaN(personId)) notFound();
 
-  const [person, contacts, interactions, tasks, initialTags, auditEntries] = await Promise.all([
+  const [person, contacts, interactions, tasks, conversations, initialTags, auditEntries] = await Promise.all([
     db.person.findFirst({ where: { id: personId, tenantId: TENANT_ID } }),
     db.contact.findMany({
       where: { personId, tenantId: TENANT_ID },
@@ -39,6 +39,15 @@ export default async function PersonDetailPage({
       where: { personId, tenantId: TENANT_ID, parentTaskId: null },
       include: { _count: { select: { subTasks: true } } },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
+    }),
+    db.conversation.findMany({
+      where: { personId, tenantId: TENANT_ID },
+      include: {
+        agent: { select: { id: true, name: true, role: true, owner: true } },
+        messages: { orderBy: { createdAt: "asc" } },
+      },
+      orderBy: { startedAt: "desc" },
+      take: 20,
     }),
     getTagsForEntity("person", personId),
     getEntityHistory("person", personId),
@@ -85,6 +94,7 @@ export default async function PersonDetailPage({
         contacts={serializeDates(contacts)}
         interactions={serializeDates(interactions)}
         tasks={serializeDates(tasks)}
+        conversations={serializeDates(conversations)}
         engagementSeries={engagementSeries}
         signalLevel={signalLevel}
         avatarColor={avatarColor}
