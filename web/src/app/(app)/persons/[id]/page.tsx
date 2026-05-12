@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { PersonDetailClient } from "./PersonDetailClient";
 import { getTagsForEntity } from "@/app/actions/tags";
 import { getEntityHistory } from "@/app/actions/audit";
+import { serializeDates } from "@/lib/serialize";
 
 const TENANT_ID = 1;
 
@@ -80,16 +81,16 @@ export default async function PersonDetailPage({
       </div>
 
       <PersonDetailClient
-        person={person}
-        contacts={contacts}
-        interactions={interactions}
-        tasks={tasks}
+        person={serializeDates(person)}
+        contacts={serializeDates(contacts)}
+        interactions={serializeDates(interactions)}
+        tasks={serializeDates(tasks)}
         engagementSeries={engagementSeries}
         signalLevel={signalLevel}
         avatarColor={avatarColor}
         initials={initials}
         initialTags={initialTags}
-        auditEntries={auditEntries}
+        auditEntries={serializeDates(auditEntries)}
       />
     </div>
   );

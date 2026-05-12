@@ -6,6 +6,7 @@ import { CompanyDetailClient } from "./CompanyDetailClient";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { getTagsForEntity } from "@/app/actions/tags";
 import { getEntityHistory } from "@/app/actions/audit";
+import { serializeDates } from "@/lib/serialize";
 
 const TENANT_ID = 1;
 
@@ -102,17 +103,17 @@ export default async function CompanyDetailPage({
       </div>
 
       <CompanyDetailClient
-        company={company}
-        contacts={contacts}
-        interactions={interactions}
-        tasks={tasks}
+        company={serializeDates(company)}
+        contacts={serializeDates(contacts)}
+        interactions={serializeDates(interactions)}
+        tasks={serializeDates(tasks)}
         revenueSeries={revenueSeries}
         engagementBreakdown={engagementBreakdown}
         kpis={kpis}
         avatarColor={avatarColor}
         initials={initials}
         initialTags={initialTags}
-        auditEntries={auditEntries}
+        auditEntries={serializeDates(auditEntries)}
       />
     </div>
   );
