@@ -132,15 +132,8 @@ export default async function CompaniesPage({
               return (
                 <tr
                   key={c.id}
-                  className="mount"
-                  style={{
-                    animationDelay: `${idx * 20}ms`,
-                    borderBottom: "1px solid var(--line-soft)",
-                    transition: "background 0.12s",
-                    cursor: "pointer",
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "oklch(0.66 0.19 278 / 0.05)")}
-                  onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                  className="tbl-row mount"
+                  style={{ animationDelay: `${idx * 20}ms`, borderBottom: "1px solid var(--line-soft)" }}
                 >
                   <td style={{ padding: "10px 16px", width: 48 }}>
                     <Link href={`/companies/${c.id}`}>
@@ -156,10 +149,7 @@ export default async function CompaniesPage({
                     </Link>
                   </td>
                   <td style={{ padding: "10px 16px" }}>
-                    <Link href={`/companies/${c.id}`} style={{ color: "var(--fg)", fontWeight: 500 }}
-                      onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-                      onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
-                    >
+                    <Link href={`/companies/${c.id}`} className="tbl-link">
                       {c.name}
                     </Link>
                     {c.vatNumber && (
