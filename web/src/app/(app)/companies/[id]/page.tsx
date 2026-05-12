@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Building2, MapPin, Globe, ArrowLeft } from "lucide-react";
 import { CompanyContactsTable } from "./CompanyContactsTable";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
+import { EntityTags } from "@/components/tags/EntityTags";
 
 const TENANT_ID = 1;
 
@@ -70,6 +71,11 @@ export default async function CompanyDetailPage({
             </div>
           </div>
           <PipelineStatusBadge status={company.pipelineStatus} />
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <p className="text-xs text-slate-400 mb-2">Tags</p>
+          <EntityTags type="company" id={company.id} />
         </div>
 
         <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">

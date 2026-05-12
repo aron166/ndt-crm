@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { TaskDetailClient } from "./TaskDetailClient";
+import { EntityTags } from "@/components/tags/EntityTags";
 import { ArrowLeft, Clock, Building2, User } from "lucide-react";
 
 const TENANT_ID = 1;
@@ -135,6 +136,11 @@ export default async function TaskDetailPage({
             {task.description}
           </p>
         )}
+
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <p className="text-xs text-slate-400 mb-2">Tags</p>
+          <EntityTags type="task" id={task.id} />
+        </div>
       </div>
 
       <TaskDetailClient task={task} />

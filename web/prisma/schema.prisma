@@ -28,6 +28,7 @@ model Tenant {
   interactions Interaction[]
   equipment    Equipment[]
   etlRuns      EtlRun[]
+  tags         Tag[]
 
   @@map("tenants")
 }
@@ -344,4 +345,37 @@ model EtlRun {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@map("etl_runs")
+}
+
+// ─────────────────────────────────────────────
+// TAGS
+// Cross-entity tagging — company / person / deal / task / interaction
+// ─────────────────────────────────────────────
+
+model Tag {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  name      String
+  color     String   @default("#6366f1") // hex color
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  taggings Tagging[]
+
+  @@unique([tenantId, name])
+  @@map("tags")
+}
+
+model Tagging {
+  id            Int      @id @default(autoincrement())
+  tagId         Int      @map("tag_id")
+  taggableType  String   @map("taggable_type") // company | person | deal | task | interaction
+  taggableId    Int      @map("taggable_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, taggableType, taggableId])
+  @@index([taggableType, taggableId])
+  @@map("taggings")
 }
