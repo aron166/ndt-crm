@@ -8,6 +8,7 @@ import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { LogInteractionButton } from "@/components/LogInteractionButton";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { EntityTags } from "@/components/tags/EntityTags";
+import { AuditLogTab } from "@/components/AuditLogTab";
 
 const TENANT_ID = 1;
 
@@ -124,6 +125,7 @@ export default async function PersonDetailPage({
           <TabsTrigger value="employment">
             Munkahely ({contacts.length})
           </TabsTrigger>
+          <TabsTrigger value="history">Előzmények</TabsTrigger>
         </TabsList>
 
         <TabsContent value="interactions" className="mt-4">
@@ -204,6 +206,10 @@ export default async function PersonDetailPage({
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          <AuditLogTab type="person" id={person.id} />
         </TabsContent>
       </Tabs>
     </div>
