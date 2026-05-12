@@ -82,7 +82,8 @@ export default async function AnalyticsPage({
       SUM(net_amount::numeric)::float AS total
     FROM invoices
     WHERE tenant_id = ${TENANT_ID} AND issued_date IS NOT NULL AND net_amount IS NOT NULL
-    GROUP BY year ORDER BY year
+    GROUP BY EXTRACT(YEAR FROM issued_date)
+    ORDER BY year
   `;
 
   // ── Revenue by month (last 24 months) ─────────────────────
@@ -94,7 +95,8 @@ export default async function AnalyticsPage({
     WHERE tenant_id = ${TENANT_ID}
       AND issued_date >= NOW() - INTERVAL '24 months'
       AND net_amount IS NOT NULL
-    GROUP BY month ORDER BY month
+    GROUP BY TO_CHAR(issued_date, 'YYYY-MM')
+    ORDER BY month
   `;
 
   // ── Top 10 companies by revenue ────────────────────────────
