@@ -51,14 +51,10 @@ export default async function CompanyDetailPage({
 
   if (!company) notFound();
 
-  // Revenue sparkline — monthly net totals (last 24 data points)
-  const revenueSeries = invoices.map((inv) =>
-    inv.netAmount ? Number(inv.netAmount) : 0
-  );
-  if (revenueSeries.length < 2) {
-    // fill with fake trend if no real data
-    for (let i = revenueSeries.length; i < 12; i++) revenueSeries.push(40 + i * 3 + Math.random() * 10);
-  }
+  // Revenue sparkline — real invoice amounts only, no fabrication
+  const revenueSeries = invoices
+    .filter((inv) => inv.netAmount != null)
+    .map((inv) => Number(inv.netAmount));
 
   // Engagement breakdown by type
   const typeCounts: Record<string, number> = {};
