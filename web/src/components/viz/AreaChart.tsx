@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useId, useRef, useState, useMemo } from "react";
 
 interface AreaChartProps {
   data: number[];
@@ -39,7 +39,8 @@ export function AreaChart({ data, height = 180, color = "var(--indigo)" }: AreaC
   }, [data, width, height]);
 
   const len = Math.round(width * 2);
-  const gradId = `ag-${Math.random().toString(36).slice(2, 7)}`;
+  const uid = useId().replace(/:/g, "");
+  const gradId = `ag-${uid}`;
   const last = pts[pts.length - 1];
 
   return (

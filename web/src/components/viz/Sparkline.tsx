@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 
 interface SparklineProps {
   data: number[];
@@ -19,6 +19,10 @@ export function Sparkline({
   fill = true,
   animate = true,
 }: SparklineProps) {
+  // useId() produces a stable ID that matches between server and client render
+  const uid = useId().replace(/:/g, "");
+  const gradId = `sg-${uid}`;
+
   const { d, dFill, len } = useMemo(() => {
     if (!data.length) return { d: "", dFill: "", len: 0 };
     const min = Math.min(...data);
@@ -35,8 +39,6 @@ export function Sparkline({
   }, [data, width, height]);
 
   if (!data.length) return null;
-
-  const gradId = `sg-${Math.random().toString(36).slice(2, 7)}`;
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block" }}>

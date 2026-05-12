@@ -10,26 +10,37 @@ interface RevenueMonth {
 
 interface AnalyticsClientProps {
   revenueByMonth: RevenueMonth[];
+  totalCompanies: number;
+  totalPersons: number;
+  neverContacted: number;
+  openTasks: number;
+  openDeals: number;
 }
 
-const ENTITY_LINKS = [
-  { label: "Összes cég",                href: "/companies",                       count: "1 696" },
-  { label: "Soha nem kontaktált cégek", href: "/companies",                       count: "→" },
-  { label: "Összes személy",            href: "/persons",                         count: "1 632" },
-  { label: "Feladatok",                 href: "/tasks",                           count: "→" },
-  { label: "Pipeline deals",           href: "/deals",                           count: "→" },
-  { label: "Pipeline beállítás",        href: "/deals/setup",                     count: "→" },
-];
-
-export function AnalyticsClient({ revenueByMonth }: AnalyticsClientProps) {
+export function AnalyticsClient({
+  revenueByMonth,
+  totalCompanies,
+  totalPersons,
+  neverContacted,
+  openTasks,
+  openDeals,
+}: AnalyticsClientProps) {
   const [activeSection, setActiveSection] = useState<"revenue" | "explorer">("revenue");
 
   const monthSeries = revenueByMonth.map((r) => r.total / 1_000_000);
-  const monthLabels = revenueByMonth.map((r) => r.month.slice(2)); // "YY-MM"
+  const monthLabels = revenueByMonth.map((r) => r.month.slice(2));
+
+  const entityLinks = [
+    { label: "Összes cég",                href: "/companies",   count: totalCompanies.toLocaleString("hu-HU") },
+    { label: "Soha nem kontaktált",        href: "/companies",   count: neverContacted.toLocaleString("hu-HU") },
+    { label: "Összes személy",            href: "/persons",     count: totalPersons.toLocaleString("hu-HU") },
+    { label: "Nyitott feladatok",         href: "/tasks",       count: openTasks > 0 ? openTasks.toLocaleString("hu-HU") : "—" },
+    { label: "Aktív dealek",             href: "/deals",       count: openDeals > 0 ? openDeals.toLocaleString("hu-HU") : "—" },
+    { label: "Pipeline beállítás",        href: "/deals/setup", count: "→" },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Section tabs */}
       <div className="tabs-ds">
         <button className={`tab-ds ${activeSection === "revenue" ? "active" : ""}`} onClick={() => setActiveSection("revenue")}>
           Bevétel · 24 hónap
@@ -39,7 +50,6 @@ export function AnalyticsClient({ revenueByMonth }: AnalyticsClientProps) {
         </button>
       </div>
 
-      {/* Revenue 24 months */}
       {activeSection === "revenue" && (
         <div className="panel mount">
           <div className="panel-head">
@@ -67,23 +77,21 @@ export function AnalyticsClient({ revenueByMonth }: AnalyticsClientProps) {
               </>
             ) : (
               <p style={{ fontSize: 13, color: "var(--fg-faint)", textAlign: "center", padding: "32px 0" }}>
-                Nincs adat az elmúlt 24 hónapra.
+                Nincs számla adat az elmúlt 24 hónapra.
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Data explorer */}
       {activeSection === "explorer" && (
         <div className="panel mount">
           <div className="panel-head">
             <div className="panel-title">Adatok böngészése</div>
-            <p style={{ fontSize: 12, color: "var(--fg-mute)" }}>Kattints bármelyik entitásra a szűrt nézethez</p>
           </div>
           <div style={{ padding: 20 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {ENTITY_LINKS.map(({ label, href, count }) => (
+              {entityLinks.map(({ label, href, count }) => (
                 <a
                   key={label}
                   href={href}
@@ -103,8 +111,6 @@ export function AnalyticsClient({ revenueByMonth }: AnalyticsClientProps) {
                 </a>
               ))}
             </div>
-
-            {/* Future: custom query builder */}
             <div style={{ marginTop: 20, padding: 16, border: "1px dashed var(--line-soft)", borderRadius: 8, fontSize: 12, color: "var(--fg-faint)", textAlign: "center" }}>
               Hamarosan: egyéni lekérdezés-készítő, exportálás CSV-be, mentett nézetek
             </div>
