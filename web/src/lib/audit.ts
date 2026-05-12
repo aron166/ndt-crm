@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { db } from "./db";
 import { createClient } from "./supabase/server";
 
@@ -8,30 +9,33 @@ export type AuditEntityType =
   | "company" | "person" | "contact"
   | "task" | "interaction" | "tag" | "tagging";
 
-export async function audit(
+// Runs after the response is sent — never blocks the main operation
+export function audit(
   entityType: AuditEntityType,
   entityId: number,
   action: AuditAction,
   before: Record<string, unknown> | null,
-  after: Record<string, unknown> | null,
+  after_data: Record<string, unknown> | null,
 ) {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+  after(async () => {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
 
-    await db.auditLog.create({
-      data: {
-        tenantId: TENANT_ID,
-        actorUserId: user?.id ?? null,
-        action,
-        entityType,
-        entityId,
-        changes: JSON.parse(JSON.stringify({ before, after })),
-      },
-    });
-  } catch {
-    // Audit failures must never break the main operation
-  }
+      await db.auditLog.create({
+        data: {
+          tenantId: TENANT_ID,
+          actorUserId: user?.id ?? null,
+          action,
+          entityType,
+          entityId,
+          changes: JSON.parse(JSON.stringify({ before: before, after: after_data })),
+        },
+      });
+    } catch {
+      // Audit failures must never break the main operation
+    }
+  });
 }
 
 // Compute a flat diff between two objects — only changed keys

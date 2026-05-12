@@ -17,23 +17,23 @@ import { Phone, X } from "lucide-react";
 
 interface Contact {
   id: number; personId: number; role: string | null;
-  email: string | null; phone: string | null; endedAt: Date | null;
+  email: string | null; phone: string | null; endedAt: string | Date | null;
   person: { firstName: string | null; lastName: string | null; email: string | null; phone: string | null };
 }
 interface Interaction {
   id: number; type: string | null; direction: string | null;
-  notes: string | null; outcome: string | null; occurredAt: Date;
+  notes: string | null; outcome: string | null; occurredAt: string | Date;
   person: { id: number; firstName: string | null; lastName: string | null } | null;
 }
 interface Task {
   id: number; title: string; type: string | null; category: string | null;
-  status: string; dueDate: Date | null; estimatedMinutes: number | null;
+  status: string; dueDate: string | Date | null; estimatedMinutes: number | null;
   description: string | null; companyId: number | null; personId: number | null;
   parentTaskId: number | null; _count: { subTasks: number };
 }
 
 interface Props {
-  company: { id: number; name: string; vatNumber: string | null; city: string | null; county: string | null; website: string | null; pipelineStatus: string | null; lastInteractionDate: Date | null; createdAt: Date };
+  company: { id: number; name: string; vatNumber: string | null; city: string | null; county: string | null; website: string | null; pipelineStatus: string | null; lastInteractionDate: string | Date | null; createdAt: Date };
   contacts: Contact[];
   interactions: Interaction[];
   tasks: Task[];
