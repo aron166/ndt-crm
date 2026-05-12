@@ -53,6 +53,13 @@ function IconInvoice() {
     </svg>
   );
 }
+function IconAnalytics() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+  );
+}
 function IconSettings() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -81,8 +88,9 @@ const NAV = [
   {
     group: "ÜZEMELTETÉS",
     items: [
-      { href: "/invoices",  label: "Számlák",   icon: IconInvoice },
-      { href: "/settings",  label: "Beállítások", icon: IconSettings },
+      { href: "/invoices",   label: "Számlák",     icon: IconInvoice },
+      { href: "/analytics",  label: "Analytics",   icon: IconAnalytics },
+      { href: "/settings",   label: "Beállítások", icon: IconSettings },
     ],
   },
 ];
