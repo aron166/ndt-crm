@@ -267,6 +267,11 @@
 .mount-3 { animation-delay: 0.15s; }
 .mount-4 { animation-delay: 0.20s; }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
 @keyframes sigpulse {
   0%, 100% { opacity: 0.35; }
   50%       { opacity: 1;    }
