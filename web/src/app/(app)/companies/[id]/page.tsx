@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { CompanyDetailClient } from "./CompanyDetailClient";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
+import { getTagsForEntity } from "@/app/actions/tags";
 
 const TENANT_ID = 1;
 
@@ -21,7 +22,7 @@ export default async function CompanyDetailPage({
   const companyId = parseInt(id, 10);
   if (isNaN(companyId)) notFound();
 
-  const [company, contacts, interactions, tasks, invoices] = await Promise.all([
+  const [company, contacts, interactions, tasks, invoices, initialTags] = await Promise.all([
     db.company.findFirst({ where: { id: companyId, tenantId: TENANT_ID } }),
     db.contact.findMany({
       where: { companyId, tenantId: TENANT_ID },
@@ -45,6 +46,7 @@ export default async function CompanyDetailPage({
       orderBy: { issuedDate: "asc" },
       take: 24,
     }),
+    getTagsForEntity("company", companyId),
   ]);
 
   if (!company) notFound();
@@ -111,6 +113,7 @@ export default async function CompanyDetailPage({
         kpis={kpis}
         avatarColor={avatarColor}
         initials={initials}
+        initialTags={initialTags}
       />
     </div>
   );
