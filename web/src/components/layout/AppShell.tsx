@@ -6,13 +6,20 @@ import { Topbar } from "./Topbar";
 import { StatusBar } from "./StatusBar";
 import { cn } from "@/lib/utils";
 
+interface PipelineStub {
+  id: number;
+  name: string;
+  stages: { id: number; name: string; color: string; isTerminalWon: boolean; isTerminalLost: boolean; probability: number; position: number }[];
+}
+
 interface AppShellProps {
   children: React.ReactNode;
   email: string;
   overdueCount?: number;
+  defaultPipeline?: PipelineStub | null;
 }
 
-export function AppShell({ children, email, overdueCount = 0 }: AppShellProps) {
+export function AppShell({ children, email, overdueCount = 0, defaultPipeline }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -23,7 +30,7 @@ export function AppShell({ children, email, overdueCount = 0 }: AppShellProps) {
   return (
     <>
       <Sidebar collapsed={collapsed} onToggle={setCollapsed} />
-      <Topbar collapsed={collapsed} email={email} />
+      <Topbar collapsed={collapsed} email={email} defaultPipeline={defaultPipeline ?? null} />
 
       <main
         className={cn(
