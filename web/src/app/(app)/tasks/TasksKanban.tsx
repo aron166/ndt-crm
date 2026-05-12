@@ -100,12 +100,14 @@ function KanbanCard({
       draggable
       onDragStart={() => onDragStart(task.id)}
       onDragEnd={onDragEnd}
-      className={cn("group rounded-lg select-none transition-all duration-150", dragging && "opacity-40 cursor-grabbing")}
+      className={cn("group rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
         border: "1px solid var(--line-soft)",
         padding: "10px 12px",
         cursor: "grab",
+        transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
+        willChange: "transform",
       }}
       onMouseOver={(e) => {
         e.currentTarget.style.borderColor = "var(--indigo-line)";
@@ -117,6 +119,8 @@ function KanbanCard({
         e.currentTarget.style.boxShadow = "none";
         e.currentTarget.style.transform = "none";
       }}
+      onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.99)"; e.currentTarget.style.transition = "transform 80ms ease"; }}
+      onMouseUp={(e) => { e.currentTarget.style.transition = "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease"; }}
     >
       {/* Top row: ID + type badge */}
       <div className="flex items-center justify-between gap-2 mb-2">
