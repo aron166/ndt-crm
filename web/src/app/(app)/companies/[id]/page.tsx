@@ -7,6 +7,7 @@ import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Building2, MapPin, Globe, ArrowLeft } from "lucide-react";
 import { CompanyContactsTable } from "./CompanyContactsTable";
+import { ContextTasksTab } from "@/components/ContextTasksTab";
 
 const TENANT_ID = 1;
 
@@ -19,7 +20,7 @@ export default async function CompanyDetailPage({
   const companyId = parseInt(id, 10);
   if (isNaN(companyId)) notFound();
 
-  const [company, contacts, interactions] = await Promise.all([
+  const [company, contacts, interactions, tasks] = await Promise.all([
     db.company.findFirst({ where: { id: companyId, tenantId: TENANT_ID } }),
     db.contact.findMany({
       where: { companyId, tenantId: TENANT_ID },
@@ -28,17 +29,22 @@ export default async function CompanyDetailPage({
     }),
     db.interaction.findMany({
       where: { companyId, tenantId: TENANT_ID },
-      include: {
-        person: { select: { id: true, firstName: true, lastName: true } },
-      },
+      include: { person: { select: { id: true, firstName: true, lastName: true } } },
       orderBy: { occurredAt: "desc" },
       take: 50,
+    }),
+    db.task.findMany({
+      where: { companyId, tenantId: TENANT_ID, parentTaskId: null },
+      include: { _count: { select: { subTasks: true } } },
+      orderBy: [{ status: "asc" }, { dueDate: "asc" }],
     }),
   ]);
 
   if (!company) notFound();
 
-  const activeContacts = contacts.filter((c) => !c.endedAt);
+  const openTaskCount = tasks.filter(
+    (t) => t.status !== "done" && t.status !== "cancelled"
+  ).length;
 
   return (
     <div>
@@ -70,9 +76,7 @@ export default async function CompanyDetailPage({
           {(company.city || company.county || company.country) && (
             <div className="flex items-start gap-2 text-slate-600">
               <MapPin className="size-4 mt-0.5 text-slate-400 shrink-0" />
-              <span>
-                {[company.city, company.county, company.country].filter(Boolean).join(", ")}
-              </span>
+              <span>{[company.city, company.county, company.country].filter(Boolean).join(", ")}</span>
             </div>
           )}
           {company.website && (
@@ -80,8 +84,7 @@ export default async function CompanyDetailPage({
               <Globe className="size-4 text-slate-400 shrink-0" />
               <a
                 href={company.website.startsWith("http") ? company.website : `https://${company.website}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                target="_blank" rel="noopener noreferrer"
                 className="hover:text-indigo-600 truncate"
               >
                 {company.website}
@@ -106,16 +109,26 @@ export default async function CompanyDetailPage({
           <TabsTrigger value="contacts">
             Kapcsolatok ({contacts.length})
           </TabsTrigger>
+          <TabsTrigger value="tasks">
+            Feladatok{openTaskCount > 0 ? ` (${openTaskCount})` : ""}
+          </TabsTrigger>
           <TabsTrigger value="interactions">
             Interakciók ({interactions.length})
           </TabsTrigger>
           <TabsTrigger value="deals">Deals</TabsTrigger>
-          <TabsTrigger value="tasks">Feladatok</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contacts" className="mt-4">
           <CompanyContactsTable
             contacts={contacts}
+            companyId={company.id}
+            companyName={company.name}
+          />
+        </TabsContent>
+
+        <TabsContent value="tasks" className="mt-4">
+          <ContextTasksTab
+            tasks={tasks}
             companyId={company.id}
             companyName={company.name}
           />
@@ -135,28 +148,17 @@ export default async function CompanyDetailPage({
                       {interactionTypeLabel(i.type)}
                     </span>
                     {i.direction && (
-                      <span className="text-xs text-slate-400">
-                        · {interactionDirectionLabel(i.direction)}
-                      </span>
+                      <span className="text-xs text-slate-400">· {interactionDirectionLabel(i.direction)}</span>
                     )}
                     {i.person && (
-                      <Link
-                        href={`/persons/${i.person.id}`}
-                        className="ml-1 text-xs text-indigo-600 hover:underline"
-                      >
+                      <Link href={`/persons/${i.person.id}`} className="ml-1 text-xs text-indigo-600 hover:underline">
                         {i.person.firstName} {i.person.lastName}
                       </Link>
                     )}
-                    <span className="ml-auto text-xs text-slate-400">
-                      {formatDateTime(i.occurredAt)}
-                    </span>
+                    <span className="ml-auto text-xs text-slate-400">{formatDateTime(i.occurredAt)}</span>
                   </div>
-                  {i.notes && (
-                    <p className="text-sm text-slate-700 whitespace-pre-line">{i.notes}</p>
-                  )}
-                  {i.outcome && (
-                    <p className="text-xs text-slate-400 mt-1">Eredmény: {i.outcome}</p>
-                  )}
+                  {i.notes && <p className="text-sm text-slate-700 whitespace-pre-line">{i.notes}</p>}
+                  {i.outcome && <p className="text-xs text-slate-400 mt-1">Eredmény: {i.outcome}</p>}
                 </div>
               ))}
             </div>
@@ -165,10 +167,6 @@ export default async function CompanyDetailPage({
 
         <TabsContent value="deals" className="mt-4">
           <p className="text-sm text-slate-400 py-6 text-center">Hamarosan — Step 4.</p>
-        </TabsContent>
-
-        <TabsContent value="tasks" className="mt-4">
-          <p className="text-sm text-slate-400 py-6 text-center">Hamarosan — Step 2.</p>
         </TabsContent>
       </Tabs>
     </div>

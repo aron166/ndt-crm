@@ -6,6 +6,7 @@ import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interacti
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { LogInteractionButton } from "@/components/LogInteractionButton";
+import { ContextTasksTab } from "@/components/ContextTasksTab";
 
 const TENANT_ID = 1;
 
@@ -18,7 +19,7 @@ export default async function PersonDetailPage({
   const personId = parseInt(id, 10);
   if (isNaN(personId)) notFound();
 
-  const [person, contacts, interactions] = await Promise.all([
+  const [person, contacts, interactions, tasks] = await Promise.all([
     db.person.findFirst({ where: { id: personId, tenantId: TENANT_ID } }),
     db.contact.findMany({
       where: { personId, tenantId: TENANT_ID },
@@ -29,6 +30,11 @@ export default async function PersonDetailPage({
       where: { personId, tenantId: TENANT_ID },
       orderBy: { occurredAt: "desc" },
       take: 50,
+    }),
+    db.task.findMany({
+      where: { personId, tenantId: TENANT_ID, parentTaskId: null },
+      include: { _count: { select: { subTasks: true } } },
+      orderBy: [{ status: "asc" }, { dueDate: "asc" }],
     }),
   ]);
 
@@ -106,8 +112,11 @@ export default async function PersonDetailPage({
           <TabsTrigger value="interactions">
             Interakciók ({interactions.length})
           </TabsTrigger>
+          <TabsTrigger value="tasks">
+            Feladatok ({tasks.filter(t => t.status !== "done" && t.status !== "cancelled").length})
+          </TabsTrigger>
           <TabsTrigger value="employment">
-            Munkahely-történet ({contacts.length})
+            Munkahely ({contacts.length})
           </TabsTrigger>
         </TabsList>
 
@@ -143,6 +152,16 @@ export default async function PersonDetailPage({
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="tasks" className="mt-4">
+          <ContextTasksTab
+            tasks={tasks}
+            personId={person.id}
+            personName={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
+            companyId={currentContact?.companyId}
+            companyName={currentContact?.company.name}
+          />
         </TabsContent>
 
         <TabsContent value="employment" className="mt-4">
