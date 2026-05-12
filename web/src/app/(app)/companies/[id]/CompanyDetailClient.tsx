@@ -9,7 +9,7 @@ import { LogInteractionModal } from "@/components/LogInteractionModal";
 import { AddContactModal } from "./AddContactModal";
 import { closeContact } from "@/app/actions/contacts";
 import { TagInput } from "@/components/tags/TagInput";
-import { AuditLogTab } from "@/components/AuditLogTab";
+import { AuditLogEntries } from "@/components/AuditLogTab";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
@@ -43,6 +43,7 @@ interface Props {
   avatarColor: string;
   initials: string;
   initialTags: { id: number; name: string; color: string }[];
+  auditEntries: Parameters<typeof AuditLogEntries>[0]["entries"];
 }
 
 const TYPE_COLOR: Record<string, string> = {
@@ -56,7 +57,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export function CompanyDetailClient({
   company, contacts, interactions, tasks, revenueSeries,
-  engagementBreakdown, kpis, avatarColor, initials, initialTags,
+  engagementBreakdown, kpis, avatarColor, initials, initialTags, auditEntries,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("overview");
@@ -314,7 +315,7 @@ export function CompanyDetailClient({
       {/* History */}
       {tab === "history" && (
         <div className="panel mount" style={{ marginTop: 16, padding: "18px 22px" }}>
-          <AuditLogTab type="company" id={company.id} />
+          <AuditLogEntries entries={auditEntries} />
         </div>
       )}
     </>
