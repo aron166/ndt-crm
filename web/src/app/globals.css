@@ -538,4 +538,7 @@
 .tbl td .sub { font-size: 11px; color: var(--fg-mute); margin-top: 2px; }
 .tbl td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
+/* KPI grid — was missing, caused stacked layout on analytics page */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
 } /* end @layer components */
