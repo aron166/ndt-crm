@@ -1,19 +1,20 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AreaChart } from "@/components/viz/AreaChart";
 import { StackBar } from "@/components/viz/StackBar";
 import { LogInteractionModal } from "@/components/LogInteractionModal";
 import { AddContactModal } from "./AddContactModal";
-import { closeContact } from "@/app/actions/contacts";
+import { personLeftCompany } from "@/app/actions/contacts";
 import { TagInput } from "@/components/tags/TagInput";
 import { AuditLogEntries } from "@/components/AuditLogTab";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { Phone, X } from "lucide-react";
+import { Phone, X, MapPin, Loader2 } from "lucide-react";
+import { geocodeCompany } from "@/app/actions/companies";
+import { useState, useTransition } from "react";
 
 interface Contact {
   id: number; personId: number; role: string | null;
@@ -39,11 +40,12 @@ interface AppEvent {
 }
 
 interface Props {
-  company: { id: number; name: string; vatNumber: string | null; city: string | null; county: string | null; website: string | null; pipelineStatus: string | null; lastInteractionDate: string | Date | null; createdAt: Date };
+  company: { id: number; name: string; vatNumber: string | null; city: string | null; county: string | null; website: string | null; pipelineStatus: string | null; lastInteractionDate: string | Date | null; createdAt: Date; lat?: number | null; lng?: number | null };
   contacts: Contact[];
   interactions: Interaction[];
   tasks: Task[];
   appEvents: AppEvent[];
+  mapsConnected: boolean;
   revenueSeries: number[];
   engagementBreakdown: { label: string; value: number; color: string }[];
   kpis: { label: string; value: string | number; accent: string }[];
@@ -63,18 +65,21 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export function CompanyDetailClient({
-  company, contacts, interactions, tasks, appEvents, revenueSeries,
-  engagementBreakdown, kpis, avatarColor, initials, initialTags, auditEntries,
+  company, contacts, interactions, tasks, appEvents, mapsConnected,
+  revenueSeries, engagementBreakdown, kpis, avatarColor, initials, initialTags, auditEntries,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("overview");
   const [logOpen, setLogOpen] = useState(false);
   const [logPerson, setLogPerson] = useState<Contact | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [geocoding, startGeocode] = useTransition();
+  const [geocodeMsg, setGeocodeMsg] = useState<string | null>(null);
 
   async function handleCloseContact(contact: Contact) {
-    if (!confirm(`Lezárod ${contact.person.firstName} ${contact.person.lastName} kapcsolatát?`)) return;
-    await closeContact(contact.id, company.id, contact.personId);
+    const name = `${contact.person.lastName ?? ""} ${contact.person.firstName ?? ""}`.trim();
+    if (!confirm(`${name} elhagyta a céget?\n\nEgy "Utánkövetés" feladat automatikusan létrejön 2 hetes határidővel.`)) return;
+    await personLeftCompany(contact.id, company.id, contact.personId);
     router.refresh();
   }
 
@@ -167,7 +172,7 @@ export function CompanyDetailClient({
 
       {/* Overview */}
       {tab === "overview" && (
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginTop: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>
           <div className="panel mount">
             <div className="panel-head">
               <div className="panel-title">Forgalom · 24 hónap</div>
@@ -211,6 +216,55 @@ export function CompanyDetailClient({
                     <span style={{ fontFamily: "var(--font-mono)", color: "var(--fg-mute)" }}>{x.value}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Map widget */}
+            <div className="panel mount" style={{ marginTop: 12 }}>
+              <div className="panel-head">
+                <div className="panel-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <MapPin style={{ width: 13, height: 13, color: "var(--indigo)" }} />
+                  Helyszín
+                </div>
+                {mapsConnected && (
+                  <button
+                    onClick={() => {
+                      startGeocode(async () => {
+                        const r = await geocodeCompany(company.id);
+                        setGeocodeMsg(r.error ?? (r.success ? "Geocodálás sikeres" : null));
+                        setTimeout(() => setGeocodeMsg(null), 3000);
+                        router.refresh();
+                      });
+                    }}
+                    disabled={geocoding}
+                    style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: geocoding ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                  >
+                    {geocoding && <Loader2 style={{ width: 11, height: 11, animation: "spin 1s linear infinite" }} />}
+                    {geocoding ? "Geocodálás..." : company.lat ? "Újra" : "Geocodálás"}
+                  </button>
+                )}
+              </div>
+              <div style={{ padding: "0 0 0" }}>
+                {company.lat && company.lng ? (
+                  <iframe
+                    src={`https://www.google.com/maps?q=${company.lat},${company.lng}&z=15&output=embed`}
+                    style={{ width: "100%", height: 200, border: "none", display: "block" }}
+                    loading="lazy"
+                    title={`${company.name} térképen`}
+                  />
+                ) : (
+                  <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "var(--fg-faint)" }}>
+                    {mapsConnected
+                      ? "Kattints a Geocodálás gombra a cím meghatározásához."
+                      : <span>Google Maps nincs csatlakoztatva. <a href="/settings" style={{ color: "var(--indigo)" }}>Beállítások →</a></span>
+                    }
+                  </div>
+                )}
+                {geocodeMsg && (
+                  <div style={{ padding: "6px 16px", fontSize: 11, color: geocodeMsg.includes("siker") ? "var(--mint)" : "var(--coral)", borderTop: "1px solid var(--line-soft)" }}>
+                    {geocodeMsg}
+                  </div>
+                )}
               </div>
             </div>
           </div>

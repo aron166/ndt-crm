@@ -11,6 +11,7 @@ interface PipelineStub {
   id: number;
   name: string;
   stages: { id: number; name: string; color: string; isTerminalWon: boolean; isTerminalLost: boolean; probability: number; position: number }[];
+  customFields: { id: number; key: string; label: string; type: string; required: boolean; options: unknown }[];
 }
 
 interface AppShellProps {
