@@ -73,8 +73,8 @@ const NAV = [
   {
     group: "WORKSPACE",
     items: [
-      { href: "/",         label: "Dashboard",  icon: IconDashboard },
-      { href: "/tasks",    label: "Feladatok",  icon: IconTasks },
+      { href: "/analytics", label: "Dashboard",  icon: IconDashboard },
+      { href: "/tasks",     label: "Feladatok",  icon: IconTasks },
     ],
   },
   {
@@ -88,8 +88,7 @@ const NAV = [
   {
     group: "ÜZEMELTETÉS",
     items: [
-      { href: "/invoices",  label: "Számlák",     icon: IconInvoice },
-      { href: "/analytics",  label: "Analytics",   icon: IconAnalytics },
+      { href: "/invoices",   label: "Számlák",     icon: IconInvoice },
       { href: "/settings",   label: "Beállítások", icon: IconSettings },
     ],
   },
