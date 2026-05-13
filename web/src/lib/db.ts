@@ -2,8 +2,11 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 function makeClient() {
+  const connectionString = (process.env.DATABASE_URL ?? "")
+    .replace("?pgbouncer=true", "")
+    .replace("&pgbouncer=true", "");
   const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL!,
+    connectionString,
     max: 3,                  // Supabase free tier: 15 total connections shared across all projects
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 8000,
