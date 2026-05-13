@@ -1,16 +1,20 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
 function makeClient() {
   const connectionString = (process.env.DATABASE_URL ?? "")
     .replace("?pgbouncer=true", "")
     .replace("&pgbouncer=true", "");
-  const adapter = new PrismaPg({
+
+  const pool = new Pool({
     connectionString,
-    max: 3,                  // Supabase free tier: 15 total connections shared across all projects
+    max: 3,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 8000,
   });
+
+  const adapter = new PrismaPg(pool);
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
