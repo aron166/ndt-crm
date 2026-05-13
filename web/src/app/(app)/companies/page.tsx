@@ -4,6 +4,8 @@ import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { formatRelativeTime, contactFreshness } from "@/lib/utils";
 import { CompaniesSearch } from "./CompaniesSearch";
 import { TagFilter } from "@/components/tags/TagFilter";
+import { SavedViewsDropdown } from "@/components/SavedViewsDropdown";
+import { getSavedViews } from "@/app/actions/saved-views";
 
 const PAGE_SIZE = 30;
 const TENANT_ID = 1;
@@ -77,7 +79,7 @@ export default async function CompaniesPage({
     ...(includeFA ? {} : { NOT: { name: { contains: "F.A." } } }),
   };
 
-  const [companies, total] = await Promise.all([
+  const [companies, total, savedViews] = await Promise.all([
     db.company.findMany({
       where,
       orderBy: { name: "asc" },
@@ -85,6 +87,7 @@ export default async function CompaniesPage({
       take: PAGE_SIZE,
     }),
     db.company.count({ where }),
+    getSavedViews("company"),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -120,6 +123,18 @@ export default async function CompaniesPage({
         <div className="flex items-center gap-2">
           <CompaniesSearch search={search} includeFA={includeFA} neverContacted={neverContacted} pipelineStatus={pipelineStatus || undefined} />
           <TagFilter activeTagName={tagName || undefined} />
+          <SavedViewsDropdown
+            entityType="company"
+            basePath="/companies"
+            currentParams={{
+              ...(search           ? { search }                              : {}),
+              ...(neverContacted   ? { never_contacted: "1" }               : {}),
+              ...(pipelineStatus   ? { pipeline_status: pipelineStatus }    : {}),
+              ...(tagName          ? { tag: tagName }                       : {}),
+              ...(includeFA        ? { fa: "1" }                            : {}),
+            }}
+            views={savedViews}
+          />
         </div>
       </div>
 

@@ -58,7 +58,7 @@ export default function LoginPage() {
             </svg>
           </div>
           <h1 style={{ fontSize: 20, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>
-            NDT CRM
+            Helm CRM
           </h1>
           <p style={{ fontSize: 11, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>
             Controllabor · EU
