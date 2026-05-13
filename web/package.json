@@ -19,6 +19,7 @@
     "@types/pg": "^8.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "groq-sdk": "^1.2.0",
     "lucide-react": "^1.14.0",
     "next": "16.2.6",
     "pg": "^8.20.0",

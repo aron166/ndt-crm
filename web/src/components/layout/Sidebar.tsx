@@ -68,6 +68,15 @@ function IconSettings() {
     </svg>
   );
 }
+function IconSparkle() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/>
+      <path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75z"/>
+      <path d="M5 3l.5 1.5L7 5l-1.5.5L5 7l-.5-1.5L3 5l1.5-.5z"/>
+    </svg>
+  );
+}
 
 const NAV = [
   {
@@ -88,9 +97,10 @@ const NAV = [
   {
     group: "ÜZEMELTETÉS",
     items: [
-      { href: "/invoices",   label: "Számlák",     icon: IconInvoice },
-      { href: "/analytics",  label: "Analytics",   icon: IconAnalytics },
-      { href: "/settings",   label: "Beállítások", icon: IconSettings },
+      { href: "/invoices",    label: "Számlák",     icon: IconInvoice },
+      { href: "/analytics",   label: "Analytics",   icon: IconAnalytics },
+      { href: "/enrichment",  label: "Enrichment",  icon: IconSparkle },
+      { href: "/settings",    label: "Beállítások", icon: IconSettings },
     ],
   },
 ];

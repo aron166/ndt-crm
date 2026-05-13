@@ -25,6 +25,21 @@ Confirm that the Person model supports proper time-bounded employment (`person_i
 
 ---
 
+## Backlog — Agreed Next Features (2026-05-13)
+
+Priority order after Péter reviews the live deploy:
+
+1. **Complete task → log interaction in one step** — when completing a call/meeting/email task, pop a quick modal to log what happened simultaneously. Only triggers for interaction-type tasks (call, email, meeting, site visit).
+2. **CSV/Excel import** — upload companies or contacts directly in the UI. Péter can add new clients without touching code or asking Áron.
+2. **Gmail sync** — connect Gmail via OAuth, auto-log sent/received emails as interactions on the relevant company/person. Settings → Integrations already has the placeholder.
+3. **Google Calendar sync** — meetings show up as interactions, tasks can generate calendar events.
+4. **Automations** — rule engine: "when deal sits in stage X for N days → create follow-up task", "when new company added → notify". Ecosystem hub (Step 5) already provides the event bus for this.
+5. **NDT cost codes UI** — KID/MRD/DOD/SZD/VIZSGALAT dropdown on task form (schema column `cost_code` already exists).
+6. **Quote intake page** (`/intake`) — public, no auth, client submits quote request → feeds into pipeline.
+7. **Google Maps distance calc** — KID travel cost auto-fill from geocoded company address to Controllabor office.
+
+---
+
 ## Current State (2026-05-11 — direction reset)
 
 **Project resumed after weeks of pause.** This repo is now **standalone** — forget the monorepo plan in `C:\Users\Áron\workspace`. This is the live CRM and will stay here.
@@ -207,4 +222,5 @@ Both need to be re-applied against Supabase Postgres after Track 2 starts.
 | 2026-05-13 | step-5-ecosystem-hub | Ecosystem hub complete. New tables: agents/conversations/messages/app_events. Migration applied + recorded. POST /api/events + POST /api/conversations with service-key auth. Person detail: AI Conversations tab. Company detail: Events tab. 51 tests green. PR #2 merged to dev. Next: Step 4 enhancements (saved views, custom fields UI, bulk actions) OR Step 6 integrations layer. |
 | 2026-05-13 | analytics-drillthrough | Analytics drill-through complete. Revenue KPI card + year labels → /analytics/invoices (new page: year tabs, company search, 200-row table). 'Soha nem kontaktált' count → /companies?never_contacted=1. Companies page handles never_contacted + pipeline_status query params with dismissable banner. CompaniesSearch preserves drill-through params. Explorer tab links wired. 51 tests green. PR #1 merged to dev. Next: Step 5 — ecosystem hub schema + ingestion API. |
 | 2026-05-13 | vercel-deploy-prep | Build passes clean (0 TS errors, 20 routes). Fixed: tsconfig.json excluded prisma/ dir so seed.ts (bcrypt) does not break Next.js type-check. Committed missing web/ config files. PR #8 open. Áron: follow Vercel manual checklist (env vars, root dir, Supabase redirect URL). Next: bulk kanban actions + Google Maps distance calc + NDT cost codes UI. |
+| 2026-05-13 | enrichment-engine | Enrichment engine complete. EnrichmentRun + EnrichmentProposal tables migrated (manual SQL, bypassing drift from pg_trgm indexes). groq-sdk installed. enrichment.ts server action: enrichCompany (Hungarian registry check + Groq llama-3.3-70b-versatile), enrichPerson (LinkedIn URL + notes inference), triggerBulkEnrichment (sequential, capped at 20), applyProposal (field-level approve/reject, audit log, entity write-back). /enrichment page: Queue tab (pending proposals with per-field approve/reject checkboxes, confidence bars, source badges) + Runs tab (status table). RunEnrichmentButton on companies list page. Sidebar entry under ÜZEMELTETÉS. 0 TS errors, 51 tests green, build clean (22 routes). PR open — awaiting Áron review. | Merge to dev after review |
 | 2026-05-12 | step-1 | Step 1 complete. Built full Next.js App Router shell: Supabase magic-link auth (login page + proxy.ts + auth/callback), AppShell with collapsible sidebar + topbar, Companies list + detail (tabs: contacts, interactions), Persons list + detail (employment timeline + interactions). ETL retargeted to Supabase: 1696 companies, 2016 invoices, 663 interactions loaded. Server runs clean on localhost:3000. Next: Step 2 — Tasks page (create/edit/complete, universal + Task button). |
