@@ -26,7 +26,7 @@ export default async function InvoicesPage({
     FROM invoices WHERE tenant_id = ${TENANT_ID} AND issued_date IS NOT NULL
     ORDER BY year DESC
   `;
-  const availableYears = yearRows.map((r) => r.year);
+  const availableYears: number[] = yearRows.map((r) => r.year as number);
 
   const where = {
     tenantId: TENANT_ID,
