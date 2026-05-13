@@ -33,8 +33,25 @@ model Tenant {
   pipelines     Pipeline[]
   conversations Conversation[]
   appEvents     AppEvent[]
+  savedViews    SavedView[]
 
   @@map("tenants")
+}
+
+model SavedView {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int      @map("tenant_id")
+  name       String
+  entityType String   @map("entity_type") // company | person | deal | task
+  filters    Json                          // URL param bundle: { search, pipeline_status, ... }
+  isShared   Boolean  @default(true) @map("is_shared")
+  position   Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, entityType])
+  @@map("saved_views")
 }
 
 // ─────────────────────────────────────────────

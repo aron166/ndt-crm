@@ -111,7 +111,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
       >
         {/* Breadcrumbs */}
         <nav className="flex items-center gap-2 text-sm" style={{ color: "var(--fg-mute)" }}>
-          <span style={{ color: "var(--fg-faint)" }}>NDT CRM</span>
+          <span style={{ color: "var(--fg-faint)" }}>Helm CRM</span>
           {crumbs.map((c, i) => (
             <span key={c.href} className="flex items-center gap-2">
               <span style={{ color: "var(--fg-faint)" }}>/</span>

@@ -15,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NDT CRM",
-  description: "Controllabor Kft. CRM",
+  title: "Helm CRM",
+  description: "Controllabor Kft. — Helm CRM",
 };
 
 export default function RootLayout({
