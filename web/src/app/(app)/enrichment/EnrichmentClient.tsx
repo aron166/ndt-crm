@@ -146,14 +146,49 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
 
   if (applied) {
     return (
-      <div style={{ padding: "14px 16px", background: "var(--bg-card)", border: "1px solid var(--line-soft)", borderRadius: 6, opacity: 0.5 }}>
-        <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>Alkalmazva — {proposal.entityName}</span>
+      <div style={{ padding: "14px 16px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, opacity: 0.5 }}>
+        <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>✓ Alkalmazva — {proposal.entityName}</span>
+      </div>
+    );
+  }
+
+  // Empty proposal — show debug info so we can diagnose
+  if (fields.length === 0) {
+    const debug = proposal.rawResponse ? (() => {
+      try { return JSON.parse(proposal.rawResponse); } catch { return null; }
+    })() : null;
+    return (
+      <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, overflow: "hidden" }}>
+        <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Link href={entityHref} style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>{proposal.entityName}</Link>
+            <span style={{ fontSize: 11, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase" }}>
+              {proposal.entityType === "company" ? "cég" : "személy"}
+            </span>
+          </div>
+          <span style={{ fontSize: 11, color: "var(--fg-faint)" }}>Nem találtunk változtatnivalót</span>
+        </div>
+        {debug?.facts && (
+          <div style={{ padding: "0 16px 12px", borderTop: "1px solid var(--line-soft)" }}>
+            <div style={{ fontSize: 10, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "10px 0 6px" }}>Debug — források</div>
+            {(debug.facts as string[]).map((f: string, i: number) => (
+              <div key={i} style={{ fontSize: 11, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", padding: "2px 0", borderBottom: "1px solid var(--line-soft)" }}>
+                {f}
+              </div>
+            ))}
+          </div>
+        )}
+        {proposal.rawResponse?.startsWith("ERROR:") && (
+          <div style={{ padding: "8px 16px", fontSize: 11, color: "var(--coral)", fontFamily: "var(--font-mono-ndt)" }}>
+            {proposal.rawResponse}
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div style={{ background: "var(--bg-card)", border: "1px solid var(--line-soft)", borderRadius: 6, overflow: "hidden" }}>
+    <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, overflow: "hidden" }}>
       {/* Header */}
       <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line-soft)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -343,7 +378,7 @@ export function EnrichmentClient({ runs, proposals }: Props) {
 
       {/* Runs tab */}
       {tab === "runs" && (
-        <div style={{ background: "var(--bg-card)", border: "1px solid var(--line-soft)", borderRadius: 6, overflow: "hidden" }}>
+        <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, overflow: "hidden" }}>
           {runs.length === 0 ? (
             <div style={{ padding: "40px 0", textAlign: "center", color: "var(--fg-mute)", fontSize: 13 }}>
               Még nem futott enrichment.

@@ -14,6 +14,8 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Phone, X, MapPin, Loader2 } from "lucide-react";
 import { geocodeCompany } from "@/app/actions/companies";
+import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
+import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
 import { useState, useTransition } from "react";
 
 interface Contact {
@@ -75,6 +77,16 @@ export function CompanyDetailClient({
   const [addOpen, setAddOpen] = useState(false);
   const [geocoding, startGeocode] = useTransition();
   const [geocodeMsg, setGeocodeMsg] = useState<string | null>(null);
+  const [enriching, startEnrich] = useTransition();
+  const [enrichmentProposals, setEnrichmentProposals] = useState<Awaited<ReturnType<typeof getProposalsByRun>> | null>(null);
+
+  function handleEnrich() {
+    startEnrich(async () => {
+      const runId = await triggerBulkEnrichment("company", [company.id]);
+      const proposals = await getProposalsByRun(runId);
+      setEnrichmentProposals(proposals);
+    });
+  }
 
   async function handleCloseContact(contact: Contact) {
     const name = `${contact.person.lastName ?? ""} ${contact.person.firstName ?? ""}`.trim();
@@ -105,6 +117,12 @@ export function CompanyDetailClient({
         />
       )}
       <AddContactModal open={addOpen} onClose={() => { setAddOpen(false); router.refresh(); }} companyId={company.id} />
+      {enrichmentProposals && (
+        <EnrichmentDrawer
+          proposals={enrichmentProposals as unknown as Parameters<typeof EnrichmentDrawer>[0]["proposals"]}
+          onClose={() => { setEnrichmentProposals(null); router.refresh(); }}
+        />
+      )}
 
       {/* Detail header */}
       <div className="detail-header mount">
@@ -147,6 +165,19 @@ export function CompanyDetailClient({
               <Phone style={{ width: 13, height: 13 }} /> Naplózás
             </button>
             <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
+            <button
+              className="btn"
+              onClick={handleEnrich}
+              disabled={enriching}
+              style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}
+            >
+              <span style={{
+                display: "inline-block",
+                animation: enriching ? "spin 1.2s linear infinite" : "none",
+                fontSize: 13,
+              }}>✦</span>
+              {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
+            </button>
           </div>
         </div>
 
