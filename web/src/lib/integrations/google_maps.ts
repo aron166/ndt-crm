@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { decrypt, isEncrypted } from "@/lib/crypto";
 
 const TENANT_ID = 1;
 
@@ -7,7 +8,10 @@ async function getApiKey(): Promise<string | null> {
     where: { tenantId_integrationSlug: { tenantId: TENANT_ID, integrationSlug: "google_maps" } },
   });
   if (!cred?.isActive) return null;
-  return (cred.credentials as Record<string, string>).apiKey ?? null;
+  const raw = (cred.credentials as Record<string, string>).apiKey;
+  if (!raw) return null;
+  // Decrypt if stored encrypted; fall back to plaintext for backwards compat
+  return isEncrypted(raw) ? decrypt(raw) : raw;
 }
 
 export async function isConnected(): Promise<boolean> {
