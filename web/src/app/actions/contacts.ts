@@ -68,3 +68,47 @@ export async function closeContact(contactId: number, companyId: number, personI
   revalidatePath(`/companies/${companyId}`);
   revalidatePath(`/persons/${personId}`);
 }
+
+// "Person left company" — close contact + auto-create a follow-up task
+export async function personLeftCompany(contactId: number, companyId: number, personId: number) {
+  const [contact] = await Promise.all([
+    db.contact.findFirst({
+      where: { id: contactId, tenantId: TENANT_ID },
+      include: {
+        person:  { select: { firstName: true, lastName: true } },
+        company: { select: { name: true } },
+      },
+    }),
+  ]);
+  if (!contact) return { error: "Kapcsolat nem található" };
+
+  // Close the contact
+  await db.contact.updateMany({
+    where: { id: contactId, tenantId: TENANT_ID },
+    data: { endedAt: new Date() },
+  });
+  await audit("contact", contactId, "update", { endedAt: null }, { endedAt: new Date().toISOString() });
+
+  // Auto-create follow-up task linked to the person
+  const personName = [contact.person.lastName, contact.person.firstName].filter(Boolean).join(" ");
+  const followUpDate = new Date();
+  followUpDate.setDate(followUpDate.getDate() + 14); // 2 weeks
+
+  await db.task.create({
+    data: {
+      tenantId: TENANT_ID,
+      personId,
+      companyId,
+      title: `Utánkövetés: ${personName} — hol dolgozik most?`,
+      description: `${personName} elhagyta a(z) ${contact.company.name} céget. Derítsd ki, hova ment, és tartsd fenn a kapcsolatot.`,
+      type: "call",
+      status: "created",
+      dueDate: followUpDate,
+    },
+  });
+
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath(`/persons/${personId}`);
+  revalidatePath("/tasks");
+  return { success: true };
+}

@@ -9,7 +9,10 @@ const TENANT_ID = 1;
 export default async function PipelineSetupPage() {
   const pipelines = await db.pipeline.findMany({
     where: { tenantId: TENANT_ID },
-    include: { stages: { orderBy: { position: "asc" } } },
+    include: {
+      stages: { orderBy: { position: "asc" } },
+      customFields: { orderBy: { position: "asc" } },
+    },
     orderBy: { position: "asc" },
   });
 

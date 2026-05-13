@@ -17,7 +17,10 @@ export default async function DealsPage({
 
   const pipelines = await db.pipeline.findMany({
     where: { tenantId: TENANT_ID, isArchived: false },
-    include: { stages: { orderBy: { position: "asc" } } },
+    include: {
+      stages: { orderBy: { position: "asc" } },
+      customFields: { orderBy: { position: "asc" } },
+    },
     orderBy: { position: "asc" },
   });
 
@@ -59,6 +62,12 @@ export default async function DealsPage({
     },
     orderBy: { position: "asc" },
   });
+
+  // cast JSONB custom field values for the client
+  const dealsWithCF = deals.map((d) => ({
+    ...d,
+    customFields: (d.customFields ?? null) as Record<string, string> | null,
+  }));
 
   // Weighted forecast = Σ (deal.value × stage.probability / 100) for non-terminal stages
   const forecast = deals.reduce((sum, d) => {
@@ -127,7 +136,7 @@ export default async function DealsPage({
 
       <DealsKanban
         pipeline={serializeDates(activePipeline)}
-        deals={serializeDates(deals) as Parameters<typeof DealsKanban>[0]["deals"]}
+        deals={serializeDates(dealsWithCF) as Parameters<typeof DealsKanban>[0]["deals"]}
       />
     </div>
   );
