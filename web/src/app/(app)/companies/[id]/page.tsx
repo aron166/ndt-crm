@@ -7,6 +7,7 @@ import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { getTagsForEntity } from "@/app/actions/tags";
 import { getEntityHistory } from "@/app/actions/audit";
 import { serializeDates } from "@/lib/serialize";
+import { isConnected } from "@/lib/integrations/google_maps";
 
 const TENANT_ID = 1;
 
@@ -92,6 +93,7 @@ export default async function CompanyDetailPage({
 
   const avatarColor = AVATAR_PALETTE[companyId % AVATAR_PALETTE.length];
   const initials = company.name.slice(0, 3).toUpperCase();
+  const mapsConnected = await isConnected();
 
   return (
     <div className="mount">
@@ -114,6 +116,7 @@ export default async function CompanyDetailPage({
         interactions={serializeDates(interactions)}
         tasks={serializeDates(tasks)}
         appEvents={serializeDates(appEvents)}
+        mapsConnected={mapsConnected}
         revenueSeries={revenueSeries}
         engagementBreakdown={engagementBreakdown}
         kpis={kpis}

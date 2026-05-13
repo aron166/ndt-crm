@@ -22,6 +22,7 @@ interface Deal {
   stageId: number | null;
   position: number;
   expectedCloseDate: string | Date | null;
+  customFields: Record<string, string> | null;
   company: { id: number; name: string };
   person: { id: number; firstName: string | null; lastName: string | null } | null;
   stage: { id: number; name: string; color: string; isTerminalWon: boolean; isTerminalLost: boolean } | null;
@@ -29,9 +30,15 @@ interface Deal {
   pipelineId: number | null;
 }
 
+interface CustomField {
+  id: number; key: string; label: string; type: string;
+  required: boolean; options: unknown;
+}
+
 interface Pipeline {
   id: number; name: string;
   stages: Stage[];
+  customFields: CustomField[];
 }
 
 interface DealsKanbanProps {
@@ -197,6 +204,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
           companyId: editDeal.company.id, companyName: editDeal.company.name,
           personId: editDeal.person?.id, personName: editDeal.person ? `${editDeal.person.lastName ?? ""} ${editDeal.person.firstName ?? ""}`.trim() : undefined,
           expectedCloseDate: editDeal.expectedCloseDate ? new Date(editDeal.expectedCloseDate).toISOString().split("T")[0] : undefined,
+          customFieldValues: editDeal.customFields ?? undefined,
         } : newStageId ? { stageId: newStageId } : undefined}
       />
 

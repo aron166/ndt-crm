@@ -29,5 +29,10 @@ export async function GET(request: Request) {
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     take: 10,
   });
-  return NextResponse.json(results);
+  const mapped = results.map((p) => ({
+    id: p.id,
+    label: [p.lastName, p.firstName].filter(Boolean).join(" ") || p.email || String(p.id),
+    sub: p.contacts[0]?.company.name ?? p.email ?? undefined,
+  }));
+  return NextResponse.json(mapped);
 }
