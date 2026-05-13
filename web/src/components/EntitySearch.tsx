@@ -102,23 +102,25 @@ export function EntitySearch({
         <span className="absolute right-2 top-2 text-xs text-slate-400">...</span>
       )}
       {open && options.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-md max-h-48 overflow-y-auto">
+        <ul style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", boxShadow: "0 8px 24px oklch(0 0 0 / 0.4)", maxHeight: 200, overflowY: "auto", listStyle: "none", padding: 0, margin: "4px 0 0" }}>
           {options.map((opt) => (
             <li key={opt.id}>
               <button
                 type="button"
-                className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                style={{ width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 13, color: "var(--fg-soft)", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "background .1s" }}
+                onMouseOver={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+                onMouseOut={(e) => (e.currentTarget.style.background = "none")}
                 onClick={() => handleSelect(opt)}
               >
-                <span className="flex-1 truncate">{opt.label}</span>
-                {opt.sub && <span className="text-xs text-slate-400 shrink-0 truncate max-w-[120px]">{opt.sub}</span>}
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.label}</span>
+                {opt.sub && <span style={{ fontSize: 11, color: "var(--fg-faint)", flexShrink: 0, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.sub}</span>}
               </button>
             </li>
           ))}
         </ul>
       )}
       {open && !loading && options.length === 0 && query.length > 1 && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-md px-3 py-2 text-sm text-slate-400">
+        <div style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", padding: "8px 12px", fontSize: 12, color: "var(--fg-faint)" }}>
           Nincs találat
         </div>
       )}

@@ -18,6 +18,12 @@ export async function createDeal(formData: FormData) {
   if (!title) return { error: "Cím kötelező" };
   if (!companyIdStr) return { error: "Cég kötelező" };
 
+  // collect custom field values (prefixed cf_)
+  const customFields: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) {
+    if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
+  }
+
   // position = max existing + 1
   const maxPos = await db.deal.aggregate({
     where: { tenantId: TENANT_ID, stageId: stageIdStr ? parseInt(stageIdStr) : null },
@@ -36,6 +42,7 @@ export async function createDeal(formData: FormData) {
       currency: "HUF",
       expectedCloseDate: closeDate ? new Date(closeDate) : null,
       position: (maxPos._max.position ?? -1) + 1,
+      ...(Object.keys(customFields).length > 0 ? { customFields } : {}),
     },
   });
 
@@ -53,9 +60,14 @@ export async function updateDeal(id: number, formData: FormData) {
   const personIdStr = formData.get("personId") as string | null;
   const stageIdStr  = formData.get("stageId") as string | null;
 
+  const customFields: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) {
+    if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
+  }
+
   const before = await db.deal.findFirst({
     where: { id, tenantId: TENANT_ID },
-    select: { title: true, stageId: true, value: true },
+    select: { title: true, stageId: true, value: true, customFields: true },
   });
 
   await db.deal.updateMany({
@@ -66,6 +78,7 @@ export async function updateDeal(id: number, formData: FormData) {
       expectedCloseDate: closeDate ? new Date(closeDate) : null,
       personId: personIdStr ? parseInt(personIdStr) : null,
       stageId: stageIdStr ? parseInt(stageIdStr) : null,
+      ...(Object.keys(customFields).length > 0 ? { customFields: { ...(before?.customFields as Record<string, string> ?? {}), ...customFields } } : {}),
       updatedAt: new Date(),
     },
   });

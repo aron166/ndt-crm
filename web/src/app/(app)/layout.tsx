@@ -24,7 +24,7 @@ export default async function AppLayout({
     }),
     db.pipeline.findFirst({
       where: { tenantId: 1, isArchived: false },
-      include: { stages: { orderBy: { position: "asc" } } },
+      include: { stages: { orderBy: { position: "asc" } }, customFields: { orderBy: { position: "asc" } } },
       orderBy: { position: "asc" },
     }),
   ]);

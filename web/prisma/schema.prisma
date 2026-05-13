@@ -103,6 +103,9 @@ model Company {
   pipelineStatus       String?   @map("pipeline_status") // 0-8 status codes
   lastInteractionDate  DateTime? @map("last_interaction_date")
   lastInteractionOwner String?   @map("last_interaction_owner")
+  lat                  Float?
+  lng                  Float?
+  geocodedAt           DateTime? @map("geocoded_at")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 

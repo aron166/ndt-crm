@@ -12,9 +12,15 @@ import {
 import { EntitySearch } from "@/components/EntitySearch";
 import { createDeal, updateDeal } from "@/app/actions/deals";
 
+interface CustomField {
+  id: number; key: string; label: string; type: string;
+  required: boolean; options: unknown;
+}
+
 interface Pipeline {
   id: number;
   stages: { id: number; name: string; color: string; isTerminalWon: boolean; isTerminalLost: boolean }[];
+  customFields: CustomField[];
 }
 
 interface DealFormData {
@@ -27,6 +33,7 @@ interface DealFormData {
   personId?: number;
   personName?: string;
   expectedCloseDate?: string;
+  customFieldValues?: Record<string, string>;
 }
 
 interface DealModalProps {
@@ -135,6 +142,62 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
             <label className="field-label">Várható zárás</label>
             <Input type="date" name="expectedCloseDate" defaultValue={initial?.expectedCloseDate} />
           </div>
+
+          {/* Dynamic custom fields */}
+          {pipeline.customFields.length > 0 && (
+            <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>
+                Egyéni mezők
+              </div>
+              <div className="space-y-3">
+                {pipeline.customFields.map((f) => {
+                  const savedVal = initial?.customFieldValues?.[f.key] ?? "";
+                  const opts = Array.isArray(f.options) ? (f.options as string[]) : [];
+                  return (
+                    <div key={f.key}>
+                      <label className="field-label">
+                        {f.label}
+                        {f.required && <span style={{ color: "var(--coral)", marginLeft: 3 }}>*</span>}
+                      </label>
+                      {f.type === "text" && (
+                        <Input name={`cf_${f.key}`} defaultValue={savedVal} required={f.required} />
+                      )}
+                      {f.type === "number" && (
+                        <Input type="number" name={`cf_${f.key}`} defaultValue={savedVal} required={f.required} />
+                      )}
+                      {f.type === "date" && (
+                        <Input type="date" name={`cf_${f.key}`} defaultValue={savedVal} required={f.required} />
+                      )}
+                      {f.type === "single_select" && opts.length > 0 && (
+                        <select
+                          name={`cf_${f.key}`}
+                          defaultValue={savedVal}
+                          required={f.required}
+                          style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none" }}
+                        >
+                          <option value="">—</option>
+                          {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      )}
+                      {f.type === "multi_select" && opts.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {opts.map((o) => {
+                            const checked = savedVal.split(",").includes(o);
+                            return (
+                              <label key={o} className="flex items-center gap-1.5 cursor-pointer" style={{ fontSize: 12, color: "var(--fg-soft)" }}>
+                                <input type="checkbox" name={`cf_${f.key}[]`} value={o} defaultChecked={checked} />
+                                {o}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
 

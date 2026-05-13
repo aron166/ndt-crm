@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upsertStage, deleteStage, createPipeline } from "@/app/actions/deals";
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { upsertCustomField, deleteCustomField } from "@/app/actions/custom-fields";
+import { Plus, Trash2, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -19,9 +20,23 @@ interface Stage {
   isTerminalWon: boolean; isTerminalLost: boolean;
 }
 
+const FIELD_TYPES = [
+  { value: "text",          label: "Szöveg" },
+  { value: "number",        label: "Szám" },
+  { value: "date",          label: "Dátum" },
+  { value: "single_select", label: "Választó (egy)" },
+  { value: "multi_select",  label: "Választó (több)" },
+];
+
+interface CustomField {
+  id: number; key: string; label: string; type: string;
+  required: boolean; position: number; options: unknown;
+}
+
 interface Pipeline {
   id: number; name: string;
   stages: Stage[];
+  customFields: CustomField[];
 }
 
 interface PipelineSetupClientProps {
@@ -132,10 +147,163 @@ function StageRow({ stage, pipelineId }: { stage: Stage; pipelineId: number }) {
   );
 }
 
+function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId: number }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(field.label);
+  const [type, setType] = useState(field.type);
+  const [required, setRequired] = useState(field.required);
+  const [options, setOptions] = useState(
+    Array.isArray(field.options) ? (field.options as string[]).join("\n") : ""
+  );
+  const [isPending, startTransition] = useTransition();
+  const needsOptions = type === "single_select" || type === "multi_select";
+
+  function save() {
+    const data = new FormData();
+    data.set("pipelineId", String(pipelineId));
+    data.set("fieldId", String(field.id));
+    data.set("key", field.key);
+    data.set("label", label);
+    data.set("type", type);
+    data.set("required", String(required));
+    data.set("position", String(field.position));
+    if (needsOptions) data.set("options", options);
+    startTransition(async () => { await upsertCustomField(data); setEditing(false); router.refresh(); });
+  }
+
+  function handleDelete() {
+    if (!confirm(`Törlöd a(z) "${field.label}" mezőt? A mentett értékek elvesznek.`)) return;
+    startTransition(async () => { await deleteCustomField(field.id); router.refresh(); });
+  }
+
+  if (!editing) {
+    return (
+      <div
+        className="flex items-center gap-3 px-3 py-2 rounded-lg"
+        style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)", cursor: "pointer" }}
+        onClick={() => setEditing(true)}
+      >
+        <span style={{ fontSize: 10, color: "var(--fg-faint)", fontFamily: "var(--font-mono)", background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 4 }}>
+          {field.type}
+        </span>
+        <span style={{ flex: 1, fontSize: 13, color: "var(--fg)" }}>{field.label}</span>
+        <span className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)" }}>{field.key}</span>
+        {field.required && <span className="badge-ds coral" style={{ fontSize: 9 }}>kötelező</span>}
+        <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+          style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
+          onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
+          onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}
+        >
+          <Trash2 style={{ width: 13, height: 13 }} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--indigo-line)", background: "var(--bg-panel)" }}>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="field-label">Mező neve</label>
+          <Input value={label} onChange={(e) => setLabel(e.target.value)} />
+        </div>
+        <div>
+          <label className="field-label">Típus</label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none" }}
+          >
+            {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+      </div>
+      {needsOptions && (
+        <div>
+          <label className="field-label">Opciók (soronként egy)</label>
+          <textarea
+            value={options}
+            onChange={(e) => setOptions(e.target.value)}
+            rows={4}
+            placeholder={"Opció 1\nOpció 2\nOpció 3"}
+            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 12, resize: "vertical", outline: "none", fontFamily: "var(--font-mono)" }}
+          />
+        </div>
+      )}
+      <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 13, color: "var(--fg-soft)" }}>
+        <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
+        Kötelező mező
+      </label>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>Mégse</Button>
+        <Button type="button" size="sm" className="btn primary" onClick={save} disabled={isPending}>Mentés</Button>
+      </div>
+    </div>
+  );
+}
+
+function AddCustomFieldForm({ pipelineId, position, onDone }: { pipelineId: number; position: number; onDone: () => void }) {
+  const router = useRouter();
+  const [label, setLabel] = useState("");
+  const [type, setType] = useState("text");
+  const [options, setOptions] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const needsOptions = type === "single_select" || type === "multi_select";
+
+  function handleAdd() {
+    if (!label.trim()) return;
+    const data = new FormData();
+    data.set("pipelineId", String(pipelineId));
+    data.set("label", label.trim());
+    data.set("type", type);
+    data.set("required", "false");
+    data.set("position", String(position));
+    if (needsOptions) data.set("options", options);
+    startTransition(async () => { await upsertCustomField(data); setLabel(""); setType("text"); onDone(); router.refresh(); });
+  }
+
+  return (
+    <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--indigo-line)", background: "var(--bg-panel)" }}>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="field-label">Mező neve</label>
+          <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="pl. NDT módszer" autoFocus
+            onKeyDown={(e) => e.key === "Enter" && handleAdd()} />
+        </div>
+        <div>
+          <label className="field-label">Típus</label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none" }}
+          >
+            {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+      </div>
+      {needsOptions && (
+        <div>
+          <label className="field-label">Opciók (soronként egy)</label>
+          <textarea rows={3} value={options} onChange={(e) => setOptions(e.target.value)}
+            placeholder={"UT\nRT\nMT"}
+            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 12, resize: "vertical", outline: "none", fontFamily: "var(--font-mono)" }} />
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onDone}>Mégse</Button>
+        <Button type="button" size="sm" className="btn primary" onClick={handleAdd} disabled={isPending || !label.trim()}>Hozzáadás</Button>
+      </div>
+    </div>
+  );
+}
+
 export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
   const router = useRouter();
   const [newPipelineName, setNewPipelineName] = useState("");
   const [addingStage, setAddingStage] = useState<number | null>(null);
+  const [addingField, setAddingField] = useState<number | null>(null);
+  const [expandedFields, setExpandedFields] = useState<Set<number>>(new Set());
   const [newStageName, setNewStageName] = useState("");
   const [newStageColor, setNewStageColor] = useState("#6366f1");
   const [isPending, startTransition] = useTransition();
@@ -216,6 +384,51 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
               <p style={{ fontSize: 13, color: "var(--fg-faint)", textAlign: "center", padding: "24px 0" }}>
                 Nincs fázis. Adj hozzá egyet a pipeline működéséhez.
               </p>
+            )}
+          </div>
+
+          {/* Custom fields section */}
+          <div style={{ borderTop: "1px solid var(--line-soft)" }}>
+            <button
+              className="flex items-center gap-2 w-full"
+              style={{ padding: "12px 20px", background: "none", border: "none", cursor: "pointer", color: "var(--fg-soft)", fontSize: 13, fontWeight: 500 }}
+              onClick={() => setExpandedFields((prev) => {
+                const next = new Set(prev);
+                next.has(pipeline.id) ? next.delete(pipeline.id) : next.add(pipeline.id);
+                return next;
+              })}
+            >
+              {expandedFields.has(pipeline.id)
+                ? <ChevronDown style={{ width: 14, height: 14 }} />
+                : <ChevronRight style={{ width: 14, height: 14 }} />
+              }
+              Egyéni mezők
+              <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)", marginLeft: 4 }}>
+                {pipeline.customFields.length}
+              </span>
+            </button>
+
+            {expandedFields.has(pipeline.id) && (
+              <div className="panel-pad space-y-2" style={{ paddingTop: 0 }}>
+                {pipeline.customFields.map((f) => (
+                  <CustomFieldRow key={f.id} field={f} pipelineId={pipeline.id} />
+                ))}
+                {addingField === pipeline.id ? (
+                  <AddCustomFieldForm
+                    pipelineId={pipeline.id}
+                    position={pipeline.customFields.length}
+                    onDone={() => setAddingField(null)}
+                  />
+                ) : (
+                  <button
+                    className="flex items-center gap-2"
+                    style={{ fontSize: 12, color: "var(--indigo)", padding: "6px 0", background: "none", border: "none", cursor: "pointer" }}
+                    onClick={() => setAddingField(pipeline.id)}
+                  >
+                    <Plus style={{ width: 12, height: 12 }} /> Mező hozzáadása
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
