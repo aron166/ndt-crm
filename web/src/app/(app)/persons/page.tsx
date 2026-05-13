@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import Link from "next/link";
 import { PersonsSearch } from "./PersonsSearch";
 import { TagFilter } from "@/components/tags/TagFilter";
+import { SavedViewsDropdown } from "@/components/SavedViewsDropdown";
+import { getSavedViews } from "@/app/actions/saved-views";
 
 const PAGE_SIZE = 30;
 const TENANT_ID = 1;
@@ -54,7 +56,7 @@ export default async function PersonsPage({
       : {}),
   };
 
-  const [persons, total] = await Promise.all([
+  const [persons, total, savedViews] = await Promise.all([
     db.person.findMany({
       where,
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -70,6 +72,7 @@ export default async function PersonsPage({
       },
     }),
     db.person.count({ where }),
+    getSavedViews("person"),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -87,6 +90,15 @@ export default async function PersonsPage({
         <div className="flex items-center gap-2">
           <PersonsSearch search={search} />
           <TagFilter activeTagName={tagName || undefined} />
+          <SavedViewsDropdown
+            entityType="person"
+            basePath="/persons"
+            currentParams={{
+              ...(search   ? { search }        : {}),
+              ...(tagName  ? { tag: tagName }  : {}),
+            }}
+            views={savedViews}
+          />
         </div>
       </div>
 

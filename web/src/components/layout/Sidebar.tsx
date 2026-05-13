@@ -151,7 +151,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>NDT CRM</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>Helm CRM</div>
               <div style={{ fontSize: 10, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Controllabor</div>
             </div>
           </>
