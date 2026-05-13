@@ -29,7 +29,7 @@ export default async function InvoicesDrillPage({
     WHERE tenant_id = ${TENANT_ID} AND issued_date IS NOT NULL
     ORDER BY year DESC
   `;
-  const availableYears = yearRows.map((r) => r.year);
+  const availableYears = yearRows.map((r: { year: number }) => r.year);
 
   const summaryWhere = {
     tenantId: TENANT_ID,
