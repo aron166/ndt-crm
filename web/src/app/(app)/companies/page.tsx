@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { formatRelativeTime, contactFreshness } from "@/lib/utils";
 import { CompaniesSearch } from "./CompaniesSearch";
+import { CreateCompanyButton } from "@/components/CreateCompanyButton";
 import { TagFilter } from "@/components/tags/TagFilter";
 import { SavedViewsDropdown } from "@/components/SavedViewsDropdown";
 import { getSavedViews } from "@/app/actions/saved-views";
@@ -115,12 +116,15 @@ export default async function CompaniesPage({
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 mb-5">
-        <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
-          Cégek
-          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", fontWeight: 400 }}>
-            {total.toLocaleString("hu-HU")}
-          </span>
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
+            Cégek
+            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", fontWeight: 400 }}>
+              {total.toLocaleString("hu-HU")}
+            </span>
+          </h1>
+          <CreateCompanyButton />
+        </div>
         <div className="flex items-center gap-2">
           <CompaniesSearch search={search} includeFA={includeFA} neverContacted={neverContacted} pipelineStatus={pipelineStatus || undefined} />
           <TagFilter activeTagName={tagName || undefined} />

@@ -3,7 +3,6 @@
 import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { CreateCompanyModal } from "@/components/CreateCompanyModal";
 
 interface CompaniesSearchProps {
   search: string;
@@ -16,7 +15,6 @@ export function CompaniesSearch({ search, includeFA, neverContacted, pipelineSta
   const router = useRouter();
   const pathname = usePathname();
   const [value, setValue] = useState(search);
-  const [createOpen, setCreateOpen] = useState(false);
 
   const push = useCallback(
     (newSearch: string, newFA: boolean) => {
@@ -41,10 +39,7 @@ export function CompaniesSearch({ search, includeFA, neverContacted, pipelineSta
   }
 
   return (
-    <>
-      <CreateCompanyModal open={createOpen} onClose={() => setCreateOpen(false)} />
     <div className="flex items-center gap-3">
-      <button className="btn primary" onClick={() => setCreateOpen(true)}>+ Új cég</button>
       <Input
         placeholder="Keresés cég neve, adószám, város..."
         value={value}
@@ -61,6 +56,5 @@ export function CompaniesSearch({ search, includeFA, neverContacted, pipelineSta
         F.A. cégek
       </label>
     </div>
-    </>
   );
 }

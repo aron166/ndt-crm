@@ -12,9 +12,8 @@ import { AuditLogEntries } from "@/components/AuditLogTab";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { Mail, Phone, MapPin, ExternalLink, Pencil, Trash2 } from "lucide-react";
-import { EditPersonModal } from "@/components/EditPersonModal";
-import { deletePerson } from "@/app/actions/persons";
+import { Mail, Phone, MapPin, Trash2 } from "lucide-react";
+import { updatePerson, deletePerson } from "@/app/actions/persons";
 
 interface Contact {
   id: number; companyId: number; role: string | null;
@@ -75,8 +74,16 @@ export function PersonDetailClient({
   const router = useRouter();
   const [tab, setTab] = useState("activity");
   const [taskOpen, setTaskOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
   const [deleting, startDelete] = useTransition();
+  const [form, setForm] = useState({
+    firstName:   person.firstName   ?? "",
+    lastName:    person.lastName    ?? "",
+    email:       person.email       ?? "",
+    phone:       person.phone       ?? "",
+    linkedinUrl: "" as string,
+    notes:       person.notes       ?? "",
+  });
+  const [saving, startSave] = useTransition();
 
   function handleDelete() {
     const name = `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim();
@@ -99,6 +106,7 @@ export function PersonDetailClient({
     ...(conversations.length > 0
       ? [{ key: "conversations", label: "AI Beszélgetések", count: conversations.length }]
       : []),
+    { key: "adatok",        label: "Adatok",       count: 0 },
   ];
 
   return (
@@ -108,7 +116,6 @@ export function PersonDetailClient({
         onClose={() => { setTaskOpen(false); router.refresh(); }}
         initial={{ personId: person.id, companyId: currentContact?.companyId, personName: `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim() }}
       />
-      <EditPersonModal open={editOpen} onClose={() => { setEditOpen(false); router.refresh(); }} person={person} />
 
       {/* Detail header */}
       <div className="detail-header mount">
@@ -190,20 +197,15 @@ export function PersonDetailClient({
               companyName={currentContact?.company.name}
             />
             <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
-            <div style={{ display: "flex", gap: 4 }}>
-              <button className="btn" style={{ flex: 1 }} onClick={() => setEditOpen(true)}>
-                <Pencil style={{ width: 11, height: 11 }} /> Szerkesztés
-              </button>
-              <button
-                className="btn ghost"
-                style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
-                onClick={handleDelete}
-                disabled={deleting}
-                title="Személy törlése"
-              >
-                <Trash2 style={{ width: 11, height: 11 }} />
-              </button>
-            </div>
+            <button
+              className="btn ghost"
+              style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
+              onClick={handleDelete}
+              disabled={deleting}
+              title="Személy törlése"
+            >
+              <Trash2 style={{ width: 11, height: 11 }} />
+            </button>
           </div>
         </div>
 
@@ -399,6 +401,84 @@ export function PersonDetailClient({
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Adatok — inline edit */}
+            {tab === "adatok" && (
+              <div className="panel mount" style={{ padding: "18px 22px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {(
+                    [
+                      { key: "lastName",   label: "Vezetéknév",  type: "text"  },
+                      { key: "firstName",  label: "Keresztnév",  type: "text"  },
+                      { key: "email",      label: "Email",       type: "email" },
+                      { key: "phone",      label: "Telefon",     type: "tel"   },
+                      { key: "linkedinUrl", label: "LinkedIn URL", type: "url" },
+                    ] as { key: keyof typeof form; label: string; type: string }[]
+                  ).map(({ key, label, type }) => (
+                    <div key={key}>
+                      <div className="field-label">{label}</div>
+                      <input
+                        type={type}
+                        value={form[key]}
+                        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                        style={{
+                          width: "100%", fontSize: 12, padding: "5px 8px",
+                          background: "var(--bg-0)", border: "1px solid var(--line-soft)",
+                          borderRadius: 5, color: "var(--fg)", outline: "none",
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <div className="field-label">Megjegyzés</div>
+                    <textarea
+                      value={form.notes}
+                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                      rows={4}
+                      style={{
+                        width: "100%", fontSize: 12, padding: "5px 8px",
+                        background: "var(--bg-0)", border: "1px solid var(--line-soft)",
+                        borderRadius: 5, color: "var(--fg)", outline: "none", resize: "vertical",
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button
+                      className="btn primary"
+                      disabled={saving}
+                      onClick={() => {
+                        startSave(async () => {
+                          await updatePerson(person.id, {
+                            firstName:   form.firstName   || undefined,
+                            lastName:    form.lastName    || undefined,
+                            email:       form.email       || undefined,
+                            phone:       form.phone       || undefined,
+                            linkedinUrl: form.linkedinUrl || undefined,
+                            notes:       form.notes       || undefined,
+                          });
+                          router.refresh();
+                        });
+                      }}
+                    >
+                      {saving ? "Mentés..." : "Mentés"}
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={() => setForm({
+                        firstName:   person.firstName   ?? "",
+                        lastName:    person.lastName    ?? "",
+                        email:       person.email       ?? "",
+                        phone:       person.phone       ?? "",
+                        linkedinUrl: "",
+                        notes:       person.notes       ?? "",
+                      })}
+                    >
+                      Mégse
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

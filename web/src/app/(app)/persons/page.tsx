@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { PersonsSearch } from "./PersonsSearch";
+import { CreatePersonButton } from "@/components/CreatePersonButton";
 import { TagFilter } from "@/components/tags/TagFilter";
 import { SavedViewsDropdown } from "@/components/SavedViewsDropdown";
 import { getSavedViews } from "@/app/actions/saved-views";
@@ -82,12 +83,15 @@ export default async function PersonsPage({
     <div className="mount">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 mb-5">
-        <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
-          Személyek
-          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", fontWeight: 400 }}>
-            {total.toLocaleString("hu-HU")}
-          </span>
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
+            Személyek
+            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", fontWeight: 400 }}>
+              {total.toLocaleString("hu-HU")}
+            </span>
+          </h1>
+          <CreatePersonButton />
+        </div>
         <div className="flex items-center gap-2">
           <PersonsSearch search={search} />
           <TagFilter activeTagName={tagName || undefined} />
