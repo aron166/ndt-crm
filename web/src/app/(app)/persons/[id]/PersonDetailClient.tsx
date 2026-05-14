@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sparkline } from "@/components/viz/Sparkline";
@@ -12,7 +12,9 @@ import { AuditLogEntries } from "@/components/AuditLogTab";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { Mail, Phone, MapPin, ExternalLink } from "lucide-react";
+import { Mail, Phone, MapPin, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { EditPersonModal } from "@/components/EditPersonModal";
+import { deletePerson } from "@/app/actions/persons";
 
 interface Contact {
   id: number; companyId: number; role: string | null;
@@ -73,6 +75,17 @@ export function PersonDetailClient({
   const router = useRouter();
   const [tab, setTab] = useState("activity");
   const [taskOpen, setTaskOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleting, startDelete] = useTransition();
+
+  function handleDelete() {
+    const name = `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim();
+    if (!confirm(`Biztosan törölni szeretnéd ${name} személyt?\nEz a művelet nem vonható vissza.`)) return;
+    startDelete(async () => {
+      await deletePerson(person.id);
+      router.push("/persons");
+    });
+  }
 
   const currentContact = contacts.find((c) => !c.endedAt);
   const signalLabel = signalLevel >= 5 ? "Aktív — 7 napon belül érintkezés"
@@ -95,6 +108,7 @@ export function PersonDetailClient({
         onClose={() => { setTaskOpen(false); router.refresh(); }}
         initial={{ personId: person.id, companyId: currentContact?.companyId, personName: `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim() }}
       />
+      <EditPersonModal open={editOpen} onClose={() => { setEditOpen(false); router.refresh(); }} person={person} />
 
       {/* Detail header */}
       <div className="detail-header mount">
@@ -176,6 +190,20 @@ export function PersonDetailClient({
               companyName={currentContact?.company.name}
             />
             <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button className="btn" style={{ flex: 1 }} onClick={() => setEditOpen(true)}>
+                <Pencil style={{ width: 11, height: 11 }} /> Szerkesztés
+              </button>
+              <button
+                className="btn ghost"
+                style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
+                onClick={handleDelete}
+                disabled={deleting}
+                title="Személy törlése"
+              >
+                <Trash2 style={{ width: 11, height: 11 }} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -220,6 +248,17 @@ export function PersonDetailClient({
               <span className="tcount">{count}</span>
             </button>
           ))}
+        </div>
+
+        {/* Quick action strip — always visible below tabs */}
+        <div style={{ display: "flex", gap: 8, padding: "10px 0", borderBottom: "1px solid var(--line-soft)", marginBottom: 2 }}>
+          <LogInteractionButton
+            personId={person.id}
+            companyId={currentContact?.companyId}
+            personName={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
+            companyName={currentContact?.company.name}
+          />
+          <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
         </div>
 
         <div className="split-grid" style={{ marginTop: 16 }}>
