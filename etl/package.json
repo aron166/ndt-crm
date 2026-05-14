@@ -9,6 +9,8 @@
     "migrate:legacy": "ts-node src/migrate.ts",
     "contacts:dry": "ts-node src/migrate-contacts.ts --dry-run",
     "contacts:import": "ts-node src/migrate-contacts.ts --reset",
+    "enrich": "ts-node src/enrich.ts",
+    "enrich:dry": "ts-node src/enrich.ts --dry-run",
     "validate": "ts-node src/validate.ts",
     "lint": "eslint src --ext ts"
   },
