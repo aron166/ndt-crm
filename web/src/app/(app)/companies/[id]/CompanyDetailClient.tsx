@@ -13,8 +13,7 @@ import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Phone, X, MapPin, Loader2, Pencil, Trash2 } from "lucide-react";
-import { geocodeCompany, deleteCompany } from "@/app/actions/companies";
-import { EditCompanyModal } from "@/components/EditCompanyModal";
+import { geocodeCompany, deleteCompany, updateCompany } from "@/app/actions/companies";
 import { LeaveCompanyModal } from "@/components/LeaveCompanyModal";
 import { useState, useTransition } from "react";
 
@@ -118,11 +117,25 @@ export function CompanyDetailClient({
   const [logOpen, setLogOpen] = useState(false);
   const [logPerson, setLogPerson] = useState<Contact | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
   const [leaveContact, setLeaveContact] = useState<Contact | null>(null);
   const [geocoding, startGeocode] = useTransition();
   const [geocodeMsg, setGeocodeMsg] = useState<string | null>(null);
   const [deleting, startDelete] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    name:           company.name,
+    vatNumber:      company.vatNumber ?? "",
+    status:         company.status ?? "",
+    accountType:    company.accountType ?? "",
+    pipelineStatus: company.pipelineStatus ?? "",
+    city:           company.city ?? "",
+    county:         company.county ?? "",
+    address:        company.address ?? "",
+    zipCode:        company.zipCode ?? "",
+    country:        company.country ?? "",
+    website:        company.website ?? "",
+  });
+  const [saving, startSave] = useTransition();
 
   function handleCloseContact(contact: Contact) {
     setLeaveContact(contact);
@@ -168,7 +181,6 @@ export function CompanyDetailClient({
         />
       )}
       <AddContactModal open={addOpen} onClose={() => { setAddOpen(false); router.refresh(); }} companyId={company.id} />
-      <EditCompanyModal open={editOpen} onClose={() => { setEditOpen(false); router.refresh(); }} company={company} />
       {leaveContact && (
         <LeaveCompanyModal
           open
@@ -241,20 +253,15 @@ export function CompanyDetailClient({
               <Phone style={{ width: 13, height: 13 }} /> Naplózás
             </button>
             <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
-            <div style={{ display: "flex", gap: 4 }}>
-              <button className="btn" style={{ flex: 1 }} onClick={() => setEditOpen(true)}>
-                <Pencil style={{ width: 11, height: 11 }} /> Szerkesztés
-              </button>
-              <button
-                className="btn ghost"
-                style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
-                onClick={handleDelete}
-                disabled={deleting}
-                title="Cég törlése"
-              >
-                <Trash2 style={{ width: 11, height: 11 }} />
-              </button>
-            </div>
+            <button
+              className="btn ghost"
+              style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
+              onClick={handleDelete}
+              disabled={deleting}
+              title="Cég törlése"
+            >
+              <Trash2 style={{ width: 11, height: 11 }} />
+            </button>
           </div>
         </div>
 
@@ -313,7 +320,133 @@ export function CompanyDetailClient({
           </div>
 
           <div className="panel mount">
-            <div className="panel-head"><div className="panel-title">Cég adatok</div></div>
+            <div className="panel-head">
+              <div className="panel-title">Cég adatok</div>
+              <button
+                className="btn sm"
+                onClick={() => {
+                  if (editing) {
+                    setForm({
+                      name:           company.name,
+                      vatNumber:      company.vatNumber ?? "",
+                      status:         company.status ?? "",
+                      accountType:    company.accountType ?? "",
+                      pipelineStatus: company.pipelineStatus ?? "",
+                      city:           company.city ?? "",
+                      county:         company.county ?? "",
+                      address:        company.address ?? "",
+                      zipCode:        company.zipCode ?? "",
+                      country:        company.country ?? "",
+                      website:        company.website ?? "",
+                    });
+                  }
+                  setEditing(!editing);
+                }}
+              >
+                {editing ? "Mégse" : <><Pencil style={{ width: 11, height: 11 }} /> Szerkesztés</>}
+              </button>
+            </div>
+            {editing ? (
+              <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {(
+                  [
+                    { key: "name",           label: "Név",             type: "text" },
+                    { key: "vatNumber",      label: "Adószám",         type: "text" },
+                    { key: "city",           label: "Város",           type: "text" },
+                    { key: "county",         label: "Megye",           type: "text" },
+                    { key: "address",        label: "Cím",             type: "text" },
+                    { key: "zipCode",        label: "Irányítószám",    type: "text" },
+                    { key: "country",        label: "Ország",          type: "text" },
+                    { key: "website",        label: "Website",         type: "text" },
+                  ] as { key: keyof typeof form; label: string; type: string }[]
+                ).map(({ key, label, type }) => (
+                  <div key={key}>
+                    <div className="field-label">{label}</div>
+                    <input
+                      type={type}
+                      value={form[key]}
+                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                      style={{
+                        width: "100%", fontSize: 12, padding: "5px 8px",
+                        background: "var(--bg-0)", border: "1px solid var(--line-soft)",
+                        borderRadius: 5, color: "var(--fg)", outline: "none",
+                      }}
+                    />
+                  </div>
+                ))}
+                <div>
+                  <div className="field-label">Státusz</div>
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                    style={{ width: "100%", fontSize: 12, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
+                  >
+                    <option value="">—</option>
+                    <option value="active">Aktív</option>
+                    <option value="inactive">Inaktív</option>
+                    <option value="fa">F.A.</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="field-label">Fióktípus</div>
+                  <select
+                    value={form.accountType}
+                    onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value }))}
+                    style={{ width: "100%", fontSize: 12, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
+                  >
+                    <option value="">—</option>
+                    <option value="Prospect">Prospect</option>
+                    <option value="Ügyfél">Ügyfél</option>
+                    <option value="Szállító">Szállító</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="field-label">Pipeline státusz</div>
+                  <select
+                    value={form.pipelineStatus}
+                    onChange={(e) => setForm((f) => ({ ...f, pipelineStatus: e.target.value }))}
+                    style={{ width: "100%", fontSize: 12, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
+                  >
+                    <option value="">—</option>
+                    <option value="0">0 · KUKA</option>
+                    <option value="1">1 · Nem hívtuk</option>
+                    <option value="2">2 · Nem válasz</option>
+                    <option value="3">3 · Érdekli</option>
+                    <option value="4">4 · Nem kell</option>
+                    <option value="5">5 · Kéri</option>
+                    <option value="6">6 · Függőben</option>
+                    <option value="7">7 · Elveszett</option>
+                    <option value="8">8 · Nyert</option>
+                  </select>
+                </div>
+                <button
+                  className="btn primary"
+                  disabled={saving}
+                  onClick={() => {
+                    startSave(async () => {
+                      await updateCompany(company.id, {
+                        name:           form.name || undefined,
+                        vatNumber:      form.vatNumber || undefined,
+                        status:         form.status || undefined,
+                        accountType:    form.accountType || undefined,
+                        pipelineStatus: form.pipelineStatus || undefined,
+                        city:           form.city || undefined,
+                        county:         form.county || undefined,
+                        address:        form.address || undefined,
+                        zipCode:        form.zipCode || undefined,
+                        country:        form.country || undefined,
+                        website:        form.website || undefined,
+                      });
+                      setEditing(false);
+                      router.refresh();
+                    });
+                  }}
+                  style={{ marginTop: 4 }}
+                >
+                  {saving ? "Mentés..." : "Mentés"}
+                </button>
+              </div>
+            ) : (
             <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {company.website && (
                 <div>
@@ -383,6 +516,7 @@ export function CompanyDetailClient({
                 </div>
               )}
             </div>
+            )}
 
             <div className="panel-head" style={{ borderTop: "1px solid var(--line-soft)" }}><div className="panel-title">Interakció típusok</div></div>
             <div className="panel-pad">
