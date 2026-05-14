@@ -39,8 +39,25 @@ interface AppEvent {
   agent: { id: number; name: string; owner: string | null } | null;
 }
 
+interface CompanyData {
+  id: number; name: string; vatNumber: string | null;
+  city: string | null; county: string | null; address: string | null; zipCode: string | null; country: string | null;
+  siteCity: string | null; siteStreet: string | null; siteZip: string | null; siteCounty: string | null; siteCountry: string | null;
+  website: string | null; linkedinUrl: string | null; euVatNumber: string | null; leadSource: string | null;
+  pipelineStatus: string | null; accountType: string | null; warmth: string | null;
+  teaorCode: string | null; teaorDescription: string | null; industryCode: string | null; industryEn: string | null;
+  scopeOfActivity: string | null;
+  ndtMethods: string[]; productAreas: string[]; materials: string[]; products: string[];
+  isPedCompliant: boolean | null; inspectionFrequency: string | null; hasInternalLab: boolean | null;
+  competitor1: string | null; competitor2: string | null; competitor3: string | null;
+  revenue2019: bigint | null; revenue2020: bigint | null; revenue2021: bigint | null;
+  revenue2022: bigint | null; revenue2023: bigint | null; revenue2024: bigint | null;
+  customerValue: bigint | null;
+  lastInteractionDate: string | Date | null; createdAt: Date; lat?: number | null; lng?: number | null;
+}
+
 interface Props {
-  company: { id: number; name: string; vatNumber: string | null; city: string | null; county: string | null; website: string | null; pipelineStatus: string | null; lastInteractionDate: string | Date | null; createdAt: Date; lat?: number | null; lng?: number | null };
+  company: CompanyData;
   contacts: Contact[];
   interactions: Interaction[];
   tasks: Task[];
@@ -53,6 +70,32 @@ interface Props {
   initials: string;
   initialTags: { id: number; name: string; color: string }[];
   auditEntries: Parameters<typeof AuditLogEntries>[0]["entries"];
+}
+
+const WARMTH_STYLE: Record<string, { bg: string; color: string; label: string }> = {
+  cold: { bg: "var(--sky-soft)",    color: "var(--sky)",    label: "Hideg" },
+  warm: { bg: "var(--amber-soft)",  color: "var(--amber)",  label: "Meleg" },
+  hot:  { bg: "var(--coral-soft)",  color: "var(--coral)",  label: "Forró" },
+};
+
+const NDT_METHOD_COLOR: Record<string, string> = {
+  VT: "var(--sky)", PT: "var(--violet)", MT: "var(--amber)", UT: "var(--indigo)",
+  RT: "var(--coral)", DRT: "var(--mint)", LT: "var(--fg-soft)", HT: "var(--amber)",
+  SPECTRO: "var(--sky)", consultation: "var(--fg-mute)",
+};
+
+const PRODUCT_AREA_LABEL: Record<string, string> = {
+  w: "Hegesztés", wp: "Hegeszt. előkészítés", f: "Gyártás", c: "Öntés", t: "Tesztelés", p: "Nyomástartó",
+};
+
+const MATERIAL_LABEL: Record<string, string> = { Fe: "Acél / Fe", Al: "Alumínium", Cu: "Réz", AM: "Additív" };
+
+function formatRevenue(v: bigint | null): string {
+  if (!v) return "—";
+  const n = Number(v);
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} Mrd`;
+  if (n >= 1_000_000) return `${Math.round(n / 1_000_000)} M`;
+  return `${Math.round(n / 1_000)} e`;
 }
 
 const TYPE_COLOR: Record<string, string> = {
@@ -83,11 +126,14 @@ export function CompanyDetailClient({
     router.refresh();
   }
 
+  const hasNdtProfile = company.ndtMethods.length > 0 || company.productAreas.length > 0 || !!company.scopeOfActivity;
+
   const TABS = [
     { key: "overview",   label: "Áttekintés" },
-    { key: "contacts",   label: `Contacts · ${contacts.filter(c => !c.endedAt).length}` },
-    { key: "activity",   label: `Activity · ${interactions.length}` },
-    { key: "tasks",      label: `Tasks · ${tasks.filter(t => t.status !== "done").length}` },
+    { key: "contacts",   label: `Kapcsolatok · ${contacts.filter(c => !c.endedAt).length}` },
+    { key: "activity",   label: `Aktivitás · ${interactions.length}` },
+    { key: "tasks",      label: `Feladatok · ${tasks.filter(t => t.status !== "done").length}` },
+    ...(hasNdtProfile ? [{ key: "ndt", label: "NDT Profil" }] : []),
     ...(appEvents.length > 0 ? [{ key: "events", label: `Események · ${appEvents.length}` }] : []),
     { key: "history",    label: "Előzmények" },
   ];
@@ -127,14 +173,35 @@ export function CompanyDetailClient({
                 {company.name}
               </h1>
             </div>
-            <div style={{ marginTop: 6, color: "var(--fg-soft)", fontSize: 13 }}>
-              {[company.city, company.county].filter(Boolean).join(" · ")}
+            <div style={{ marginTop: 6, color: "var(--fg-soft)", fontSize: 13, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <span>{[company.city, company.county].filter(Boolean).join(" · ")}</span>
               {company.vatNumber && (
-                <span style={{ fontFamily: "var(--font-mono)", color: "var(--fg-faint)", marginLeft: 12 }}>
+                <span style={{ fontFamily: "var(--font-mono)", color: "var(--fg-faint)" }}>
                   {company.vatNumber}
                 </span>
               )}
+              {company.warmth && WARMTH_STYLE[company.warmth] && (
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, fontWeight: 600,
+                  background: WARMTH_STYLE[company.warmth].bg, color: WARMTH_STYLE[company.warmth].color }}>
+                  {WARMTH_STYLE[company.warmth].label}
+                </span>
+              )}
+              {company.accountType && (
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "var(--bg-3)", color: "var(--fg-mute)" }}>
+                  {company.accountType}
+                </span>
+              )}
+              {company.teaorCode && (
+                <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--fg-faint)" }}>
+                  TEÁOR {company.teaorCode}
+                </span>
+              )}
             </div>
+            {company.scopeOfActivity && (
+              <div style={{ marginTop: 6, fontSize: 12, color: "var(--fg-mute)", fontStyle: "italic", maxWidth: 600 }}>
+                {company.scopeOfActivity}
+              </div>
+            )}
             {/* Tags */}
             <div style={{ marginTop: 12 }}>
               <TagInput taggableType="company" taggableId={company.id} initialTags={initialTags} />
@@ -205,7 +272,78 @@ export function CompanyDetailClient({
           </div>
 
           <div className="panel mount">
-            <div className="panel-head"><div className="panel-title">Interakció típusok</div></div>
+            <div className="panel-head"><div className="panel-title">Cég adatok</div></div>
+            <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {company.website && (
+                <div>
+                  <div className="field-label">Website</div>
+                  <a href={company.website.startsWith("http") ? company.website : `https://${company.website}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 12, color: "var(--indigo)", wordBreak: "break-all" }}>
+                    {company.website.replace(/^https?:\/\//, "")}
+                  </a>
+                </div>
+              )}
+              {company.linkedinUrl && (
+                <div>
+                  <div className="field-label">LinkedIn</div>
+                  <a href={company.linkedinUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 12, color: "var(--indigo)" }}>Profil →</a>
+                </div>
+              )}
+              {company.teaorDescription && (
+                <div>
+                  <div className="field-label">TEÁOR {company.teaorCode}</div>
+                  <div className="field-value">{company.teaorDescription}</div>
+                </div>
+              )}
+              {company.industryEn && (
+                <div>
+                  <div className="field-label">Iparág</div>
+                  <div className="field-value">{company.industryEn}</div>
+                </div>
+              )}
+              {company.leadSource && (
+                <div>
+                  <div className="field-label">Lead forrás</div>
+                  <div className="field-value">{company.leadSource}</div>
+                </div>
+              )}
+              {/* Revenue summary */}
+              {(company.revenue2022 || company.revenue2023 || company.revenue2024) && (
+                <div>
+                  <div className="field-label">Éves forgalom (HUF)</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 4 }}>
+                    {[
+                      { year: "2022", val: company.revenue2022 },
+                      { year: "2023", val: company.revenue2023 },
+                      { year: "2024", val: company.revenue2024 },
+                    ].map(({ year, val }) => (
+                      <div key={year} style={{ textAlign: "center", padding: "6px 4px", background: "var(--bg-3)", borderRadius: 6 }}>
+                        <div style={{ fontSize: 10, color: "var(--fg-faint)" }}>{year}</div>
+                        <div style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--fg-soft)" }}>{formatRevenue(val)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* NDT methods quick glance */}
+              {company.ndtMethods.length > 0 && (
+                <div>
+                  <div className="field-label">NDT módszerek</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                    {company.ndtMethods.map((m) => (
+                      <span key={m} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
+                        background: "var(--bg-3)", color: NDT_METHOD_COLOR[m] ?? "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="panel-head" style={{ borderTop: "1px solid var(--line-soft)" }}><div className="panel-title">Interakció típusok</div></div>
             <div className="panel-pad">
               <StackBar segments={engagementBreakdown} />
               <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -371,6 +509,142 @@ export function CompanyDetailClient({
       {tab === "tasks" && (
         <div style={{ marginTop: 16 }}>
           <ContextTasksTab tasks={tasks} companyId={company.id} companyName={company.name} />
+        </div>
+      )}
+
+      {/* NDT Profil */}
+      {tab === "ndt" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>
+          {/* Left column: capabilities */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {company.ndtMethods.length > 0 && (
+              <div className="panel mount">
+                <div className="panel-head"><div className="panel-title">NDT módszerek</div></div>
+                <div className="panel-pad" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {["VT","PT","MT","UT","RT","DRT","LT","HT","SPECTRO","consultation"].map((m) => {
+                    const active = company.ndtMethods.includes(m);
+                    return (
+                      <div key={m} style={{ padding: "6px 12px", borderRadius: 6, fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600,
+                        background: active ? "var(--bg-3)" : "transparent",
+                        color: active ? (NDT_METHOD_COLOR[m] ?? "var(--fg)") : "var(--fg-faint)",
+                        border: `1px solid ${active ? "var(--line-soft)" : "transparent"}`,
+                        opacity: active ? 1 : 0.3,
+                      }}>
+                        {m}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {company.productAreas.length > 0 && (
+              <div className="panel mount">
+                <div className="panel-head"><div className="panel-title">Termékterület</div></div>
+                <div className="panel-pad" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {company.productAreas.map((pa) => (
+                    <span key={pa} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 12,
+                      background: "var(--bg-3)", color: "var(--fg-soft)", border: "1px solid var(--line-soft)" }}>
+                      {PRODUCT_AREA_LABEL[pa] ?? pa}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {company.materials.length > 0 && (
+              <div className="panel mount">
+                <div className="panel-head"><div className="panel-title">Vizsgált anyagok</div></div>
+                <div className="panel-pad" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {company.materials.map((m) => (
+                    <span key={m} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 12,
+                      background: "var(--bg-3)", color: "var(--amber)", fontFamily: "var(--font-mono)" }}>
+                      {MATERIAL_LABEL[m] ?? m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {company.products.length > 0 && (
+              <div className="panel mount">
+                <div className="panel-head"><div className="panel-title">Gyártmányok</div></div>
+                <div className="panel-pad" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {company.products.map((p, i) => (
+                    <span key={i} style={{ padding: "3px 8px", borderRadius: 4, fontSize: 11,
+                      background: "var(--bg-3)", color: "var(--fg-mute)" }}>
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right column: inspection profile + addresses + competitors */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="panel mount">
+              <div className="panel-head"><div className="panel-title">Vizsgálati profil</div></div>
+              <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {company.inspectionFrequency && (
+                  <div>
+                    <div className="field-label">Vizsgálati gyakoriság</div>
+                    <div className="field-value">{company.inspectionFrequency}</div>
+                  </div>
+                )}
+                {company.hasInternalLab !== null && (
+                  <div>
+                    <div className="field-label">Labor típus</div>
+                    <div className="field-value">{company.hasInternalLab ? "Belső és külső labor" : "Csak külső labor"}</div>
+                  </div>
+                )}
+                {company.isPedCompliant !== null && (
+                  <div>
+                    <div className="field-label">PED megfelelőség</div>
+                    <div className="field-value" style={{ color: company.isPedCompliant ? "var(--mint)" : "var(--fg-mute)" }}>
+                      {company.isPedCompliant ? "Igen" : "Nem"}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {(company.competitor1 || company.competitor2 || company.competitor3) && (
+              <div className="panel mount">
+                <div className="panel-head"><div className="panel-title">Versenytársak</div></div>
+                <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {[company.competitor1, company.competitor2, company.competitor3].filter(Boolean).map((c, i) => (
+                    <div key={i} style={{ fontSize: 12, padding: "5px 8px", background: "var(--bg-3)", borderRadius: 5, color: "var(--coral)" }}>
+                      {c}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(company.siteCity || company.siteStreet) && (
+              <div className="panel mount">
+                <div className="panel-head"><div className="panel-title">Telephely</div></div>
+                <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div className="field-label">Székhely</div>
+                  <div style={{ fontSize: 12, color: "var(--fg-soft)" }}>
+                    {[company.zipCode, company.city, company.address].filter(Boolean).join(", ") || "—"}
+                  </div>
+                  {company.siteCity && (
+                    <>
+                      <div className="field-label" style={{ marginTop: 8 }}>Telephely</div>
+                      <div style={{ fontSize: 12, color: "var(--fg-soft)" }}>
+                        {[company.siteZip, company.siteCity, company.siteStreet].filter(Boolean).join(", ")}
+                      </div>
+                      {company.siteCounty && (
+                        <div style={{ fontSize: 11, color: "var(--fg-faint)" }}>{company.siteCounty}</div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
