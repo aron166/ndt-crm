@@ -25,6 +25,73 @@ Confirm that the Person model supports proper time-bounded employment (`person_i
 
 ---
 
+## Backlog — Péter Meeting 2026-05-14 (ACTIVE)
+
+**Direction:** Stop settings work. Each item below gets its own branch from `dev`. Merge order: schema → CRUD → list filters → import. Áron approves each PR before push to prod.
+
+### Branch 1: `feature/company-data-model` ← START HERE
+Schema additions to Company (all sourced from `etl/data/20240125_accounts.xlsx` MAIN sheet):
+- `warmth` — cold / warm / hot (Account Temperature, xlsx col 29)
+- `teaorCode` — full 4-digit TEÁOR e.g. "2511" (col 52, replaces sector-only `industryCode`)
+- `teaorDescription` — Hungarian industry description e.g. "Fémszerkezet gyártása" (col 53)
+- `industryEn` — English industry name (col 57)
+- `scopeOfActivity` — what they actually do (col 60); prime target for enrichment agent
+- `euVatNumber` — EU-format VAT number (col 7)
+- `linkedinUrl` — company LinkedIn (col 49)
+- `leadSource` — how they first contacted Controllabor (col 15)
+- `ndtMethods` String[] — VT/PT/MT/UT/RT/DRT/LT/HT/SPECTRO/consultation (cols 93-103)
+- `productAreas` String[] — w/wp/f/c/t/p = welding/fabrication/casting/pressure (cols 63-69)
+- `materials` String[] — Fe/Al/Cu/AM inspected materials (cols 73-78)
+- `products` String[] — GYÁRTMÁNY_01-07, what the company manufactures (cols 80-86)
+- `isPedCompliant` Boolean? — Pressure Equipment Directive flag (col 87)
+- `inspectionFrequency` — "rendszeresen" / "évente néhány alkalom" etc. (col 104)
+- `hasInternalLab` Boolean? — whether they have in-house testing capability (col 105)
+- `competitor1/2/3` String? — NDT competitors they currently use (cols 106-108)
+- `siteZip/siteCity/siteStreet/siteCounty/siteCountry` — TELEPHELY operating address (cols 117-121)
+- `revenue2019..2024` BigInt? — yearly revenue summary (cols 31-36)
+- `customerValue` BigInt? — ÜGYFÉLÉRTÉK total (col 37)
+
+ETL: re-run to populate all new fields from xlsx after migration.
+UI: Company detail — new "NDT Profil" tab (capabilities matrix, material types, products, competitors, frequency, lab type). Address section shows both SZÉKHELY + TELEPHELY.
+
+### Branch 2: `feature/crud-improvements`
+- Create new company (modal + server action)
+- Create new person (modal + server action)
+- Edit company / person inline on detail pages
+- Delete company / person (soft delete + confirmation dialog)
+- Date picker when ending a Contact — input the ACTUAL leave date, not auto-"now"
+- Person detail: literal "Naplózás" + "Feladat" quick-action buttons above the tabs (not buried)
+
+### Branch 3: `feature/list-enhancements`
+- Company list: badge/dot if company has at least one active contact (person linked)
+- Company list filters: warmth, accountType/partnerCategory, TEÁOR sector, city, county, NDT method
+- Person list filters: role, current company, tag, has-no-contact
+- Pipeline stage reordering: drag handles in pipeline settings
+
+### Branch 4: `feature/accounts-import`
+Depends on Branch 1 (new schema columns must exist first).
+- Import accounts xlsx: map warmth + partnerCategory + all NDT profile fields → existing companies by VAT
+- Show preview diff (current vs proposed) before applying
+- Log as an EtlRun entry
+
+---
+
+## Backlog — Ongoing (2026-05-13, lower priority)
+
+1. **Complete task → log interaction in one step** — when completing a call/meeting/email task, pop a quick modal to log what happened simultaneously. Only triggers for interaction-type tasks (call, email, meeting, site visit).
+2. **Gmail sync** — connect Gmail via OAuth, auto-log sent/received emails as interactions. Note: `etl/data/20240125_accounts.xlsx` Munka1 sheet has 3891 historical email records for bootstrap.
+3. **Google Calendar sync** — meetings show up as interactions, tasks can generate calendar events.
+4. **Automations** — rule engine: "when deal sits in stage X for N days → create follow-up task".
+5. **NDT cost codes UI** — KID/MRD/DOD/SZD/VIZSGALAT dropdown on task form (`cost_code` column already in schema).
+6. **Quote intake page** (`/intake`) — public, no auth, client submits quote request → feeds into pipeline.
+7. **Google Maps distance calc** — KID travel cost auto-fill from geocoded address to Controllabor office.
+8. **Campaign feature** — bulk-select companies by complex filter (warmth + NDT method + industry + frequency) → push to campaign. Schema reserved via tags for now.
+9. **AI scope-of-activity scrape** — agent fetches company website, fills `scopeOfActivity` via enrichment engine. Both `website` field + enrichment engine already exist.
+10. **Incoming call auto-log** (dream) — Péter's phone integration. Flag for Step 6 integrations layer.
+11. **Google Contacts sync** — dedup on email. Assess after Gmail sync lands.
+
+---
+
 ## Current State (2026-05-11 — direction reset)
 
 **Project resumed after weeks of pause.** This repo is now **standalone** — forget the monorepo plan in `C:\Users\Áron\workspace`. This is the live CRM and will stay here.
