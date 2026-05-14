@@ -12,8 +12,10 @@ import { AuditLogEntries } from "@/components/AuditLogTab";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { Phone, X, MapPin, Loader2 } from "lucide-react";
-import { geocodeCompany } from "@/app/actions/companies";
+import { Phone, X, MapPin, Loader2, Pencil, Trash2 } from "lucide-react";
+import { geocodeCompany, deleteCompany } from "@/app/actions/companies";
+import { EditCompanyModal } from "@/components/EditCompanyModal";
+import { LeaveCompanyModal } from "@/components/LeaveCompanyModal";
 import { useState, useTransition } from "react";
 
 interface Contact {
@@ -40,7 +42,15 @@ interface AppEvent {
 }
 
 interface Props {
-  company: { id: number; name: string; vatNumber: string | null; city: string | null; county: string | null; website: string | null; pipelineStatus: string | null; lastInteractionDate: string | Date | null; createdAt: Date; lat?: number | null; lng?: number | null };
+  company: {
+    id: number; name: string; vatNumber: string | null;
+    status: string | null; accountType: string | null;
+    city: string | null; county: string | null; address: string | null;
+    zipCode: string | null; country: string | null;
+    website: string | null;
+    pipelineStatus: string | null; lastInteractionDate: string | Date | null;
+    createdAt: Date; lat?: number | null; lng?: number | null;
+  };
   contacts: Contact[];
   interactions: Interaction[];
   tasks: Task[];
@@ -73,14 +83,29 @@ export function CompanyDetailClient({
   const [logOpen, setLogOpen] = useState(false);
   const [logPerson, setLogPerson] = useState<Contact | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [leaveContact, setLeaveContact] = useState<Contact | null>(null);
   const [geocoding, startGeocode] = useTransition();
   const [geocodeMsg, setGeocodeMsg] = useState<string | null>(null);
+  const [deleting, startDelete] = useTransition();
 
-  async function handleCloseContact(contact: Contact) {
-    const name = `${contact.person.lastName ?? ""} ${contact.person.firstName ?? ""}`.trim();
-    if (!confirm(`${name} elhagyta a céget?\n\nEgy "Utánkövetés" feladat automatikusan létrejön 2 hetes határidővel.`)) return;
-    await personLeftCompany(contact.id, company.id, contact.personId);
-    router.refresh();
+  function handleCloseContact(contact: Contact) {
+    setLeaveContact(contact);
+  }
+
+  function handleLeaveConfirm(endedAt: Date) {
+    if (!leaveContact) return;
+    const c = leaveContact;
+    setLeaveContact(null);
+    personLeftCompany(c.id, company.id, c.personId, endedAt).then(() => router.refresh());
+  }
+
+  function handleDelete() {
+    if (!confirm(`Biztosan törölni szeretnéd a(z) "${company.name}" céget?\nEz a művelet nem vonható vissza.`)) return;
+    startDelete(async () => {
+      await deleteCompany(company.id);
+      router.push("/companies");
+    });
   }
 
   const TABS = [
@@ -105,6 +130,16 @@ export function CompanyDetailClient({
         />
       )}
       <AddContactModal open={addOpen} onClose={() => { setAddOpen(false); router.refresh(); }} companyId={company.id} />
+      <EditCompanyModal open={editOpen} onClose={() => { setEditOpen(false); router.refresh(); }} company={company} />
+      {leaveContact && (
+        <LeaveCompanyModal
+          open
+          personName={`${leaveContact.person.lastName ?? ""} ${leaveContact.person.firstName ?? ""}`.trim()}
+          companyName={company.name}
+          onConfirm={handleLeaveConfirm}
+          onClose={() => setLeaveContact(null)}
+        />
+      )}
 
       {/* Detail header */}
       <div className="detail-header mount">
@@ -147,6 +182,20 @@ export function CompanyDetailClient({
               <Phone style={{ width: 13, height: 13 }} /> Naplózás
             </button>
             <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button className="btn" style={{ flex: 1 }} onClick={() => setEditOpen(true)}>
+                <Pencil style={{ width: 11, height: 11 }} /> Szerkesztés
+              </button>
+              <button
+                className="btn ghost"
+                style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
+                onClick={handleDelete}
+                disabled={deleting}
+                title="Cég törlése"
+              >
+                <Trash2 style={{ width: 11, height: 11 }} />
+              </button>
+            </div>
           </div>
         </div>
 

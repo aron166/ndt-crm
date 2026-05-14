@@ -29,7 +29,15 @@ Confirm that the Person model supports proper time-bounded employment (`person_i
 
 **Direction:** Stop settings work. Each item below gets its own branch from `dev`. Merge order: schema → CRUD → list filters → import. Áron approves each PR before push to prod.
 
-### Branch 1: `feature/company-data-model` ← START HERE
+### Branch 1: `feature/company-data-model` ✅ COMMITTED (2026-05-14)
+30 new Company fields from xlsx: warmth, TEÁOR, scopeOfActivity, NDT capability matrix, telephely, revenue 2019-2024, competitors, etc.
+ETL: `npm run enrich` in etl/ — 1698 companies updated from MAIN sheet.
+UI: warmth badge + TEÁOR in header, "Cég adatok" right panel, "NDT Profil" tab.
+**FOLLOW-UP REQUIRED (separate branch `feature/ndt-profile-edit`):**
+- Auto-update logic: when enrichment engine runs on a company, it should propose updates to all new fields (scopeOfActivity, TEÁOR, ndtMethods, etc.) — wire into enrichment proposal UI
+- Manual edit UI for each field in the NDT Profil tab (inline edit or drawer) — user can override any enriched value per company
+
+### Branch 1 (original spec)
 Schema additions to Company (all sourced from `etl/data/20240125_accounts.xlsx` MAIN sheet):
 - `warmth` — cold / warm / hot (Account Temperature, xlsx col 29)
 - `teaorCode` — full 4-digit TEÁOR e.g. "2511" (col 52, replaces sector-only `industryCode`)

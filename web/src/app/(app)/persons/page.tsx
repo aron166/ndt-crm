@@ -43,6 +43,7 @@ export default async function PersonsPage({
 
   const where = {
     tenantId: TENANT_ID,
+    deletedAt: null,
     ...(tagFilterIds !== undefined ? { id: { in: tagFilterIds } } : {}),
     ...(search
       ? {
