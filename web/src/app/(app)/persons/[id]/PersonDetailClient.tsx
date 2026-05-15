@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
+import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
 import Link from "next/link";
 import { Sparkline } from "@/components/viz/Sparkline";
 import { SignalMeter } from "@/components/viz/SignalMeter";
@@ -84,6 +86,8 @@ export function PersonDetailClient({
     notes:       person.notes       ?? "",
   });
   const [saving, startSave] = useTransition();
+  const [enriching, startEnrich] = useTransition();
+  const [enrichmentProposals, setEnrichmentProposals] = useState<Awaited<ReturnType<typeof getProposalsByRun>> | null>(null);
 
   function handleDelete() {
     const name = `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim();
@@ -91,6 +95,14 @@ export function PersonDetailClient({
     startDelete(async () => {
       await deletePerson(person.id);
       router.push("/persons");
+    });
+  }
+
+  function handleEnrich() {
+    startEnrich(async () => {
+      const runId = await triggerBulkEnrichment("person", [person.id]);
+      const proposals = await getProposalsByRun(runId);
+      setEnrichmentProposals(proposals);
     });
   }
 
@@ -116,6 +128,12 @@ export function PersonDetailClient({
         onClose={() => { setTaskOpen(false); router.refresh(); }}
         initial={{ personId: person.id, companyId: currentContact?.companyId, personName: `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim() }}
       />
+      {enrichmentProposals && (
+        <EnrichmentDrawer
+          proposals={enrichmentProposals as unknown as Parameters<typeof EnrichmentDrawer>[0]["proposals"]}
+          onClose={() => { setEnrichmentProposals(null); router.refresh(); }}
+        />
+      )}
 
       {/* Detail header */}
       <div className="detail-header mount">
@@ -197,6 +215,15 @@ export function PersonDetailClient({
               companyName={currentContact?.company.name}
             />
             <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
+            <button
+              className="btn"
+              onClick={handleEnrich}
+              disabled={enriching}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <span style={{ display: "inline-block", animation: enriching ? "spin 1.2s linear infinite" : "none", fontSize: 13 }}>✦</span>
+              {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
+            </button>
             <button
               className="btn ghost"
               style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}

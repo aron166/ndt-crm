@@ -7,6 +7,7 @@ import { CreateCompanyButton } from "@/components/CreateCompanyButton";
 import { TagFilter } from "@/components/tags/TagFilter";
 import { SavedViewsDropdown } from "@/components/SavedViewsDropdown";
 import { getSavedViews } from "@/app/actions/saved-views";
+import { RunEnrichmentButton } from "./RunEnrichmentButton";
 
 const PAGE_SIZE = 30;
 const TENANT_ID = 1;
@@ -128,6 +129,7 @@ export default async function CompaniesPage({
         <div className="flex items-center gap-2">
           <CompaniesSearch search={search} includeFA={includeFA} neverContacted={neverContacted} pipelineStatus={pipelineStatus || undefined} />
           <TagFilter activeTagName={tagName || undefined} />
+          <RunEnrichmentButton companyIds={companies.map((c) => c.id)} />
           <SavedViewsDropdown
             entityType="company"
             basePath="/companies"

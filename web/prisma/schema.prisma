@@ -16,25 +16,27 @@ model Tenant {
   slug      String   @unique
   createdAt DateTime @default(now()) @map("created_at")
 
-  companies     Company[]
-  persons       Person[]
-  users         User[]
-  contacts      Contact[]
-  leads         Lead[]
-  deals         Deal[]
-  proposals     Proposal[]
-  invoices      Invoice[]
-  tasks         Task[]
-  interactions  Interaction[]
-  equipment     Equipment[]
-  etlRuns       EtlRun[]
-  tags          Tag[]
-  auditLogs     AuditLog[]
-  pipelines     Pipeline[]
-  conversations Conversation[]
-  appEvents     AppEvent[]
-  savedViews              SavedView[]
-  integrationCredentials  IntegrationCredential[]
+  companies              Company[]
+  persons                Person[]
+  users                  User[]
+  contacts               Contact[]
+  leads                  Lead[]
+  deals                  Deal[]
+  proposals              Proposal[]
+  invoices               Invoice[]
+  tasks                  Task[]
+  interactions           Interaction[]
+  equipment              Equipment[]
+  etlRuns                EtlRun[]
+  tags                   Tag[]
+  auditLogs              AuditLog[]
+  pipelines              Pipeline[]
+  conversations          Conversation[]
+  appEvents              AppEvent[]
+  savedViews             SavedView[]
+  integrationCredentials IntegrationCredential[]
+  enrichmentRuns         EnrichmentRun[]
+  enrichmentProposals    EnrichmentProposal[]
 
   @@map("tenants")
 }
@@ -631,4 +633,45 @@ model AppEvent {
   @@index([tenantId, companyId])
   @@index([tenantId, personId])
   @@map("app_events")
+}
+
+// ─────────────────────────────────────────────
+// ENRICHMENT ENGINE
+// LLM-assisted company/person data enrichment with human review.
+// ─────────────────────────────────────────────
+
+model EnrichmentRun {
+  id          Int       @id @default(autoincrement())
+  tenantId    Int       @map("tenant_id")
+  entityType  String    @map("entity_type")  // "company" | "person"
+  entityIds   Int[]     @map("entity_ids")   // which IDs were queued
+  status      String    @default("pending")  // pending | running | done | failed
+  triggeredBy String?   @map("triggered_by") // user email
+  startedAt   DateTime? @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  proposals EnrichmentProposal[]
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("enrichment_runs")
+}
+
+model EnrichmentProposal {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int      @map("tenant_id")
+  runId         Int      @map("run_id")
+  entityType    String   @map("entity_type")   // "company" | "person"
+  entityId      Int      @map("entity_id")
+  entityName    String   @map("entity_name")   // denormalized for display
+  changes       Json     // { fieldName: { current, proposed, source, confidence, status } }
+  overallStatus String   @default("pending") @map("overall_status") // pending | partial | approved | rejected
+  rawResponse   String?  @map("raw_response")  // full LLM response for debugging
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  run    EnrichmentRun @relation(fields: [runId], references: [id])
+  tenant Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@map("enrichment_proposals")
 }

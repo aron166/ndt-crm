@@ -15,6 +15,8 @@ import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interacti
 import { Phone, X, MapPin, Loader2, Pencil, Trash2 } from "lucide-react";
 import { geocodeCompany, deleteCompany, updateCompany } from "@/app/actions/companies";
 import { LeaveCompanyModal } from "@/components/LeaveCompanyModal";
+import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
+import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
 import { useState, useTransition } from "react";
 
 interface Contact {
@@ -136,6 +138,16 @@ export function CompanyDetailClient({
     website:        company.website ?? "",
   });
   const [saving, startSave] = useTransition();
+  const [enriching, startEnrich] = useTransition();
+  const [enrichmentProposals, setEnrichmentProposals] = useState<Awaited<ReturnType<typeof getProposalsByRun>> | null>(null);
+
+  function handleEnrich() {
+    startEnrich(async () => {
+      const runId = await triggerBulkEnrichment("company", [company.id]);
+      const proposals = await getProposalsByRun(runId);
+      setEnrichmentProposals(proposals);
+    });
+  }
 
   function handleCloseContact(contact: Contact) {
     setLeaveContact(contact);
@@ -188,6 +200,12 @@ export function CompanyDetailClient({
           companyName={company.name}
           onConfirm={handleLeaveConfirm}
           onClose={() => setLeaveContact(null)}
+        />
+      )}
+      {enrichmentProposals && (
+        <EnrichmentDrawer
+          proposals={enrichmentProposals as unknown as Parameters<typeof EnrichmentDrawer>[0]["proposals"]}
+          onClose={() => { setEnrichmentProposals(null); router.refresh(); }}
         />
       )}
 
@@ -253,6 +271,19 @@ export function CompanyDetailClient({
               <Phone style={{ width: 13, height: 13 }} /> Naplózás
             </button>
             <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
+            <button
+              className="btn"
+              onClick={handleEnrich}
+              disabled={enriching}
+              style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}
+            >
+              <span style={{
+                display: "inline-block",
+                animation: enriching ? "spin 1.2s linear infinite" : "none",
+                fontSize: 13,
+              }}>✦</span>
+              {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
+            </button>
             <button
               className="btn ghost"
               style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
