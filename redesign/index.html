@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Árpil · NDT CRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles.css"/>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="data.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="shell.jsx"></script>
+<script type="text/babel" src="dashboard.jsx"></script>
+<script type="text/babel" src="persons.jsx"></script>
+<script type="text/babel" src="companies.jsx"></script>
+<script type="text/babel" src="tasks.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function ComingSoon({ title, description }) {
+  return (
+    <div>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">{title}</h1>
+          <div className="page-sub">{description}</div>
+        </div>
+      </div>
+      <div className="panel" style={{padding:60, textAlign:'center'}}>
+        <div style={{width:48, height:48, borderRadius:12, background:'var(--bg-2)', display:'inline-grid', placeItems:'center', color:'var(--fg-mute)', marginBottom:14}}>
+          {I.bolt()}
+        </div>
+        <div style={{fontSize:14, color:'var(--fg-soft)', fontWeight:500}}>Module in design</div>
+        <div style={{fontSize:12, color:'var(--fg-mute)', marginTop:6, maxWidth:380, marginLeft:'auto', marginRight:'auto', lineHeight:1.5}}>
+          This screen exists in the spec but isn't part of this first hi-fi pass. Use the sidebar to explore the four flagship pages: Dashboard, Tasks, Persons and Companies.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [route, setRoute] = useState({ page: 'dashboard' });
+
+  // Persist route across reloads (so users can stay in place during iteration)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('arpil-route');
+      if (stored) setRoute(JSON.parse(stored));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem('arpil-route', JSON.stringify(route)); } catch {}
+  }, [route]);
+
+  let body;
+  if (route.page === 'dashboard') body = <Dashboard setRoute={setRoute}/>;
+  else if (route.page === 'tasks') body = <Kanban setRoute={setRoute}/>;
+  else if (route.page === 'persons' && route.id) body = <PersonDetail id={route.id} setRoute={setRoute}/>;
+  else if (route.page === 'persons') body = <PersonsList setRoute={setRoute}/>;
+  else if (route.page === 'companies' && route.id) body = <CompanyDetail id={route.id} setRoute={setRoute}/>;
+  else if (route.page === 'companies') body = <CompaniesList setRoute={setRoute}/>;
+  else if (route.page === 'inbox') body = <ComingSoon title="Morning briefing" description="AI-prioritized queue · Jarvis style"/>;
+  else if (route.page === 'pipeline') body = <ComingSoon title="Pipeline" description="Funnel + cohort view"/>;
+  else if (route.page === 'invoices') body = <ComingSoon title="Invoices" description="Billing & receivables"/>;
+  else if (route.page === 'ai') body = <ComingSoon title="Ask Árpil" description="Natural-language CRM queries"/>;
+  else if (route.page === 'settings') body = <ComingSoon title="Settings" description="Tenant, users, permissions"/>;
+  else body = <Dashboard setRoute={setRoute}/>;
+
+  return (
+    <div className="app-root">
+      <Sidebar route={route} setRoute={setRoute}/>
+      <div className="main">
+        <Topbar route={route} setRoute={setRoute}/>
+        <div className="content" key={route.page + (route.id||'')}>
+          {body}
+        </div>
+        <StatusBar/>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
