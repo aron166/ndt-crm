@@ -45,3 +45,17 @@ etl/data/
 etl/source/
 *.xlsx
 *.csv
+
+# Internal docs & agent tooling — kept local, NEVER published to the public repo
+/CLAUDE.md
+etl/CLAUDE.md
+/STATUS.md
+/memory/
+/.claude/
+/FOUNDATION.md
+/ProjectOverview.md
+/QuoteFeatureContext/
+/BRIEFING_2026-05-12.md
+web/.agents/
+/redesign/
+_enrichment_wip/
