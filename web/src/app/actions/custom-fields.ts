@@ -3,8 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-
-const TENANT_ID = 1;
+import { audit } from "@/lib/audit";
 
 export async function upsertCustomField(formData: FormData) {
   const pipelineId = parseInt(formData.get("pipelineId") as string);
@@ -27,20 +26,27 @@ export async function upsertCustomField(formData: FormData) {
     : null;
 
   if (fieldId) {
+    const id = parseInt(fieldId);
+    const before = await db.pipelineCustomField.findUnique({
+      where: { id },
+      select: { label: true, type: true, required: true, position: true },
+    });
     await db.pipelineCustomField.update({
-      where: { id: parseInt(fieldId) },
+      where: { id },
       data: {
         label, type, required, position,
         options: options ? (options as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
+    audit("custom_field", id, "update", before, { label, type, required, position });
   } else {
-    await db.pipelineCustomField.create({
+    const field = await db.pipelineCustomField.create({
       data: {
         pipelineId, key, label, type, required, position,
         options: options ? (options as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
+    audit("custom_field", field.id, "create", null, { pipelineId, key, label, type, required });
   }
 
   revalidatePath("/deals/setup");
@@ -49,7 +55,14 @@ export async function upsertCustomField(formData: FormData) {
 }
 
 export async function deleteCustomField(fieldId: number) {
+  const before = await db.pipelineCustomField.findUnique({
+    where: { id: fieldId },
+    select: { pipelineId: true, key: true, label: true, type: true },
+  });
+
   await db.pipelineCustomField.delete({ where: { id: fieldId } });
+
+  if (before) audit("custom_field", fieldId, "delete", before, null);
   revalidatePath("/deals/setup");
   revalidatePath("/deals");
 }
