@@ -46,7 +46,7 @@ export async function createDeal(formData: FormData) {
     },
   });
 
-  audit("task", deal.id, "create", null, { title, stageId: deal.stageId });
+  audit("deal", deal.id, "create", null, { title, stageId: deal.stageId });
   revalidatePath("/deals");
   return { success: true, dealId: deal.id };
 }
@@ -83,7 +83,7 @@ export async function updateDeal(id: number, formData: FormData) {
     },
   });
 
-  if (before) audit("task", id, "update", { title: before.title }, { title });
+  if (before) audit("deal", id, "update", { title: before.title }, { title });
   revalidatePath("/deals");
   return { success: true };
 }
@@ -108,7 +108,7 @@ export async function moveDeal(
     data: { stageId: newStageId, position: newPosition, updatedAt: new Date() },
   });
 
-  audit("task", dealId, "update",
+  audit("deal", dealId, "update",
     { stageId: deal?.stageId, stageName: deal?.stage?.name },
     { stageId: newStageId, stageName: newStage?.name }
   );
@@ -116,7 +116,14 @@ export async function moveDeal(
 }
 
 export async function deleteDeal(id: number) {
+  const before = await db.deal.findFirst({
+    where: { id, tenantId: TENANT_ID },
+    select: { title: true, stageId: true, value: true, companyId: true },
+  });
+
   await db.deal.deleteMany({ where: { id, tenantId: TENANT_ID } });
+
+  if (before) audit("deal", id, "delete", before, null);
   revalidatePath("/deals");
 }
 
