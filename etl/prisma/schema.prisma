@@ -1,8 +1,8 @@
-// ETL-local copy of the backend schema.
+// ETL-local copy of the application schema.
 // The only difference: output points to etl/node_modules so prisma generate
-// does NOT touch backend/node_modules (which may be locked by the running dev server).
+// does NOT touch web/node_modules (which may be locked by the running dev server).
 //
-// Keep this in sync with backend/prisma/schema.prisma when the schema changes.
+// Keep this in sync with web/prisma/schema.prisma when the schema changes.
 
 generator client {
   provider = "prisma-client-js"
