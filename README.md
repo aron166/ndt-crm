@@ -83,7 +83,7 @@ The CRM is deliberately a **separate product** from the operating company. Contr
 - **UI:** Tailwind CSS 4 with a custom dark, industrial design system
 - **Data migration:** a standalone Python/Node ETL that loads the cleaned Zoho export into the schema
 
-The project started as a NestJS + Vite prototype (still in the repo under `backend/` and `frontend/`) and was migrated to the single Next.js app in `web/`, which is what runs today.
+The project started as a NestJS + Vite prototype and was rebuilt as the single Next.js app in `web/`, which is what runs today.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -217,9 +217,7 @@ ndt-crm/
 │   ├── prisma/   # Schema + migrations
 │   └── src/      # Routes (app/), server actions, components, lib
 ├── etl/          # Zoho → PostgreSQL migration pipeline
-├── ADR/          # Architecture Decision Records
-├── backend/      # Original NestJS API (prototype, superseded by web/)
-└── frontend/     # Original React + Vite SPA (prototype, superseded by web/)
+└── ADR/          # Architecture Decision Records
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
