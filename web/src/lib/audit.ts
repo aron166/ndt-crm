@@ -7,7 +7,8 @@ const TENANT_ID = 1;
 export type AuditAction = "create" | "update" | "delete";
 export type AuditEntityType =
   | "company" | "person" | "contact"
-  | "task" | "interaction" | "tag" | "tagging";
+  | "task" | "interaction" | "tag" | "tagging"
+  | "lead" | "deal" | "integration_credential";
 
 // Runs after the response is sent — never blocks the main operation
 export function audit(

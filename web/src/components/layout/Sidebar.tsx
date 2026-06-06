@@ -45,6 +45,13 @@ function IconPipe() {
     </svg>
   );
 }
+function IconLeads() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 11l19-9-9 19-2-8-8-2z"/>
+    </svg>
+  );
+}
 function IconInvoice() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -82,6 +89,7 @@ const NAV = [
     items: [
       { href: "/persons",   label: "Személyek", icon: IconPersons },
       { href: "/companies", label: "Cégek",     icon: IconBuilding },
+      { href: "/leads",     label: "Leadek",    icon: IconLeads },
       { href: "/deals",     label: "Pipeline",  icon: IconPipe },
     ],
   },

@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { saveIntegrationCredential, disconnectIntegration } from "@/app/actions/integrations";
-import { CheckCircle, Circle, ExternalLink, Zap } from "lucide-react";
+import { createAppApiKey, revokeAppApiKey, type AppKeyRow } from "@/app/actions/app-keys";
+import { CheckCircle, Circle, ExternalLink, Zap, KeyRound, Copy, Check, Trash2, Plus } from "lucide-react";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface Integration {
   slug: string;
@@ -69,6 +71,7 @@ const INTEGRATIONS: Integration[] = [
 interface SettingsClientProps {
   tenant: { id: number; name: string; slug: string } | null;
   connectedIntegrations: string[];
+  appKeys: AppKeyRow[];
 }
 
 function IntegrationCard({
@@ -189,8 +192,127 @@ function IntegrationCard({
   );
 }
 
-export function SettingsClient({ tenant, connectedIntegrations }: SettingsClientProps) {
-  const [tab, setTab] = useState<"general" | "integrations">("general");
+function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
+  const [appSlug, setAppSlug] = useState("");
+  const [label, setLabel] = useState("");
+  const [created, setCreated] = useState<{ plaintext: string; appSlug: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  function handleCreate() {
+    if (!appSlug.trim()) return;
+    startTransition(async () => {
+      const res = await createAppApiKey(appSlug, label);
+      if (res?.success && res.plaintext) {
+        setCreated({ plaintext: res.plaintext, appSlug: res.appSlug });
+        setAppSlug("");
+        setLabel("");
+      }
+    });
+  }
+
+  function handleRevoke(id: number) {
+    startTransition(async () => { await revokeAppApiKey(id); });
+  }
+
+  function copyKey() {
+    if (!created) return;
+    navigator.clipboard.writeText(created.plaintext);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <div className="mount space-y-5">
+      <div className="flex items-center gap-3" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+        <KeyRound style={{ width: 14, height: 14, color: "var(--indigo)" }} />
+        Per-app kulcsok a <code style={{ fontFamily: "var(--font-mono)", color: "var(--sky)" }}>POST /api/leads</code> végponthoz. A kulcs csak hash-elve tárolódik — a teljes érték egyszer jelenik meg, létrehozáskor.
+      </div>
+
+      {/* Create */}
+      <div className="panel" style={{ maxWidth: 560 }}>
+        <div className="panel-head"><div className="panel-title">Új kulcs</div></div>
+        <div className="panel-pad space-y-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <label style={{ fontSize: 11, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>App azonosító</label>
+              <input
+                value={appSlug}
+                onChange={(e) => setAppSlug(e.target.value)}
+                placeholder="betonscan_landing"
+                style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)", outline: "none", fontFamily: "var(--font-mono)" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>Címke (opcionális)</label>
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="BetonScan landing oldal"
+                style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)", outline: "none" }}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button onClick={handleCreate} disabled={isPending || !appSlug.trim()} className="btn primary" style={{ gap: 6, opacity: appSlug.trim() ? 1 : 0.5 }}>
+              <Plus style={{ width: 13, height: 13 }} />
+              Kulcs létrehozása
+            </button>
+          </div>
+
+          {created && (
+            <div style={{ marginTop: 4, padding: "12px 14px", borderRadius: 8, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)" }}>
+              <div style={{ fontSize: 11, color: "var(--amber)", marginBottom: 6, fontWeight: 500 }}>
+                ⚠ Másold ki most — ez az érték többé nem jelenik meg.
+              </div>
+              <div className="flex items-center gap-2">
+                <code style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg)", wordBreak: "break-all" }}>{created.plaintext}</code>
+                <button onClick={copyKey} className="btn" style={{ gap: 5, flexShrink: 0 }}>
+                  {copied ? <Check style={{ width: 13, height: 13, color: "var(--mint)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
+                  {copied ? "Másolva" : "Másolás"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Existing keys */}
+      <div className="panel" style={{ maxWidth: 560 }}>
+        <div className="panel-head"><div className="panel-title">Kulcsok</div></div>
+        <div className="panel-pad">
+          {appKeys.length === 0 ? (
+            <div style={{ fontSize: 12, color: "var(--fg-mute)", padding: "8px 0" }}>Még nincs kulcs.</div>
+          ) : (
+            <div className="space-y-2">
+              {appKeys.map((k) => (
+                <div key={k.id} className="flex items-center justify-between" style={{ padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono-ndt" style={{ fontSize: 12, color: k.isActive ? "var(--fg)" : "var(--fg-faint)", textDecoration: k.isActive ? "none" : "line-through" }}>{k.appSlug}</span>
+                      {!k.isActive && <span style={{ fontSize: 10, color: "var(--coral)" }}>visszavonva</span>}
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--fg-faint)" }}>
+                      {k.label ? `${k.label} · ` : ""}{k.lastUsedAt ? `utoljára ${formatRelativeTime(k.lastUsedAt)}` : "még nem használt"}
+                    </div>
+                  </div>
+                  {k.isActive && (
+                    <button onClick={() => handleRevoke(k.id)} disabled={isPending} title="Visszavonás" style={{ background: "transparent", border: "1px solid var(--line-soft)", borderRadius: 5, padding: "4px 8px", color: "var(--coral)", cursor: "pointer", display: "flex" }}>
+                      <Trash2 style={{ width: 13, height: 13 }} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function SettingsClient({ tenant, connectedIntegrations, appKeys }: SettingsClientProps) {
+  const [tab, setTab] = useState<"general" | "integrations" | "apikeys">("general");
 
   const categories = Array.from(new Set(INTEGRATIONS.map((i) => i.category)));
 
@@ -208,6 +330,12 @@ export function SettingsClient({ tenant, connectedIntegrations }: SettingsClient
           Integrációk
           {connectedIntegrations.length > 0 && (
             <span className="tcount">{connectedIntegrations.length}</span>
+          )}
+        </button>
+        <button className={`tab-ds ${tab === "apikeys" ? "active" : ""}`} onClick={() => setTab("apikeys")}>
+          API kulcsok
+          {appKeys.filter((k) => k.isActive).length > 0 && (
+            <span className="tcount">{appKeys.filter((k) => k.isActive).length}</span>
           )}
         </button>
       </div>
@@ -231,6 +359,8 @@ export function SettingsClient({ tenant, connectedIntegrations }: SettingsClient
           </div>
         </div>
       )}
+
+      {tab === "apikeys" && <ApiKeysSection appKeys={appKeys} />}
 
       {tab === "integrations" && (
         <div className="mount space-y-6">
