@@ -37,7 +37,8 @@ export async function proxy(request: NextRequest) {
   // (VeloQuote, agents, BirdsView webhooks) can never reach them.
   const isServiceApi =
     request.nextUrl.pathname === "/api/events" ||
-    request.nextUrl.pathname === "/api/conversations";
+    request.nextUrl.pathname === "/api/conversations" ||
+    request.nextUrl.pathname === "/api/leads";
 
   if (!user && !isLoginPage && !isAuthRoute && !isServiceApi) {
     const url = request.nextUrl.clone();
