@@ -35,6 +35,7 @@ model Tenant {
   appEvents     AppEvent[]
   savedViews              SavedView[]
   integrationCredentials  IntegrationCredential[]
+  appApiKeys              AppApiKey[]
 
   @@map("tenants")
 }
@@ -178,13 +179,16 @@ model Lead {
   contactId       Int?      @map("contact_id")
   assignedToId    Int?      @map("assigned_to_id")
   source          String?                          // Web, phone, email, referral
-  status          String?                          // New, Contacted, Working, Unqualified
+  sourceApp       String?   @map("source_app")      // app slug from the API key that submitted it (betonscan_landing, n8n, ...)
+  status          String?                          // new, contacted, replied, call_booked, qualified, proposal_sent, unqualified, nurture
   subject         String?
+  message         String?                          // free-text body from the landing-page / intake form
   serviceInterest String?   @map("service_interest")
   estimatedValue  Decimal?  @map("estimated_value")
   receivedDate    DateTime? @map("received_date")
   lostReason      String?   @map("lost_reason")
   rawSourceFile   String?   @map("raw_source_file")
+  customFields    Json?     @map("custom_fields")   // marketing passthrough: utm_*, referrer, landing_variant, lead_score, priority, contact snapshot
   createdAt       DateTime  @default(now()) @map("created_at")
 
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
@@ -570,6 +574,27 @@ model IntegrationCredential {
 
   @@unique([tenantId, integrationSlug])
   @@map("integration_credentials")
+}
+
+// Per-app ingestion credentials (Platform Foundation #4).
+// Scoped, hashed, revocable API keys issued per source app (betonscan_landing,
+// n8n, ...). The public /api/leads route authenticates with these — never the
+// shared Supabase service-role key. Only the SHA-256 hash is stored; the
+// plaintext key is shown to the operator exactly once, at creation.
+model AppApiKey {
+  id         Int       @id @default(autoincrement())
+  tenantId   Int       @map("tenant_id")
+  appSlug    String    @map("app_slug")   // betonscan_landing | n8n | birdsview | ...
+  keyHash    String    @unique @map("key_hash") // SHA-256 hex of the plaintext key
+  label      String?                            // optional human label
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("app_api_keys")
 }
 
 model AppEvent {
