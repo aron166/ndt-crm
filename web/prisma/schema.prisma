@@ -16,26 +16,28 @@ model Tenant {
   slug      String   @unique
   createdAt DateTime @default(now()) @map("created_at")
 
-  companies     Company[]
-  persons       Person[]
-  users         User[]
-  contacts      Contact[]
-  leads         Lead[]
-  deals         Deal[]
-  proposals     Proposal[]
-  invoices      Invoice[]
-  tasks         Task[]
-  interactions  Interaction[]
-  equipment     Equipment[]
-  etlRuns       EtlRun[]
-  tags          Tag[]
-  auditLogs     AuditLog[]
-  pipelines     Pipeline[]
-  conversations Conversation[]
-  appEvents     AppEvent[]
-  savedViews              SavedView[]
-  integrationCredentials  IntegrationCredential[]
-  appApiKeys              AppApiKey[]
+  companies              Company[]
+  persons                Person[]
+  users                  User[]
+  contacts               Contact[]
+  leads                  Lead[]
+  deals                  Deal[]
+  proposals              Proposal[]
+  invoices               Invoice[]
+  tasks                  Task[]
+  interactions           Interaction[]
+  equipment              Equipment[]
+  etlRuns                EtlRun[]
+  tags                   Tag[]
+  auditLogs              AuditLog[]
+  pipelines              Pipeline[]
+  conversations          Conversation[]
+  appEvents              AppEvent[]
+  savedViews             SavedView[]
+  integrationCredentials IntegrationCredential[]
+  enrichmentRuns         EnrichmentRun[]
+  enrichmentProposals    EnrichmentProposal[]
+  appApiKeys             AppApiKey[]
 
   @@map("tenants")
 }
@@ -71,6 +73,7 @@ model Person {
   phone       String?
   linkedinUrl String?  @map("linkedin_url")
   notes       String?
+  deletedAt   DateTime? @map("deleted_at")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -108,6 +111,43 @@ model Company {
   lat                  Float?
   lng                  Float?
   geocodedAt           DateTime? @map("geocoded_at")
+  // ── Enriched contact / classification ───────────────────────────────────
+  euVatNumber          String?   @map("eu_vat_number")
+  linkedinUrl          String?   @map("linkedin_url")
+  leadSource           String?   @map("lead_source")
+  warmth               String?   // cold | warm | hot
+  // ── TEÁOR / industry ────────────────────────────────────────────────────
+  teaorCode            String?   @map("teaor_code")         // 4-digit e.g. "2511"
+  teaorDescription     String?   @map("teaor_description")  // "Fémszerkezet gyártása"
+  industryEn           String?   @map("industry_en")
+  scopeOfActivity      String?   @map("scope_of_activity")
+  // ── NDT capability matrix ────────────────────────────────────────────────
+  ndtMethods           String[]  @map("ndt_methods")        // ["VT","PT","MT","UT","RT","DRT","LT","HT","SPECTRO"]
+  productAreas         String[]  @map("product_areas")      // ["w","wp","f","c","t","p"]
+  materials            String[]                             // ["Fe","Al","Cu","AM"]
+  products             String[]                             // GYÁRTMÁNY_01-07
+  isPedCompliant       Boolean?  @map("is_ped_compliant")
+  inspectionFrequency  String?   @map("inspection_frequency")
+  hasInternalLab       Boolean?  @map("has_internal_lab")
+  competitor1          String?   @map("competitor_1")
+  competitor2          String?   @map("competitor_2")
+  competitor3          String?   @map("competitor_3")
+  // ── Operating address (telephely) ───────────────────────────────────────
+  siteZip              String?   @map("site_zip")
+  siteCity             String?   @map("site_city")
+  siteStreet           String?   @map("site_street")
+  siteCounty           String?   @map("site_county")
+  siteCountry          String?   @map("site_country")
+  // ── Revenue summary ─────────────────────────────────────────────────────
+  revenue2019          BigInt?   @map("revenue_2019")
+  revenue2020          BigInt?   @map("revenue_2020")
+  revenue2021          BigInt?   @map("revenue_2021")
+  revenue2022          BigInt?   @map("revenue_2022")
+  revenue2023          BigInt?   @map("revenue_2023")
+  revenue2024          BigInt?   @map("revenue_2024")
+  customerValue        BigInt?   @map("customer_value")
+  customFields         Json?     @map("custom_fields")
+  deletedAt            DateTime? @map("deleted_at")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
@@ -619,4 +659,45 @@ model AppEvent {
   @@index([tenantId, companyId])
   @@index([tenantId, personId])
   @@map("app_events")
+}
+
+// ─────────────────────────────────────────────
+// ENRICHMENT ENGINE
+// LLM-assisted company/person data enrichment with human review.
+// ─────────────────────────────────────────────
+
+model EnrichmentRun {
+  id          Int       @id @default(autoincrement())
+  tenantId    Int       @map("tenant_id")
+  entityType  String    @map("entity_type")  // "company" | "person"
+  entityIds   Int[]     @map("entity_ids")   // which IDs were queued
+  status      String    @default("pending")  // pending | running | done | failed
+  triggeredBy String?   @map("triggered_by") // user email
+  startedAt   DateTime? @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  proposals EnrichmentProposal[]
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("enrichment_runs")
+}
+
+model EnrichmentProposal {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int      @map("tenant_id")
+  runId         Int      @map("run_id")
+  entityType    String   @map("entity_type")   // "company" | "person"
+  entityId      Int      @map("entity_id")
+  entityName    String   @map("entity_name")   // denormalized for display
+  changes       Json     // { fieldName: { current, proposed, source, confidence, status } }
+  overallStatus String   @default("pending") @map("overall_status") // pending | partial | approved | rejected
+  rawResponse   String?  @map("raw_response")  // full LLM response for debugging
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  run    EnrichmentRun @relation(fields: [runId], references: [id])
+  tenant Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@map("enrichment_proposals")
 }

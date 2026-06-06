@@ -70,7 +70,7 @@ export async function closeContact(contactId: number, companyId: number, personI
 }
 
 // "Person left company" — close contact + auto-create a follow-up task
-export async function personLeftCompany(contactId: number, companyId: number, personId: number) {
+export async function personLeftCompany(contactId: number, companyId: number, personId: number, endedAt?: Date) {
   const [contact] = await Promise.all([
     db.contact.findFirst({
       where: { id: contactId, tenantId: TENANT_ID },
@@ -82,12 +82,14 @@ export async function personLeftCompany(contactId: number, companyId: number, pe
   ]);
   if (!contact) return { error: "Kapcsolat nem található" };
 
+  const leaveDate = endedAt ?? new Date();
+
   // Close the contact
   await db.contact.updateMany({
     where: { id: contactId, tenantId: TENANT_ID },
-    data: { endedAt: new Date() },
+    data: { endedAt: leaveDate },
   });
-  await audit("contact", contactId, "update", { endedAt: null }, { endedAt: new Date().toISOString() });
+  await audit("contact", contactId, "update", { endedAt: null }, { endedAt: leaveDate.toISOString() });
 
   // Auto-create follow-up task linked to the person
   const personName = [contact.person.lastName, contact.person.firstName].filter(Boolean).join(" ");
