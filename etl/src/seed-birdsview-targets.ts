@@ -40,8 +40,22 @@ function parseArgs(): Args {
   const out: Args = { dryRun: false, tenantId: 1, file: DEFAULT_CSV };
   for (let i = 0; i < a.length; i++) {
     if (a[i] === '--dry-run') out.dryRun = true;
-    else if (a[i] === '--tenant-id') out.tenantId = parseInt(a[++i], 10);
-    else if (a[i] === '--file') out.file = a[++i];
+    else if (a[i] === '--tenant-id') {
+      const raw = a[++i];
+      const n = Number(raw);
+      if (raw === undefined || !Number.isInteger(n) || n <= 0) {
+        throw new Error(`--tenant-id requires a positive integer (got: ${raw ?? '<missing>'})`);
+      }
+      out.tenantId = n;
+    } else if (a[i] === '--file') {
+      const raw = a[++i];
+      if (!raw || raw.startsWith('--')) {
+        throw new Error(`--file requires a path (got: ${raw ?? '<missing>'})`);
+      }
+      out.file = raw;
+    } else {
+      throw new Error(`Unknown argument: ${a[i]}`);
+    }
   }
   return out;
 }
@@ -76,8 +90,20 @@ interface TargetRow {
   website: string; source: string;
 }
 
+const REQUIRED_HEADERS = [
+  'num', 'name', 'segment', 'top10', 'q4_loi', 'in_crm',
+  'crm_name', 'dm_role', 'why_now', 'website', 'source',
+];
+
 function toRows(matrix: string[][]): TargetRow[] {
+  if (matrix.length === 0) throw new Error('CSV is empty — no rows parsed.');
   const header = matrix[0].map((h) => h.trim());
+  const missing = REQUIRED_HEADERS.filter((h) => !header.includes(h));
+  if (missing.length > 0) {
+    throw new Error(
+      `CSV is missing required column(s): ${missing.join(', ')}. Found: ${header.join(', ')}`,
+    );
+  }
   const idx = (k: string) => header.indexOf(k);
   const truthy = (v: string) => (v ?? '').trim().toLowerCase() === 'true';
   return matrix.slice(1).map((r) => ({
