@@ -100,6 +100,7 @@ model Company {
   address              String?
   zipCode              String?   @map("zip_code")
   website              String?
+  notes                String?                        // free-text intel (e.g. BirdsView target research blocks)
   pipelineStatus       String?   @map("pipeline_status") // 0-8 status codes
   lastInteractionDate  DateTime? @map("last_interaction_date")
   lastInteractionOwner String?   @map("last_interaction_owner")
