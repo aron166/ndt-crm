@@ -56,45 +56,67 @@ export async function convertLeadToDeal(leadId: number) {
   });
   if (!pipeline) return { error: "Nincs pipeline — hozz létre egyet előbb" };
 
-  const firstStage = pipeline.stages[0] ?? null;
+  const firstStage = pipeline.stages[0];
+  if (!firstStage) {
+    return { error: "A pipeline-nak nincs egyetlen szakasza sem — előbb hozz létre egyet" };
+  }
 
-  const maxPos = await db.deal.aggregate({
-    where: { tenantId: TENANT_ID, stageId: firstStage?.id ?? null },
-    _max: { position: true },
-  });
+  // Snapshot the fields we need so TS narrowing survives the transaction closure.
+  const companyId = lead.companyId;
+  const companyName = lead.company.name;
+  const personId = lead.contact?.personId ?? null;
+  const priorStatus = lead.status;
+  const title = lead.serviceInterest?.trim() || `${companyName} — érdeklődés`;
+  const value = lead.estimatedValue ?? null;
 
-  const deal = await db.deal.create({
-    data: {
-      tenantId: TENANT_ID,
-      title: lead.serviceInterest?.trim() || `${lead.company.name} — érdeklődés`,
-      companyId: lead.companyId,
-      personId: lead.contact?.personId ?? null,
-      pipelineId: pipeline.id,
-      stageId: firstStage?.id ?? null,
-      value: lead.estimatedValue ?? null,
-      currency: "HUF",
-      position: (maxPos._max.position ?? -1) + 1,
-    },
-    select: { id: true },
-  });
+  // Convert atomically: claim the lead (status != qualified → qualified) and
+  // create the deal in one transaction. The conditional updateMany is the race
+  // guard — if the lead is already qualified (e.g. a double-click or a second
+  // tab), claim.count is 0 and we abort instead of creating a duplicate deal.
+  let dealId: number;
+  try {
+    dealId = await db.$transaction(async (tx) => {
+      const claim = await tx.lead.updateMany({
+        where: { id: leadId, tenantId: TENANT_ID, status: { not: "qualified" } },
+        data: { status: "qualified" },
+      });
+      if (claim.count === 0) throw new Error("LEAD_ALREADY_QUALIFIED");
 
-  // The lead's job is done once it becomes a deal — mark it qualified.
-  await db.lead.updateMany({
-    where: { id: leadId, tenantId: TENANT_ID },
-    data: { status: "qualified" },
-  });
+      const maxPos = await tx.deal.aggregate({
+        where: { tenantId: TENANT_ID, stageId: firstStage.id },
+        _max: { position: true },
+      });
+      const deal = await tx.deal.create({
+        data: {
+          tenantId: TENANT_ID,
+          title,
+          companyId,
+          personId,
+          pipelineId: pipeline.id,
+          stageId: firstStage.id,
+          value,
+          currency: "HUF",
+          position: (maxPos._max.position ?? -1) + 1,
+        },
+        select: { id: true },
+      });
+      return deal.id;
+    });
+  } catch (e) {
+    if (e instanceof Error && e.message === "LEAD_ALREADY_QUALIFIED") {
+      return { error: "A lead már minősített — valószínűleg korábban átalakítva lett" };
+    }
+    throw e;
+  }
 
-  audit("deal", deal.id, "create", null, {
-    title: lead.serviceInterest ?? lead.company.name,
-    fromLeadId: leadId,
-  });
+  audit("deal", dealId, "create", null, { title, fromLeadId: leadId });
   audit("lead", leadId, "update",
-    { status: lead.status },
-    { status: "qualified", convertedToDealId: deal.id },
+    { status: priorStatus },
+    { status: "qualified", convertedToDealId: dealId },
   );
 
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/deals");
-  return { success: true, dealId: deal.id };
+  return { success: true, dealId };
 }

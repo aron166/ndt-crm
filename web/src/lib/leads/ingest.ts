@@ -74,7 +74,11 @@ export async function ingestLead(
   tx: LeadTx,
 ): Promise<IngestResult> {
   const { tenantId } = ctx;
-  const sourceApp = (input.source_app || ctx.appSlug).trim();
+  // sourceApp is authoritative from the authenticated key — the payload's
+  // source_app is deliberately ignored, so a key issued to app X can never
+  // attribute a lead to app Y. (input.source_app is still preserved verbatim
+  // inside the app_events payload below for raw-submission traceability.)
+  const sourceApp = ctx.appSlug.trim();
 
   // 1. Dedupe Company by exact name (case-insensitive) within the tenant.
   const existingCompany = await tx.company.findFirst({

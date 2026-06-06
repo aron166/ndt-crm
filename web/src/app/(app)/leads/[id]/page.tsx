@@ -14,8 +14,10 @@ export default async function LeadDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  // Reject anything that isn't purely digits before parseInt — "12abc",
+  // "1e9", " 3 ", etc. must 404 rather than silently coerce to a valid id.
+  if (!/^\d+$/.test(id)) notFound();
   const leadId = parseInt(id, 10);
-  if (isNaN(leadId)) notFound();
 
   const lead = await db.lead.findFirst({
     where: { id: leadId, tenantId: TENANT_ID },

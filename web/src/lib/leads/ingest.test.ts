@@ -119,6 +119,27 @@ describe("ingestLead", () => {
     expect(data.sourceApp).toBe("betonscan_landing");
   });
 
+  it("ignores a spoofed payload source_app and always uses the key's appSlug", async () => {
+    // A key issued to betonscan_landing must not be able to attribute a lead
+    // to another app by sending its own source_app in the body.
+    const input = parse({
+      company_name: "Acme",
+      contact_phone: "+36301234567",
+      source_app: "n8n",
+    });
+    const { tx } = makeTx({});
+    await ingestLead(input, ctx, tx);
+    // Lead is attributed to the authenticated key, not the payload value.
+    const leadData = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(leadData.sourceApp).toBe("betonscan_landing");
+    // The app_event is also attributed to the key...
+    const eventData = (tx.appEvent.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(eventData.sourceApp).toBe("betonscan_landing");
+    // ...while the raw submitted body (incl. the spoofed value) is preserved
+    // verbatim in the event payload for traceability.
+    expect(eventData.payload.source_app).toBe("n8n");
+  });
+
   it("still creates a person when only a phone is provided (no email to dedupe on)", async () => {
     const input = parse({ company_name: "Acme", contact_phone: "+36301234567" });
     const { tx, created } = makeTx({});
