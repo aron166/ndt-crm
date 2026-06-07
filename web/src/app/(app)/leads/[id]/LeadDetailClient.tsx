@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, User, Mail, Phone, Globe, ArrowRightCircle, CheckCircle2 } from "lucide-react";
+import { Building2, User, Mail, Phone, Globe, ArrowRightCircle, CheckCircle2, Pencil } from "lucide-react";
 import { convertLeadToDeal, updateLeadStatus } from "@/app/actions/leads";
+import { LeadEditModal } from "./LeadEditModal";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
@@ -34,6 +35,7 @@ interface Lead {
   subject: string | null;
   serviceInterest: string | null;
   message: string | null;
+  lostReason: string | null;
   estimatedValue: number | null;
   receivedDate: string | Date | null;
   convertedDealId: number | null;
@@ -68,6 +70,7 @@ export function LeadDetailClient({
   const [converting, startConvert] = useTransition();
   const [statusPending, startStatus] = useTransition();
   const [converted, setConverted] = useState<number | null>(lead.convertedDealId ?? null);
+  const [editing, setEditing] = useState(false);
 
   const person = lead.contact?.person;
   const personName = person ? fullName(person.firstName, person.lastName) : null;
@@ -111,6 +114,11 @@ export function LeadDetailClient({
           </p>
         </div>
         <div className="page-actions" style={{ gap: 8 }}>
+          <button onClick={() => setEditing(true)} className="btn" style={{ gap: 6 }}>
+            <Pencil style={{ width: 14, height: 14 }} />
+            Szerkesztés
+          </button>
+
           <select
             value={status}
             onChange={(e) => handleStatusChange(e.target.value)}
@@ -279,6 +287,23 @@ export function LeadDetailClient({
           )}
         </div>
       </div>
+
+      <LeadEditModal
+        open={editing}
+        onClose={() => setEditing(false)}
+        onSaved={() => router.refresh()}
+        initial={{
+          id: lead.id,
+          subject: lead.subject,
+          serviceInterest: lead.serviceInterest,
+          source: lead.source,
+          estimatedValue: lead.estimatedValue,
+          message: lead.message,
+          lostReason: lead.lostReason,
+          companyId: lead.companyId,
+          companyName: lead.company?.name ?? null,
+        }}
+      />
     </div>
   );
 }
