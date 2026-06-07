@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { leadStatusLabel, DEFAULT_LEAD_STATUSES } from "@/lib/leads/statuses";
 import { getLeadStatuses } from "@/lib/leads/queries";
+import { runAutomations } from "@/lib/automations/engine";
 
 const TENANT_ID = 1;
 
@@ -12,11 +13,19 @@ export async function moveLead(leadId: number, newStatus: string) {
   const statuses = await getLeadStatuses(TENANT_ID);
   if (!statuses.some((s) => s.key === newStatus)) return { error: "Ismeretlen státusz" };
 
+  // Single query pulls the entity context the audit + automation engine need
+  // (company name, person, condition fields) — no follow-up per-row lookups.
   const before = await db.lead.findFirst({
     where: { id: leadId, tenantId: TENANT_ID },
-    select: { status: true },
+    select: {
+      status: true, companyId: true, source: true, serviceInterest: true,
+      estimatedValue: true,
+      company: { select: { name: true } },
+      contact: { select: { personId: true } },
+    },
   });
   if (!before) return { error: "Lead nem található" };
+  if (before.status === newStatus) return { success: true };
 
   await db.lead.updateMany({
     where: { id: leadId, tenantId: TENANT_ID },
@@ -27,6 +36,23 @@ export async function moveLead(leadId: number, newStatus: string) {
     { status: before.status, statusLabel: leadStatusLabel(before.status, statuses) },
     { status: newStatus, statusLabel: leadStatusLabel(newStatus, statuses) },
   );
+
+  await runAutomations({
+    type: "lead_status_changed",
+    tenantId: TENANT_ID,
+    companyId: before.companyId,
+    personId: before.contact?.personId ?? null,
+    companyName: before.company?.name ?? null,
+    toStatus: newStatus,
+    fields: {
+      company: before.company?.name ?? null,
+      status: newStatus,
+      source: before.source,
+      serviceInterest: before.serviceInterest,
+      estimatedValue: before.estimatedValue != null ? Number(before.estimatedValue) : null,
+    },
+  });
+
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
   return { success: true };

@@ -30,9 +30,6 @@ export interface LeadTx {
   leadStatus: {
     findFirst(args: Prisma.LeadStatusFindFirstArgs): Promise<{ key: string } | null>;
   };
-  task: {
-    create(args: Prisma.TaskCreateArgs): Promise<{ id: number }>;
-  };
   auditLog: {
     create(args: Prisma.AuditLogCreateArgs): Promise<{ id: number }>;
   };
@@ -221,27 +218,10 @@ export async function ingestLead(
     },
   });
 
-  // 7. Auto-task: a follow-up to contact the new lead, due tomorrow. This is the
-  //    minimal seed of the planned task-automation rule engine ("when X happens
-  //    → create task Y", user-configurable). The task tracks work against the
-  //    permanent entities (company + person), not the lead card itself.
-  const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 1);
-  await tx.task.create({
-    data: {
-      tenantId,
-      companyId: company.id,
-      personId: person.id,
-      title: `Lead megkeresése: ${input.company_name}`,
-      type: "call",
-      category: "revenue_generating",
-      status: "created",
-      dueDate,
-      description: input.message
-        ? `Új lead (${sourceApp}). Üzenet: ${input.message}`
-        : `Új lead a(z) ${sourceApp} csatornán.`,
-    },
-  });
+  // NB: the new-lead follow-up task is no longer created here. It is now driven
+  // by the task-automation rule engine (a seeded "lead_created → create_task"
+  // rule), fired by the caller via runAutomations() AFTER this transaction
+  // commits — so an automation failure can never roll back the lead intake.
 
   return {
     leadId: lead.id,

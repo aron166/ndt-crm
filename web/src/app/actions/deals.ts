@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
+import { runAutomations } from "@/lib/automations/engine";
 
 const TENANT_ID = 1;
 
@@ -95,7 +96,11 @@ export async function moveDeal(
 ) {
   const deal = await db.deal.findFirst({
     where: { id: dealId, tenantId: TENANT_ID },
-    select: { stageId: true, stage: { select: { name: true } } },
+    select: {
+      stageId: true, companyId: true, personId: true, value: true,
+      stage: { select: { name: true } },
+      company: { select: { name: true } },
+    },
   });
 
   const newStage = await db.pipelineStage.findUnique({
@@ -112,6 +117,24 @@ export async function moveDeal(
     { stageId: deal?.stageId, stageName: deal?.stage?.name },
     { stageId: newStageId, stageName: newStage?.name }
   );
+
+  if (deal && deal.stageId !== newStageId) {
+    await runAutomations({
+      type: "deal_stage_changed",
+      tenantId: TENANT_ID,
+      companyId: deal.companyId,
+      personId: deal.personId,
+      dealId,
+      companyName: deal.company?.name ?? null,
+      toStageId: newStageId,
+      fields: {
+        company: deal.company?.name ?? null,
+        stageId: newStageId,
+        value: deal.value != null ? Number(deal.value) : null,
+      },
+    });
+  }
+
   revalidatePath("/deals");
 }
 

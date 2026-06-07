@@ -12,7 +12,7 @@ function makeTx(seed: {
 }) {
   let nextId = 100;
   const created = {
-    company: 0, person: 0, contact: 0, lead: 0, auditLog: 0, appEvent: 0, task: 0,
+    company: 0, person: 0, contact: 0, lead: 0, auditLog: 0, appEvent: 0,
   };
   const lastLeadData: { value?: unknown } = {};
 
@@ -35,9 +35,6 @@ function makeTx(seed: {
     leadStatus: {
       // No configured initial status in the fake → ingest falls back to "new".
       findFirst: vi.fn(async () => null),
-    },
-    task: {
-      create: vi.fn(async () => { created.task++; return { id: ++nextId }; }),
     },
     auditLog: {
       create: vi.fn(async () => { created.auditLog++; return { id: ++nextId }; }),
@@ -73,18 +70,12 @@ describe("ingestLead", () => {
     const { tx, created } = makeTx({});
     const result = await ingestLead(input, ctx, tx);
 
-    expect(created).toEqual({ company: 1, person: 1, contact: 1, lead: 1, auditLog: 1, appEvent: 1, task: 1 });
+    expect(created).toEqual({ company: 1, person: 1, contact: 1, lead: 1, auditLog: 1, appEvent: 1 });
     expect(result.companyReused).toBe(false);
     expect(result.personReused).toBe(false);
     expect(result.leadId).toBeTypeOf("number");
-
-    // A follow-up "contact the lead" task is auto-created against the company/person.
-    const taskData = (tx.task.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
-    expect(taskData.title).toContain("Acme Kft.");
-    expect(taskData.type).toBe("call");
-    expect(taskData.status).toBe("created");
-    expect(taskData.companyId).toBeTypeOf("number");
-    expect(taskData.personId).toBeTypeOf("number");
+    // The follow-up task is no longer created inside ingest — it's now driven by
+    // the automation engine (seeded lead_created rule) post-commit. See engine.test.ts.
 
     // Lead gets status "new", the resolved sourceApp, and marketing passthrough.
     const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;

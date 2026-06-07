@@ -85,6 +85,14 @@ function IconSparkle() {
   );
 }
 
+function IconZap() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+    </svg>
+  );
+}
+
 const NAV = [
   {
     group: "WORKSPACE",
@@ -108,6 +116,7 @@ const NAV = [
       { href: "/invoices",    label: "Számlák",     icon: IconInvoice },
       { href: "/analytics",   label: "Analytics",   icon: IconAnalytics },
       { href: "/enrichment",  label: "Enrichment",  icon: IconSparkle },
+      { href: "/automations", label: "Automatizálás", icon: IconZap },
       { href: "/settings",    label: "Beállítások", icon: IconSettings },
     ],
   },
