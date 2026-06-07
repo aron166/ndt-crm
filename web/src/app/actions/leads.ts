@@ -36,7 +36,9 @@ export async function updateLeadStatus(leadId: number, newStatus: string) {
 
 /**
  * Convert a lead into a Deal in the default (first, non-archived) pipeline,
- * linked to the same company + person. Marks the lead "qualified" and audits.
+ * linked to the same company + person. Stamps the lead's convertedDealId/
+ * convertedAt so it hands off to the deal pipeline (leaves the active leads
+ * board, kept for history) and audits the hand-off.
  */
 export async function convertLeadToDeal(leadId: number) {
   const lead = await db.lead.findFirst({
@@ -68,22 +70,16 @@ export async function convertLeadToDeal(leadId: number) {
   const title = lead.serviceInterest?.trim() || `${companyName} — érdeklődés`;
   const value = lead.estimatedValue ?? null;
 
-  // Convert atomically: claim the lead (convertedAt null → now) and create the
-  // deal in one transaction. The conditional updateMany is the race guard — if
-  // the lead was already converted (a double-click or a second tab), claim.count
-  // is 0 and we abort instead of creating a duplicate deal. The lead is then
-  // linked to its deal via convertedDealId; once set, the lead leaves the active
-  // leads board — the deal is the process tracker from here on. The lead entity
-  // is kept (origin/UTM history) and never duplicated across both boards.
+  // Convert atomically in one transaction: create the deal, then claim the lead.
+  // `convertedDealId` is the single source of truth for "this lead has graduated"
+  // — the conditional updateMany is the race guard, so a double-click / second
+  // tab that loses the race gets claim.count 0 and throws, rolling back the deal
+  // we just created (no duplicate). Once set, the lead leaves the active leads
+  // board; the deal is the process tracker from here on. The lead entity is kept
+  // (origin/UTM history), linked to its deal, never duplicated across both boards.
   let dealId: number;
   try {
     dealId = await db.$transaction(async (tx) => {
-      const claim = await tx.lead.updateMany({
-        where: { id: leadId, tenantId: TENANT_ID, convertedAt: null },
-        data: { convertedAt: new Date() },
-      });
-      if (claim.count === 0) throw new Error("LEAD_ALREADY_CONVERTED");
-
       const maxPos = await tx.deal.aggregate({
         where: { tenantId: TENANT_ID, stageId: firstStage.id },
         _max: { position: true },
@@ -103,10 +99,12 @@ export async function convertLeadToDeal(leadId: number) {
         select: { id: true },
       });
 
-      await tx.lead.update({
-        where: { id: leadId },
-        data: { convertedDealId: deal.id },
+      const claim = await tx.lead.updateMany({
+        where: { id: leadId, tenantId: TENANT_ID, convertedDealId: null },
+        data: { convertedDealId: deal.id, convertedAt: new Date() },
       });
+      if (claim.count === 0) throw new Error("LEAD_ALREADY_CONVERTED");
+
       return deal.id;
     });
   } catch (e) {

@@ -88,7 +88,11 @@ export function LeadDetailClient({
       if (res?.success && res.dealId) {
         setConverted(res.dealId);
         router.refresh();
+        return;
       }
+      // Lost the race (already converted) or another error — resync from server
+      // so the button reflects the real convertedDealId state.
+      if (res?.error) router.refresh();
     });
   }
 

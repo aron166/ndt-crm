@@ -237,10 +237,11 @@ model Lead {
   convertedAt     DateTime? @map("converted_at")
   createdAt       DateTime  @default(now()) @map("created_at")
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  company    Company? @relation(fields: [companyId], references: [id])
-  contact    Contact? @relation(fields: [contactId], references: [id])
-  assignedTo User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  company       Company? @relation(fields: [companyId], references: [id])
+  contact       Contact? @relation(fields: [contactId], references: [id])
+  assignedTo    User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  convertedDeal Deal?    @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, convertedDealId])
   @@map("leads")
@@ -328,6 +329,7 @@ model Deal {
   assignedTo User?          @relation("DealAssignee", fields: [assignedToId], references: [id])
   proposals  Proposal[]
   tasks      Task[]         @relation("TaskDeal")
+  convertedFromLeads Lead[] @relation("LeadConvertedDeal")
 
   @@index([pipelineId, stageId, position])
   @@map("deals")
