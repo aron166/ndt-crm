@@ -77,6 +77,12 @@ function DealCard({
       draggable
       onDragStart={() => onDragStart(deal.id)}
       onDragEnd={onDragEnd}
+      onClick={() => onEdit(deal)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(deal); }
+      }}
       className={cn("rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
@@ -105,13 +111,9 @@ function DealCard({
         </div>
       )}
 
-      {/* Title */}
+      {/* Title — presentational only; the parent card handles click + hover */}
       <p
         style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", marginBottom: 6 }}
-        onClick={() => onEdit(deal)}
-        className="cursor-pointer"
-        onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-        onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
       >
         {deal.title}
       </p>
