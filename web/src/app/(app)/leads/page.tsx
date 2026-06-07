@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { serializeDates } from "@/lib/serialize";
-import { LEAD_STATUSES } from "@/lib/leads/statuses";
+import { getLeadStatuses } from "@/lib/leads/queries";
 import { LeadsKanban } from "./LeadsKanban";
+import { Settings2 } from "lucide-react";
 import { fullName, formatRelativeTime } from "@/lib/utils";
 
 const TENANT_ID = 1;
@@ -135,7 +136,9 @@ export default async function LeadsPage({
     customFields: (l.customFields ?? null) as Record<string, unknown> | null,
   }));
 
-  const fresh = leads.filter((l) => l.status === "new").length;
+  const statuses = await getLeadStatuses(TENANT_ID);
+  const initialKey = statuses.find((s) => s.isInitial)?.key ?? "new";
+  const fresh = leads.filter((l) => l.status === initialKey).length;
 
   return (
     <div className="mount">
@@ -153,11 +156,17 @@ export default async function LeadsPage({
             Beérkező érdeklődések a landing oldalakról és automatizációkból.
           </p>
         </div>
-        <div className="page-actions">{Toggle}</div>
+        <div className="page-actions" style={{ gap: 8 }}>
+          {Toggle}
+          <Link href="/leads/setup" className="btn sm" style={{ gap: 6 }}>
+            <Settings2 style={{ width: 13, height: 13 }} />
+            Státuszok
+          </Link>
+        </div>
       </div>
 
       <LeadsKanban
-        statuses={LEAD_STATUSES}
+        statuses={statuses}
         leads={serializeDates(leadsForClient) as Parameters<typeof LeadsKanban>[0]["leads"]}
       />
     </div>

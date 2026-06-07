@@ -38,6 +38,7 @@ model Tenant {
   enrichmentRuns         EnrichmentRun[]
   enrichmentProposals    EnrichmentProposal[]
   appApiKeys             AppApiKey[]
+  leadStatuses           LeadStatus[]
 
   @@map("tenants")
 }
@@ -245,6 +246,26 @@ model Lead {
 
   @@index([tenantId, convertedDealId])
   @@map("leads")
+}
+
+// Customizable columns of the LEAD pipeline (the cold/inbound qualification
+// funnel), the counterpart to PipelineStage for deals. Lead.status references
+// LeadStatus.key (stable slug; the label is the editable display name).
+model LeadStatus {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int      @map("tenant_id")
+  key        String                                       // stable slug stored on Lead.status
+  label      String
+  color      String   @default("#6366f1")
+  position   Int      @default(0)
+  isInitial  Boolean  @default(false) @map("is_initial")  // where inbound API leads land
+  isTerminal Boolean  @default(false) @map("is_terminal") // terminal-lost style (greyed)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, key])
+  @@map("lead_statuses")
 }
 
 // ─────────────────────────────────────────────

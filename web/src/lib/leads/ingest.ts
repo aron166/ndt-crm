@@ -27,6 +27,9 @@ export interface LeadTx {
   lead: {
     create(args: Prisma.LeadCreateArgs): Promise<{ id: number }>;
   };
+  leadStatus: {
+    findFirst(args: Prisma.LeadStatusFindFirstArgs): Promise<{ key: string } | null>;
+  };
   auditLog: {
     create(args: Prisma.AuditLogCreateArgs): Promise<{ id: number }>;
   };
@@ -139,8 +142,15 @@ export async function ingestLead(
     });
   }
 
-  // 4. Create the Lead (status "new"). Marketing passthrough + contact snapshot
-  //    live on custom_fields, mirroring the deals customFields pattern.
+  // 4. Create the Lead at the tenant's INITIAL status (the configurable entry
+  //    column of the lead pipeline; falls back to "new"). Marketing passthrough
+  //    + contact snapshot live on custom_fields, mirroring the deals pattern.
+  const initialStatus = await tx.leadStatus.findFirst({
+    where: { tenantId, isInitial: true },
+    orderBy: { position: "asc" },
+  });
+  const statusKey = initialStatus?.key ?? "new";
+
   const customFields: Record<string, unknown> = {};
   const passthrough: (keyof LeadIntake)[] = [
     "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
@@ -162,7 +172,7 @@ export async function ingestLead(
       contactId: contact.id,
       source: input.source,
       sourceApp,
-      status: "new",
+      status: statusKey,
       subject: input.service_interest ?? null,
       message: input.message ?? null,
       serviceInterest: input.service_interest ?? null,
@@ -190,7 +200,7 @@ export async function ingestLead(
           contactId: contact.id,
           source: input.source,
           sourceApp,
-          status: "new",
+          status: statusKey,
         },
       } as Prisma.InputJsonValue,
     },

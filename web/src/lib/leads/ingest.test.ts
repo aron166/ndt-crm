@@ -32,6 +32,10 @@ function makeTx(seed: {
     lead: {
       create: vi.fn(async (args) => { created.lead++; lastLeadData.value = args.data; return { id: ++nextId }; }),
     },
+    leadStatus: {
+      // No configured initial status in the fake → ingest falls back to "new".
+      findFirst: vi.fn(async () => null),
+    },
     auditLog: {
       create: vi.fn(async () => { created.auditLog++; return { id: ++nextId }; }),
     },
