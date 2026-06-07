@@ -81,11 +81,26 @@ export function MarketingDetailClient({
   function run(fn: () => Promise<{ error?: string; success?: boolean }>, after?: () => void) {
     setError(null);
     startTransition(async () => {
-      const res = await fn();
-      if (res?.error) { setError(res.error); return; }
-      after?.();
-      router.refresh();
+      try {
+        const res = await fn();
+        if (res?.error) { setError(res.error); return; }
+        after?.();
+        router.refresh();
+      } catch {
+        // A thrown server action would otherwise leave the UI stuck pending with
+        // no feedback — surface it.
+        setError("Váratlan hiba történt. Próbáld újra.");
+      }
     });
+  }
+
+  function isSafeHttpUrl(url: string): boolean {
+    try {
+      const p = new URL(url).protocol;
+      return p === "http:" || p === "https:";
+    } catch {
+      return false;
+    }
   }
 
   async function copyAndOpenPublish() {
@@ -203,12 +218,19 @@ export function MarketingDetailClient({
         </div>
       )}
 
-      {/* Published link */}
+      {/* Published link — only render as a link for http(s); never href a
+          javascript:/data: scheme. */}
       {isPublished && item.externalUrl && (
-        <a href={item.externalUrl} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--indigo)", marginBottom: 16 }}>
-          <ExternalLink style={{ width: 13, height: 13 }} /> {item.externalUrl}
-        </a>
+        isSafeHttpUrl(item.externalUrl) ? (
+          <a href={item.externalUrl} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--indigo)", marginBottom: 16 }}>
+            <ExternalLink style={{ width: 13, height: 13 }} /> {item.externalUrl}
+          </a>
+        ) : (
+          <div className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--fg-mute)", marginBottom: 16 }}>
+            <ExternalLink style={{ width: 13, height: 13 }} /> {item.externalUrl}
+          </div>
+        )
       )}
 
       {/* Action bar */}

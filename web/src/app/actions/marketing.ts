@@ -37,9 +37,11 @@ export async function updateContent(id: number, title: string, body: string) {
     data: { title: cleanTitle, body: cleanBody },
   });
 
+  // Record both fields the human edit can change — the body edit IS the language
+  // pass, so omitting it would leave the most-edited field out of the trail.
   audit("content_item", id, "update",
-    { title: item.title },
-    { title: cleanTitle },
+    { title: item.title, body: item.body },
+    { title: cleanTitle, body: cleanBody },
   );
   revalidate(id);
   return { success: true };
@@ -131,10 +133,16 @@ export async function publishContent(id: number, externalUrl: string) {
 
   const url = externalUrl?.trim();
   if (!url) return { error: "A megjelenés linkje kötelező" };
+  // Only http(s) — new URL() also accepts javascript:/data:, which would become
+  // a stored XSS sink once rendered into an href.
+  let parsed: URL;
   try {
-    new URL(url);
+    parsed = new URL(url);
   } catch {
     return { error: "Érvénytelen URL" };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { error: "Csak http/https link engedélyezett" };
   }
 
   return transition(id, "published", { publishedAt: new Date(), externalUrl: url });

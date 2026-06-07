@@ -41,11 +41,26 @@ describe("contentIntakeSchema", () => {
       assets: [{ kind: "gif", url: "https://x/y.gif" }],
     });
     expect(badKind.success).toBe(false);
+
+    const tooMany = contentIntakeSchema.safeParse({
+      ...valid,
+      assets: Array.from({ length: 21 }, () => ({ kind: "image", url: "https://x/y.png" })),
+    });
+    expect(tooMany.success).toBe(false);
   });
 
   it("carries the internal flag through", () => {
     const r = contentIntakeSchema.safeParse({ ...valid, internal: true });
     expect(r.success && r.data.internal).toBe(true);
+  });
+
+  it("does NOT coerce the string \"false\" to true for internal (safety inversion)", () => {
+    const r = contentIntakeSchema.safeParse({ ...valid, internal: "false" });
+    expect(r.success && r.data.internal).toBe(false);
+    const r2 = contentIntakeSchema.safeParse({ ...valid, internal: "true" });
+    expect(r2.success && r2.data.internal).toBe(true);
+    const r3 = contentIntakeSchema.safeParse({ ...valid, internal: 0 });
+    expect(r3.success && r3.data.internal).toBe(false);
   });
 });
 

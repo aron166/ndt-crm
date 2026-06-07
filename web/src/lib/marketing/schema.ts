@@ -10,6 +10,23 @@ const emptyToUndef = (v: unknown) =>
 
 const optStr = z.preprocess(emptyToUndef, z.string().trim().max(10000).optional());
 
+// z.coerce.boolean() is a footgun: it's just Boolean(v), so the string "false"
+// coerces to TRUE. For the `internal` flag (INTERNAL = never postable) that would
+// be a silent safety inversion. Parse booleans explicitly instead.
+const boolish = z
+  .preprocess((v) => {
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") return v !== 0;
+    if (typeof v === "string") {
+      const s = v.trim().toLowerCase();
+      if (["true", "1", "yes", "on"].includes(s)) return true;
+      if (["false", "0", "no", "off", ""].includes(s)) return false;
+    }
+    return v;
+  }, z.boolean())
+  .optional()
+  .default(false);
+
 const assetSchema = z.object({
   kind: z.enum(ASSET_KINDS),
   url: z.string().trim().min(1).max(2000),
@@ -34,7 +51,7 @@ export const contentIntakeSchema = z.object({
     z.string().datetime({ offset: true }).optional(),
   ),
   // INTERNAL angles are never postable; the publish flow is hidden for them.
-  internal: z.coerce.boolean().optional().default(false),
+  internal: boolish,
 
   assets: z.array(assetSchema).max(20).optional(),
 });
