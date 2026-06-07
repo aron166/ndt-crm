@@ -65,22 +65,24 @@ export async function convertLeadToDeal(leadId: number) {
   const companyId = lead.companyId;
   const companyName = lead.company.name;
   const personId = lead.contact?.personId ?? null;
-  const priorStatus = lead.status;
   const title = lead.serviceInterest?.trim() || `${companyName} — érdeklődés`;
   const value = lead.estimatedValue ?? null;
 
-  // Convert atomically: claim the lead (status != qualified → qualified) and
-  // create the deal in one transaction. The conditional updateMany is the race
-  // guard — if the lead is already qualified (e.g. a double-click or a second
-  // tab), claim.count is 0 and we abort instead of creating a duplicate deal.
+  // Convert atomically: claim the lead (convertedAt null → now) and create the
+  // deal in one transaction. The conditional updateMany is the race guard — if
+  // the lead was already converted (a double-click or a second tab), claim.count
+  // is 0 and we abort instead of creating a duplicate deal. The lead is then
+  // linked to its deal via convertedDealId; once set, the lead leaves the active
+  // leads board — the deal is the process tracker from here on. The lead entity
+  // is kept (origin/UTM history) and never duplicated across both boards.
   let dealId: number;
   try {
     dealId = await db.$transaction(async (tx) => {
       const claim = await tx.lead.updateMany({
-        where: { id: leadId, tenantId: TENANT_ID, status: { not: "qualified" } },
-        data: { status: "qualified" },
+        where: { id: leadId, tenantId: TENANT_ID, convertedAt: null },
+        data: { convertedAt: new Date() },
       });
-      if (claim.count === 0) throw new Error("LEAD_ALREADY_QUALIFIED");
+      if (claim.count === 0) throw new Error("LEAD_ALREADY_CONVERTED");
 
       const maxPos = await tx.deal.aggregate({
         where: { tenantId: TENANT_ID, stageId: firstStage.id },
@@ -100,19 +102,24 @@ export async function convertLeadToDeal(leadId: number) {
         },
         select: { id: true },
       });
+
+      await tx.lead.update({
+        where: { id: leadId },
+        data: { convertedDealId: deal.id },
+      });
       return deal.id;
     });
   } catch (e) {
-    if (e instanceof Error && e.message === "LEAD_ALREADY_QUALIFIED") {
-      return { error: "A lead már minősített — valószínűleg korábban átalakítva lett" };
+    if (e instanceof Error && e.message === "LEAD_ALREADY_CONVERTED") {
+      return { error: "A lead már át lett alakítva deallé" };
     }
     throw e;
   }
 
   audit("deal", dealId, "create", null, { title, fromLeadId: leadId });
   audit("lead", leadId, "update",
-    { status: priorStatus },
-    { status: "qualified", convertedToDealId: dealId },
+    { convertedDealId: null },
+    { convertedDealId: dealId },
   );
 
   revalidatePath("/leads");
