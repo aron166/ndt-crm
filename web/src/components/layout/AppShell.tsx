@@ -18,10 +18,11 @@ interface AppShellProps {
   children: React.ReactNode;
   email: string;
   overdueCount?: number;
+  marketingReviewCount?: number;
   defaultPipeline?: PipelineStub | null;
 }
 
-export function AppShell({ children, email, overdueCount = 0, defaultPipeline }: AppShellProps) {
+export function AppShell({ children, email, overdueCount = 0, marketingReviewCount = 0, defaultPipeline }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -44,7 +45,7 @@ export function AppShell({ children, email, overdueCount = 0, defaultPipeline }:
 
   return (
     <>
-      <Sidebar collapsed={collapsed} onToggle={setCollapsed} />
+      <Sidebar collapsed={collapsed} onToggle={setCollapsed} badges={{ "/marketing": marketingReviewCount }} />
       <Topbar
         collapsed={collapsed}
         email={email}
