@@ -33,6 +33,12 @@ export async function POST(request: Request) {
     );
   }
 
+  // NOTE: app_event is the hub's own append-only ledger, distinct from audit_log
+  // (which tracks mutations to CRM entities). When this endpoint starts mutating
+  // audited CRM entities (e.g. a BirdsView lead webhook creating a `lead`/`deal`),
+  // attribute it via audit(..., { actor: "agent", actorAgentId, tenantId }).
+  // TODO(ctx): once per-app credentials land (Platform Foundations #4), derive the
+  // actor + tenant from the scoped API key rather than the request body.
   const event = await db.appEvent.create({
     data: {
       tenantId,
