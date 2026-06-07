@@ -54,14 +54,18 @@ function evalCondition(
   }
 }
 
-/** Optional, AND-ed. Null/empty conditions = always passes. Bad data fails open (passes). */
+/**
+ * Optional, AND-ed. Null/empty conditions = always passes. A malformed entry
+ * fails CLOSED (the rule does not fire) — better to skip an automation than to
+ * create an unintended task off a broken condition.
+ */
 export function conditionsPass(
   conditions: unknown,
   fields: Record<string, string | number | null | undefined>,
 ): boolean {
   if (!Array.isArray(conditions) || conditions.length === 0) return true;
   return conditions.every((c) => {
-    if (!c || typeof c !== "object" || typeof (c as Condition).field !== "string") return true;
+    if (!c || typeof c !== "object" || typeof (c as Condition).field !== "string") return false;
     return evalCondition(c as Condition, fields);
   });
 }
@@ -138,14 +142,19 @@ export async function runAutomations(event: AutomationEvent): Promise<void> {
       where: { tenantId: event.tenantId, triggerType: event.type, isActive: true },
     });
     for (const rule of rules) {
-      if (!triggerMatches(rule.triggerType as TriggerType, rule.triggerConfig, event)) continue;
-      if (!conditionsPass(rule.conditions, event.fields)) continue;
-      if (rule.actionType !== "create_task") continue;
+      // Per-rule isolation: one rule failing must not stop the others.
+      try {
+        if (!triggerMatches(rule.triggerType as TriggerType, rule.triggerConfig, event)) continue;
+        if (!conditionsPass(rule.conditions, event.fields)) continue;
+        if (rule.actionType !== "create_task") continue;
 
-      const cfg = rule.actionConfig as unknown as CreateTaskActionConfig;
-      if (!cfg?.titleTemplate) continue;
-      await db.task.create({ data: buildCreateTaskData(cfg, event) });
-      await db.automationRule.update({ where: { id: rule.id }, data: { lastRunAt: new Date() } });
+        const cfg = rule.actionConfig as unknown as CreateTaskActionConfig;
+        if (!cfg?.titleTemplate) continue;
+        await db.task.create({ data: buildCreateTaskData(cfg, event) });
+        await db.automationRule.update({ where: { id: rule.id }, data: { lastRunAt: new Date() } });
+      } catch (err) {
+        console.error(`[automations] rule ${rule.id} failed:`, err);
+      }
     }
   } catch (err) {
     console.error("[automations] runAutomations failed:", err);

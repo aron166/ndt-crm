@@ -11,12 +11,15 @@ import {
 
 const TENANT_ID = 1;
 
-function parseJson<T>(raw: FormDataEntryValue | null, fallback: T): T {
-  if (typeof raw !== "string" || raw.trim() === "") return fallback;
+// Fail CLOSED on malformed JSON: an unparseable triggerConfig/conditions must
+// abort the write, never silently fall back to a broad (filter-less) rule.
+// Empty/absent input is legitimately "no value" → ok with null.
+function parseJson<T>(raw: FormDataEntryValue | null): { ok: true; value: T | null } | { ok: false } {
+  if (typeof raw !== "string" || raw.trim() === "") return { ok: true, value: null };
   try {
-    return JSON.parse(raw) as T;
+    return { ok: true, value: JSON.parse(raw) as T };
   } catch {
-    return fallback;
+    return { ok: false };
   }
 }
 
@@ -39,16 +42,28 @@ function parseRuleForm(formData: FormData): RuleInput | { error: string } {
   if (!TRIGGER_TYPES.includes(triggerType as TriggerType)) return { error: "Ismeretlen trigger típus" };
   if (!ACTION_TYPES.includes(actionType as ActionType)) return { error: "Ismeretlen művelet típus" };
 
-  const actionConfig = parseJson<Record<string, unknown>>(formData.get("actionConfig"), {});
-  if (typeof actionConfig.titleTemplate !== "string" || !actionConfig.titleTemplate.trim()) {
+  const actionParsed = parseJson<Record<string, unknown>>(formData.get("actionConfig"));
+  if (!actionParsed.ok) return { error: "Érvénytelen actionConfig JSON" };
+  const actionConfig = actionParsed.value;
+  if (!actionConfig || typeof actionConfig !== "object" ||
+      typeof actionConfig.titleTemplate !== "string" || !actionConfig.titleTemplate.trim()) {
     return { error: "A létrehozandó feladat címe kötelező" };
   }
+  if (actionConfig.dueInDays != null) {
+    const n = Number(actionConfig.dueInDays);
+    if (!Number.isFinite(n) || n < 0) return { error: "A határidő (nap) érvénytelen" };
+  }
 
-  const rawConditions = parseJson<unknown[] | null>(formData.get("conditions"), null);
-  const conditions = Array.isArray(rawConditions) && rawConditions.length > 0 ? rawConditions : null;
+  const condParsed = parseJson<unknown[]>(formData.get("conditions"));
+  if (!condParsed.ok) return { error: "Érvénytelen feltétel JSON" };
+  const conditions =
+    Array.isArray(condParsed.value) && condParsed.value.length > 0 ? condParsed.value : null;
 
-  const rawTrigger = parseJson<Record<string, unknown> | null>(formData.get("triggerConfig"), null);
-  const triggerConfig = rawTrigger && Object.keys(rawTrigger).length > 0 ? rawTrigger : null;
+  const trigParsed = parseJson<Record<string, unknown>>(formData.get("triggerConfig"));
+  if (!trigParsed.ok) return { error: "Érvénytelen trigger JSON" };
+  const triggerConfig =
+    trigParsed.value && typeof trigParsed.value === "object" &&
+    Object.keys(trigParsed.value).length > 0 ? trigParsed.value : null;
 
   return {
     name,

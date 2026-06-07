@@ -216,11 +216,19 @@ export function AutomationsClient({
   }
 
   function handleToggle(r: RuleRow) {
-    startTransition(async () => { await toggleAutomation(r.id, !r.isActive); router.refresh(); });
+    startTransition(async () => {
+      const res = await toggleAutomation(r.id, !r.isActive);
+      if (res && "error" in res && res.error) { setError(res.error); return; }
+      router.refresh();
+    });
   }
   function handleDelete(id: number) {
     if (!confirm("Biztosan törlöd ezt a szabályt?")) return;
-    startTransition(async () => { await deleteAutomation(id); router.refresh(); });
+    startTransition(async () => {
+      const res = await deleteAutomation(id);
+      if (res && "error" in res && res.error) { setError(res.error); return; }
+      router.refresh();
+    });
   }
 
   return (
@@ -240,6 +248,10 @@ export function AutomationsClient({
           )}
         </div>
       </div>
+
+      {error && !showForm && (
+        <div className="panel"><div className="panel-pad" style={{ fontSize: 13, color: "var(--coral)" }}>{error}</div></div>
+      )}
 
       {showForm && (
         <RuleForm

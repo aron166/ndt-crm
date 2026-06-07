@@ -1,8 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  triggerMatches, conditionsPass, renderTemplate, buildCreateTaskData,
+  triggerMatches, conditionsPass, renderTemplate, buildCreateTaskData, runAutomations,
 } from "./engine";
 import type { AutomationEvent, CreateTaskActionConfig } from "./types";
+import { db } from "@/lib/db";
+
+vi.mock("@/lib/db", () => ({
+  db: {
+    automationRule: { findMany: vi.fn(), update: vi.fn() },
+    task: { create: vi.fn() },
+  },
+}));
 
 function leadCreated(over: Partial<AutomationEvent> = {}): AutomationEvent {
   return {
@@ -119,5 +127,67 @@ describe("buildCreateTaskData", () => {
     const data = buildCreateTaskData({ titleTemplate: "x" }, leadCreated());
     expect(data.dueDate).toBeNull();
     expect(data.description).toBeNull();
+  });
+});
+
+describe("runAutomations (orchestrator)", () => {
+  const mockDb = db as unknown as {
+    automationRule: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+    task: { create: ReturnType<typeof vi.fn> };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  function dbRule(over: Record<string, unknown> = {}) {
+    return {
+      id: 1, triggerType: "lead_created", triggerConfig: null, conditions: null,
+      actionType: "create_task", actionConfig: { titleTemplate: "Feladat {company}" },
+      ...over,
+    };
+  }
+
+  it("isolates a failing rule and still runs the rest", async () => {
+    mockDb.automationRule.findMany.mockResolvedValue([dbRule({ id: 1 }), dbRule({ id: 2 })]);
+    mockDb.task.create
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce({ id: 99 });
+    mockDb.automationRule.update.mockResolvedValue({});
+
+    await runAutomations(leadCreated());
+
+    expect(mockDb.task.create).toHaveBeenCalledTimes(2); // both attempted
+    expect(mockDb.automationRule.update).toHaveBeenCalledTimes(1); // only the one that succeeded stamps lastRunAt
+  });
+
+  it("only fires rules whose trigger config matches", async () => {
+    mockDb.automationRule.findMany.mockResolvedValue([
+      dbRule({ id: 1, triggerType: "lead_status_changed", triggerConfig: { toStatus: "qualified" } }),
+      dbRule({ id: 2, triggerType: "lead_status_changed", triggerConfig: { toStatus: "nurture" } }),
+    ]);
+    mockDb.task.create.mockResolvedValue({ id: 1 });
+    mockDb.automationRule.update.mockResolvedValue({});
+
+    await runAutomations(leadCreated({ type: "lead_status_changed", toStatus: "qualified" }));
+
+    expect(mockDb.task.create).toHaveBeenCalledTimes(1);
+    expect(mockDb.automationRule.update).toHaveBeenCalledWith({
+      where: { id: 1 }, data: { lastRunAt: expect.any(Date) },
+    });
+  });
+
+  it("skips rules whose conditions do not pass", async () => {
+    mockDb.automationRule.findMany.mockResolvedValue([
+      dbRule({ id: 1, conditions: [{ field: "source", op: "eq", value: "email" }] }),
+    ]);
+    await runAutomations(leadCreated()); // source is "web" → condition fails
+    expect(mockDb.task.create).not.toHaveBeenCalled();
+  });
+
+  it("never throws even if the rule query fails", async () => {
+    mockDb.automationRule.findMany.mockRejectedValue(new Error("db down"));
+    await expect(runAutomations(leadCreated())).resolves.toBeUndefined();
   });
 });
