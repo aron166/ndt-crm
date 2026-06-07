@@ -182,13 +182,18 @@ function StagesList({ stages, pipelineId }: { stages: Stage[]; pipelineId: numbe
       setDragIndex(null); setOverIndex(null);
       return;
     }
+    const prev = items;
     const next = [...items];
     const [moved] = next.splice(dragIndex, 1);
     next.splice(overIndex, 0, moved);
     setItems(next);
     setDragIndex(null); setOverIndex(null);
     const orderedIds = next.map((s) => s.id);
-    startTransition(async () => { await reorderStages(pipelineId, orderedIds); router.refresh(); });
+    startTransition(async () => {
+      const res = await reorderStages(pipelineId, orderedIds);
+      if (res?.error) setItems(prev); // revert optimistic order if the server rejected it
+      router.refresh();
+    });
   }
 
   return (
