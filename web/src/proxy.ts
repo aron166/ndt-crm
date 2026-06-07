@@ -34,11 +34,13 @@ export async function proxy(request: NextRequest) {
   // Service-to-service ingestion endpoints authenticate with a service-role
   // Bearer key (validated in-route), not a session cookie. Without this bypass
   // the session gate redirects their callers to /login, so external apps
-  // (VeloQuote, agents, BirdsView webhooks) can never reach them.
+  // (VeloQuote, agents, BirdsView webhooks) can never reach them. The cron
+  // endpoint likewise self-authenticates with CRON_SECRET, not a session.
   const isServiceApi =
     request.nextUrl.pathname === "/api/events" ||
     request.nextUrl.pathname === "/api/conversations" ||
-    request.nextUrl.pathname === "/api/leads";
+    request.nextUrl.pathname === "/api/leads" ||
+    request.nextUrl.pathname === "/api/cron/automations";
 
   if (!user && !isLoginPage && !isAuthRoute && !isServiceApi) {
     const url = request.nextUrl.clone();

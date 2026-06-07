@@ -123,6 +123,7 @@ export async function convertLeadToDeal(leadId: number) {
           value,
           currency: "HUF",
           position: (maxPos._max.position ?? -1) + 1,
+          stageEnteredAt: new Date(),
         },
         select: { id: true },
       });

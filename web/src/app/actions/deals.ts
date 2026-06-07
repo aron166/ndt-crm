@@ -43,6 +43,7 @@ export async function createDeal(formData: FormData) {
       currency: "HUF",
       expectedCloseDate: closeDate ? new Date(closeDate) : null,
       position: (maxPos._max.position ?? -1) + 1,
+      stageEnteredAt: new Date(),
       ...(Object.keys(customFields).length > 0 ? { customFields } : {}),
     },
   });
@@ -108,9 +109,16 @@ export async function moveDeal(
     select: { name: true },
   });
 
+  // Only a real stage change resets the idle clock (drags within the same
+  // column reorder but keep the deal in its stage).
+  const stageChanged = !!deal && deal.stageId !== newStageId;
+
   await db.deal.updateMany({
     where: { id: dealId, tenantId: TENANT_ID },
-    data: { stageId: newStageId, position: newPosition, updatedAt: new Date() },
+    data: {
+      stageId: newStageId, position: newPosition, updatedAt: new Date(),
+      ...(stageChanged ? { stageEnteredAt: new Date() } : {}),
+    },
   });
 
   audit("deal", dealId, "update",
@@ -118,7 +126,7 @@ export async function moveDeal(
     { stageId: newStageId, stageName: newStage?.name }
   );
 
-  if (deal && deal.stageId !== newStageId) {
+  if (stageChanged && deal) {
     await runAutomations({
       type: "deal_stage_changed",
       tenantId: TENANT_ID,

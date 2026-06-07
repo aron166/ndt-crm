@@ -40,6 +40,7 @@ model Tenant {
   appApiKeys             AppApiKey[]
   leadStatuses           LeadStatus[]
   automationRules        AutomationRule[]
+  automationFirings      AutomationFiring[]
 
   @@map("tenants")
 }
@@ -340,6 +341,7 @@ model Deal {
   lostReason        String?   @map("lost_reason")
   position          Int       @default(0)            // order within stage
   customFields      Json?     @map("custom_fields")  // JSONB values keyed by PipelineCustomField.key
+  stageEnteredAt    DateTime? @map("stage_entered_at") // set when the deal enters its current stage; basis for deal_idle_in_stage automations
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -352,6 +354,7 @@ model Deal {
   proposals  Proposal[]
   tasks      Task[]         @relation("TaskDeal")
   convertedFromLeads Lead[] @relation("LeadConvertedDeal")
+  automationFirings  AutomationFiring[]
 
   @@index([pipelineId, stageId, position])
   @@map("deals")
@@ -710,10 +713,33 @@ model AutomationRule {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant  Tenant             @relation(fields: [tenantId], references: [id])
+  firings AutomationFiring[]
 
   @@index([tenantId, triggerType, isActive])
   @@map("automation_rules")
+}
+
+// Dedupe ledger for time-based automations (deal_idle_in_stage). One row per
+// (rule, deal, stage-entry) — the unique constraint guarantees a given idle
+// rule fires at most once per stage entry, even across overlapping cron runs.
+// When a deal moves to a new stage its stageEnteredAt changes, so the rule can
+// legitimately fire again once it goes idle in the new stage.
+model AutomationFiring {
+  id             Int      @id @default(autoincrement())
+  tenantId       Int      @map("tenant_id")
+  ruleId         Int      @map("rule_id")
+  dealId         Int      @map("deal_id")
+  stageEnteredAt DateTime @map("stage_entered_at")
+  firedAt        DateTime @default(now()) @map("fired_at")
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  rule   AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  deal   Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, dealId, stageEnteredAt])
+  @@index([tenantId])
+  @@map("automation_firings")
 }
 
 // ─────────────────────────────────────────────
