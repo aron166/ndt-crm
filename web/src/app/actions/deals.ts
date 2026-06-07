@@ -160,6 +160,22 @@ export async function upsertStage(formData: FormData) {
   return { success: true };
 }
 
+export async function reorderStages(pipelineId: number, orderedIds: number[]) {
+  // Persist the new column order. Scope each update to the pipeline so a stray
+  // id from another pipeline can't be repositioned.
+  await db.$transaction(
+    orderedIds.map((id, index) =>
+      db.pipelineStage.updateMany({
+        where: { id, pipelineId },
+        data: { position: index },
+      }),
+    ),
+  );
+  revalidatePath("/deals/setup");
+  revalidatePath("/deals");
+  return { success: true };
+}
+
 export async function deleteStage(stageId: number) {
   // Move deals in this stage to null stage first
   await db.deal.updateMany({
