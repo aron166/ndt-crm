@@ -128,6 +128,100 @@ export async function convertLeadToDeal(leadId: number) {
   return { success: true, dealId };
 }
 
+/**
+ * Edit a lead's own (process-tracker) fields. Company/person *content* lives on
+ * their entity pages; here we only edit fields that belong to the lead itself,
+ * plus company *reassignment* (fixing a mis-attached inbound lead). A lead must
+ * always keep a company so it can still be converted, so clearing it is rejected.
+ */
+export async function updateLead(id: number, formData: FormData) {
+  const before = await db.lead.findFirst({
+    where: { id, tenantId: TENANT_ID },
+    select: {
+      subject: true, serviceInterest: true, source: true,
+      estimatedValue: true, message: true, lostReason: true, companyId: true,
+    },
+  });
+  if (!before) return { error: "Lead nem található" };
+
+  // Absent key → field not submitted, leave unchanged. Empty string → clear to null.
+  const text = (k: string): string | null | undefined => {
+    const v = formData.get(k);
+    if (v === null) return undefined;
+    const s = String(v).trim();
+    return s === "" ? null : s;
+  };
+
+  const subject = text("subject");
+  const serviceInterest = text("serviceInterest");
+  const source = text("source");
+  const message = text("message");
+  const lostReason = text("lostReason");
+
+  let estimatedValue: number | null | undefined = undefined;
+  const valueRaw = formData.get("estimatedValue");
+  if (valueRaw !== null) {
+    const s = String(valueRaw).trim();
+    if (s === "") estimatedValue = null;
+    else {
+      const n = Number(s);
+      if (!Number.isFinite(n) || n < 0) return { error: "A becsült érték érvénytelen" };
+      estimatedValue = n;
+    }
+  }
+
+  let companyId: number | undefined = undefined;
+  const companyIdRaw = formData.get("companyId");
+  if (companyIdRaw !== null) {
+    const s = String(companyIdRaw).trim();
+    if (s === "") return { error: "A leadhez tartoznia kell cégnek" };
+    const parsed = parseInt(s, 10);
+    if (!Number.isInteger(parsed)) return { error: "Érvénytelen cég" };
+    if (parsed !== before.companyId) {
+      const company = await db.company.findFirst({
+        where: { id: parsed, tenantId: TENANT_ID }, select: { id: true },
+      });
+      if (!company) return { error: "Cég nem található" };
+    }
+    companyId = parsed;
+  }
+
+  await db.lead.updateMany({
+    where: { id, tenantId: TENANT_ID },
+    data: {
+      ...(subject !== undefined ? { subject } : {}),
+      ...(serviceInterest !== undefined ? { serviceInterest } : {}),
+      ...(source !== undefined ? { source } : {}),
+      ...(message !== undefined ? { message } : {}),
+      ...(lostReason !== undefined ? { lostReason } : {}),
+      ...(estimatedValue !== undefined ? { estimatedValue } : {}),
+      ...(companyId !== undefined ? { companyId } : {}),
+    },
+  });
+
+  const beforeValue = before.estimatedValue != null ? Number(before.estimatedValue) : null;
+  audit("lead", id, "update",
+    {
+      subject: before.subject, serviceInterest: before.serviceInterest, source: before.source,
+      estimatedValue: beforeValue, message: before.message, lostReason: before.lostReason,
+      companyId: before.companyId,
+    },
+    {
+      subject: subject ?? before.subject,
+      serviceInterest: serviceInterest ?? before.serviceInterest,
+      source: source ?? before.source,
+      estimatedValue: estimatedValue !== undefined ? estimatedValue : beforeValue,
+      message: message ?? before.message,
+      lostReason: lostReason ?? before.lostReason,
+      companyId: companyId ?? before.companyId,
+    },
+  );
+
+  revalidatePath("/leads");
+  revalidatePath(`/leads/${id}`);
+  return { success: true };
+}
+
 // ── Lead status (pipeline column) management ───────────────────────
 
 function slugifyStatusKey(s: string): string {
