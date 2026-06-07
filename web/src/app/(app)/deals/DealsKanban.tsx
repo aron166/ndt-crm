@@ -77,6 +77,7 @@ function DealCard({
       draggable
       onDragStart={() => onDragStart(deal.id)}
       onDragEnd={onDragEnd}
+      onClick={() => onEdit(deal)}
       className={cn("rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
@@ -105,13 +106,9 @@ function DealCard({
         </div>
       )}
 
-      {/* Title */}
+      {/* Title — whole card is clickable; this just adds a hover affordance */}
       <p
         style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", marginBottom: 6 }}
-        onClick={() => onEdit(deal)}
-        className="cursor-pointer"
-        onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-        onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
       >
         {deal.title}
       </p>

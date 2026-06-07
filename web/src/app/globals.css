@@ -395,6 +395,50 @@
   display: flex; align-items: center; gap: 8px;
 }
 
+/* ── Kanban columns (deals + leads boards; mirrors the tasks board) ── */
+.kcol {
+  display: flex; flex-direction: column;
+  border-radius: 12px;
+  min-height: 200px;
+  max-height: calc(100vh - 215px);
+}
+.kcol-head {
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.kcol-dot {
+  width: 8px; height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.kcol-title {
+  font-size: 12px; font-weight: 600;
+  color: var(--fg-soft);
+  letter-spacing: 0.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kcol-count {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  background: var(--bg-raised);
+  color: var(--fg-mute);
+  padding: 1px 7px;
+  border-radius: 5px;
+}
+.kcol-body {
+  flex: 1; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px;
+}
+.kcol.mount { animation: kcol-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) both; }
+@keyframes kcol-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
 .badge-ds {
   display: inline-flex; align-items: center; gap: 6px;
   height: 20px; padding: 0 8px;

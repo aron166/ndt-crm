@@ -45,6 +45,7 @@ function LeadCard({
   onDragEnd: () => void;
   dragging: boolean;
 }) {
+  const router = useRouter();
   const person = lead.contact?.person;
   const personName = person
     ? `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()
@@ -56,6 +57,7 @@ function LeadCard({
       draggable
       onDragStart={() => onDragStart(lead.id)}
       onDragEnd={onDragEnd}
+      onClick={() => router.push(`/leads/${lead.id}`)}
       className={cn("rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
