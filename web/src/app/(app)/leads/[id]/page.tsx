@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { serializeDates } from "@/lib/serialize";
 import { getEntityHistory } from "@/app/actions/audit";
+import { getLeadStatuses } from "@/lib/leads/queries";
 import { LeadDetailClient } from "./LeadDetailClient";
 
 const TENANT_ID = 1;
@@ -51,6 +52,8 @@ export default async function LeadDetailPage({
     getEntityHistory("lead", leadId),
   ]);
 
+  const statuses = await getLeadStatuses(TENANT_ID);
+
   return (
     <div className="mount">
       <div style={{ marginBottom: 16 }}>
@@ -72,6 +75,7 @@ export default async function LeadDetailPage({
         })}
         interactions={serializeDates(interactions)}
         auditEntries={serializeDates(auditEntries)}
+        statuses={statuses}
       />
     </div>
   );

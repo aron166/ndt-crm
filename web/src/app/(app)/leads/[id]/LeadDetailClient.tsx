@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Building2, User, Mail, Phone, Globe, ArrowRightCircle, CheckCircle2 } from "lucide-react";
 import { convertLeadToDeal, updateLeadStatus } from "@/app/actions/leads";
-import { LEAD_STATUSES, leadStatusLabel } from "@/lib/leads/statuses";
+import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
 
@@ -56,10 +56,12 @@ export function LeadDetailClient({
   lead,
   interactions,
   auditEntries,
+  statuses,
 }: {
   lead: Lead;
   interactions: Interaction[];
   auditEntries: AuditEntry[];
+  statuses: LeadStatusDef[];
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(lead.status ?? "new");
@@ -120,7 +122,7 @@ export function LeadDetailClient({
               color: "var(--fg)", outline: "none",
             }}
           >
-            {LEAD_STATUSES.map((s) => (
+            {statuses.map((s) => (
               <option key={s.key} value={s.key}>{s.label}</option>
             ))}
           </select>
@@ -208,7 +210,7 @@ export function LeadDetailClient({
               </div>
               <div className="flex justify-between" style={{ fontSize: 12 }}>
                 <span style={{ color: "var(--fg-mute)" }}>Státusz</span>
-                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{leadStatusLabel(status)}</span>
+                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{leadStatusLabel(status, statuses)}</span>
               </div>
               {marketing.length > 0 && (
                 <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 6 }}>

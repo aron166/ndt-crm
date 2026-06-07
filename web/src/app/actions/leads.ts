@@ -3,12 +3,14 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { isLeadStatus, leadStatusLabel } from "@/lib/leads/statuses";
+import { leadStatusLabel, DEFAULT_LEAD_STATUSES } from "@/lib/leads/statuses";
+import { getLeadStatuses } from "@/lib/leads/queries";
 
 const TENANT_ID = 1;
 
 export async function moveLead(leadId: number, newStatus: string) {
-  if (!isLeadStatus(newStatus)) return { error: "Ismeretlen státusz" };
+  const statuses = await getLeadStatuses(TENANT_ID);
+  if (!statuses.some((s) => s.key === newStatus)) return { error: "Ismeretlen státusz" };
 
   const before = await db.lead.findFirst({
     where: { id: leadId, tenantId: TENANT_ID },
@@ -22,8 +24,8 @@ export async function moveLead(leadId: number, newStatus: string) {
   });
 
   audit("lead", leadId, "update",
-    { status: before.status, statusLabel: leadStatusLabel(before.status) },
-    { status: newStatus, statusLabel: leadStatusLabel(newStatus) },
+    { status: before.status, statusLabel: leadStatusLabel(before.status, statuses) },
+    { status: newStatus, statusLabel: leadStatusLabel(newStatus, statuses) },
   );
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
@@ -124,4 +126,128 @@ export async function convertLeadToDeal(leadId: number) {
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/deals");
   return { success: true, dealId };
+}
+
+// ── Lead status (pipeline column) management ───────────────────────
+
+function slugifyStatusKey(s: string): string {
+  return (
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "") // strip combining accents (á→a, ő→o)
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 50) || "status"
+  );
+}
+
+export async function createLeadStatus(formData: FormData) {
+  const label = (formData.get("label") as string)?.trim();
+  const color = (formData.get("color") as string) || "#6366f1";
+  if (!label) return { error: "Név kötelező" };
+
+  // Generate a unique slug key for this tenant.
+  const base = slugifyStatusKey(label);
+  let key = base;
+  let n = 1;
+  while (await db.leadStatus.findFirst({ where: { tenantId: TENANT_ID, key } })) {
+    key = `${base}_${++n}`;
+  }
+
+  const max = await db.leadStatus.aggregate({
+    where: { tenantId: TENANT_ID },
+    _max: { position: true },
+  });
+
+  await db.leadStatus.create({
+    data: {
+      tenantId: TENANT_ID, key, label, color,
+      position: (max._max.position ?? -1) + 1,
+      isInitial: false, isTerminal: false,
+    },
+  });
+  revalidatePath("/leads/setup");
+  revalidatePath("/leads");
+  return { success: true };
+}
+
+export async function upsertLeadStatus(formData: FormData) {
+  const id = parseInt(formData.get("id") as string);
+  const label = (formData.get("label") as string)?.trim();
+  const color = (formData.get("color") as string) || "#6366f1";
+  const isInitial = formData.get("isInitial") === "true";
+  const isTerminal = formData.get("isTerminal") === "true";
+  if (!id) return { error: "Hiányzó azonosító" };
+  if (!label) return { error: "Név kötelező" };
+
+  const existing = await db.leadStatus.findFirst({ where: { id, tenantId: TENANT_ID } });
+  if (!existing) return { error: "Státusz nem található" };
+
+  // Exactly one initial status: clear the flag on the others when setting it here.
+  // A status can't be both initial and terminal.
+  await db.$transaction([
+    ...(isInitial
+      ? [db.leadStatus.updateMany({ where: { tenantId: TENANT_ID, isInitial: true, NOT: { id } }, data: { isInitial: false } })]
+      : []),
+    db.leadStatus.update({
+      where: { id },
+      data: { label, color, isInitial, isTerminal: isInitial ? false : isTerminal },
+    }),
+  ]);
+  revalidatePath("/leads/setup");
+  revalidatePath("/leads");
+  return { success: true };
+}
+
+export async function deleteLeadStatus(id: number) {
+  const status = await db.leadStatus.findFirst({ where: { id, tenantId: TENANT_ID } });
+  if (!status) return { error: "Státusz nem található" };
+  if (status.isInitial) return { error: "A kezdő státusz nem törölhető — előbb jelölj ki másikat." };
+
+  const remaining = await db.leadStatus.count({ where: { tenantId: TENANT_ID } });
+  if (remaining <= 1) return { error: "Legalább egy státusznak maradnia kell." };
+
+  // Reassign any leads in this column to the initial status so none are orphaned.
+  const initial = await db.leadStatus.findFirst({ where: { tenantId: TENANT_ID, isInitial: true } });
+  const fallbackKey = initial?.key ?? "new";
+  await db.lead.updateMany({
+    where: { tenantId: TENANT_ID, status: status.key },
+    data: { status: fallbackKey },
+  });
+  await db.leadStatus.delete({ where: { id } });
+  revalidatePath("/leads/setup");
+  revalidatePath("/leads");
+  return { success: true };
+}
+
+export async function seedDefaultLeadStatuses() {
+  const count = await db.leadStatus.count({ where: { tenantId: TENANT_ID } });
+  if (count > 0) return { error: "Már léteznek státuszok" };
+  await db.leadStatus.createMany({
+    data: DEFAULT_LEAD_STATUSES.map((s) => ({ tenantId: TENANT_ID, ...s })),
+  });
+  revalidatePath("/leads/setup");
+  revalidatePath("/leads");
+  return { success: true };
+}
+
+export async function reorderLeadStatuses(orderedIds: number[]) {
+  // All ids must belong to this tenant (app-level scoping is the only guard).
+  const owned = await db.leadStatus.count({
+    where: { tenantId: TENANT_ID, id: { in: orderedIds } },
+  });
+  if (owned !== orderedIds.length) return { error: "Érvénytelen sorrend" };
+
+  await db.$transaction(
+    orderedIds.map((id, index) =>
+      db.leadStatus.updateMany({
+        where: { id, tenantId: TENANT_ID },
+        data: { position: index },
+      }),
+    ),
+  );
+  revalidatePath("/leads/setup");
+  revalidatePath("/leads");
+  return { success: true };
 }
