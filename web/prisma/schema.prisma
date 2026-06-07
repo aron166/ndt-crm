@@ -39,6 +39,7 @@ model Tenant {
   enrichmentProposals    EnrichmentProposal[]
   appApiKeys             AppApiKey[]
   leadStatuses           LeadStatus[]
+  automationRules        AutomationRule[]
 
   @@map("tenants")
 }
@@ -688,6 +689,31 @@ model AppEvent {
   @@index([tenantId, companyId])
   @@index([tenantId, personId])
   @@map("app_events")
+}
+
+// Configurable task-automation rules: "when <trigger> [and <conditions>] →
+// <action>". v1 action = create a task. The event-driven triggers fire from
+// domain mutations (lead intake, lead status change, deal stage change); the
+// time-based trigger (deal_idle_in_stage) is evaluated by a scheduled job.
+// Generalises the hard-coded new-lead follow-up task into user-editable rules.
+model AutomationRule {
+  id            Int       @id @default(autoincrement())
+  tenantId      Int       @map("tenant_id")
+  name          String
+  isActive      Boolean   @default(true) @map("is_active")
+  triggerType   String    @map("trigger_type")   // lead_created | lead_status_changed | deal_stage_changed | deal_idle_in_stage
+  triggerConfig Json?     @map("trigger_config")  // { toStatus?, toStageId?, stageId?, idleDays? }
+  conditions    Json?                             // [{ field, op, value }] AND-ed; empty/null = always
+  actionType    String    @map("action_type")     // create_task
+  actionConfig  Json      @map("action_config")    // { titleTemplate, type, category, dueInDays, descriptionTemplate, assignedToId? }
+  lastRunAt     DateTime? @map("last_run_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, triggerType, isActive])
+  @@map("automation_rules")
 }
 
 // ─────────────────────────────────────────────

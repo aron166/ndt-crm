@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { leadIntakeSchema } from "@/lib/leads/schema";
 import { ingestLead } from "@/lib/leads/ingest";
+import { runAutomations } from "@/lib/automations/engine";
 
 // Public lead-intake endpoint (Platform Foundation #4).
 //
@@ -52,6 +53,24 @@ export async function POST(request: Request) {
     const result = await db.$transaction((tx) =>
       ingestLead(parsed.data, { tenantId: key.tenantId, appSlug: key.appSlug }, tx),
     );
+
+    // Fire task-automation rules for the new lead (e.g. the seeded follow-up
+    // task). Runs post-commit and is itself fail-safe, so it never blocks or
+    // fails the intake response.
+    await runAutomations({
+      type: "lead_created",
+      tenantId: key.tenantId,
+      companyId: result.companyId,
+      personId: result.personId,
+      companyName: parsed.data.company_name,
+      fields: {
+        company: parsed.data.company_name,
+        source: parsed.data.source ?? null,
+        serviceInterest: parsed.data.service_interest ?? null,
+        message: parsed.data.message ?? null,
+        sourceApp: key.appSlug,
+      },
+    });
 
     return json(
       {

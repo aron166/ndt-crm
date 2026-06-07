@@ -18,7 +18,8 @@ export type AuditEntityType =
   | "company" | "person" | "contact"
   | "task" | "interaction" | "tag" | "tagging"
   | "deal" | "lead" | "proposal" | "invoice"
-  | "equipment" | "integration_credential" | "custom_field";
+  | "equipment" | "integration_credential" | "custom_field"
+  | "automation_rule";
 
 // Who performed the mutation. Users come from the Supabase session; agents/system
 // callers (the ingestion API, future hub writes) must attribute themselves explicitly.
