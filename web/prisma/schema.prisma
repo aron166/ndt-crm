@@ -263,8 +263,9 @@ model LeadStatus {
   label      String
   color      String   @default("#6366f1")
   position   Int      @default(0)
-  isInitial  Boolean  @default(false) @map("is_initial")  // where inbound API leads land
-  isTerminal Boolean  @default(false) @map("is_terminal") // terminal-lost style (greyed)
+  isInitial    Boolean @default(false) @map("is_initial")    // where inbound API leads land
+  isTerminal   Boolean @default(false) @map("is_terminal")   // terminal-lost style (greyed)
+  isCommitment Boolean @default(false) @map("is_commitment") // booking = the order (megrendelés); the commitment point
   createdAt  DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])

@@ -285,7 +285,7 @@ export async function createLeadStatus(formData: FormData) {
     data: {
       tenantId: TENANT_ID, key, label, color,
       position: (max._max.position ?? -1) + 1,
-      isInitial: false, isTerminal: false,
+      isInitial: false, isTerminal: false, isCommitment: false,
     },
   });
   revalidatePath("/leads/setup");
@@ -299,21 +299,33 @@ export async function upsertLeadStatus(formData: FormData) {
   const color = (formData.get("color") as string) || "#6366f1";
   const isInitial = formData.get("isInitial") === "true";
   const isTerminal = formData.get("isTerminal") === "true";
+  const isCommitment = formData.get("isCommitment") === "true";
   if (!id) return { error: "Hiányzó azonosító" };
   if (!label) return { error: "Név kötelező" };
 
   const existing = await db.leadStatus.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!existing) return { error: "Státusz nem található" };
 
-  // Exactly one initial status: clear the flag on the others when setting it here.
-  // A status can't be both initial and terminal.
+  // Exactly one initial status and one commitment status (the megrendelés
+  // column): clear the flag on the others when setting it here. A status can't
+  // be both initial and terminal; the commitment point is mid-pipeline so it's
+  // never terminal/initial.
   await db.$transaction([
     ...(isInitial
       ? [db.leadStatus.updateMany({ where: { tenantId: TENANT_ID, isInitial: true, NOT: { id } }, data: { isInitial: false } })]
       : []),
+    ...(isCommitment
+      ? [db.leadStatus.updateMany({ where: { tenantId: TENANT_ID, isCommitment: true, NOT: { id } }, data: { isCommitment: false } })]
+      : []),
     db.leadStatus.update({
       where: { id },
-      data: { label, color, isInitial, isTerminal: isInitial ? false : isTerminal },
+      data: {
+        label,
+        color,
+        isInitial,
+        isTerminal: isInitial || isCommitment ? false : isTerminal,
+        isCommitment: isInitial ? false : isCommitment,
+      },
     }),
   ]);
   revalidatePath("/leads/setup");

@@ -27,6 +27,7 @@ interface LeadStatus {
   position: number;
   isInitial: boolean;
   isTerminal: boolean;
+  isCommitment: boolean;
 }
 
 function StatusRow({
@@ -42,6 +43,7 @@ function StatusRow({
   const [color, setColor] = useState(status.color);
   const [isInitial, setIsInitial] = useState(status.isInitial);
   const [isTerminal, setIsTerminal] = useState(status.isTerminal);
+  const [isCommitment, setIsCommitment] = useState(status.isCommitment);
   const [isPending, startTransition] = useTransition();
 
   function save() {
@@ -51,6 +53,7 @@ function StatusRow({
     data.set("color", color);
     data.set("isInitial", String(isInitial));
     data.set("isTerminal", String(isTerminal));
+    data.set("isCommitment", String(isCommitment));
     startTransition(async () => { await upsertLeadStatus(data); setEditing(false); router.refresh(); });
   }
 
@@ -81,6 +84,11 @@ function StatusRow({
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: status.color, flexShrink: 0, boxShadow: `0 0 6px ${status.color}` }} />
         <span style={{ flex: 1, fontSize: 13, color: "var(--fg)" }}>{status.label}</span>
         {status.isInitial && <span className="badge-ds indigo" style={{ fontSize: 10 }}>Kezdő</span>}
+        {status.isCommitment && (
+          <span style={{ fontSize: 10, fontWeight: 600, color: "#16a34a", background: "#16a34a1f", border: "1px solid #16a34a55", borderRadius: 4, padding: "1px 6px" }}>
+            Megrendelés
+          </span>
+        )}
         {status.isTerminal && <span className="badge-ds coral" style={{ fontSize: 10 }}>Lezárt</span>}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
@@ -113,13 +121,17 @@ function StatusRow({
           ))}
         </div>
       </div>
-      <div className="flex gap-4 text-sm" style={{ color: "var(--fg-soft)" }}>
+      <div className="flex gap-4 text-sm flex-wrap" style={{ color: "var(--fg-soft)" }}>
         <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={isInitial} onChange={(e) => { setIsInitial(e.target.checked); if (e.target.checked) setIsTerminal(false); }} />
+          <input type="checkbox" checked={isInitial} onChange={(e) => { setIsInitial(e.target.checked); if (e.target.checked) { setIsTerminal(false); setIsCommitment(false); } }} />
           Kezdő (ide érkeznek a leadek)
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={isTerminal} onChange={(e) => { setIsTerminal(e.target.checked); if (e.target.checked) setIsInitial(false); }} />
+          <input type="checkbox" checked={isCommitment} onChange={(e) => { setIsCommitment(e.target.checked); if (e.target.checked) { setIsInitial(false); setIsTerminal(false); } }} />
+          Megrendelés (a lefoglalás = az order)
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={isTerminal} onChange={(e) => { setIsTerminal(e.target.checked); if (e.target.checked) { setIsInitial(false); setIsCommitment(false); } }} />
           Lezárt (greyed)
         </label>
       </div>

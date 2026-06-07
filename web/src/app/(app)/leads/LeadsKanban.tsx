@@ -168,8 +168,14 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
             key={status.key}
             className="kcol mount"
             style={{
-              background: isHover ? `${status.color}10` : "oklch(0.18 0.014 255 / 0.5)",
-              border: `1px solid ${isHover ? status.color : "var(--line-soft)"}`,
+              // The commitment column (booking = the order) gets a permanent
+              // accent so the "this is where it becomes a megrendelés" boundary
+              // reads at a glance, not just from the label.
+              background: isHover
+                ? `${status.color}10`
+                : status.isCommitment ? `${status.color}0d` : "oklch(0.18 0.014 255 / 0.5)",
+              border: `1px solid ${isHover || status.isCommitment ? status.color : "var(--line-soft)"}`,
+              ...(status.isCommitment ? { boxShadow: `0 0 0 1px ${status.color}55, 0 0 14px ${status.color}22` } : {}),
               transition: "border-color .15s, background .15s",
             }}
             onDragOver={(e) => { e.preventDefault(); setHoverCol(status.key); }}
@@ -179,6 +185,19 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
             <div className="kcol-head">
               <span className="kcol-dot" style={{ background: status.color, boxShadow: `0 0 8px ${status.color}` }} />
               <span className="kcol-title">{status.label}</span>
+              {status.isCommitment && (
+                <span
+                  className="font-mono-ndt"
+                  title="Az időpont lefoglalása maga a megrendelés"
+                  style={{
+                    fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                    color: status.color, background: `${status.color}1f`,
+                    border: `1px solid ${status.color}55`, borderRadius: 4, padding: "1px 5px",
+                  }}
+                >
+                  Megrendelés
+                </span>
+              )}
               <span className="kcol-count font-mono-ndt">{cards.length}</span>
             </div>
 
