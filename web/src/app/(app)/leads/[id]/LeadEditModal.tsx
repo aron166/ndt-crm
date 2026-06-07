@@ -37,7 +37,13 @@ export function LeadEditModal({ open, onClose, onSaved, initial }: LeadEditModal
     initial.companyId ? { id: initial.companyId, label: initial.companyName ?? "" } : null
   );
 
-  function handleClose() { setError(null); onClose(); }
+  function handleClose() {
+    setError(null);
+    // Modal stays mounted (controlled by `open`); reset the company picker so a
+    // changed-then-cancelled selection doesn't persist into the next open.
+    setCompany(initial.companyId ? { id: initial.companyId, label: initial.companyName ?? "" } : null);
+    onClose();
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

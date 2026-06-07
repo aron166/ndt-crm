@@ -207,13 +207,13 @@ export async function updateLead(id: number, formData: FormData) {
       companyId: before.companyId,
     },
     {
-      subject: subject ?? before.subject,
-      serviceInterest: serviceInterest ?? before.serviceInterest,
-      source: source ?? before.source,
+      subject: subject !== undefined ? subject : before.subject,
+      serviceInterest: serviceInterest !== undefined ? serviceInterest : before.serviceInterest,
+      source: source !== undefined ? source : before.source,
       estimatedValue: estimatedValue !== undefined ? estimatedValue : beforeValue,
-      message: message ?? before.message,
-      lostReason: lostReason ?? before.lostReason,
-      companyId: companyId ?? before.companyId,
+      message: message !== undefined ? message : before.message,
+      lostReason: lostReason !== undefined ? lostReason : before.lostReason,
+      companyId: companyId !== undefined ? companyId : before.companyId,
     },
   );
 
