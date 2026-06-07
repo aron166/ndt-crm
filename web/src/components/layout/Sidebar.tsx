@@ -93,6 +93,14 @@ function IconZap() {
   );
 }
 
+function IconMegaphone() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m3 11 18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+    </svg>
+  );
+}
+
 const NAV = [
   {
     group: "WORKSPACE",
@@ -117,6 +125,7 @@ const NAV = [
       { href: "/analytics",   label: "Analytics",   icon: IconAnalytics },
       { href: "/enrichment",  label: "Enrichment",  icon: IconSparkle },
       { href: "/automations", label: "Automatizálás", icon: IconZap },
+      { href: "/marketing",   label: "Marketing",   icon: IconMegaphone },
       { href: "/settings",    label: "Beállítások", icon: IconSettings },
     ],
   },
@@ -125,9 +134,11 @@ const NAV = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: (collapsed: boolean) => void;
+  /** Count badges keyed by nav href (e.g. { "/marketing": 3 }). */
+  badges?: Record<string, number>;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
   const pathname = usePathname();
 
   function toggle() {
@@ -217,6 +228,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <ul className="space-y-0.5">
               {items.map(({ href, label, icon: Icon }) => {
                 const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+                const badge = badges?.[href] ?? 0;
                 return (
                   <li key={href}>
                     <Link
@@ -256,6 +268,25 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                         <Icon />
                       </span>
                       {!collapsed && <span>{label}</span>}
+                      {badge > 0 && (
+                        <span
+                          className="font-mono-ndt"
+                          style={{
+                            marginLeft: collapsed ? 0 : "auto",
+                            position: collapsed ? "absolute" : "static",
+                            top: collapsed ? 3 : undefined,
+                            right: collapsed ? 3 : undefined,
+                            minWidth: 16, height: 16, padding: "0 4px",
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 9, fontWeight: 700, lineHeight: 1,
+                            color: "white", background: "var(--indigo)",
+                            borderRadius: 8,
+                            boxShadow: "0 0 8px oklch(0.66 0.19 278 / 0.5)",
+                          }}
+                        >
+                          {badge}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );

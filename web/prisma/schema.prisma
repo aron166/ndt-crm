@@ -41,6 +41,9 @@ model Tenant {
   leadStatuses           LeadStatus[]
   automationRules        AutomationRule[]
   automationFirings      AutomationFiring[]
+  campaigns              Campaign[]
+  contentItems           ContentItem[]
+  contentAssets          ContentAsset[]
 
   @@map("tenants")
 }
@@ -781,4 +784,76 @@ model EnrichmentProposal {
   tenant Tenant        @relation(fields: [tenantId], references: [id])
 
   @@map("enrichment_proposals")
+}
+
+// ─────────────────────────────────────────────
+// Marketing module — the CRM as approval queue + control tower for AI-generated
+// content. External jobs POST drafts via /api/content; humans review/approve in
+// the CRM (often from a phone); approval can fire a webhook. Enums are app-level
+// strings (codebase convention — no Prisma enums), validated by Zod / the UI.
+
+model Campaign {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  name        String
+  slug        String                                  // stable handle; auto-created on first content POST
+  project     String?                                 // e.g. "birdsview"
+  description String?
+  isArchived  Boolean  @default(false) @map("is_archived")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  contentItems ContentItem[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("campaigns")
+}
+
+model ContentItem {
+  id          Int       @id @default(autoincrement())
+  tenantId    Int       @map("tenant_id")
+  campaignId  Int?      @map("campaign_id")
+  channel     String                                  // linkedin_personal | linkedin_company | facebook | blog | email | other
+  contentType String    @map("content_type")          // post | article | email | video_script | other
+  title       String
+  body        String                                  // markdown
+  status      String    @default("draft")             // draft | in_review | approved | scheduled | published | rejected
+  // INTERNAL angles (BVQ) are never postable — the publish flow is hidden for them.
+  internal    Boolean   @default(false)
+  scheduledFor DateTime? @map("scheduled_for")
+  publishedAt DateTime?  @map("published_at")
+  externalUrl String?    @map("external_url")
+  source      String                                  // content_factory | manual | <app slug>
+  sourceMeta  Json?      @map("source_meta")          // hook refs, week, generator notes
+  metrics     Json?                                   // impressions, reactions, comments, clicks, leads (manual)
+  reviewNote  String?    @map("review_note")          // rejection reason / edit note
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  campaign Campaign?      @relation(fields: [campaignId], references: [id])
+  assets   ContentAsset[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, campaignId])
+  @@map("content_items")
+}
+
+model ContentAsset {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int      @map("tenant_id")
+  contentItemId Int      @map("content_item_id")
+  kind          String                                // image | video | file | link
+  url           String                                // URL or storage path (no upload UI this phase)
+  caption       String?
+  position      Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([contentItemId])
+  @@map("content_assets")
 }
