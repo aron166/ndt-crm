@@ -58,6 +58,11 @@ function LeadCard({
       onDragStart={() => onDragStart(lead.id)}
       onDragEnd={onDragEnd}
       onClick={() => router.push(`/leads/${lead.id}`)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/leads/${lead.id}`); }
+      }}
       className={cn("rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",

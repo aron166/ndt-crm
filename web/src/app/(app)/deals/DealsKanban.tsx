@@ -78,6 +78,11 @@ function DealCard({
       onDragStart={() => onDragStart(deal.id)}
       onDragEnd={onDragEnd}
       onClick={() => onEdit(deal)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(deal); }
+      }}
       className={cn("rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
@@ -106,7 +111,7 @@ function DealCard({
         </div>
       )}
 
-      {/* Title — whole card is clickable; this just adds a hover affordance */}
+      {/* Title — presentational only; the parent card handles click + hover */}
       <p
         style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", marginBottom: 6 }}
       >
