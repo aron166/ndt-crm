@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { upsertStage, deleteStage, createPipeline } from "@/app/actions/deals";
+import { upsertStage, deleteStage, createPipeline, reorderStages } from "@/app/actions/deals";
 import { upsertCustomField, deleteCustomField } from "@/app/actions/custom-fields";
 import { Plus, Trash2, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -43,7 +43,15 @@ interface PipelineSetupClientProps {
   pipelines: Pipeline[];
 }
 
-function StageRow({ stage, pipelineId }: { stage: Stage; pipelineId: number }) {
+function StageRow({
+  stage,
+  pipelineId,
+  dragHandle,
+}: {
+  stage: Stage;
+  pipelineId: number;
+  dragHandle?: React.HTMLAttributes<HTMLSpanElement> & { draggable?: boolean };
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
@@ -78,7 +86,14 @@ function StageRow({ stage, pipelineId }: { stage: Stage; pipelineId: number }) {
         style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)", cursor: "pointer" }}
         onClick={() => setEditing(true)}
       >
-        <GripVertical style={{ width: 14, height: 14, color: "var(--fg-faint)", flexShrink: 0 }} />
+        <span
+          {...dragHandle}
+          onClick={(e) => e.stopPropagation()}
+          title="Húzd az átrendezéshez"
+          style={{ display: "flex", flexShrink: 0, cursor: dragHandle ? "grab" : "default", touchAction: "none" }}
+        >
+          <GripVertical style={{ width: 14, height: 14, color: "var(--fg-faint)" }} />
+        </span>
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: stage.color, flexShrink: 0, boxShadow: `0 0 6px ${stage.color}` }} />
         <span style={{ flex: 1, fontSize: 13, color: "var(--fg)" }}>{stage.name}</span>
         <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-mute)" }}>{stage.probability}%</span>
@@ -143,6 +158,72 @@ function StageRow({ stage, pipelineId }: { stage: Stage; pipelineId: number }) {
           {isPending ? "Mentés..." : "Mentés"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function StagesList({ stages, pipelineId }: { stages: Stage[]; pipelineId: number }) {
+  const router = useRouter();
+  const [items, setItems] = useState(stages);
+  const [prevStages, setPrevStages] = useState(stages);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [, startTransition] = useTransition();
+
+  // Re-sync when the server sends a fresh order (after router.refresh()).
+  // Render-phase sync — the React-recommended alternative to a setState effect.
+  if (prevStages !== stages) {
+    setPrevStages(stages);
+    setItems(stages);
+  }
+
+  function handleDrop() {
+    if (dragIndex === null || overIndex === null || dragIndex === overIndex) {
+      setDragIndex(null); setOverIndex(null);
+      return;
+    }
+    const prev = items;
+    const next = [...items];
+    const [moved] = next.splice(dragIndex, 1);
+    next.splice(overIndex, 0, moved);
+    setItems(next);
+    setDragIndex(null); setOverIndex(null);
+    const orderedIds = next.map((s) => s.id);
+    startTransition(async () => {
+      const res = await reorderStages(pipelineId, orderedIds);
+      if (res?.error) setItems(prev); // revert optimistic order if the server rejected it
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.map((stage, i) => {
+        const showIndicator = dragIndex !== null && overIndex === i && dragIndex !== i;
+        return (
+          <div
+            key={stage.id}
+            onDragOver={(e) => { e.preventDefault(); setOverIndex(i); }}
+            onDrop={handleDrop}
+            style={{
+              opacity: dragIndex === i ? 0.4 : 1,
+              borderTop: `2px solid ${showIndicator ? "var(--indigo)" : "transparent"}`,
+              borderRadius: 2,
+              transition: "opacity .15s",
+            }}
+          >
+            <StageRow
+              stage={stage}
+              pipelineId={pipelineId}
+              dragHandle={{
+                draggable: true,
+                onDragStart: () => setDragIndex(i),
+                onDragEnd: () => { setDragIndex(null); setOverIndex(null); },
+              }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -343,9 +424,7 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
             </button>
           </div>
           <div className="panel-pad space-y-2">
-            {pipeline.stages.map((stage) => (
-              <StageRow key={stage.id} stage={stage} pipelineId={pipeline.id} />
-            ))}
+            <StagesList stages={pipeline.stages} pipelineId={pipeline.id} />
 
             {addingStage === pipeline.id && (
               <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--indigo-line)", background: "var(--bg-panel)" }}>
