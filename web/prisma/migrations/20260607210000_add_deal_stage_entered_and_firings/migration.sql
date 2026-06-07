@@ -28,3 +28,6 @@ ALTER TABLE "automation_firings" ADD CONSTRAINT "automation_firings_tenant_id_fk
 
 ALTER TABLE "automation_firings" ADD CONSTRAINT "automation_firings_rule_id_fkey"
     FOREIGN KEY ("rule_id") REFERENCES "automation_rules"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "automation_firings" ADD CONSTRAINT "automation_firings_deal_id_fkey"
+    FOREIGN KEY ("deal_id") REFERENCES "deals"("id") ON DELETE CASCADE ON UPDATE CASCADE;

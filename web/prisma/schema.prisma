@@ -354,6 +354,7 @@ model Deal {
   proposals  Proposal[]
   tasks      Task[]         @relation("TaskDeal")
   convertedFromLeads Lead[] @relation("LeadConvertedDeal")
+  automationFirings  AutomationFiring[]
 
   @@index([pipelineId, stageId, position])
   @@map("deals")
@@ -734,6 +735,7 @@ model AutomationFiring {
 
   tenant Tenant         @relation(fields: [tenantId], references: [id])
   rule   AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  deal   Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@unique([ruleId, dealId, stageEnteredAt])
   @@index([tenantId])

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Prisma } from "@prisma/client";
 import { runIdleAutomations } from "./idle";
 import { db } from "@/lib/db";
@@ -50,6 +50,10 @@ describe("runIdleAutomations", () => {
       async (fn: (tx: unknown) => Promise<unknown>) =>
         fn({ automationFiring: { create: firingCreate }, task: { create: taskCreate } }),
     );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("creates a task + firing for an idle deal", async () => {
