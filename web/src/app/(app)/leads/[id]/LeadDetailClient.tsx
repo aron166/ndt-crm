@@ -36,6 +36,7 @@ interface Lead {
   message: string | null;
   estimatedValue: number | null;
   receivedDate: string | Date | null;
+  convertedDealId: number | null;
   createdAt: string | Date;
   customFields: Record<string, unknown> | null;
   companyId: number | null;
@@ -64,7 +65,7 @@ export function LeadDetailClient({
   const [status, setStatus] = useState(lead.status ?? "new");
   const [converting, startConvert] = useTransition();
   const [statusPending, startStatus] = useTransition();
-  const [converted, setConverted] = useState<number | null>(null);
+  const [converted, setConverted] = useState<number | null>(lead.convertedDealId ?? null);
 
   const person = lead.contact?.person;
   const personName = person ? fullName(person.firstName, person.lastName) : null;
@@ -86,9 +87,12 @@ export function LeadDetailClient({
       const res = await convertLeadToDeal(lead.id);
       if (res?.success && res.dealId) {
         setConverted(res.dealId);
-        setStatus("qualified");
         router.refresh();
+        return;
       }
+      // Lost the race (already converted) or another error — resync from server
+      // so the button reflects the real convertedDealId state.
+      if (res?.error) router.refresh();
     });
   }
 

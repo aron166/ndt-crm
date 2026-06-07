@@ -230,13 +230,20 @@ model Lead {
   lostReason      String?   @map("lost_reason")
   rawSourceFile   String?   @map("raw_source_file")
   customFields    Json?     @map("custom_fields")   // marketing passthrough: utm_*, referrer, landing_variant, lead_score, priority, contact snapshot
+  // Lead→deal hand-off: once set, the lead has graduated to the deal pipeline and
+  // leaves the active leads board (kept for origin/history, never duplicated).
+  // See memory lead-deal-process-tracker-model.
+  convertedDealId Int?      @map("converted_deal_id")
+  convertedAt     DateTime? @map("converted_at")
   createdAt       DateTime  @default(now()) @map("created_at")
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  company    Company? @relation(fields: [companyId], references: [id])
-  contact    Contact? @relation(fields: [contactId], references: [id])
-  assignedTo User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  company       Company? @relation(fields: [companyId], references: [id])
+  contact       Contact? @relation(fields: [contactId], references: [id])
+  assignedTo    User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  convertedDeal Deal?    @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
 
+  @@index([tenantId, convertedDealId])
   @@map("leads")
 }
 
@@ -322,6 +329,7 @@ model Deal {
   assignedTo User?          @relation("DealAssignee", fields: [assignedToId], references: [id])
   proposals  Proposal[]
   tasks      Task[]         @relation("TaskDeal")
+  convertedFromLeads Lead[] @relation("LeadConvertedDeal")
 
   @@index([pipelineId, stageId, position])
   @@map("deals")
