@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
+import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
 import Link from "next/link";
 import { Sparkline } from "@/components/viz/Sparkline";
 import { SignalMeter } from "@/components/viz/SignalMeter";
@@ -12,7 +14,8 @@ import { AuditLogEntries } from "@/components/AuditLogTab";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { Mail, Phone, MapPin, ExternalLink } from "lucide-react";
+import { Mail, Phone, MapPin, Trash2 } from "lucide-react";
+import { updatePerson, deletePerson } from "@/app/actions/persons";
 
 interface Contact {
   id: number; companyId: number; role: string | null;
@@ -73,6 +76,35 @@ export function PersonDetailClient({
   const router = useRouter();
   const [tab, setTab] = useState("activity");
   const [taskOpen, setTaskOpen] = useState(false);
+  const [deleting, startDelete] = useTransition();
+  const [form, setForm] = useState({
+    firstName:   person.firstName   ?? "",
+    lastName:    person.lastName    ?? "",
+    email:       person.email       ?? "",
+    phone:       person.phone       ?? "",
+    linkedinUrl: "" as string,
+    notes:       person.notes       ?? "",
+  });
+  const [saving, startSave] = useTransition();
+  const [enriching, startEnrich] = useTransition();
+  const [enrichmentProposals, setEnrichmentProposals] = useState<Awaited<ReturnType<typeof getProposalsByRun>> | null>(null);
+
+  function handleDelete() {
+    const name = `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim();
+    if (!confirm(`Biztosan törölni szeretnéd ${name} személyt?\nEz a művelet nem vonható vissza.`)) return;
+    startDelete(async () => {
+      await deletePerson(person.id);
+      router.push("/persons");
+    });
+  }
+
+  function handleEnrich() {
+    startEnrich(async () => {
+      const runId = await triggerBulkEnrichment("person", [person.id]);
+      const proposals = await getProposalsByRun(runId);
+      setEnrichmentProposals(proposals);
+    });
+  }
 
   const currentContact = contacts.find((c) => !c.endedAt);
   const signalLabel = signalLevel >= 5 ? "Aktív — 7 napon belül érintkezés"
@@ -86,6 +118,7 @@ export function PersonDetailClient({
     ...(conversations.length > 0
       ? [{ key: "conversations", label: "AI Beszélgetések", count: conversations.length }]
       : []),
+    { key: "adatok",        label: "Adatok",       count: 0 },
   ];
 
   return (
@@ -95,6 +128,12 @@ export function PersonDetailClient({
         onClose={() => { setTaskOpen(false); router.refresh(); }}
         initial={{ personId: person.id, companyId: currentContact?.companyId, personName: `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim() }}
       />
+      {enrichmentProposals && (
+        <EnrichmentDrawer
+          proposals={enrichmentProposals as unknown as Parameters<typeof EnrichmentDrawer>[0]["proposals"]}
+          onClose={() => { setEnrichmentProposals(null); router.refresh(); }}
+        />
+      )}
 
       {/* Detail header */}
       <div className="detail-header mount">
@@ -176,6 +215,24 @@ export function PersonDetailClient({
               companyName={currentContact?.company.name}
             />
             <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
+            <button
+              className="btn"
+              onClick={handleEnrich}
+              disabled={enriching}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <span style={{ display: "inline-block", animation: enriching ? "spin 1.2s linear infinite" : "none", fontSize: 13 }}>✦</span>
+              {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
+            </button>
+            <button
+              className="btn ghost"
+              style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
+              onClick={handleDelete}
+              disabled={deleting}
+              title="Személy törlése"
+            >
+              <Trash2 style={{ width: 11, height: 11 }} />
+            </button>
           </div>
         </div>
 
@@ -220,6 +277,17 @@ export function PersonDetailClient({
               <span className="tcount">{count}</span>
             </button>
           ))}
+        </div>
+
+        {/* Quick action strip — always visible below tabs */}
+        <div style={{ display: "flex", gap: 8, padding: "10px 0", borderBottom: "1px solid var(--line-soft)", marginBottom: 2 }}>
+          <LogInteractionButton
+            personId={person.id}
+            companyId={currentContact?.companyId}
+            personName={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
+            companyName={currentContact?.company.name}
+          />
+          <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
         </div>
 
         <div className="split-grid" style={{ marginTop: 16 }}>
@@ -360,6 +428,84 @@ export function PersonDetailClient({
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Adatok — inline edit */}
+            {tab === "adatok" && (
+              <div className="panel mount" style={{ padding: "18px 22px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {(
+                    [
+                      { key: "lastName",   label: "Vezetéknév",  type: "text"  },
+                      { key: "firstName",  label: "Keresztnév",  type: "text"  },
+                      { key: "email",      label: "Email",       type: "email" },
+                      { key: "phone",      label: "Telefon",     type: "tel"   },
+                      { key: "linkedinUrl", label: "LinkedIn URL", type: "url" },
+                    ] as { key: keyof typeof form; label: string; type: string }[]
+                  ).map(({ key, label, type }) => (
+                    <div key={key}>
+                      <div className="field-label">{label}</div>
+                      <input
+                        type={type}
+                        value={form[key]}
+                        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                        style={{
+                          width: "100%", fontSize: 12, padding: "5px 8px",
+                          background: "var(--bg-0)", border: "1px solid var(--line-soft)",
+                          borderRadius: 5, color: "var(--fg)", outline: "none",
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <div className="field-label">Megjegyzés</div>
+                    <textarea
+                      value={form.notes}
+                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                      rows={4}
+                      style={{
+                        width: "100%", fontSize: 12, padding: "5px 8px",
+                        background: "var(--bg-0)", border: "1px solid var(--line-soft)",
+                        borderRadius: 5, color: "var(--fg)", outline: "none", resize: "vertical",
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button
+                      className="btn primary"
+                      disabled={saving}
+                      onClick={() => {
+                        startSave(async () => {
+                          await updatePerson(person.id, {
+                            firstName:   form.firstName   || undefined,
+                            lastName:    form.lastName    || undefined,
+                            email:       form.email       || undefined,
+                            phone:       form.phone       || undefined,
+                            linkedinUrl: form.linkedinUrl || undefined,
+                            notes:       form.notes       || undefined,
+                          });
+                          router.refresh();
+                        });
+                      }}
+                    >
+                      {saving ? "Mentés..." : "Mentés"}
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={() => setForm({
+                        firstName:   person.firstName   ?? "",
+                        lastName:    person.lastName    ?? "",
+                        email:       person.email       ?? "",
+                        phone:       person.phone       ?? "",
+                        linkedinUrl: "",
+                        notes:       person.notes       ?? "",
+                      })}
+                    >
+                      Mégse
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
