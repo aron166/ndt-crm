@@ -6,16 +6,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // append-only interaction documents the move, (d) inline new-company creation
 // works when the company isn't in the DB yet (the bug this fixes).
 
-const { audit, db, createCompany } = vi.hoisted(() => ({
-  audit: vi.fn(),
-  createCompany: vi.fn(),
-  db: {
+const { audit, db, createCompany } = vi.hoisted(() => {
+  const db: Record<string, Record<string, ReturnType<typeof vi.fn>>> & {
+    $transaction?: (fn: (tx: unknown) => unknown) => unknown;
+  } = {
     person: { findFirst: vi.fn() },
     company: { findFirst: vi.fn() },
     contact: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
     interaction: { create: vi.fn() },
-  },
-}));
+  };
+  // Pass-through transaction: run the callback against the same mock db. Defined
+  // as a plain fn (not vi.fn) so the beforeEach reset loop skips it harmlessly.
+  db.$transaction = (fn: (tx: unknown) => unknown) => fn(db);
+  return { audit: vi.fn(), createCompany: vi.fn(), db };
+});
 
 vi.mock("@/lib/audit", () => ({ audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -92,6 +96,20 @@ describe("setCurrentEmployer", () => {
     });
 
     const res = await setCurrentEmployer(fd({ personId: "5", companyId: "42" }));
+
+    expect(res).toMatchObject({ error: expect.any(String) });
+    expect(db.contact.create).not.toHaveBeenCalled();
+    expect(db.contact.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a start date earlier than the current job's start (no writes)", async () => {
+    db.company.findFirst.mockResolvedValue({ id: 42, name: "NDT Global Kft." });
+    db.contact.findFirst.mockResolvedValue({
+      id: 100, companyId: 7, startedAt: new Date("2024-01-01"),
+      company: { id: 7, name: "CÖÉDÁC" },
+    });
+
+    const res = await setCurrentEmployer(fd({ personId: "5", companyId: "42", startedAt: "2020-01-01" }));
 
     expect(res).toMatchObject({ error: expect.any(String) });
     expect(db.contact.create).not.toHaveBeenCalled();

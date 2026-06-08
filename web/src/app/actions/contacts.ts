@@ -123,29 +123,37 @@ export async function setCurrentEmployer(formData: FormData) {
   if (current && current.companyId === companyId) {
     return { error: "Ez már a jelenlegi munkahely" };
   }
-
-  // Close the old employment at the new job's start date (preserve history).
-  // Guard against an endedAt that would precede the old startedAt (invalid range).
-  if (current) {
-    const endedAt =
-      current.startedAt && startedAt < current.startedAt ? new Date() : startedAt;
-    await db.contact.update({ where: { id: current.id }, data: { endedAt } });
-    await audit("contact", current.id, "update", { endedAt: null }, { endedAt: endedAt.toISOString() });
+  // Reject a new start date earlier than the current job's start — that would
+  // make the old employment end before it began (an illogical range).
+  if (current?.startedAt && startedAt < current.startedAt) {
+    return { error: "Az új munkahely kezdete nem lehet korábbi a jelenlegi munkahely kezdeténél" };
   }
 
-  // Open the new employment.
-  const contact = await db.contact.create({
-    data: { tenantId: TENANT_ID, personId, companyId, role, isPrimary: false, startedAt },
-  });
-  await audit("contact", contact.id, "create", null, { personId, companyId, role, startedAt: startedAt.toISOString() });
-
-  // Append-only interaction documenting the move (the relationship history).
   const note = current
     ? `Munkahelyváltás: ${current.company.name} → ${companyName}${role ? ` (${role})` : ""}`
     : `Munkahely rögzítve: ${companyName}${role ? ` (${role})` : ""}`;
-  await db.interaction.create({
-    data: { tenantId: TENANT_ID, personId, companyId, type: "note", notes: note, occurredAt: startedAt },
+
+  // Atomic switch: close the old employment + open the new one + log the move in
+  // ONE transaction — never leave a person with a closed employer and no current
+  // one if a write fails mid-flow. Audits (non-critical) run after commit.
+  const contact = await db.$transaction(async (tx) => {
+    if (current) {
+      await tx.contact.update({ where: { id: current.id }, data: { endedAt: startedAt } });
+    }
+    const created = await tx.contact.create({
+      data: { tenantId: TENANT_ID, personId, companyId, role, isPrimary: false, startedAt },
+    });
+    // Append-only interaction documenting the move (the relationship history).
+    await tx.interaction.create({
+      data: { tenantId: TENANT_ID, personId, companyId, type: "note", notes: note, occurredAt: startedAt },
+    });
+    return created;
   });
+
+  if (current) {
+    await audit("contact", current.id, "update", { endedAt: null }, { endedAt: startedAt.toISOString() });
+  }
+  await audit("contact", contact.id, "create", null, { personId, companyId, role, startedAt: startedAt.toISOString() });
 
   revalidatePath(`/persons/${personId}`);
   revalidatePath(`/companies/${companyId}`);

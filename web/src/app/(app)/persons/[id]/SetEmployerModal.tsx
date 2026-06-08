@@ -50,10 +50,14 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
 
     setError(null);
     startTransition(async () => {
-      const res = await setCurrentEmployer(fd);
-      if (res?.error) { setError(res.error); return; }
-      router.refresh();
-      handleClose();
+      try {
+        const res = await setCurrentEmployer(fd);
+        if (res?.error) { setError(res.error); return; }
+        router.refresh();
+        handleClose();
+      } catch {
+        setError("Mentés közben hiba történt. Próbáld újra.");
+      }
     });
   }
 
