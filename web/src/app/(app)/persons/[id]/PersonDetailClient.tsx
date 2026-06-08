@@ -12,6 +12,7 @@ import { TagInput } from "@/components/tags/TagInput";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { AuditLogEntries } from "@/components/AuditLogTab";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
+import { SetEmployerModal } from "./SetEmployerModal";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Mail, Phone, MapPin, Trash2 } from "lucide-react";
@@ -76,6 +77,7 @@ export function PersonDetailClient({
   const router = useRouter();
   const [tab, setTab] = useState("activity");
   const [taskOpen, setTaskOpen] = useState(false);
+  const [employerOpen, setEmployerOpen] = useState(false);
   const [deleting, startDelete] = useTransition();
   const [form, setForm] = useState({
     firstName:   person.firstName   ?? "",
@@ -127,6 +129,12 @@ export function PersonDetailClient({
         open={taskOpen}
         onClose={() => { setTaskOpen(false); router.refresh(); }}
         initial={{ personId: person.id, companyId: currentContact?.companyId, personName: `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim() }}
+      />
+      <SetEmployerModal
+        open={employerOpen}
+        onClose={() => setEmployerOpen(false)}
+        personId={person.id}
+        currentCompanyName={currentContact?.company.name}
       />
       {enrichmentProposals && (
         <EnrichmentDrawer
@@ -342,6 +350,9 @@ export function PersonDetailClient({
                     <span style={{ fontSize: 11, color: "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>
                       {contacts.length} munkahely
                     </span>
+                    <button className="btn" style={{ marginLeft: "auto" }} onClick={() => setEmployerOpen(true)}>
+                      + Munkahelyváltás
+                    </button>
                   </div>
                   <div className="tl">
                     {contacts.map((c, i) => (
@@ -513,9 +524,27 @@ export function PersonDetailClient({
           {/* Right: sidebar panels */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Current employer */}
-            {currentContact && (
+            {!currentContact && (
               <div className="panel mount">
                 <div className="panel-head"><div className="panel-title">Jelenlegi munkahely</div></div>
+                <div className="panel-pad" style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: "var(--fg-mute)", marginBottom: 10 }}>
+                    Nincs rögzített munkahely.
+                  </div>
+                  <button className="btn primary" onClick={() => setEmployerOpen(true)}>
+                    + Munkahely beállítása
+                  </button>
+                </div>
+              </div>
+            )}
+            {currentContact && (
+              <div className="panel mount">
+                <div className="panel-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div className="panel-title">Jelenlegi munkahely</div>
+                  <button className="btn" style={{ padding: "2px 10px", fontSize: 11 }} onClick={() => setEmployerOpen(true)}>
+                    Módosítás
+                  </button>
+                </div>
                 <div className="panel-pad">
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{
