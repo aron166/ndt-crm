@@ -44,6 +44,7 @@ model Tenant {
   campaigns              Campaign[]
   contentItems           ContentItem[]
   contentAssets          ContentAsset[]
+  companyAttributes      CompanyAttribute[]
 
   @@map("tenants")
 }
@@ -167,9 +168,41 @@ model Company {
   tasks         Task[]         @relation("TaskCompany")
   conversations Conversation[]
   appEvents     AppEvent[]
+  attributes    CompanyAttribute[]
 
   @@unique([tenantId, vatNumber])
   @@map("companies")
+}
+
+// Effective-dated company metadata (industry, TEÁOR, warmth, account_type,
+// status, …). The HISTORY source of truth — never overwrite a value, end-date it
+// and insert a new row (same philosophy as the time-bounded Contact). The
+// matching scalar column on Company stays as the denormalized PRIMARY-current
+// value for fast filtering; both are written in one transaction.
+//
+// A company may hold several CURRENT values of one attrType (validTo = null) —
+// e.g. a main TEÁOR + secondary ones — with exactly one flagged isPrimary. A
+// past value has validTo set. See decisions.md (historical-attribute pattern).
+model CompanyAttribute {
+  id        Int       @id @default(autoincrement())
+  tenantId  Int       @map("tenant_id")
+  companyId Int       @map("company_id")
+  attrType  String    @map("attr_type")  // industry | teaor | warmth | account_type | status
+  value     String                       // the stable value (e.g. teaor code "2511", status "active")
+  label     String?                      // human label (e.g. "Fémszerkezet gyártása")
+  source    String?                      // where it came from (excel_import, manual, enrichment)
+  isPrimary Boolean   @default(true) @map("is_primary") // the MAIN current value of this attrType
+  validFrom DateTime  @default(now()) @map("valid_from")
+  validTo   DateTime? @map("valid_to")   // null = current; set = historical
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Fast "current value of this type for filtering" + per-company history reads.
+  @@index([tenantId, attrType, value, validTo])
+  @@index([companyId, attrType, validTo])
+  @@map("company_attributes")
 }
 
 // Contact = person at company, time-bound state.

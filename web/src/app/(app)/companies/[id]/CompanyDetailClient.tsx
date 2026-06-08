@@ -17,6 +17,8 @@ import { geocodeCompany, deleteCompany, updateCompany } from "@/app/actions/comp
 import { LeaveCompanyModal } from "@/components/LeaveCompanyModal";
 import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
 import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
+import { CompanyMetadataTab } from "./CompanyMetadataTab";
+import type { AttrRow } from "@/lib/companies/attributes";
 import { useState, useTransition } from "react";
 
 interface Contact {
@@ -73,6 +75,7 @@ interface Props {
   initials: string;
   initialTags: { id: number; name: string; color: string }[];
   auditEntries: Parameters<typeof AuditLogEntries>[0]["entries"];
+  attributes: AttrRow[];
 }
 
 const WARMTH_STYLE: Record<string, { bg: string; color: string; label: string }> = {
@@ -112,7 +115,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export function CompanyDetailClient({
   company, contacts, interactions, tasks, appEvents, mapsConnected,
-  revenueSeries, engagementBreakdown, kpis, avatarColor, initials, initialTags, auditEntries,
+  revenueSeries, engagementBreakdown, kpis, avatarColor, initials, initialTags, auditEntries, attributes,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("overview");
@@ -176,6 +179,7 @@ export function CompanyDetailClient({
     { key: "activity",   label: `Aktivitás · ${interactions.length}` },
     { key: "tasks",      label: `Feladatok · ${tasks.filter(t => t.status !== "done").length}` },
     ...(hasNdtProfile ? [{ key: "ndt", label: "NDT Profil" }] : []),
+    { key: "metadata",   label: "Metaadatok" },
     ...(appEvents.length > 0 ? [{ key: "events", label: `Események · ${appEvents.length}` }] : []),
     { key: "history",    label: "Előzmények" },
   ];
@@ -882,6 +886,13 @@ export function CompanyDetailClient({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Metadata (effective-dated attributes) */}
+      {tab === "metadata" && (
+        <div style={{ marginTop: 16 }}>
+          <CompanyMetadataTab companyId={company.id} attributes={attributes} />
         </div>
       )}
 
