@@ -60,6 +60,8 @@ model SavedView {
   createdAt  DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
+  // Campaigns that use this (company) view as their target audience (Feature E2).
+  campaignAudiences Campaign[] @relation("CampaignAudience")
 
   @@index([tenantId, entityType])
   @@map("saved_views")
@@ -834,13 +836,18 @@ model Campaign {
   project     String?                                 // e.g. "birdsview"
   description String?
   isArchived  Boolean  @default(false) @map("is_archived")
+  // Feature E2: the target AUDIENCE = a saved company view (segment). Resolved
+  // live (no membership snapshot) so the audience tracks the underlying data.
+  audienceViewId Int?  @map("audience_view_id")
   createdAt   DateTime @default(now()) @map("created_at")
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   contentItems ContentItem[]
+  audienceView SavedView?    @relation("CampaignAudience", fields: [audienceViewId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, slug])
   @@index([tenantId])
+  @@index([audienceViewId])
   @@map("campaigns")
 }
 
