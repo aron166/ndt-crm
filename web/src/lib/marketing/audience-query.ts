@@ -38,6 +38,6 @@ export async function listAudience(
     where,
     select: AUDIENCE_SELECT,
     orderBy: { name: "asc" },
-    ...(take ? { take } : {}),
+    ...(take !== undefined ? { take } : {}),
   });
 }

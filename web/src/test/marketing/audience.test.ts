@@ -32,6 +32,19 @@ describe("companiesToCsv", () => {
   it("header-only when there are no rows", () => {
     expect(companiesToCsv([])).toBe("Cégnév,Adószám,Város,Megye,Weboldal,Pipeline,Hőfok,TEÁOR");
   });
+
+  it("neutralizes spreadsheet formula injection with a leading apostrophe", () => {
+    const csv = companiesToCsv([row({ name: "=cmd|'/c calc'!A0", city: "+1", county: "@SUM(A1)" })]);
+    const cells = csv.split("\r\n")[1];
+    expect(cells).toContain("'=cmd|'/c calc'!A0");
+    expect(cells).toContain("'+1");
+    expect(cells).toContain("'@SUM(A1)");
+  });
+
+  it("apostrophe-prefixes AND quotes a formula cell that also contains a comma", () => {
+    const csv = companiesToCsv([row({ name: "=SUM(A1,B2)" })]);
+    expect(csv.split("\r\n")[1].startsWith(`"'=SUM(A1,B2)"`)).toBe(true);
+  });
 });
 
 describe("audienceFileName", () => {

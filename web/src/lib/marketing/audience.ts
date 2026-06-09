@@ -5,6 +5,10 @@
 /** How many audience rows the campaign detail previews inline. */
 export const AUDIENCE_PREVIEW_LIMIT = 25;
 
+/** Hard cap on a CSV export — bounds memory; far above any real single-tenant
+ * segment, so it only ever trips on a pathological/unscoped query. */
+export const MAX_EXPORT_ROWS = 50_000;
+
 /** The columns an outreach list needs, in order. */
 export interface AudienceCompany {
   name: string;
@@ -21,9 +25,13 @@ const CSV_HEADERS = [
   "Cégnév", "Adószám", "Város", "Megye", "Weboldal", "Pipeline", "Hőfok", "TEÁOR",
 ] as const;
 
-/** RFC-4180-ish escape: quote when the value holds a comma, quote, or newline. */
+/** RFC-4180-ish escape with spreadsheet-formula-injection guard. */
 function csvCell(value: string | null | undefined): string {
-  const s = value ?? "";
+  const raw = value ?? "";
+  // A leading =,+,-,@ (or tab/CR) can be evaluated as a formula when the CSV is
+  // opened in Excel/Sheets. Company names come from external data — prefix with
+  // an apostrophe so the cell is always treated as literal text.
+  const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
   if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }

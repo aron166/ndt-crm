@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { audienceWhere, listAudience } from "@/lib/marketing/audience-query";
-import { companiesToCsv, audienceFileName } from "@/lib/marketing/audience";
+import { audienceWhere, listAudience, countAudience } from "@/lib/marketing/audience-query";
+import { companiesToCsv, audienceFileName, MAX_EXPORT_ROWS } from "@/lib/marketing/audience";
 
 const TENANT_ID = 1;
 
@@ -28,7 +28,17 @@ export async function GET(
   }
 
   const where = await audienceWhere(campaign.audienceView.filters, TENANT_ID);
-  const rows = await listAudience(where);
+
+  // Bound memory: refuse (don't silently truncate) a pathologically large export.
+  const total = await countAudience(where);
+  if (total > MAX_EXPORT_ROWS) {
+    return new Response(
+      `A célközönség túl nagy az exporthoz (${total} cég, max ${MAX_EXPORT_ROWS}). Szűkítsd a szegmenst.`,
+      { status: 413 },
+    );
+  }
+
+  const rows = await listAudience(where, MAX_EXPORT_ROWS);
   // Lead with a UTF-8 BOM so Excel reads Hungarian accents correctly.
   const csv = "﻿" + companiesToCsv(rows);
 
