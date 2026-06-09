@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { EntitySearch } from "@/components/EntitySearch";
 import { setCurrentEmployer } from "@/app/actions/contacts";
+import { useRouter } from "next/navigation";
 
 interface Props {
   open: boolean;
@@ -17,8 +21,7 @@ interface Props {
 /**
  * Set / change a person's current employer. Two modes:
  *  - "find": pick an EXISTING company (EntitySearch),
- *  - "create": type a NEW company that isn't in the DB yet (the bug fix —
- *    previously you could only link to existing companies).
+ *  - "create": type a NEW company that isn't in the DB yet.
  * Either way the server closes the old employment and opens a new one,
  * preserving the career history (Person ≠ Contact).
  */
@@ -26,10 +29,9 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
   const router = useRouter();
   const [mode, setMode] = useState<"find" | "create">("find");
   const [company, setCompany] = useState<{ id: number; label: string; sub?: string } | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-
-  if (!open) return null;
+  const formRef = useRef<HTMLFormElement>(null);
 
   function handleClose() {
     setError(null);
@@ -38,20 +40,23 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
     onClose();
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    fd.set("personId", String(personId));
+    const form = formRef.current;
+    if (!form) return;
+
+    const data = new FormData(form);
+    data.set("personId", String(personId));
 
     if (mode === "find") {
       if (!company) { setError("Válassz céget, vagy válts az 'Új cég' fülre"); return; }
-      fd.set("companyId", String(company.id));
+      data.set("companyId", String(company.id));
     }
 
     setError(null);
     startTransition(async () => {
       try {
-        const res = await setCurrentEmployer(fd);
+        const res = await setCurrentEmployer(data);
         if (res?.error) { setError(res.error); return; }
         router.refresh();
         handleClose();
@@ -62,35 +67,49 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
   }
 
   return (
-    <div className="modal-backdrop" onClick={handleClose}>
-      <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <span className="modal-title">Munkahely beállítása</span>
-          <button className="modal-close" onClick={handleClose}><X style={{ width: 16, height: 16 }} /></button>
+    <Dialog open={open} onOpenChange={(o) => !o && !isPending && handleClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Munkahely beállítása</DialogTitle>
+        </DialogHeader>
+
+        {currentCompanyName && (
+          <p className="text-xs text-slate-500 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            Jelenlegi: <span className="text-slate-700 font-medium">{currentCompanyName}</span> — ez lezárul, és az új lesz a jelenlegi.
+          </p>
+        )}
+
+        <div className="flex gap-2 mb-1">
+          <button
+            type="button"
+            onClick={() => setMode("find")}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+              mode === "find"
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Meglévő cég
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("create")}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+              mode === "create"
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Új cég
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {currentCompanyName && (
-            <div style={{ fontSize: 12, color: "var(--fg-mute)", padding: "8px 10px", background: "var(--bg-0)", borderRadius: 6, border: "1px solid var(--line-soft)" }}>
-              Jelenlegi: <span style={{ color: "var(--fg-soft)" }}>{currentCompanyName}</span> — ez lezárul, és az új lesz a jelenlegi.
-            </div>
-          )}
-
-          {/* Mode toggle */}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={() => setMode("find")}
-              className={`btn ${mode === "find" ? "primary" : ""}`} style={{ flex: 1 }}>
-              Meglévő cég
-            </button>
-            <button type="button" onClick={() => setMode("create")}
-              className={`btn ${mode === "create" ? "primary" : ""}`} style={{ flex: 1 }}>
-              Új cég
-            </button>
-          </div>
-
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           {mode === "find" ? (
-            <div className="field-group">
-              <label className="field-label">Cég keresése *</label>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Cég keresése *
+              </label>
               <EntitySearch
                 endpoint="/api/search/companies"
                 placeholder="Cég neve, adószám..."
@@ -99,43 +118,51 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
               />
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div className="field-group" style={{ gridColumn: "1 / -1" }}>
-                <label className="field-label">Új cég neve *</label>
-                <input name="newCompanyName" className="input-ds" placeholder="Pl. NDT Global Kft." autoFocus required={mode === "create"} />
+            <>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Új cég neve *</label>
+                <Input name="newCompanyName" placeholder="Pl. NDT Global Kft." autoFocus required={mode === "create"} />
               </div>
-              <div className="field-group">
-                <label className="field-label">Adószám</label>
-                <input name="newCompanyVat" className="input-ds" placeholder="12345678-2-01" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Adószám</label>
+                  <Input name="newCompanyVat" placeholder="12345678-2-01" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Város</label>
+                  <Input name="newCompanyCity" placeholder="Budapest" />
+                </div>
               </div>
-              <div className="field-group">
-                <label className="field-label">Város</label>
-                <input name="newCompanyCity" className="input-ds" placeholder="Budapest" />
-              </div>
-            </div>
+            </>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div className="field-group">
-              <label className="field-label">Beosztás</label>
-              <input name="role" className="input-ds" placeholder="pl. Mérnök, Vezető..." />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Beosztás</label>
+              <Input name="role" placeholder="pl. Mérnök, Vezető..." />
             </div>
-            <div className="field-group">
-              <label className="field-label">Kezdés dátuma</label>
-              <input name="startedAt" type="date" className="input-ds" />
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Kezdés dátuma</label>
+              <Input name="startedAt" type="date" />
             </div>
           </div>
 
-          {error && <div style={{ fontSize: 12, color: "var(--coral)", padding: "6px 10px", background: "var(--coral-soft)", borderRadius: 5 }}>{error}</div>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
-            <button type="button" className="btn" onClick={handleClose} disabled={pending}>Mégse</button>
-            <button type="submit" className="btn primary" disabled={pending}>
-              {pending ? "Mentés..." : "Mentés"}
-            </button>
-          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
+              Mégse
+            </Button>
+            <Button
+              type="submit"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              disabled={isPending}
+            >
+              {isPending ? "Mentés..." : "Mentés"}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
