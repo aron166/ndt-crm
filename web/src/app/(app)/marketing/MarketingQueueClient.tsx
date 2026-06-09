@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Lock, ExternalLink } from "lucide-react";
+import Link from "next/link";
+import { Clock, Lock, ExternalLink, Megaphone } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import {
   CHANNEL_LABELS, STATUS_LABELS, STATUS_COLORS, QUEUE_SECTION_ORDER,
@@ -71,7 +72,7 @@ export function MarketingQueueClient({
 
   return (
     <div className="mount">
-      <div className="page-head">
+      <div className="page-head flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">Marketing</h1>
           <p className="page-sub">
@@ -79,6 +80,14 @@ export function MarketingQueueClient({
             {reviewCount > 0 && ` ${reviewCount} vár jóváhagyásra.`}
           </p>
         </div>
+        <Link
+          href="/marketing/campaigns"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap"
+          style={{ border: "1px solid var(--line-soft)", color: "var(--fg-soft)", background: "var(--bg-panel)" }}
+        >
+          <Megaphone className="size-4" />
+          Kampányok
+        </Link>
       </div>
 
       {/* Filters */}
