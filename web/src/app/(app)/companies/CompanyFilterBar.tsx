@@ -41,8 +41,14 @@ function CompanyFilterBarInner({ facets }: { facets: CompanyFacets }) {
   const liveSelection = useMemo(() => {
     const sel: Record<string, Set<string>> = {};
     for (const g of GROUPS) {
-      const raw = searchParams.get(g.param);
-      sel[g.param] = new Set(raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : []);
+      // Parser accepts both repeated AND comma-joined params — flatten both so a
+      // value isn't silently dropped on the next Apply.
+      const values = searchParams
+        .getAll(g.param)
+        .flatMap((raw) => raw.split(","))
+        .map((s) => s.trim())
+        .filter(Boolean);
+      sel[g.param] = new Set(values);
     }
     return sel;
   }, [searchParams]);

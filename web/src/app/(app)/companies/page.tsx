@@ -51,11 +51,13 @@ async function loadFacets(): Promise<CompanyFacets> {
       select: { industryCode: true, industryEn: true },
       orderBy: { industryCode: "asc" },
     }),
-    db.company.findMany({
-      where: { ...base, teaorCode: { not: null } },
-      distinct: ["teaorCode"],
-      select: { teaorCode: true, teaorDescription: true },
-      orderBy: { teaorCode: "asc" },
+    // TEÁOR facets from company_attributes — the SAME source the resolver filters
+    // on — so secondary-only current TEÁOR codes are selectable, not just primaries.
+    db.companyAttribute.findMany({
+      where: { tenantId: TENANT_ID, attrType: "teaor", validTo: null },
+      distinct: ["value"],
+      select: { value: true, label: true },
+      orderBy: { value: "asc" },
       take: 300,
     }),
     db.company.findMany({
@@ -74,10 +76,10 @@ async function loadFacets(): Promise<CompanyFacets> {
       .filter((r) => r.industryCode)
       .map((r) => ({ value: r.industryCode!, label: r.industryEn?.trim() || r.industryCode! })),
     teaor: teaors
-      .filter((r) => r.teaorCode)
+      .filter((r) => r.value)
       .map((r) => ({
-        value: r.teaorCode!,
-        label: r.teaorDescription?.trim() ? `${r.teaorCode} · ${r.teaorDescription}` : r.teaorCode!,
+        value: r.value,
+        label: r.label?.trim() ? `${r.value} · ${r.label}` : r.value,
       })),
     county: counties
       .filter((r) => r.county)
@@ -123,7 +125,9 @@ export default async function CompaniesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const page = Math.max(1, parseInt((params.page as string) ?? "1", 10));
+  const rawPage = Array.isArray(params.page) ? params.page[0] : params.page;
+  const parsedPage = Number.parseInt(rawPage ?? "1", 10);
+  const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
   const filters = parseCompanyFilters(params);
 
   const where = await resolveCompanyWhere(filters, TENANT_ID);

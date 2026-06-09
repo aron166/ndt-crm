@@ -24,10 +24,14 @@ function CompanyActiveFiltersInner({ chips }: { chips: ActiveChip[] }) {
     if (chip.value === undefined) {
       params.delete(chip.param);
     } else {
-      const remaining = (params.get(chip.param) ?? "")
-        .split(",").map((s) => s.trim()).filter((v) => v && v !== chip.value);
+      // The parser accepts both repeated AND comma-joined params — flatten both.
+      const remaining = params
+        .getAll(chip.param)
+        .flatMap((raw) => raw.split(","))
+        .map((s) => s.trim())
+        .filter((v) => v && v !== chip.value);
+      params.delete(chip.param);
       if (remaining.length) params.set(chip.param, remaining.join(","));
-      else params.delete(chip.param);
     }
     params.set("page", "1");
     router.push(`${pathname}?${params.toString()}`);

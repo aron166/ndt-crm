@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 
@@ -14,6 +14,12 @@ function CompaniesSearchInner({ search, includeFA }: CompaniesSearchProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [value, setValue] = useState(search);
+
+  // Keep the textbox in sync when the applied search changes via chip removal,
+  // a loaded saved view, or back/forward navigation.
+  useEffect(() => {
+    setValue(search);
+  }, [search]);
 
   // Preserve every other active filter param; only touch search / fa / page.
   const push = useCallback(
