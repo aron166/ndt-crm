@@ -74,12 +74,19 @@ async function loadFacets(): Promise<CompanyFacets> {
   return {
     industry: industries
       .filter((r) => r.industryCode)
-      .map((r) => ({ value: r.industryCode!, label: r.industryEn?.trim() || r.industryCode! })),
+      .map((r) => ({
+        value: r.industryCode!,
+        // Lead with the readable name; keep the code as a muted hint.
+        label: r.industryEn?.trim() || r.industryCode!,
+        hint: r.industryEn?.trim() ? r.industryCode! : undefined,
+      })),
     teaor: teaors
       .filter((r) => r.value)
       .map((r) => ({
         value: r.value,
-        label: r.label?.trim() ? `${r.value} · ${r.label}` : r.value,
+        // Lead with the description (what the company does), code as muted hint.
+        label: r.label?.trim() || r.value,
+        hint: r.label?.trim() ? r.value : undefined,
       })),
     county: counties
       .filter((r) => r.county)
