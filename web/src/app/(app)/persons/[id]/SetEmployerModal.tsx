@@ -67,7 +67,7 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && !isPending && handleClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Munkahely beállítása</DialogTitle>
