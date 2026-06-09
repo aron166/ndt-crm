@@ -3,11 +3,18 @@ import Link from "next/link";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { formatRelativeTime, contactFreshness } from "@/lib/utils";
 import { CompaniesSearch } from "./CompaniesSearch";
+import { CompanyFilterBar, type CompanyFacets } from "./CompanyFilterBar";
+import { CompanyActiveFilters, type ActiveChip } from "./CompanyActiveFilters";
 import { CreateCompanyButton } from "@/components/CreateCompanyButton";
 import { TagFilter } from "@/components/tags/TagFilter";
 import { SavedViewsDropdown } from "@/components/SavedViewsDropdown";
 import { getSavedViews } from "@/app/actions/saved-views";
 import { RunEnrichmentButton } from "./RunEnrichmentButton";
+import { COMPANY_ATTR_DEFS } from "@/lib/companies/attributes";
+import {
+  parseCompanyFilters, serializeCompanyFilters, type CompanyFilters,
+} from "@/lib/companies/filters";
+import { resolveCompanyWhere } from "@/lib/companies/resolve";
 
 const PAGE_SIZE = 30;
 const TENANT_ID = 1;
@@ -27,62 +34,105 @@ const FRESHNESS_COLOR: Record<string, string> = {
   coral:  "var(--coral)",
 };
 
-interface SearchParams {
-  search?: string;
-  page?: string;
-  fa?: string;
-  tag?: string;
-  never_contacted?: string;
-  pipeline_status?: string;
-}
-
 const PIPELINE_LABELS: Record<string, string> = {
   "0": "KUKA", "1": "Nem hívtuk", "2": "Nem válasz",
   "3": "Érdekli", "4": "Nem kell", "5": "Kéri",
   "6": "Függőben", "7": "Elveszett", "8": "Nyert",
 };
 
+/** Fixed-enum facets come from config; free-value facets (industry/teaor/county)
+ * are the distinct values actually present in the tenant's data. */
+async function loadFacets(): Promise<CompanyFacets> {
+  const base = { tenantId: TENANT_ID, deletedAt: null };
+  const [industries, teaors, counties] = await Promise.all([
+    db.company.findMany({
+      where: { ...base, industryCode: { not: null } },
+      distinct: ["industryCode"],
+      select: { industryCode: true, industryEn: true },
+      orderBy: { industryCode: "asc" },
+    }),
+    // TEÁOR facets from company_attributes — the SAME source the resolver filters
+    // on — so secondary-only current TEÁOR codes are selectable, not just primaries.
+    db.companyAttribute.findMany({
+      where: { tenantId: TENANT_ID, attrType: "teaor", validTo: null },
+      distinct: ["value"],
+      select: { value: true, label: true },
+      orderBy: { value: "asc" },
+      take: 300,
+    }),
+    db.company.findMany({
+      where: { ...base, county: { not: null } },
+      distinct: ["county"],
+      select: { county: true },
+      orderBy: { county: "asc" },
+    }),
+  ]);
+
+  const opt = (type: keyof typeof COMPANY_ATTR_DEFS) =>
+    (COMPANY_ATTR_DEFS[type].options ?? []).map((o) => ({ value: o.value, label: o.label }));
+
+  return {
+    industry: industries
+      .filter((r) => r.industryCode)
+      .map((r) => ({ value: r.industryCode!, label: r.industryEn?.trim() || r.industryCode! })),
+    teaor: teaors
+      .filter((r) => r.value)
+      .map((r) => ({
+        value: r.value,
+        label: r.label?.trim() ? `${r.value} · ${r.label}` : r.value,
+      })),
+    county: counties
+      .filter((r) => r.county)
+      .map((r) => ({ value: r.county!, label: r.county! })),
+    warmth: opt("warmth"),
+    accountType: opt("account_type"),
+    status: opt("status"),
+    pipelineStatus: Object.entries(PIPELINE_LABELS).map(([value, label]) => ({ value, label })),
+  };
+}
+
+/** Build the removable chip list for the active-filters row, with human labels. */
+function buildActiveChips(f: CompanyFilters, facets: CompanyFacets): ActiveChip[] {
+  const chips: ActiveChip[] = [];
+  const labelFrom = (opts: { value: string; label: string }[], v: string) =>
+    opts.find((o) => o.value === v)?.label ?? v;
+
+  if (f.search) chips.push({ param: "search", value: undefined, label: `„${f.search}”` });
+
+  const groups: [keyof CompanyFilters, string, { value: string; label: string }[]][] = [
+    ["industry", "industry", facets.industry],
+    ["teaor", "teaor", facets.teaor],
+    ["county", "county", facets.county],
+    ["warmth", "warmth", facets.warmth],
+    ["accountType", "accountType", facets.accountType],
+    ["status", "status", facets.status],
+    ["pipelineStatus", "pipeline_status", facets.pipelineStatus],
+  ];
+  for (const [fkey, param, opts] of groups) {
+    const vals = f[fkey] as string[] | undefined;
+    if (vals?.length) for (const v of vals) chips.push({ param, value: v, label: labelFrom(opts, v) });
+  }
+
+  if (f.tags?.length) for (const t of f.tags) chips.push({ param: "tag", value: t, label: `#${t}` });
+  if (f.neverContacted) chips.push({ param: "never_contacted", value: undefined, label: "soha nem hívtuk" });
+
+  return chips;
+}
+
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const search = params.search?.trim() ?? "";
-  const page = Math.max(1, parseInt(params.page ?? "1", 10));
-  const includeFA = params.fa === "1";
-  const tagName = params.tag?.trim() ?? "";
-  const neverContacted = params.never_contacted === "1";
-  const pipelineStatus = params.pipeline_status?.trim() ?? "";
+  const rawPage = Array.isArray(params.page) ? params.page[0] : params.page;
+  const parsedPage = Number.parseInt(rawPage ?? "1", 10);
+  const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+  const filters = parseCompanyFilters(params);
 
-  let tagFilterIds: number[] | undefined;
-  if (tagName) {
-    const tag = await db.tag.findFirst({
-      where: { tenantId: TENANT_ID, name: { equals: tagName, mode: "insensitive" } },
-      include: { taggings: { where: { taggableType: "company" }, select: { taggableId: true } } },
-    });
-    tagFilterIds = tag?.taggings.map((t) => t.taggableId) ?? [];
-  }
+  const where = await resolveCompanyWhere(filters, TENANT_ID);
 
-  const where = {
-    tenantId: TENANT_ID,
-    deletedAt: null,
-    ...(tagFilterIds !== undefined ? { id: { in: tagFilterIds } } : {}),
-    ...(neverContacted ? { lastInteractionDate: null } : {}),
-    ...(pipelineStatus ? { pipelineStatus } : {}),
-    ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: "insensitive" as const } },
-            { vatNumber: { contains: search, mode: "insensitive" as const } },
-            { city: { contains: search, mode: "insensitive" as const } },
-          ],
-        }
-      : {}),
-    ...(includeFA ? {} : { NOT: { name: { contains: "F.A." } } }),
-  };
-
-  const [companies, total, savedViews] = await Promise.all([
+  const [companies, total, savedViews, facets] = await Promise.all([
     db.company.findMany({
       where,
       orderBy: { name: "asc" },
@@ -91,29 +141,24 @@ export default async function CompaniesPage({
     }),
     db.company.count({ where }),
     getSavedViews("company"),
+    loadFacets(),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const activeChips = buildActiveChips(filters, facets);
+  const serialized = serializeCompanyFilters(filters);
+
+  // Pagination link preserving every active filter param.
+  function pageHref(p: number) {
+    const sp = new URLSearchParams(serialized);
+    sp.set("page", String(p));
+    return `/companies?${sp.toString()}`;
+  }
 
   return (
     <div className="mount">
-      {/* Active filter pill */}
-      {(neverContacted || pipelineStatus) && (
-        <div className="flex items-center gap-2 mb-4" style={{ fontSize: 12 }}>
-          <span style={{ color: "var(--fg-faint)" }}>Szűrő:</span>
-          {neverContacted && (
-            <span style={{ padding: "2px 8px", borderRadius: 20, background: "oklch(0.35 0.08 60 / 0.3)", color: "var(--amber)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
-              soha nem hívtuk
-            </span>
-          )}
-          {pipelineStatus && (
-            <span style={{ padding: "2px 8px", borderRadius: 20, background: "var(--indigo-soft)", color: "var(--indigo)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
-              {PIPELINE_LABELS[pipelineStatus] ?? pipelineStatus}
-            </span>
-          )}
-          <Link href="/companies" style={{ color: "var(--fg-faint)", marginLeft: 4, fontSize: 11 }}>× törlés</Link>
-        </div>
-      )}
+      {/* Active filter chips (removable) */}
+      <CompanyActiveFilters chips={activeChips} />
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 mb-5">
@@ -127,19 +172,14 @@ export default async function CompaniesPage({
           <CreateCompanyButton />
         </div>
         <div className="flex items-center gap-2">
-          <CompaniesSearch search={search} includeFA={includeFA} neverContacted={neverContacted} pipelineStatus={pipelineStatus || undefined} />
-          <TagFilter activeTagName={tagName || undefined} />
+          <CompaniesSearch search={filters.search ?? ""} includeFA={filters.includeFA ?? false} />
+          <CompanyFilterBar facets={facets} />
+          <TagFilter activeTagName={filters.tags?.[0]} />
           <RunEnrichmentButton companyIds={companies.map((c) => c.id)} />
           <SavedViewsDropdown
             entityType="company"
             basePath="/companies"
-            currentParams={{
-              ...(search           ? { search }                              : {}),
-              ...(neverContacted   ? { never_contacted: "1" }               : {}),
-              ...(pipelineStatus   ? { pipeline_status: pipelineStatus }    : {}),
-              ...(tagName          ? { tag: tagName }                       : {}),
-              ...(includeFA        ? { fa: "1" }                            : {}),
-            }}
+            currentParams={serialized}
             views={savedViews}
           />
         </div>
@@ -172,7 +212,7 @@ export default async function CompaniesPage({
             <tr>
               <td colSpan={4} style={{ padding: "56px 14px", textAlign: "center" }}>
                 <div style={{ color: "var(--fg-faint)", fontSize: 13 }}>Nincs találat</div>
-                {search && (
+                {activeChips.length > 0 && (
                   <div style={{ marginTop: 6, fontSize: 12, color: "var(--fg-faint)" }}>
                     <Link href="/companies" style={{ color: "var(--indigo)" }}>Szűrő törlése</Link>
                   </div>
@@ -254,7 +294,7 @@ export default async function CompaniesPage({
           <div className="flex gap-2">
             {page > 1 && (
               <Link
-                href={`/companies?search=${search}&page=${page - 1}&fa=${includeFA ? "1" : "0"}`}
+                href={pageHref(page - 1)}
                 style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 11 }}
               >
                 ← Előző
@@ -262,7 +302,7 @@ export default async function CompaniesPage({
             )}
             {page < totalPages && (
               <Link
-                href={`/companies?search=${search}&page=${page + 1}&fa=${includeFA ? "1" : "0"}`}
+                href={pageHref(page + 1)}
                 style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 11 }}
               >
                 Következő →
