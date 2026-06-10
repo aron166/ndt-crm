@@ -7,14 +7,17 @@ import { Settings2 } from "lucide-react";
 import { fullName, formatRelativeTime } from "@/lib/utils";
 
 const TENANT_ID = 1;
+const PAGE_SIZE = 30;
 
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; page?: string }>;
 }) {
-  const { view } = await searchParams;
+  const { view, page: rawPage } = await searchParams;
   const showConverted = view === "converted";
+  const parsedPage = Number.parseInt(rawPage ?? "1", 10);
+  const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
 
   // Counts power the toggle. Converted leads have graduated to the deal pipeline
   // and are excluded from the active board — see lead-deal-process-tracker model.
@@ -60,7 +63,11 @@ export default async function LeadsPage({
         contact: { select: { person: { select: { firstName: true, lastName: true } } } },
       },
       orderBy: { convertedAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
     });
+    const totalPages = Math.ceil(convertedCount / PAGE_SIZE);
+    const pageHref = (p: number) => `/leads?view=converted&page=${p}`;
 
     return (
       <div className="mount">
@@ -110,6 +117,31 @@ export default async function LeadsPage({
             </div>
           )}
         </div>
+
+        {/* Pagination — same pattern as /companies */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+            <span>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, convertedCount)} / {convertedCount.toLocaleString("hu-HU")}</span>
+            <div className="flex gap-2">
+              {page > 1 && (
+                <Link
+                  href={pageHref(page - 1)}
+                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 11 }}
+                >
+                  ← Előző
+                </Link>
+              )}
+              {page < totalPages && (
+                <Link
+                  href={pageHref(page + 1)}
+                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 11 }}
+                >
+                  Következő →
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
