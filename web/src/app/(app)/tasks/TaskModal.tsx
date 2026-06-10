@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -13,6 +13,7 @@ import {
 import { EntitySearch } from "@/components/EntitySearch";
 import { createTask, updateTask } from "@/app/actions/tasks";
 import { COST_CODES, computeCostAmount, costCodeUnitHint } from "@/lib/tasks/costing";
+import { getCostRates, type CostRateEntry } from "@/app/actions/cost-rates";
 import { formatHUF } from "@/lib/utils";
 
 interface TaskFormData {
@@ -85,6 +86,24 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
     costQuantity.trim() ? Number(costQuantity.replace(",", ".")) : null,
     costUnitRate.trim() ? Number(costUnitRate.replace(",", ".")) : null,
   );
+
+  // Rate card → auto-fill unit/rate when a cost code is picked (without clobbering edits).
+  const [rates, setRates] = useState<CostRateEntry[]>([]);
+  useEffect(() => {
+    if (open && rates.length === 0) {
+      getCostRates().then(setRates).catch((e) => console.error("Díjszabás betöltése sikertelen", e));
+    }
+  }, [open, rates.length]);
+
+  function handleCostCodeChange(v: string | null) {
+    const code = !v || v === "none" ? "" : v;
+    setCostCode(code);
+    if (!code) return;
+    const rate = rates.find((r) => r.code === code);
+    if (!rate) return;
+    if (!costUnit.trim() && rate.unit) setCostUnit(rate.unit);
+    if (!costUnitRate.trim() && rate.unitRate != null) setCostUnitRate(String(rate.unitRate));
+  }
 
   function handleClose() {
     setError(null);
@@ -231,7 +250,7 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
             <div className="px-3 pb-3 space-y-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Költségkód</label>
-                <Select value={costCode || "none"} onValueChange={(v) => setCostCode(!v || v === "none" ? "" : v)}>
+                <Select value={costCode || "none"} onValueChange={handleCostCodeChange}>
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Nincs</SelectItem>

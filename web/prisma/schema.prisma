@@ -25,6 +25,7 @@ model Tenant {
   proposals              Proposal[]
   invoices               Invoice[]
   tasks                  Task[]
+  costRates              CostRate[]
   interactions           Interaction[]
   equipment              Equipment[]
   etlRuns                EtlRun[]
@@ -489,6 +490,27 @@ model Task {
   subTasks   Task[]   @relation("SubTasks")
 
   @@map("tasks")
+}
+
+// ─────────────────────────────────────────────
+// COST RATE CARD
+// Tenant-level default unit + HUF rate per NDT cost code (KID/MRD/DOD/SZD/
+// VIZSGALAT). Auto-fills the task cost section; still editable per task
+// (decisions.md #15 — "central rate-card later, values may differ per task").
+// ─────────────────────────────────────────────
+
+model CostRate {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  code      String   // KID | MRD | DOD | SZD | VIZSGALAT
+  unit      String?  // default unit label (km, óra, db…)
+  unitRate  Decimal? @map("unit_rate") // default HUF per unit
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, code])
+  @@map("cost_rates")
 }
 
 // ─────────────────────────────────────────────
