@@ -260,10 +260,16 @@ export async function runAutomations(event: AutomationEvent): Promise<void> {
             continue;
           }
           if (cfg.sendOnce) {
-            // Record the send; a P2002 race just means another worker beat us — fine.
+            // Record the send. A P2002 unique-violation just means another worker
+            // beat us (already recorded) — fine to ignore; any OTHER error must be
+            // surfaced, not swallowed (a lost record could re-send next run).
             try {
               await db.automationEmailSend.create({ data: { tenantId: ev.tenantId, ruleId: rule.id, recipient } });
-            } catch { /* unique-violation race: already recorded */ }
+            } catch (err) {
+              if ((err as { code?: string }).code !== "P2002") {
+                reportError("automations.email_send_record", err, { ruleId: rule.id });
+              }
+            }
           }
         } else {
           continue;
