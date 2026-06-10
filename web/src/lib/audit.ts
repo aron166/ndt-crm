@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { db } from "./db";
+import { reportError } from "./report-error";
 import { createClient } from "./supabase/server";
 
 // TODO(ctx): tenant should come from the request context (AppContext) once the
@@ -95,13 +96,12 @@ export function audit(
       // Audit failures must never break the main operation, but they MUST be
       // observable — a silently swallowed failure is an undetectable hole in the
       // trail (a compliance problem for e.g. legally-binding quote approvals).
-      console.error("[audit] failed to write audit log", {
+      reportError("audit", err, {
         entityType,
         entityId,
         action,
         tenantId: options.tenantId ?? DEFAULT_TENANT_ID,
         actorAgentId: options.actorAgentId ?? null,
-        error: err instanceof Error ? err.message : String(err),
       });
     }
   });

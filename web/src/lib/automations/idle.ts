@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { reportError } from "@/lib/report-error";
 import { conditionsPass, buildCreateTaskData } from "./engine";
 import type { AutomationEvent, CreateTaskActionConfig, TriggerConfig } from "./types";
 
@@ -83,13 +84,13 @@ export async function runIdleAutomations(now: Date = new Date()): Promise<IdleRu
           // Unique (rule, deal, stageEnteredAt) violation = already fired for this
           // stage entry → expected on every subsequent run, skip silently.
           if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
-          console.error(`[automations] idle rule ${rule.id} / deal ${deal.id} failed:`, err);
+          reportError("automations.idle", err, { ruleId: rule.id, dealId: deal.id });
         }
       }
 
       await db.automationRule.update({ where: { id: rule.id }, data: { lastRunAt: now } });
     } catch (err) {
-      console.error(`[automations] idle rule ${rule.id} failed:`, err);
+      reportError("automations.idle", err, { ruleId: rule.id });
     }
   }
 
