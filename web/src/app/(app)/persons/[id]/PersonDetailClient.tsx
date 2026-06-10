@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Sparkline } from "@/components/viz/Sparkline";
 import { SignalMeter } from "@/components/viz/SignalMeter";
 import { LogInteractionButton } from "@/components/LogInteractionButton";
+import { SendEmailButton } from "@/components/SendEmailButton";
 import { TagInput } from "@/components/tags/TagInput";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { AuditLogEntries } from "@/components/AuditLogTab";
@@ -223,6 +224,12 @@ export function PersonDetailClient({
               companyId={currentContact?.companyId}
               personName={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
               companyName={currentContact?.company.name}
+            />
+            <SendEmailButton
+              personId={person.id}
+              companyId={currentContact?.companyId}
+              defaultTo={person.email || undefined}
+              contextLabel={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
             />
             <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
             <button

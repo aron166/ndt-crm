@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveIntegrationCredential, disconnectIntegration } from "@/app/actions/integrations";
+import { sendResendTest } from "@/app/actions/email";
 import { createAppApiKey, revokeAppApiKey, type AppKeyRow } from "@/app/actions/app-keys";
 import { CheckCircle, Circle, ExternalLink, Zap, KeyRound, Copy, Check, Trash2, Plus } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
@@ -14,6 +15,7 @@ interface Integration {
   fields: { key: string; label: string; placeholder: string; type?: string }[];
   docsUrl?: string;
   available: boolean;
+  testable?: boolean;
 }
 
 const INTEGRATIONS: Integration[] = [
@@ -37,10 +39,16 @@ const INTEGRATIONS: Integration[] = [
   {
     slug: "resend",
     name: "Resend (Email)",
-    description: "Kimenő emailek küldése CRM-ből, beépített thread-tracking.",
+    description: "Kimenő emailek küldése a CRM-ből; minden küldés interakcióként naplózódik.",
     category: "Kommunikáció",
-    available: false,
-    fields: [],
+    available: true,
+    testable: true,
+    docsUrl: "https://resend.com/api-keys",
+    fields: [
+      { key: "apiKey", label: "API kulcs", placeholder: "re_...", type: "password" },
+      { key: "fromEmail", label: "Feladó email", placeholder: "peter.z.nagy@controllabor.hu" },
+      { key: "fromName", label: "Feladó név", placeholder: "Nagy Péter" },
+    ],
   },
   {
     slug: "twilio",
@@ -84,6 +92,17 @@ function IntegrationCard({
   const [expanded, setExpanded] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  function handleTest() {
+    setTestMsg(null);
+    startTransition(async () => {
+      const res = await sendResendTest().catch(() => ({ error: "Nem sikerült elküldeni a teszt emailt." }));
+      setTestMsg(res && "error" in res && res.error
+        ? { ok: false, text: res.error }
+        : { ok: true, text: "Teszt email elküldve a feladó címre — nézd meg a postafiókod." });
+    });
+  }
 
   function handleSave() {
     startTransition(async () => {
@@ -136,13 +155,24 @@ function IntegrationCard({
               </a>
             )}
             {connected ? (
-              <button
-                onClick={handleDisconnect}
-                disabled={isPending}
-                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 5, background: "transparent", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", cursor: "pointer" }}
-              >
-                Lecsatlakozás
-              </button>
+              <>
+                {integration.testable && (
+                  <button
+                    onClick={handleTest}
+                    disabled={isPending}
+                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: "pointer" }}
+                  >
+                    {isPending ? "Küldés..." : "Teszt küldése"}
+                  </button>
+                )}
+                <button
+                  onClick={handleDisconnect}
+                  disabled={isPending}
+                  style={{ fontSize: 11, padding: "4px 10px", borderRadius: 5, background: "transparent", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", cursor: "pointer" }}
+                >
+                  Lecsatlakozás
+                </button>
+              </>
             ) : (
               <button
                 onClick={() => setExpanded((e) => !e)}
@@ -154,6 +184,12 @@ function IntegrationCard({
           </div>
         )}
       </div>
+
+      {testMsg && (
+        <p role="status" aria-live="polite" style={{ marginTop: 10, fontSize: 12, color: testMsg.ok ? "var(--mint)" : "var(--coral)" }}>
+          {testMsg.ok ? "✓ " : "⚠ "}{testMsg.text}
+        </p>
+      )}
 
       {expanded && integration.fields.length > 0 && (
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 8 }}>
