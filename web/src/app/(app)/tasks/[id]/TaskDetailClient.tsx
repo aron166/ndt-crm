@@ -26,6 +26,11 @@ interface SubTask {
   parentTaskId: number | null;
   company: { id: number; name: string } | null;
   person: { id: number; firstName: string | null; lastName: string | null } | null;
+  costCode: string | null;
+  costQuantity: number | null;
+  costUnit: string | null;
+  costUnitRate: number | null;
+  costAmount: number | null;
   _count: { subTasks: number };
 }
 
@@ -41,6 +46,11 @@ interface Task {
   companyId: number | null;
   personId: number | null;
   parentTaskId: number | null;
+  costCode: string | null;
+  costQuantity: number | null;
+  costUnit: string | null;
+  costUnitRate: number | null;
+  costAmount: number | null;
   subTasks: SubTask[];
 }
 
@@ -92,6 +102,10 @@ export function TaskDetailClient({ task }: { task: Task }) {
           description: task.description,
           companyId: task.companyId ?? undefined,
           personId: task.personId ?? undefined,
+          costCode: task.costCode,
+          costQuantity: task.costQuantity,
+          costUnit: task.costUnit,
+          costUnitRate: task.costUnitRate,
         }}
       />
       <TaskModal

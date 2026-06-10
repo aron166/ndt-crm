@@ -1,9 +1,10 @@
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime, formatHUF } from "@/lib/utils";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { TaskDetailClient } from "./TaskDetailClient";
+import { serializeTaskCost, rollupTaskCost, costCodeLabel } from "@/lib/tasks/costing";
 import { EntityTags } from "@/components/tags/EntityTags";
 import { AuditLogTab } from "@/components/AuditLogTab";
 import { ArrowLeft, Clock, Building2, User } from "lucide-react";
@@ -37,6 +38,15 @@ export default async function TaskDetailPage({
   });
 
   if (!task) notFound();
+
+  const taskForClient = {
+    ...serializeTaskCost(task),
+    subTasks: task.subTasks.map(serializeTaskCost),
+  };
+  const costRollup = rollupTaskCost(
+    { costCode: taskForClient.costCode, costAmount: taskForClient.costAmount },
+    taskForClient.subTasks.map((s) => ({ costCode: s.costCode, costAmount: s.costAmount })),
+  );
 
   return (
     <div className="max-w-2xl">
@@ -144,7 +154,33 @@ export default async function TaskDetailPage({
         </div>
       </div>
 
-      <TaskDetailClient task={task} />
+      {costRollup.byCode.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-slate-700">Elszámolás</h2>
+            <span className="font-mono-ndt text-sm font-semibold text-slate-900">
+              {formatHUF(costRollup.total)}
+            </span>
+          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              {costRollup.byCode.map((line) => (
+                <tr key={line.code} className="border-b border-slate-100 last:border-0">
+                  <td className="py-1.5 text-slate-600">{costCodeLabel(line.code)}</td>
+                  <td className="py-1.5 text-right font-mono-ndt text-slate-700">
+                    {formatHUF(line.amount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-xs text-slate-400 mt-2">
+            A feladat és alfeladatai költségkódonként összesítve · ebből készül a számla.
+          </p>
+        </div>
+      )}
+
+      <TaskDetailClient task={taskForClient} />
 
       <div className="mt-4">
         <details className="group">

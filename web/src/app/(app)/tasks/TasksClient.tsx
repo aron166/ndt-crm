@@ -25,6 +25,10 @@ interface Task {
   parentTaskId: number | null;
   company: { id: number; name: string } | null;
   person: { id: number; firstName: string | null; lastName: string | null } | null;
+  costCode: string | null;
+  costQuantity: number | null;
+  costUnit: string | null;
+  costUnitRate: number | null;
   _count: { subTasks: number };
 }
 
@@ -101,6 +105,10 @@ export function TasksClient({ tasks }: TasksClientProps) {
                 description: editTask.description,
                 companyId: editTask.companyId ?? undefined,
                 personId: editTask.personId ?? undefined,
+                costCode: editTask.costCode,
+                costQuantity: editTask.costQuantity,
+                costUnit: editTask.costUnit,
+                costUnitRate: editTask.costUnitRate,
               }
             : undefined
         }
