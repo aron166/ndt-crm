@@ -1,61 +1,88 @@
 import { db } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { validateServiceKey, unauthorizedResponse } from "@/lib/service-auth";
+import { rateLimit } from "@/lib/app-key-auth";
+import { authenticateIngest } from "@/lib/hub/ingest-auth";
+import { conversationIntakeSchema } from "@/lib/hub/schema";
 
-interface MessageInput {
-  role: string;
-  content: string;
-}
-
-interface ConversationPayload {
-  tenantId?: number;
-  agentId?: number;
-  personId?: number;
-  companyId?: number;
-  channel: string;
-  summary?: string;
-  endedAt?: string;
-  messages?: MessageInput[];
-}
+// Agent-conversation ingestion (conversations + messages).
+//
+// Auth: Authorization: Bearer <per-app key> (preferred — tenant comes from the
+// key) or, transitionally, the shared service-role key (deprecated).
 
 export async function POST(request: Request) {
-  if (!validateServiceKey(request)) return unauthorizedResponse();
+  const ctx = await authenticateIngest(request, "/api/conversations");
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: ConversationPayload;
+  if (!rateLimit(ctx.keyId)) {
+    return NextResponse.json({ error: "Rate limit exceeded (30 req/min)" }, { status: 429 });
+  }
+
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { channel, summary, endedAt, messages, agentId, personId, companyId } = body;
-  const tenantId = body.tenantId ?? 1;
-
-  if (!channel) {
-    return NextResponse.json({ error: "channel is required" }, { status: 400 });
+  const parsed = conversationIntakeSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
+  const body = parsed.data;
 
-  const conversation = await db.conversation.create({
-    data: {
-      tenantId,
-      channel,
-      ...(summary   ? { summary }                    : {}),
-      ...(endedAt   ? { endedAt: new Date(endedAt) } : {}),
-      ...(agentId   ? { agentId }                    : {}),
-      ...(personId  ? { personId }                   : {}),
-      ...(companyId ? { companyId }                  : {}),
-      ...(messages?.length
-        ? { messages: { create: messages.map((m) => ({ role: m.role, content: m.content })) } }
-        : {}),
-    },
-    select: {
-      id: true,
-      channel: true,
-      summary: true,
-      startedAt: true,
-      messages: { select: { id: true, role: true, createdAt: true }, orderBy: { createdAt: "asc" } },
-    },
-  });
+  // App-key callers can't write outside their key's tenant; a mismatched body
+  // tenantId is a misconfigured caller, so fail loudly instead of ignoring it.
+  if (!ctx.legacyServiceKey && body.tenantId !== undefined && body.tenantId !== ctx.tenantId) {
+    return NextResponse.json(
+      { error: "tenantId does not match the API key's tenant" },
+      { status: 403 },
+    );
+  }
+  const tenantId = ctx.legacyServiceKey ? (body.tenantId ?? 1) : ctx.tenantId;
 
-  return NextResponse.json({ ok: true, conversation }, { status: 201 });
+  try {
+    const conversation = await db.conversation.create({
+      data: {
+        tenantId,
+        channel: body.channel,
+        ...(body.summary ? { summary: body.summary } : {}),
+        ...(body.endedAt ? { endedAt: body.endedAt } : {}),
+        ...(body.agentId ? { agentId: body.agentId } : {}),
+        ...(body.personId ? { personId: body.personId } : {}),
+        ...(body.companyId ? { companyId: body.companyId } : {}),
+        ...(body.messages?.length
+          ? {
+              messages: {
+                create: body.messages.map((m) => ({ role: m.role, content: m.content })),
+              },
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        channel: true,
+        summary: true,
+        startedAt: true,
+        messages: {
+          select: { id: true, role: true, createdAt: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    return NextResponse.json({ ok: true, conversation }, { status: 201 });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+      return NextResponse.json(
+        { error: "Unknown tenantId, agentId, personId, or companyId reference" },
+        { status: 400 },
+      );
+    }
+    console.error("[/api/conversations] ingest failed:", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
 }
