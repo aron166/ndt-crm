@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, User, Mail, Phone, Globe, ArrowRightCircle, CheckCircle2, Pencil } from "lucide-react";
-import { convertLeadToDeal, updateLeadStatus } from "@/app/actions/leads";
+import { Building2, User, Mail, Phone, Globe, ArrowRightCircle, CheckCircle2, Pencil, Trash2 } from "lucide-react";
+import { convertLeadToDeal, updateLeadStatus, deleteLead } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
@@ -71,6 +71,17 @@ export function LeadDetailClient({
   const [statusPending, startStatus] = useTransition();
   const [converted, setConverted] = useState<number | null>(lead.convertedDealId ?? null);
   const [editing, setEditing] = useState(false);
+  const [deleting, startDelete] = useTransition();
+
+  function handleDelete() {
+    const label = lead.serviceInterest || lead.subject || `Lead #${lead.id}`;
+    if (!confirm(`Biztosan törlöd ezt a leadet: "${label}"?\n\nA cég, a kapcsolattartó és az interakciók megmaradnak — csak a lead-kártya tűnik el.`)) return;
+    startDelete(async () => {
+      const res = await deleteLead(lead.id);
+      if (res?.error) { alert(res.error); return; }
+      router.push("/leads");
+    });
+  }
 
   const person = lead.contact?.person;
   const personName = person ? fullName(person.firstName, person.lastName) : null;
@@ -117,6 +128,17 @@ export function LeadDetailClient({
           <button onClick={() => setEditing(true)} className="btn" style={{ gap: 6 }}>
             <Pencil style={{ width: 14, height: 14 }} />
             Szerkesztés
+          </button>
+
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="btn"
+            style={{ gap: 6, color: "var(--coral)" }}
+            title="Lead törlése"
+          >
+            <Trash2 style={{ width: 14, height: 14 }} />
+            {deleting ? "Törlés…" : "Törlés"}
           </button>
 
           <select
