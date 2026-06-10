@@ -42,6 +42,7 @@ model Tenant {
   leadStatuses           LeadStatus[]
   automationRules        AutomationRule[]
   automationFirings      AutomationFiring[]
+  automationEmailSends   AutomationEmailSend[]
   campaigns              Campaign[]
   contentItems           ContentItem[]
   contentAssets          ContentAsset[]
@@ -778,11 +779,29 @@ model AutomationRule {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  tenant  Tenant             @relation(fields: [tenantId], references: [id])
-  firings AutomationFiring[]
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id])
+  firings    AutomationFiring[]
+  emailSends AutomationEmailSend[]
 
   @@index([tenantId, triggerType, isActive])
   @@map("automation_rules")
+}
+
+// Dedup log for send_email rules with "send once per recipient" enabled — one
+// row per (rule, recipient email) so an automated email can't be sent twice.
+model AutomationEmailSend {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  ruleId    Int      @map("rule_id")
+  recipient String   // lowercased recipient email
+  sentAt    DateTime @default(now()) @map("sent_at")
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  rule   AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, recipient])
+  @@index([tenantId])
+  @@map("automation_email_sends")
 }
 
 // Dedupe ledger for time-based automations (deal_idle_in_stage). One row per

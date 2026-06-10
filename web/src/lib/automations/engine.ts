@@ -170,6 +170,30 @@ export async function resolveRecipientEmail(event: AutomationEvent): Promise<str
 // ── Orchestrator (DB-backed) ────────────────────────────────────────
 
 /**
+ * Load the triggering company's attributes as `company_*` condition fields, so
+ * a rule can target on warmth / county / city / pipeline / industry — richer
+ * filtering than the lead's own fields alone.
+ */
+async function loadCompanyFields(
+  tenantId: number,
+  companyId: number,
+): Promise<Record<string, string | number | null>> {
+  const c = await db.company.findFirst({
+    where: { id: companyId, tenantId },
+    select: { warmth: true, county: true, city: true, pipelineStatus: true, industryCode: true, teaorCode: true },
+  });
+  if (!c) return {};
+  return {
+    company_warmth: c.warmth,
+    company_county: c.county,
+    company_city: c.city,
+    company_pipeline: c.pipelineStatus,
+    company_industry: c.industryCode,
+    company_teaor: c.teaorCode,
+  };
+}
+
+/**
  * Run every active rule whose trigger matches this event. Fail-safe: an
  * automation error must never break the originating mutation (lead intake,
  * status/stage change), so everything is wrapped and logged, never thrown.
@@ -180,34 +204,72 @@ export async function runAutomations(event: AutomationEvent): Promise<void> {
     const rules = await db.automationRule.findMany({
       where: { tenantId: event.tenantId, triggerType: event.type, isActive: true },
     });
+    if (rules.length === 0) return;
+
+    // Enrich once with company attributes for richer targeting. The event's own
+    // fields win on any key clash. A failed enrichment must NOT abort the run —
+    // degrade to the base event.
+    let ev = event;
+    if (event.companyId) {
+      try {
+        const companyFields = await loadCompanyFields(event.tenantId, event.companyId);
+        ev = { ...event, fields: { ...companyFields, ...event.fields } };
+      } catch (err) {
+        reportError("automations.enrich", err, { trigger: event.type, companyId: event.companyId });
+      }
+    }
+
     for (const rule of rules) {
       // Per-rule isolation: one rule failing must not stop the others.
       try {
-        if (!triggerMatches(rule.triggerType as TriggerType, rule.triggerConfig, event)) continue;
-        if (!conditionsPass(rule.conditions, event.fields)) continue;
+        if (!triggerMatches(rule.triggerType as TriggerType, rule.triggerConfig, ev)) continue;
+        if (!conditionsPass(rule.conditions, ev.fields)) continue;
 
         if (rule.actionType === "create_task") {
           const cfg = rule.actionConfig as unknown as CreateTaskActionConfig;
           if (!cfg?.titleTemplate) continue;
-          await db.task.create({ data: buildCreateTaskData(cfg, event) });
+          await db.task.create({ data: buildCreateTaskData(cfg, ev) });
         } else if (rule.actionType === "send_email") {
           const cfg = rule.actionConfig as unknown as SendEmailActionConfig;
           if (!cfg?.subjectTemplate || !cfg?.bodyTemplate) continue;
-          const to = await resolveRecipientEmail(event);
+          const to = await resolveRecipientEmail(ev);
           if (!to) continue; // no address on file — skip (not an error)
+          const recipient = to.trim().toLowerCase();
+
+          // "Send once per recipient": skip if this rule already emailed them.
+          if (cfg.sendOnce) {
+            const prior = await db.automationEmailSend.findUnique({
+              where: { ruleId_recipient: { ruleId: rule.id, recipient } },
+              select: { id: true },
+            });
+            if (prior) continue;
+          }
+
           // Dynamic import keeps the server-only Resend module out of the unit-test
           // import graph for this otherwise-pure engine module.
           const { sendEmail } = await import("@/lib/integrations/resend");
           const result = await sendEmail({
             to,
-            subject: renderTemplate(cfg.subjectTemplate, event),
-            text: renderTemplate(cfg.bodyTemplate, event, false),
-            companyId: event.companyId,
-            personId: event.personId,
+            subject: renderTemplate(cfg.subjectTemplate, ev),
+            text: renderTemplate(cfg.bodyTemplate, ev, false),
+            companyId: ev.companyId,
+            personId: ev.personId,
           });
           if (!result.ok) {
-            reportError("automations.send_email", new Error(result.error), { ruleId: rule.id, trigger: event.type });
+            reportError("automations.send_email", new Error(result.error), { ruleId: rule.id, trigger: ev.type });
             continue;
+          }
+          if (cfg.sendOnce) {
+            // Record the send. A P2002 unique-violation just means another worker
+            // beat us (already recorded) — fine to ignore; any OTHER error must be
+            // surfaced, not swallowed (a lost record could re-send next run).
+            try {
+              await db.automationEmailSend.create({ data: { tenantId: ev.tenantId, ruleId: rule.id, recipient } });
+            } catch (err) {
+              if ((err as { code?: string }).code !== "P2002") {
+                reportError("automations.email_send_record", err, { ruleId: rule.id });
+              }
+            }
           }
         } else {
           continue;
