@@ -130,6 +130,7 @@ export function CompanyDetailClient({
   const [geocodeMsg, setGeocodeMsg] = useState<string | null>(null);
   const [deleting, startDelete] = useTransition();
   const [editing, setEditing] = useState(false);
+  const activeContact = contacts.find((c) => !c.endedAt) ?? null;
   const [form, setForm] = useState({
     name:           company.name,
     vatNumber:      company.vatNumber ?? "",
@@ -279,7 +280,8 @@ export function CompanyDetailClient({
             </button>
             <SendEmailButton
               companyId={company.id}
-              defaultTo={(() => { const c = contacts.find((c) => !c.endedAt); return c?.email || c?.person.email || undefined; })()}
+              personId={activeContact?.personId}
+              defaultTo={activeContact?.email || activeContact?.person.email || undefined}
               contextLabel={company.name}
             />
             <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>

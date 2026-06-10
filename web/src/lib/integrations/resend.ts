@@ -99,6 +99,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       return { ok: false, error: data?.message || `Resend hiba (${res.status}).` };
     }
     id = data?.id ?? "";
+    if (!id) return { ok: false, error: "A Resend nem adott vissza üzenetazonosítót." };
   } catch {
     return { ok: false, error: "Nem sikerült kapcsolódni a Resendhez." };
   }

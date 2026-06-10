@@ -97,8 +97,8 @@ function IntegrationCard({
   function handleTest() {
     setTestMsg(null);
     startTransition(async () => {
-      const res = await sendResendTest();
-      setTestMsg(res?.error
+      const res = await sendResendTest().catch(() => ({ error: "Nem sikerült elküldeni a teszt emailt." }));
+      setTestMsg(res && "error" in res && res.error
         ? { ok: false, text: res.error }
         : { ok: true, text: "Teszt email elküldve a feladó címre — nézd meg a postafiókod." });
     });
@@ -186,7 +186,7 @@ function IntegrationCard({
       </div>
 
       {testMsg && (
-        <p style={{ marginTop: 10, fontSize: 12, color: testMsg.ok ? "var(--mint)" : "var(--coral)" }}>
+        <p role="status" aria-live="polite" style={{ marginTop: 10, fontSize: 12, color: testMsg.ok ? "var(--mint)" : "var(--coral)" }}>
           {testMsg.ok ? "✓ " : "⚠ "}{testMsg.text}
         </p>
       )}
