@@ -196,11 +196,16 @@ export function AutomationsClient({
     e.preventDefault();
     if (!form.name.trim()) { setError("Név kötelező"); return; }
     const isEmail = form.actionType === "send_email";
+    let dueInDays: number | undefined;
     if (isEmail) {
       if (!form.subjectTemplate.trim()) { setError("Az email tárgya kötelező"); return; }
       if (!form.bodyTemplate.trim()) { setError("Az email szövege kötelező"); return; }
-    } else if (!form.titleTemplate.trim()) {
-      setError("A létrehozandó feladat címe kötelező"); return;
+    } else {
+      if (!form.titleTemplate.trim()) { setError("A létrehozandó feladat címe kötelező"); return; }
+      if (form.dueInDays !== "") {
+        dueInDays = Number(form.dueInDays);
+        if (!Number.isFinite(dueInDays) || dueInDays < 0) { setError("A határidő (nap) érvénytelen"); return; }
+      }
     }
 
     const data = new FormData();
@@ -221,7 +226,7 @@ export function AutomationsClient({
           titleTemplate: form.titleTemplate.trim(),
           type: form.taskType || undefined,
           category: form.category || undefined,
-          dueInDays: form.dueInDays !== "" ? Number(form.dueInDays) : undefined,
+          dueInDays,
           descriptionTemplate: form.descriptionTemplate.trim() || undefined,
         }));
 

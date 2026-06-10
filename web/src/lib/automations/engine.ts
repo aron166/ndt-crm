@@ -156,9 +156,10 @@ export async function resolveRecipientEmail(event: AutomationEvent): Promise<str
     if (contact?.email) return contact.email;
   }
   if (event.companyId) {
+    // Only a PRIMARY open contact — never guess at a random contact for an
+    // automated send; no primary on file ⇒ skip rather than email the wrong person.
     const contact = await db.contact.findFirst({
-      where: { companyId: event.companyId, tenantId: event.tenantId, endedAt: null, email: { not: null } },
-      orderBy: { isPrimary: "desc" },
+      where: { companyId: event.companyId, tenantId: event.tenantId, endedAt: null, isPrimary: true, email: { not: null } },
       select: { email: true },
     });
     if (contact?.email) return contact.email;
