@@ -47,6 +47,13 @@ const LEAD_FIELDS = [
   { key: "message", label: "Üzenet" },
   { key: "sourceApp", label: "Forrás app" },
   { key: "status", label: "Státusz" },
+  // Company attributes (auto-merged by the engine for richer targeting):
+  { key: "company_warmth", label: "Cég — hőfok" },
+  { key: "company_pipeline", label: "Cég — pipeline státusz" },
+  { key: "company_county", label: "Cég — megye" },
+  { key: "company_city", label: "Cég — város" },
+  { key: "company_industry", label: "Cég — iparág (TEÁOR betű)" },
+  { key: "company_teaor", label: "Cég — TEÁOR kód" },
 ];
 const DEAL_FIELDS = [
   { key: "value", label: "Érték" },
@@ -92,6 +99,7 @@ interface FormState {
   descriptionTemplate: string;
   subjectTemplate: string;
   bodyTemplate: string;
+  sendOnce: boolean;
 }
 
 const EMPTY: FormState = {
@@ -110,6 +118,7 @@ const EMPTY: FormState = {
   descriptionTemplate: "",
   subjectTemplate: "",
   bodyTemplate: "",
+  sendOnce: true,
 };
 
 // ── Shared input styles ─────────────────────────────────────────────
@@ -145,6 +154,7 @@ function fromRule(r: RuleRow): FormState {
     descriptionTemplate: ac.descriptionTemplate ? String(ac.descriptionTemplate) : "",
     subjectTemplate: ac.subjectTemplate ? String(ac.subjectTemplate) : "",
     bodyTemplate: ac.bodyTemplate ? String(ac.bodyTemplate) : "",
+    sendOnce: ac.sendOnce !== false,
   };
 }
 
@@ -221,6 +231,7 @@ export function AutomationsClient({
       ? {
           subjectTemplate: form.subjectTemplate.trim(),
           bodyTemplate: form.bodyTemplate.trim(),
+          sendOnce: form.sendOnce,
         }
       : {
           titleTemplate: form.titleTemplate.trim(),
@@ -511,8 +522,12 @@ function RuleForm({
                 </div>
                 <p style={{ fontSize: 11, color: "var(--fg-faint)" }}>
                   Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}. A címzettet a lead/cég
-                  kapcsolattartójának emailje adja. A Resend integrációnak beállítva kell lennie.
+                  elsődleges kapcsolattartójának emailje adja. A Resend integrációnak beállítva kell lennie.
                 </p>
+                <label className="flex items-center gap-2" style={{ fontSize: 13, color: "var(--fg-soft)", cursor: "pointer" }}>
+                  <input type="checkbox" checked={form.sendOnce} onChange={(e) => set("sendOnce", e.target.checked)} />
+                  Csak egyszer küldd el címzettenként (ne ismételje)
+                </label>
               </>
             ) : (
               <>

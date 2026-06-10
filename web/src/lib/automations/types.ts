@@ -58,6 +58,8 @@ export interface SendEmailActionConfig {
   subjectTemplate: string;
   /** Email body (plain text; newlines preserved); same placeholders. */
   bodyTemplate: string;
+  /** When true, never email the same recipient twice for this rule. */
+  sendOnce?: boolean;
 }
 
 /**

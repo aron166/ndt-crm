@@ -9,6 +9,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     automationRule: { findMany: vi.fn(), update: vi.fn() },
     task: { create: vi.fn() },
+    company: { findFirst: vi.fn() },
   },
 }));
 
@@ -140,11 +141,13 @@ describe("runAutomations (orchestrator)", () => {
   const mockDb = db as unknown as {
     automationRule: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
     task: { create: ReturnType<typeof vi.fn> };
+    company: { findFirst: ReturnType<typeof vi.fn> };
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, "error").mockImplementation(() => {});
+    mockDb.company.findFirst.mockResolvedValue(null); // no enrichment by default
   });
 
   function dbRule(over: Record<string, unknown> = {}) {
@@ -182,6 +185,24 @@ describe("runAutomations (orchestrator)", () => {
     expect(mockDb.automationRule.update).toHaveBeenCalledWith({
       where: { id: 1 }, data: { lastRunAt: expect.any(Date) },
     });
+  });
+
+  it("enriches conditions with the company's attributes (company_* fields)", async () => {
+    mockDb.company.findFirst.mockResolvedValue({
+      warmth: "hot", county: "Pest", city: "Budapest",
+      pipelineStatus: "5", industryCode: "C", teaorCode: "2511",
+    });
+    mockDb.automationRule.findMany.mockResolvedValue([
+      dbRule({ id: 1, conditions: [{ field: "company_warmth", op: "eq", value: "hot" }] }),
+      dbRule({ id: 2, conditions: [{ field: "company_warmth", op: "eq", value: "cold" }] }),
+    ]);
+    mockDb.task.create.mockResolvedValue({ id: 1 });
+    mockDb.automationRule.update.mockResolvedValue({});
+
+    await runAutomations(leadCreated());
+
+    // Only the rule targeting hot companies fires.
+    expect(mockDb.task.create).toHaveBeenCalledTimes(1);
   });
 
   it("skips rules whose conditions do not pass", async () => {
