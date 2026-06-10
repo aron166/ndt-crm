@@ -17,7 +17,7 @@ import { SetEmployerModal } from "./SetEmployerModal";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Mail, Phone, MapPin, Trash2 } from "lucide-react";
-import { updatePerson, deletePerson } from "@/app/actions/persons";
+import { updatePerson, deletePerson, restorePerson } from "@/app/actions/persons";
 
 interface Contact {
   id: number; companyId: number; role: string | null;
@@ -48,6 +48,7 @@ interface Conversation {
 interface Person {
   id: number; firstName: string | null; lastName: string | null;
   email: string | null; phone: string | null; notes: string | null;
+  deletedAt?: string | Date | null;
 }
 
 const TYPE_COLOR: Record<string, string> = {
@@ -91,6 +92,9 @@ export function PersonDetailClient({
     notes:       person.notes       ?? "",
   });
   const [saving, startSave] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [restoring, startRestore] = useTransition();
+  const isDeleted = !!person.deletedAt;
   const [enriching, startEnrich] = useTransition();
   const [enrichmentProposals, setEnrichmentProposals] = useState<Awaited<ReturnType<typeof getProposalsByRun>> | null>(null);
 
@@ -144,6 +148,29 @@ export function PersonDetailClient({
           proposals={enrichmentProposals as unknown as Parameters<typeof EnrichmentDrawer>[0]["proposals"]}
           onClose={() => { setEnrichmentProposals(null); router.refresh(); }}
         />
+      )}
+
+      {isDeleted && (
+        <div
+          className="mount"
+          style={{
+            display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
+            padding: "10px 16px", borderRadius: 8,
+            background: "var(--coral-soft)", border: "1px solid var(--coral)",
+          }}
+        >
+          <span style={{ fontSize: 13, color: "var(--fg)", flex: 1 }}>
+            Ez a személy törölve van — nem jelenik meg a keresésben, és az adatai nem
+            menthetők, amíg vissza nem állítod.
+          </span>
+          <button
+            className="btn primary"
+            disabled={restoring}
+            onClick={() => startRestore(async () => { await restorePerson(person.id); router.refresh(); })}
+          >
+            {restoring ? "Visszaállítás..." : "Visszaállítás"}
+          </button>
+        </div>
       )}
 
       {/* Detail header */}
@@ -497,7 +524,8 @@ export function PersonDetailClient({
                       disabled={saving}
                       onClick={() => {
                         startSave(async () => {
-                          await updatePerson(person.id, {
+                          setSaveError(null);
+                          const res = await updatePerson(person.id, {
                             firstName:   form.firstName   || undefined,
                             lastName:    form.lastName    || undefined,
                             email:       form.email       || undefined,
@@ -505,6 +533,7 @@ export function PersonDetailClient({
                             linkedinUrl: form.linkedinUrl || undefined,
                             notes:       form.notes       || undefined,
                           });
+                          if (res?.error) { setSaveError(res.error); return; }
                           router.refresh();
                         });
                       }}
@@ -525,6 +554,9 @@ export function PersonDetailClient({
                       Mégse
                     </button>
                   </div>
+                  {saveError && (
+                    <p style={{ fontSize: 12, color: "var(--coral)", marginTop: 4 }}>{saveError}</p>
+                  )}
                 </div>
               </div>
             )}

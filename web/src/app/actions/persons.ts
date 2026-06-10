@@ -89,3 +89,19 @@ export async function deletePerson(id: number) {
   revalidatePath("/persons");
   return { success: true };
 }
+
+export async function restorePerson(id: number) {
+  const person = await db.person.findFirst({
+    where: { id, tenantId: TENANT_ID },
+    select: { firstName: true, lastName: true, deletedAt: true },
+  });
+  if (!person) return { error: "Személy nem található" };
+  if (!person.deletedAt) return { success: true }; // already active
+
+  await db.person.update({ where: { id }, data: { deletedAt: null } });
+  await audit("person", id, "update", { deletedAt: person.deletedAt }, { deletedAt: null });
+
+  revalidatePath("/persons");
+  revalidatePath(`/persons/${id}`);
+  return { success: true };
+}
