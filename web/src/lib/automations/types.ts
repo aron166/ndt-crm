@@ -12,7 +12,7 @@ export const TRIGGER_TYPES = [
 ] as const;
 export type TriggerType = (typeof TRIGGER_TYPES)[number];
 
-export const ACTION_TYPES = ["create_task"] as const;
+export const ACTION_TYPES = ["create_task", "send_email"] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 
 export const CONDITION_OPS = [
@@ -51,6 +51,13 @@ export interface CreateTaskActionConfig {
   dueInDays?: number;
   descriptionTemplate?: string;
   assignedToId?: number;
+}
+
+export interface SendEmailActionConfig {
+  /** Email subject; supports {company}/{message}/… placeholders. */
+  subjectTemplate: string;
+  /** Email body (plain text; newlines preserved); same placeholders. */
+  bodyTemplate: string;
 }
 
 /**
