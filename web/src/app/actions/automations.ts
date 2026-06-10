@@ -45,13 +45,24 @@ function parseRuleForm(formData: FormData): RuleInput | { error: string } {
   const actionParsed = parseJson<Record<string, unknown>>(formData.get("actionConfig"));
   if (!actionParsed.ok) return { error: "Érvénytelen actionConfig JSON" };
   const actionConfig = actionParsed.value;
-  if (!actionConfig || typeof actionConfig !== "object" ||
-      typeof actionConfig.titleTemplate !== "string" || !actionConfig.titleTemplate.trim()) {
-    return { error: "A létrehozandó feladat címe kötelező" };
+  if (!actionConfig || typeof actionConfig !== "object") {
+    return { error: "Érvénytelen actionConfig" };
   }
-  if (actionConfig.dueInDays != null) {
-    const n = Number(actionConfig.dueInDays);
-    if (!Number.isFinite(n) || n < 0) return { error: "A határidő (nap) érvénytelen" };
+  if (actionType === "send_email") {
+    if (typeof actionConfig.subjectTemplate !== "string" || !actionConfig.subjectTemplate.trim()) {
+      return { error: "Az email tárgya kötelező" };
+    }
+    if (typeof actionConfig.bodyTemplate !== "string" || !actionConfig.bodyTemplate.trim()) {
+      return { error: "Az email szövege kötelező" };
+    }
+  } else {
+    if (typeof actionConfig.titleTemplate !== "string" || !actionConfig.titleTemplate.trim()) {
+      return { error: "A létrehozandó feladat címe kötelező" };
+    }
+    if (actionConfig.dueInDays != null) {
+      const n = Number(actionConfig.dueInDays);
+      if (!Number.isFinite(n) || n < 0) return { error: "A határidő (nap) érvénytelen" };
+    }
   }
 
   const condParsed = parseJson<unknown[]>(formData.get("conditions"));

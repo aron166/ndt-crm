@@ -84,11 +84,14 @@ interface FormState {
   stageId: string;
   idleDays: string;
   conditions: Cond[];
+  actionType: string;
   titleTemplate: string;
   taskType: string;
   category: string;
   dueInDays: string;
   descriptionTemplate: string;
+  subjectTemplate: string;
+  bodyTemplate: string;
 }
 
 const EMPTY: FormState = {
@@ -99,11 +102,14 @@ const EMPTY: FormState = {
   stageId: "",
   idleDays: "7",
   conditions: [],
+  actionType: "create_task",
   titleTemplate: "",
   taskType: "call",
   category: "revenue_generating",
   dueInDays: "1",
   descriptionTemplate: "",
+  subjectTemplate: "",
+  bodyTemplate: "",
 };
 
 // ── Shared input styles ─────────────────────────────────────────────
@@ -131,11 +137,14 @@ function fromRule(r: RuleRow): FormState {
     stageId: tc.stageId != null ? String(tc.stageId) : "",
     idleDays: tc.idleDays != null ? String(tc.idleDays) : "7",
     conditions: conds,
+    actionType: r.actionType || "create_task",
     titleTemplate: ac.titleTemplate ? String(ac.titleTemplate) : "",
     taskType: ac.type ? String(ac.type) : "call",
     category: ac.category ? String(ac.category) : "revenue_generating",
     dueInDays: ac.dueInDays != null ? String(ac.dueInDays) : "",
     descriptionTemplate: ac.descriptionTemplate ? String(ac.descriptionTemplate) : "",
+    subjectTemplate: ac.subjectTemplate ? String(ac.subjectTemplate) : "",
+    bodyTemplate: ac.bodyTemplate ? String(ac.bodyTemplate) : "",
   };
 }
 
@@ -186,24 +195,40 @@ export function AutomationsClient({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) { setError("Név kötelező"); return; }
-    if (!form.titleTemplate.trim()) { setError("A létrehozandó feladat címe kötelező"); return; }
+    const isEmail = form.actionType === "send_email";
+    let dueInDays: number | undefined;
+    if (isEmail) {
+      if (!form.subjectTemplate.trim()) { setError("Az email tárgya kötelező"); return; }
+      if (!form.bodyTemplate.trim()) { setError("Az email szövege kötelező"); return; }
+    } else {
+      if (!form.titleTemplate.trim()) { setError("A létrehozandó feladat címe kötelező"); return; }
+      if (form.dueInDays !== "") {
+        dueInDays = Number(form.dueInDays);
+        if (!Number.isFinite(dueInDays) || dueInDays < 0) { setError("A határidő (nap) érvénytelen"); return; }
+      }
+    }
 
     const data = new FormData();
     data.set("name", form.name.trim());
     data.set("triggerType", form.triggerType);
-    data.set("actionType", "create_task");
+    data.set("actionType", form.actionType);
     data.set("triggerConfig", JSON.stringify(buildTriggerConfig()));
     const conds = form.conditions
       .filter((c) => c.field && c.op)
       .map((c) => ({ field: c.field, op: c.op, value: c.value }));
     data.set("conditions", JSON.stringify(conds));
-    data.set("actionConfig", JSON.stringify({
-      titleTemplate: form.titleTemplate.trim(),
-      type: form.taskType || undefined,
-      category: form.category || undefined,
-      dueInDays: form.dueInDays !== "" ? Number(form.dueInDays) : undefined,
-      descriptionTemplate: form.descriptionTemplate.trim() || undefined,
-    }));
+    data.set("actionConfig", JSON.stringify(isEmail
+      ? {
+          subjectTemplate: form.subjectTemplate.trim(),
+          bodyTemplate: form.bodyTemplate.trim(),
+        }
+      : {
+          titleTemplate: form.titleTemplate.trim(),
+          type: form.taskType || undefined,
+          category: form.category || undefined,
+          dueInDays,
+          descriptionTemplate: form.descriptionTemplate.trim() || undefined,
+        }));
 
     startTransition(async () => {
       const res = editingId
@@ -309,7 +334,11 @@ function RuleCard({
   rule: RuleRow; leadStatuses: Opt[]; stages: StageOpt[]; pending: boolean;
   onToggle: () => void; onEdit: () => void; onDelete: () => void;
 }) {
-  const title = ((rule.actionConfig ?? {}) as Record<string, unknown>).titleTemplate as string | undefined ?? "—";
+  const ac = (rule.actionConfig ?? {}) as Record<string, unknown>;
+  const isEmail = rule.actionType === "send_email";
+  const actionSummary = isEmail
+    ? `email: „${(ac.subjectTemplate as string | undefined) ?? "—"}”`
+    : `feladat: „${(ac.titleTemplate as string | undefined) ?? "—"}”`;
   const condCount = Array.isArray(rule.conditions) ? rule.conditions.length : 0;
   return (
     <div className="panel" style={{ opacity: rule.isActive ? 1 : 0.6 }}>
@@ -323,7 +352,7 @@ function RuleCard({
           <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>
             {describeTrigger(rule, leadStatuses, stages)}
             {condCount > 0 && <span style={{ color: "var(--fg-faint)" }}> · {condCount} feltétel</span>}
-            <span style={{ color: "var(--fg-faint)" }}> → feladat: „{title}”</span>
+            <span style={{ color: "var(--fg-faint)" }}> → {actionSummary}</span>
           </div>
         </div>
         <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
@@ -460,35 +489,62 @@ function RuleForm({
 
         {/* Action */}
         <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Művelet — hozz létre feladatot</div>
+          <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Művelet</div>
           <div className="space-y-3">
             <div>
-              <label className="field-label">Feladat címe</label>
-              <input style={inputStyle} value={form.titleTemplate} onChange={(e) => set("titleTemplate", e.target.value)} placeholder="pl. Lead megkeresése: {company}" />
-              <p style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}</p>
+              <label className="field-label">Művelet típusa</label>
+              <select style={inputStyle} value={form.actionType} onChange={(e) => set("actionType", e.target.value)}>
+                <option value="create_task">Feladat létrehozása</option>
+                <option value="send_email">Email küldése</option>
+              </select>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="field-label">Típus</label>
-                <select style={inputStyle} value={form.taskType} onChange={(e) => set("taskType", e.target.value)}>
-                  {TASK_TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="field-label">Kategória</label>
-                <select style={inputStyle} value={form.category} onChange={(e) => set("category", e.target.value)}>
-                  {CATEGORIES.map((c) => <option key={c.v} value={c.v}>{c.l}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="field-label">Határidő (nap múlva)</label>
-                <input type="number" min={0} style={inputStyle} value={form.dueInDays} onChange={(e) => set("dueInDays", e.target.value)} placeholder="pl. 1" />
-              </div>
-            </div>
-            <div>
-              <label className="field-label">Leírás (opcionális)</label>
-              <input style={inputStyle} value={form.descriptionTemplate} onChange={(e) => set("descriptionTemplate", e.target.value)} placeholder="pl. Új lead a(z) {sourceApp} csatornán." />
-            </div>
+
+            {form.actionType === "send_email" ? (
+              <>
+                <div>
+                  <label className="field-label">Tárgy</label>
+                  <input style={inputStyle} value={form.subjectTemplate} onChange={(e) => set("subjectTemplate", e.target.value)} placeholder="pl. Ajánlatunk — {company}" />
+                </div>
+                <div>
+                  <label className="field-label">Üzenet</label>
+                  <textarea style={{ ...inputStyle, minHeight: 120, resize: "vertical" }} value={form.bodyTemplate} onChange={(e) => set("bodyTemplate", e.target.value)} placeholder={"Tisztelt Cím!\n\n..."} />
+                </div>
+                <p style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+                  Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}. A címzettet a lead/cég
+                  kapcsolattartójának emailje adja. A Resend integrációnak beállítva kell lennie.
+                </p>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="field-label">Feladat címe</label>
+                  <input style={inputStyle} value={form.titleTemplate} onChange={(e) => set("titleTemplate", e.target.value)} placeholder="pl. Lead megkeresése: {company}" />
+                  <p style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="field-label">Típus</label>
+                    <select style={inputStyle} value={form.taskType} onChange={(e) => set("taskType", e.target.value)}>
+                      {TASK_TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label">Kategória</label>
+                    <select style={inputStyle} value={form.category} onChange={(e) => set("category", e.target.value)}>
+                      {CATEGORIES.map((c) => <option key={c.v} value={c.v}>{c.l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label">Határidő (nap múlva)</label>
+                    <input type="number" min={0} style={inputStyle} value={form.dueInDays} onChange={(e) => set("dueInDays", e.target.value)} placeholder="pl. 1" />
+                  </div>
+                </div>
+                <div>
+                  <label className="field-label">Leírás (opcionális)</label>
+                  <input style={inputStyle} value={form.descriptionTemplate} onChange={(e) => set("descriptionTemplate", e.target.value)} placeholder="pl. Új lead a(z) {sourceApp} csatornán." />
+                </div>
+              </>
+            )}
           </div>
         </div>
 

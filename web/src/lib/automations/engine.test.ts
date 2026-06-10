@@ -103,6 +103,12 @@ describe("renderTemplate", () => {
     const ev = leadCreated({ companyName: "Acme", fields: { company: "Acme", sourceApp: "web", message: "" } });
     expect(renderTemplate("Új lead a(z) {sourceApp} csatornán. {message}", ev)).toBe("Új lead a(z) web csatornán.");
   });
+
+  it("preserves newlines for email bodies when collapseWhitespace is false", () => {
+    const ev = leadCreated({ companyName: "Acme", fields: { company: "Acme" } });
+    const body = "Tisztelt {company}!\n\nKöszönjük az érdeklődést.\n\nÜdv";
+    expect(renderTemplate(body, ev, false)).toBe("Tisztelt Acme!\n\nKöszönjük az érdeklődést.\n\nÜdv");
+  });
 });
 
 describe("buildCreateTaskData", () => {
