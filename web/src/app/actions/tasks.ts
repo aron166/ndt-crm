@@ -3,8 +3,29 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit, diff } from "@/lib/audit";
+import { computeCostAmount } from "@/lib/tasks/costing";
 
 const TENANT_ID = 1;
+
+/**
+ * Parse the optional cost-line fields off a task form. Cost code carries a
+ * measurable amount (quantity × unit rate → HUF) — decisions.md #15. Returns
+ * nulls when a field is blank so an empty cost section clears the line.
+ */
+function parseCostFields(formData: FormData) {
+  const num = (key: string): number | null => {
+    const raw = (formData.get(key) as string | null)?.trim();
+    if (!raw) return null;
+    const n = Number(raw.replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  };
+  const costCode = ((formData.get("costCode") as string) || "").trim() || null;
+  const costQuantity = num("costQuantity");
+  const costUnit = ((formData.get("costUnit") as string) || "").trim() || null;
+  const costUnitRate = num("costUnitRate");
+  const costAmount = computeCostAmount(costQuantity, costUnitRate);
+  return { costCode, costQuantity, costUnit, costUnitRate, costAmount };
+}
 
 export async function createTask(formData: FormData) {
   const title = formData.get("title") as string;
@@ -15,6 +36,8 @@ export async function createTask(formData: FormData) {
   const companyIdStr = formData.get("companyId") as string | null;
   const personIdStr  = formData.get("personId") as string | null;
   const parentIdStr  = formData.get("parentTaskId") as string | null;
+
+  const cost = parseCostFields(formData);
 
   const task = await db.task.create({
     data: {
@@ -29,10 +52,14 @@ export async function createTask(formData: FormData) {
       companyId: companyIdStr ? parseInt(companyIdStr, 10) : null,
       personId: personIdStr ? parseInt(personIdStr, 10) : null,
       parentTaskId: parentIdStr ? parseInt(parentIdStr, 10) : null,
+      ...cost,
     },
   });
 
-  await audit("task", task.id, "create", null, { title: task.title, status: task.status, type: task.type });
+  await audit("task", task.id, "create", null, {
+    title: task.title, status: task.status, type: task.type,
+    costCode: cost.costCode, costAmount: cost.costAmount,
+  });
 
   revalidatePath("/tasks");
   if (task.companyId) revalidatePath(`/companies/${task.companyId}`);
@@ -51,10 +78,12 @@ export async function updateTask(id: number, formData: FormData) {
   const before = await db.task.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { title: true, status: true, type: true, dueDate: true,
-              estimatedMinutes: true, description: true, companyId: true, personId: true },
+              estimatedMinutes: true, description: true, companyId: true, personId: true,
+              costCode: true, costAmount: true },
   });
 
   const newStatus = (formData.get("status") as string) || "created";
+  const cost = parseCostFields(formData);
 
   await db.task.updateMany({
     where: { id, tenantId: TENANT_ID },
@@ -67,13 +96,21 @@ export async function updateTask(id: number, formData: FormData) {
       dueDate: dueDateStr ? new Date(dueDateStr) : null,
       estimatedMinutes: estStr ? parseInt(estStr, 10) : null,
       actualMinutes: actualStr ? parseInt(actualStr, 10) : null,
+      ...cost,
       updatedAt: new Date(),
     },
   });
 
   if (before) {
-    const after = { title: title.trim(), status: newStatus, type: formData.get("type") || "internal", dueDate: dueDateStr };
-    const d = diff(before as Record<string, unknown>, after as Record<string, unknown>);
+    const beforeForDiff = {
+      ...before,
+      costAmount: before.costAmount != null ? Number(before.costAmount) : null,
+    };
+    const after = {
+      title: title.trim(), status: newStatus, type: formData.get("type") || "internal", dueDate: dueDateStr,
+      costCode: cost.costCode, costAmount: cost.costAmount,
+    };
+    const d = diff(beforeForDiff as Record<string, unknown>, after as Record<string, unknown>);
     if (Object.keys(d.after).length > 0) {
       await audit("task", id, "update", d.before, d.after);
     }

@@ -8,6 +8,7 @@ import { getTagsForEntity } from "@/app/actions/tags";
 import { getEntityHistory } from "@/app/actions/audit";
 import { getCompanyAttributes } from "@/app/actions/company-attributes";
 import { serializeDates } from "@/lib/serialize";
+import { serializeTaskCost } from "@/lib/tasks/costing";
 import { isConnected } from "@/lib/integrations/google_maps";
 
 const TENANT_ID = 1;
@@ -116,7 +117,7 @@ export default async function CompanyDetailPage({
         company={serializeDates(company)}
         contacts={serializeDates(contacts)}
         interactions={serializeDates(interactions)}
-        tasks={serializeDates(tasks)}
+        tasks={serializeDates(tasks).map(serializeTaskCost)}
         appEvents={serializeDates(appEvents)}
         mapsConnected={mapsConnected}
         revenueSeries={revenueSeries}

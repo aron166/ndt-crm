@@ -4,6 +4,7 @@ import { TasksClient } from "./TasksClient";
 import { TasksKanban } from "./TasksKanban";
 import { NewTaskButton } from "./NewTaskButton";
 import { ViewToggle } from "./ViewToggle";
+import { serializeTaskCost } from "@/lib/tasks/costing";
 
 const TENANT_ID = 1;
 
@@ -61,6 +62,7 @@ export default async function TasksPage({
     orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
     take: view === "kanban" ? 500 : 200,
   });
+  const tasksForClient = tasks.map(serializeTaskCost);
 
   const openCount = await db.task.count({
     where: {
@@ -144,11 +146,11 @@ export default async function TasksPage({
             </div>
           </div>
 
-          <TasksClient tasks={tasks} />
+          <TasksClient tasks={tasksForClient} />
         </>
       )}
 
-      {view === "kanban" && <TasksKanban tasks={tasks} />}
+      {view === "kanban" && <TasksKanban tasks={tasksForClient} />}
     </div>
   );
 }

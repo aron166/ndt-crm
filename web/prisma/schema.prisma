@@ -464,6 +464,10 @@ model Task {
   status           String    @default("created")     // created, in_progress, done, cancelled
   executorType     String    @default("human") @map("executor_type") // human, ai_agent, robot
   costCode         String?   @map("cost_code")        // KID, MRD, DOD, SZD, VIZSGALAT
+  costQuantity     Decimal?  @map("cost_quantity")    // measured amount (km, m², db, óra…)
+  costUnit         String?   @map("cost_unit")        // dynamic unit label for costQuantity
+  costUnitRate     Decimal?  @map("cost_unit_rate")   // HUF per unit (manual now; rate-card later)
+  costAmount       Decimal?  @map("cost_amount")      // costQuantity × costUnitRate, in HUF — rolls up to the invoice
   setMembership    String[]  @map("set_membership")   // user-defined set membership
   skillRequiredId  Int?      @map("skill_required_id") // FK added in Step 4.5
   dueDate          DateTime? @map("due_date")

@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select";
 import { EntitySearch } from "@/components/EntitySearch";
 import { createTask, updateTask } from "@/app/actions/tasks";
+import { COST_CODES, computeCostAmount, costCodeUnitHint } from "@/lib/tasks/costing";
+import { formatHUF } from "@/lib/utils";
 
 interface TaskFormData {
   id?: number;
@@ -27,6 +29,10 @@ interface TaskFormData {
   personId?: number | null;
   personName?: string | null;
   parentTaskId?: number | null;
+  costCode?: string | null;
+  costQuantity?: number | null;
+  costUnit?: string | null;
+  costUnitRate?: number | null;
 }
 
 interface TaskModalProps {
@@ -66,6 +72,20 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
     initial?.personId ? { id: initial.personId, label: initial.personName ?? "" } : null
   );
 
+  const [costCode, setCostCode] = useState(initial?.costCode ?? "");
+  const [costQuantity, setCostQuantity] = useState(
+    initial?.costQuantity != null ? String(initial.costQuantity) : ""
+  );
+  const [costUnit, setCostUnit] = useState(initial?.costUnit ?? "");
+  const [costUnitRate, setCostUnitRate] = useState(
+    initial?.costUnitRate != null ? String(initial.costUnitRate) : ""
+  );
+
+  const liveAmount = computeCostAmount(
+    costQuantity.trim() ? Number(costQuantity.replace(",", ".")) : null,
+    costUnitRate.trim() ? Number(costUnitRate.replace(",", ".")) : null,
+  );
+
   function handleClose() {
     setError(null);
     onClose();
@@ -82,6 +102,10 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
     if (company) data.set("companyId", String(company.id));
     if (person)  data.set("personId", String(person.id));
     if (initial?.parentTaskId) data.set("parentTaskId", String(initial.parentTaskId));
+    data.set("costCode", costCode);
+    data.set("costQuantity", costQuantity);
+    data.set("costUnit", costUnit);
+    data.set("costUnitRate", costUnitRate);
 
     startTransition(async () => {
       const result = isEdit
@@ -193,6 +217,73 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
               />
             </div>
           </div>
+
+          <details
+            className="rounded-lg border border-slate-200"
+            open={!!(initial?.costCode || type === "field_visit")}
+          >
+            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-slate-600 flex items-center justify-between">
+              <span>Költség / elszámolás</span>
+              {liveAmount != null && (
+                <span className="font-mono-ndt text-slate-500">{formatHUF(liveAmount)}</span>
+              )}
+            </summary>
+            <div className="px-3 pb-3 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Költségkód</label>
+                <Select value={costCode || "none"} onValueChange={(v) => setCostCode(!v || v === "none" ? "" : v)}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nincs</SelectItem>
+                    {COST_CODES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Mennyiség</label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min={0}
+                    value={costQuantity}
+                    onChange={(e) => setCostQuantity(e.target.value)}
+                    placeholder="pl. 80"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Egység</label>
+                  <Input
+                    value={costUnit}
+                    onChange={(e) => setCostUnit(e.target.value)}
+                    placeholder={costCodeUnitHint(costCode) || "pl. m²"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Egységár (Ft)</label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min={0}
+                    value={costUnitRate}
+                    onChange={(e) => setCostUnitRate(e.target.value)}
+                    placeholder="pl. 300"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-slate-500">
+                Összeg:{" "}
+                <span className="font-mono-ndt text-slate-700">
+                  {liveAmount != null ? formatHUF(liveAmount) : "—"}
+                </span>
+                <span className="text-slate-400"> · mennyiség × egységár, automatikusan</span>
+              </p>
+            </div>
+          </details>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

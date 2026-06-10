@@ -22,6 +22,10 @@ interface Task {
   companyId: number | null;
   personId: number | null;
   parentTaskId: number | null;
+  costCode: string | null;
+  costQuantity: number | null;
+  costUnit: string | null;
+  costUnitRate: number | null;
   _count: { subTasks: number };
 }
 
@@ -81,6 +85,10 @@ export function ContextTasksTab({
                 companyName,
                 personId: editTask.personId,
                 personName,
+                costCode: editTask.costCode,
+                costQuantity: editTask.costQuantity,
+                costUnit: editTask.costUnit,
+                costUnitRate: editTask.costUnitRate,
               }
             : {
                 companyId: companyId ?? null,

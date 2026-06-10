@@ -31,7 +31,9 @@ interface Task {
   id: number; title: string; type: string | null; category: string | null;
   status: string; dueDate: string | Date | null; estimatedMinutes: number | null;
   description: string | null; companyId: number | null; personId: number | null;
-  parentTaskId: number | null; _count: { subTasks: number };
+  parentTaskId: number | null;
+  costCode: string | null; costQuantity: number | null; costUnit: string | null; costUnitRate: number | null;
+  _count: { subTasks: number };
 }
 interface ConversationMessage {
   id: number; role: string; content: string; createdAt: string | Date;
