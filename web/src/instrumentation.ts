@@ -8,7 +8,8 @@ import type { Instrumentation } from "next";
 export const onRequestError: Instrumentation.onRequestError = async (err, request, context) => {
   const { reportError } = await import("@/lib/report-error");
   reportError(`unhandled:${context.routeType}`, err, {
-    path: request.path,
+    // Query strings can carry PII (search terms, emails) — report the path only.
+    path: request.path.split("?")[0],
     method: request.method,
     routePath: context.routePath,
   });

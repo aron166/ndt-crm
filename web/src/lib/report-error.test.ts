@@ -60,11 +60,11 @@ describe("reportError", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
     expect(() => reportError("test.scope", new Error("boom"))).not.toThrow();
-    // Let the rejected promise's .catch handler run.
-    await new Promise((r) => setTimeout(r, 0));
-    expect(console.error).toHaveBeenCalledWith(
-      "[report-error] webhook delivery failed:",
-      expect.any(Error),
+    await vi.waitFor(() =>
+      expect(console.error).toHaveBeenCalledWith(
+        "[report-error] webhook delivery failed:",
+        expect.any(Error),
+      ),
     );
   });
 });

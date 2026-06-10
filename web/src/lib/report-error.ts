@@ -16,6 +16,14 @@ export interface ReportContext {
   [key: string]: unknown;
 }
 
+/**
+ * Report a server-side failure: structured console.error always, webhook alert
+ * when ERROR_WEBHOOK_URL is set. Never throws, never blocks the caller.
+ *
+ * ⚠️ `context` is logged AND sent to the external webhook unsanitized — pass
+ * only identifiers (ids, scopes, route paths without query strings), never
+ * PII, tokens, or payload contents.
+ */
 export function reportError(scope: string, err: unknown, context: ReportContext = {}): void {
   const message = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack : undefined;
