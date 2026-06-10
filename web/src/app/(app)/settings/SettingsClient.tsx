@@ -37,10 +37,15 @@ const INTEGRATIONS: Integration[] = [
   {
     slug: "resend",
     name: "Resend (Email)",
-    description: "Kimenő emailek küldése CRM-ből, beépített thread-tracking.",
+    description: "Kimenő emailek küldése a CRM-ből; minden küldés interakcióként naplózódik.",
     category: "Kommunikáció",
-    available: false,
-    fields: [],
+    available: true,
+    docsUrl: "https://resend.com/api-keys",
+    fields: [
+      { key: "apiKey", label: "API kulcs", placeholder: "re_..." },
+      { key: "fromEmail", label: "Feladó email", placeholder: "peter.z.nagy@controllabor.hu" },
+      { key: "fromName", label: "Feladó név", placeholder: "Nagy Péter" },
+    ],
   },
   {
     slug: "twilio",

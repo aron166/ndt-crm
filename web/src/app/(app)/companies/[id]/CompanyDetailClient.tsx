@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AreaChart } from "@/components/viz/AreaChart";
 import { StackBar } from "@/components/viz/StackBar";
 import { LogInteractionModal } from "@/components/LogInteractionModal";
+import { SendEmailButton } from "@/components/SendEmailButton";
 import { AddContactModal } from "./AddContactModal";
 import { personLeftCompany } from "@/app/actions/contacts";
 import { TagInput } from "@/components/tags/TagInput";
@@ -276,6 +277,11 @@ export function CompanyDetailClient({
             <button className="btn primary" onClick={() => { setLogPerson(contacts.find(c => !c.endedAt) ?? null); setLogOpen(true); }}>
               <Phone style={{ width: 13, height: 13 }} /> Naplózás
             </button>
+            <SendEmailButton
+              companyId={company.id}
+              defaultTo={(() => { const c = contacts.find((c) => !c.endedAt); return c?.email || c?.person.email || undefined; })()}
+              contextLabel={company.name}
+            />
             <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
             <button
               className="btn"
