@@ -9,6 +9,23 @@ import { runAutomations } from "@/lib/automations/engine";
 
 const TENANT_ID = 1;
 
+export async function deleteLead(id: number) {
+  const lead = await db.lead.findFirst({
+    where: { id, tenantId: TENANT_ID },
+    select: { subject: true, serviceInterest: true, status: true },
+  });
+  if (!lead) return { error: "Lead nem található" };
+
+  // Leads are thin process trackers — deleting one removes the tracker only;
+  // the company, person/contact, interactions and any converted deal persist.
+  await db.lead.deleteMany({ where: { id, tenantId: TENANT_ID } });
+  await audit("lead", id, "delete",
+    { subject: lead.subject, serviceInterest: lead.serviceInterest, status: lead.status }, null);
+
+  revalidatePath("/leads");
+  return { success: true };
+}
+
 export async function moveLead(leadId: number, newStatus: string) {
   const statuses = await getLeadStatuses(TENANT_ID);
   if (!statuses.some((s) => s.key === newStatus)) return { error: "Ismeretlen státusz" };
