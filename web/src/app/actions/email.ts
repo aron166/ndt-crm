@@ -1,7 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { sendEmail } from "@/lib/integrations/resend";
+import { sendEmail, sendTestEmail } from "@/lib/integrations/resend";
+
+export async function sendResendTest() {
+  const result = await sendTestEmail();
+  if (!result.ok) return { error: result.error };
+  return { success: true };
+}
 
 export async function sendCrmEmail(input: {
   to: string;

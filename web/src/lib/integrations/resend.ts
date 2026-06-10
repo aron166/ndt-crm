@@ -42,6 +42,20 @@ export interface SendEmailInput {
   /** Context to attach the logged interaction to. */
   companyId?: number | null;
   personId?: number | null;
+  /** Skip the interaction log (used for connection test sends). */
+  skipLog?: boolean;
+}
+
+/** Send a test email to the configured From address to verify the credentials. */
+export async function sendTestEmail(): Promise<SendEmailResult> {
+  const config = await getResendConfig();
+  if (!config) return { ok: false, error: "A Resend integráció nincs beállítva." };
+  return sendEmail({
+    to: config.fromEmail,
+    subject: "Helm CRM — teszt email",
+    text: "Ez egy teszt üzenet a Helm CRM-ből. Ha megkaptad, a Resend integráció működik. 🎉",
+    skipLog: true,
+  });
 }
 
 export type SendEmailResult =
@@ -88,6 +102,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   } catch {
     return { ok: false, error: "Nem sikerült kapcsolódni a Resendhez." };
   }
+
+  if (input.skipLog) return { ok: true, id };
 
   // Append-only interaction log (never blocks the send result).
   const companyId = input.companyId ?? null;
