@@ -90,7 +90,9 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
   // Rate card → auto-fill unit/rate when a cost code is picked (without clobbering edits).
   const [rates, setRates] = useState<CostRateEntry[]>([]);
   useEffect(() => {
-    if (open && rates.length === 0) getCostRates().then(setRates).catch(() => {});
+    if (open && rates.length === 0) {
+      getCostRates().then(setRates).catch((e) => console.error("Díjszabás betöltése sikertelen", e));
+    }
   }, [open, rates.length]);
 
   function handleCostCodeChange(v: string | null) {

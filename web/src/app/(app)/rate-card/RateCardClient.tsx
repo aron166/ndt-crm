@@ -29,6 +29,17 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
 
   function handleSave() {
     setMsg(null);
+    // Validate every row up front so all bad rates surface at once, not one-by-one.
+    const invalid = rows.filter((r) => {
+      const t = r.unitRate.trim();
+      if (!t) return false;
+      const n = Number(t.replace(",", "."));
+      return !Number.isFinite(n) || n < 0;
+    });
+    if (invalid.length) {
+      setMsg({ ok: false, text: `Érvénytelen egységár: ${invalid.map((r) => costCodeLabel(r.code)).join(", ")}` });
+      return;
+    }
     startTransition(async () => {
       for (const r of rows) {
         const res = await upsertCostRate(r.code, r.unit, r.unitRate);
