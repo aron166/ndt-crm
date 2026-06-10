@@ -14,7 +14,7 @@ import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Phone, X, MapPin, Loader2, Pencil, Trash2 } from "lucide-react";
-import { geocodeCompany, deleteCompany, updateCompany } from "@/app/actions/companies";
+import { geocodeCompany, deleteCompany, updateCompany, restoreCompany } from "@/app/actions/companies";
 import { LeaveCompanyModal } from "@/components/LeaveCompanyModal";
 import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
 import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
@@ -62,6 +62,7 @@ interface CompanyData {
   revenue2022: bigint | null; revenue2023: bigint | null; revenue2024: bigint | null;
   customerValue: bigint | null;
   lastInteractionDate: string | Date | null; createdAt: Date; lat?: number | null; lng?: number | null;
+  deletedAt?: string | Date | null;
 }
 
 interface Props {
@@ -145,6 +146,9 @@ export function CompanyDetailClient({
     website:        company.website ?? "",
   });
   const [saving, startSave] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [restoring, startRestore] = useTransition();
+  const isDeleted = !!company.deletedAt;
   const [enriching, startEnrich] = useTransition();
   const [enrichmentProposals, setEnrichmentProposals] = useState<Awaited<ReturnType<typeof getProposalsByRun>> | null>(null);
 
@@ -215,6 +219,29 @@ export function CompanyDetailClient({
           proposals={enrichmentProposals as unknown as Parameters<typeof EnrichmentDrawer>[0]["proposals"]}
           onClose={() => { setEnrichmentProposals(null); router.refresh(); }}
         />
+      )}
+
+      {isDeleted && (
+        <div
+          className="mount"
+          style={{
+            display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
+            padding: "10px 16px", borderRadius: 8,
+            background: "var(--coral-soft)", border: "1px solid var(--coral)",
+          }}
+        >
+          <span style={{ fontSize: 13, color: "var(--fg)", flex: 1 }}>
+            Ez a cég törölve van — nem jelenik meg a keresésben, és az adatai nem
+            menthetők, amíg vissza nem állítod.
+          </span>
+          <button
+            className="btn primary"
+            disabled={restoring}
+            onClick={() => startRestore(async () => { await restoreCompany(company.id); router.refresh(); })}
+          >
+            {restoring ? "Visszaállítás..." : "Visszaállítás"}
+          </button>
+        </div>
       )}
 
       {/* Detail header */}
@@ -469,7 +496,8 @@ export function CompanyDetailClient({
                   disabled={saving}
                   onClick={() => {
                     startSave(async () => {
-                      await updateCompany(company.id, {
+                      setSaveError(null);
+                      const res = await updateCompany(company.id, {
                         name:           form.name || undefined,
                         vatNumber:      form.vatNumber || undefined,
                         status:         form.status || undefined,
@@ -482,6 +510,7 @@ export function CompanyDetailClient({
                         country:        form.country || undefined,
                         website:        form.website || undefined,
                       });
+                      if (res?.error) { setSaveError(res.error); return; }
                       setEditing(false);
                       router.refresh();
                     });
@@ -490,6 +519,9 @@ export function CompanyDetailClient({
                 >
                   {saving ? "Mentés..." : "Mentés"}
                 </button>
+                {saveError && (
+                  <p style={{ fontSize: 12, color: "var(--coral)", marginTop: 6 }}>{saveError}</p>
+                )}
               </div>
             ) : (
             <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
