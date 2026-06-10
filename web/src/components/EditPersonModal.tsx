@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updatePerson } from "@/app/actions/persons";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Person {
   id: number; firstName: string | null; lastName: string | null;
@@ -19,8 +19,6 @@ interface Props {
 export function EditPersonModal({ open, onClose, person }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-
-  if (!open) return null;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -41,13 +39,12 @@ export function EditPersonModal({ open, onClose, person }: Props) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <span className="modal-title">Személy szerkesztése</span>
-          <button className="modal-close" onClick={onClose}><X style={{ width: 16, height: 16 }} /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Személy szerkesztése</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div className="field-group">
               <label className="field-label">Vezetéknév *</label>
@@ -84,7 +81,7 @@ export function EditPersonModal({ open, onClose, person }: Props) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
