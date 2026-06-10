@@ -13,8 +13,11 @@ export const MAX_MESSAGES = 200;
 
 const id = z.number().int().positive();
 
+// Measure real UTF-8 bytes — String.length counts UTF-16 code units, which
+// undercounts multibyte content (emoji, accented Hungarian text) vs. what is
+// actually stored.
 const payloadWithinLimit = (payload: unknown) =>
-  JSON.stringify(payload).length <= MAX_PAYLOAD_BYTES;
+  new TextEncoder().encode(JSON.stringify(payload)).length <= MAX_PAYLOAD_BYTES;
 
 export const appEventSchema = z
   .object({

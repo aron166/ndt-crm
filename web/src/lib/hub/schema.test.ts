@@ -69,6 +69,13 @@ describe("appEventSchema", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  it("counts UTF-8 bytes, not UTF-16 code units (multibyte content)", () => {
+    // 9000 emoji ≈ 18k UTF-16 code units (under the cap) but ≈ 36k UTF-8 bytes.
+    const blob = "😀".repeat(9000);
+    expect(JSON.stringify({ blob }).length).toBeLessThan(MAX_PAYLOAD_BYTES);
+    expect(appEventSchema.safeParse({ ...valid, payload: { blob } }).success).toBe(false);
+  });
 });
 
 describe("conversationIntakeSchema", () => {
