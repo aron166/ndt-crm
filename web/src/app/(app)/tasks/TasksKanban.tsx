@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Clock } from "lucide-react";
 import { moveTask } from "@/app/actions/tasks";
+import { useTaskCompletion } from "@/components/useTaskCompletion";
 import { TaskModal } from "./TaskModal";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -235,6 +236,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStatus, setModalStatus] = useState<Status>("created");
   const [, startTransition] = useTransition();
+  const { promptLog, logModal } = useTaskCompletion();
 
   function handleDrop(colKey: string) {
     if (!draggingId) return;
@@ -243,7 +245,25 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
     setTasks((prev) => prev.map((t) => t.id === draggingId ? { ...t, status: colKey } : t));
     const id = draggingId;
     setDraggingId(null); setHoverCol(null);
-    startTransition(async () => { await moveTask(id, colKey); router.refresh(); });
+    const wasDone = task.status === "done";
+    startTransition(async () => {
+      await moveTask(id, colKey);
+      router.refresh();
+      // Offer to log the interaction when a comms task is newly marked done.
+      if (colKey === "done" && !wasDone) {
+        const personName = task.person
+          ? `${task.person.lastName ?? ""} ${task.person.firstName ?? ""}`.trim()
+          : undefined;
+        promptLog({
+          id: task.id,
+          type: task.type,
+          companyId: task.companyId,
+          personId: task.personId,
+          companyName: task.company?.name,
+          personName,
+        });
+      }
+    });
   }
 
   const filtered = tasks.filter((t) =>
@@ -260,6 +280,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
         onClose={() => { setModalOpen(false); router.refresh(); }}
         initial={{ status: modalStatus }}
       />
+      {logModal}
 
       {/* Filter chips + stats */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
