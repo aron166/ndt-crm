@@ -6,7 +6,8 @@ import Link from "next/link";
 import { Plus, CheckCircle2 } from "lucide-react";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
-import { completeTask, reopenTask } from "@/app/actions/tasks";
+import { reopenTask } from "@/app/actions/tasks";
+import { useTaskCompletion } from "@/components/useTaskCompletion";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -48,10 +49,17 @@ export function ContextTasksTab({
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const { complete, logModal } = useTaskCompletion();
 
-  async function handleComplete(id: number) {
-    await completeTask(id);
-    router.refresh();
+  async function handleComplete(task: Task) {
+    await complete({
+      id: task.id,
+      type: task.type,
+      companyId: task.companyId ?? companyId ?? null,
+      personId: task.personId ?? personId ?? null,
+      companyName,
+      personName,
+    });
   }
 
   async function handleReopen(id: number) {
@@ -90,6 +98,7 @@ export function ContextTasksTab({
               }
         }
       />
+      {logModal}
 
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-slate-500">
@@ -125,7 +134,7 @@ export function ContextTasksTab({
                     <td className="px-3 py-2.5 w-8">
                       {t.status !== "done" ? (
                         <button
-                          onClick={() => handleComplete(t.id)}
+                          onClick={() => handleComplete(t)}
                           className="w-4.5 h-4.5 rounded-full border-2 border-slate-300 hover:border-green-500 transition-colors"
                           title="Kész"
                         />

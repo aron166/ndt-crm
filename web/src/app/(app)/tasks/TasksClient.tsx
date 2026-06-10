@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TaskModal } from "./TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
-import { completeTask, reopenTask, deleteTask } from "@/app/actions/tasks";
+import { reopenTask, deleteTask } from "@/app/actions/tasks";
+import { useTaskCompletion } from "@/components/useTaskCompletion";
 import { formatDate } from "@/lib/utils";
 import { CheckCircle2, RotateCcw, Pencil, Trash2, Plus } from "lucide-react";
 import Link from "next/link";
@@ -51,10 +52,20 @@ export function TasksClient({ tasks }: TasksClientProps) {
   const router = useRouter();
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const { complete, logModal } = useTaskCompletion();
 
-  async function handleComplete(id: number) {
-    await completeTask(id);
-    router.refresh();
+  function handleComplete(task: Task) {
+    const personName = task.person
+      ? `${task.person.lastName ?? ""} ${task.person.firstName ?? ""}`.trim()
+      : undefined;
+    return complete({
+      id: task.id,
+      type: task.type,
+      companyId: task.companyId,
+      personId: task.personId,
+      companyName: task.company?.name,
+      personName,
+    });
   }
 
   async function handleReopen(id: number) {
@@ -94,6 +105,7 @@ export function TasksClient({ tasks }: TasksClientProps) {
             : undefined
         }
       />
+      {logModal}
 
       <div className="rounded-xl overflow-hidden" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)" }}>
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
@@ -131,7 +143,7 @@ export function TasksClient({ tasks }: TasksClientProps) {
                   <td style={{ padding: "8px 12px", width: 36 }}>
                     {t.status !== "done" ? (
                       <button
-                        onClick={() => handleComplete(t.id)}
+                        onClick={() => handleComplete(t)}
                         style={{ width: 18, height: 18, borderRadius: "50%", border: "1.5px solid var(--line)", background: "transparent", cursor: "pointer", transition: "border-color .15s" }}
                         onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--mint)")}
                         onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--line)")}

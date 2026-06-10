@@ -40,6 +40,8 @@ interface LogInteractionModalProps {
   personId?: number | null;
   companyName?: string;
   personName?: string;
+  /** Pre-select the interaction type (e.g. derived from a completed task's type). */
+  defaultType?: string;
 }
 
 function nowLocalIso() {
@@ -55,16 +57,17 @@ export function LogInteractionModal({
   personId,
   companyName,
   personName,
+  defaultType,
 }: LogInteractionModalProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [type, setType] = useState("call");
+  const [type, setType] = useState(defaultType ?? "call");
   const [direction, setDirection] = useState("outbound");
 
   function handleClose() {
     setError(null);
-    setType("call");
+    setType(defaultType ?? "call");
     setDirection("outbound");
     onClose();
   }
