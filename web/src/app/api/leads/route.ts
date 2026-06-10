@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { leadIntakeSchema } from "@/lib/leads/schema";
 import { ingestLead } from "@/lib/leads/ingest";
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
       201,
     );
   } catch (err) {
-    console.error("[/api/leads] ingest failed:", err);
+    reportError("api.leads", err, { sourceApp: key.appSlug });
     return json({ error: "Internal error" }, 500);
   }
 }

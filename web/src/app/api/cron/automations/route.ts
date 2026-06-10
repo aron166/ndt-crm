@@ -1,4 +1,5 @@
 import { runIdleAutomations } from "@/lib/automations/idle";
+import { reportError } from "@/lib/report-error";
 
 // Scheduled evaluator for time-based automations (deal_idle_in_stage).
 // Invoked by Vercel Cron (see web/vercel.json). Vercel attaches
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     const result = await runIdleAutomations();
     return Response.json({ ok: true, ...result });
   } catch (err) {
-    console.error("[/api/cron/automations] failed:", err);
+    reportError("cron.automations", err);
     return Response.json({ ok: false, error: "Internal error" }, { status: 500 });
   }
 }

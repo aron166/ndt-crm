@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { reportError } from "@/lib/report-error";
 import type {
   AutomationEvent,
   Condition,
@@ -153,10 +154,10 @@ export async function runAutomations(event: AutomationEvent): Promise<void> {
         await db.task.create({ data: buildCreateTaskData(cfg, event) });
         await db.automationRule.update({ where: { id: rule.id }, data: { lastRunAt: new Date() } });
       } catch (err) {
-        console.error(`[automations] rule ${rule.id} failed:`, err);
+        reportError("automations.rule", err, { ruleId: rule.id, trigger: event.type });
       }
     }
   } catch (err) {
-    console.error("[automations] runAutomations failed:", err);
+    reportError("automations.run", err, { trigger: event.type });
   }
 }
