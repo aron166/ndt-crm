@@ -1,0 +1,377 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
+import { formatRelativeTime } from "@/lib/utils";
+import { CALL_OUTCOMES } from "@/lib/outreach/queue";
+import {
+  getCallQueue,
+  recordCall,
+  type CallCard,
+  type CallSegment,
+} from "@/app/actions/outreach";
+
+const INTERACTION_LABEL: Record<string, string> = {
+  call: "Hívás", email: "Email", meeting: "Találkozó", site_visit: "Helyszíni", note: "Jegyzet",
+};
+
+export default function CallCockpit({
+  initialQueue,
+  segments,
+}: {
+  initialQueue: CallCard[];
+  segments: CallSegment[];
+}) {
+  const [queue, setQueue] = useState<CallCard[]>(initialQueue);
+  const [index, setIndex] = useState(0);
+  const [notes, setNotes] = useState("");
+  const [followupDate, setFollowupDate] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingQueue, setLoadingQueue] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [viewId, setViewId] = useState<number | null>(null);
+  const [tally, setTally] = useState<Record<string, number>>({});
+
+  const current = queue[index] ?? null;
+  const done = !loadingQueue && index >= queue.length;
+  const totalDone = Object.values(tally).reduce((a, b) => a + b, 0);
+
+  const resetCard = useCallback(() => {
+    setNotes("");
+    setFollowupDate("");
+    setError(null);
+  }, []);
+
+  const advance = useCallback(() => {
+    setIndex((i) => i + 1);
+    resetCard();
+  }, [resetCard]);
+
+  const submit = useCallback(
+    async (outcomeKey: string) => {
+      if (!current || submitting) return;
+      setSubmitting(true);
+      setError(null);
+      try {
+        const res = await recordCall({
+          companyId: current.id,
+          personId: current.contact?.personId ?? null,
+          outcome: outcomeKey,
+          notes,
+          followupDate: followupDate || null,
+        });
+        if ("error" in res) {
+          setError(res.error);
+          return;
+        }
+        setTally((t) => ({ ...t, [outcomeKey]: (t[outcomeKey] ?? 0) + 1 }));
+        advance();
+      } catch {
+        setError("Hívás naplózása sikertelen");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [current, submitting, notes, followupDate, advance],
+  );
+
+  async function changeSegment(next: number | null) {
+    setLoadingQueue(true);
+    setViewId(next);
+    setError(null);
+    try {
+      const q = await getCallQueue(next);
+      setQueue(q);
+      setIndex(0);
+      resetCard();
+      setTally({});
+    } catch {
+      setError("Sor betöltése sikertelen");
+    } finally {
+      setLoadingQueue(false);
+    }
+  }
+
+  // Keyboard: 1–6 fire the outcome buttons, "s" skips. The whole point is to work
+  // a list at speed without reaching for the mouse. Disabled while typing a note.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!current || submitting) return;
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      if (tag === "textarea" || tag === "input" || tag === "select") return;
+      if (e.key >= "1" && e.key <= String(CALL_OUTCOMES.length)) {
+        e.preventDefault();
+        submit(CALL_OUTCOMES[Number(e.key) - 1].key);
+      } else if (e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        advance();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [current, submitting, submit, advance]);
+
+  return (
+    <div className="mount" style={{ maxWidth: 720, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg)", margin: 0 }}>
+            Hívás mód
+          </h1>
+          <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 3 }}>
+            Vezetett hívókör · egy érintés = naplózott hívás
+          </p>
+        </div>
+        <select
+          value={viewId ?? ""}
+          onChange={(e) => changeSegment(e.target.value ? Number(e.target.value) : null)}
+          disabled={loadingQueue || submitting}
+          style={{
+            fontSize: 12, color: "var(--fg-soft)", background: "var(--bg-panel)",
+            border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px",
+          }}
+        >
+          <option value="">Alapértelmezett hívandó-sor</option>
+          {segments.map((s) => (
+            <option key={s.id} value={s.id}>Szegmens: {s.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Progress + session tally */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+          {queue.length === 0 ? "0 / 0" : `${Math.min(index + 1, queue.length)} / ${queue.length}`}
+        </span>
+        <div style={{ flex: 1, height: 5, background: "var(--bg-raised)", borderRadius: 4, overflow: "hidden", minWidth: 80 }}>
+          <div style={{ height: "100%", width: `${queue.length ? (index / queue.length) * 100 : 0}%`, background: "var(--indigo)", transition: "width .2s" }} />
+        </div>
+        {totalDone > 0 && (
+          <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--mint)", background: "var(--mint-soft)", padding: "2px 9px", borderRadius: 10 }}>
+            {totalDone} ma
+          </span>
+        )}
+      </div>
+
+      {loadingQueue ? (
+        <Empty>Betöltés…</Empty>
+      ) : done ? (
+        <DoneCard tally={tally} totalDone={totalDone} onRestart={() => changeSegment(viewId)} />
+      ) : !current ? (
+        <Empty>Nincs hívandó cég ebben a sorban. 🎉</Empty>
+      ) : (
+        <div className="panel mount mount-1" style={{ padding: 0 }}>
+          {/* Company head */}
+          <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid var(--line-soft)" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <h2 style={{ fontSize: 19, fontWeight: 600, color: "var(--fg)", margin: 0, letterSpacing: "-0.01em" }}>
+                    {current.name}
+                  </h2>
+                  <PipelineStatusBadge status={current.pipelineStatus} />
+                </div>
+                <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
+                  {[current.city, current.county].filter(Boolean).join(", ") || "—"}
+                  {current.website && (
+                    <>
+                      {" · "}
+                      <a href={normalizeUrl(current.website)} target="_blank" rel="noreferrer" style={{ color: "var(--sky)" }}>
+                        {current.website.replace(/^https?:\/\//, "")}
+                      </a>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+                  Utolsó: {formatRelativeTime(current.lastInteractionDate)}
+                </div>
+                <Link href={`/companies/${current.id}`} style={{ fontSize: 11, color: "var(--indigo)" }}>
+                  Megnyitás →
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact + click-to-call */}
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--line-soft)" }}>
+            {current.contact ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>{current.contact.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 1 }}>
+                    {current.contact.role || "—"}
+                    {current.contact.email && <> · {current.contact.email}</>}
+                  </div>
+                </div>
+                {current.contact.phone ? (
+                  <a
+                    href={`tel:${current.contact.phone.replace(/\s+/g, "")}`}
+                    className="font-mono-ndt"
+                    style={{
+                      fontSize: 15, fontWeight: 600, color: "var(--mint)",
+                      background: "var(--mint-soft)", border: "1px solid oklch(0.80 0.13 165 / 0.35)",
+                      padding: "8px 16px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap",
+                    }}
+                  >
+                    📞 {current.contact.phone}
+                  </a>
+                ) : (
+                  <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Nincs telefonszám</span>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+                Nincs rögzített kapcsolattartó —{" "}
+                <Link href={`/companies/${current.id}`} style={{ color: "var(--indigo)" }}>adj hozzá egyet</Link>
+              </div>
+            )}
+          </div>
+
+          {/* Company intel */}
+          {current.notes && (
+            <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--line-soft)", fontSize: 12, color: "var(--fg-mute)", whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto" }}>
+              {current.notes}
+            </div>
+          )}
+
+          {/* History */}
+          {current.history.length > 0 && (
+            <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--line-soft)" }}>
+              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)", marginBottom: 8 }}>
+                Előzmény
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {current.history.map((h) => (
+                  <div key={h.id} style={{ display: "flex", gap: 8, fontSize: 12 }}>
+                    <span className="font-mono-ndt" style={{ color: "var(--fg-faint)", flexShrink: 0, width: 64 }}>
+                      {formatRelativeTime(h.occurredAt)}
+                    </span>
+                    <span style={{ color: "var(--fg-mute)", minWidth: 0 }}>
+                      <span style={{ color: "var(--fg-soft)" }}>{INTERACTION_LABEL[h.type ?? "note"] ?? h.type}</span>
+                      {h.notes && <> — {h.notes}</>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Note + follow-up */}
+          <div style={{ padding: "14px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Jegyzet a hívásról (opcionális)…"
+              rows={2}
+              style={{
+                width: "100%", fontSize: 13, color: "var(--fg)", background: "var(--bg-raised)",
+                border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical",
+              }}
+            />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--fg-mute)" }}>
+              Visszahívás:
+              <input
+                type="date"
+                value={followupDate}
+                onChange={(e) => setFollowupDate(e.target.value)}
+                style={{ fontSize: 12, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "5px 8px" }}
+              />
+              {followupDate && <span style={{ color: "var(--fg-faint)" }}>→ feladat készül</span>}
+            </label>
+          </div>
+
+          {error && (
+            <div style={{ padding: "0 20px 10px", fontSize: 12, color: "var(--coral)" }}>{error}</div>
+          )}
+
+          {/* Outcome buttons */}
+          <div style={{ padding: "12px 20px 18px", borderTop: "1px solid var(--line-soft)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {CALL_OUTCOMES.map((o, i) => (
+                <button
+                  key={o.key}
+                  onClick={() => submit(o.key)}
+                  disabled={submitting}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    fontSize: 13, fontWeight: 500, color: o.tone,
+                    background: "var(--bg-raised)", border: `1px solid ${o.tone}`,
+                    borderRadius: 8, padding: "10px 8px", cursor: submitting ? "default" : "pointer",
+                    opacity: submitting ? 0.5 : 1,
+                  }}
+                  className="tbl-row"
+                >
+                  <span className="font-mono-ndt" style={{ fontSize: 10, opacity: 0.6 }}>{i + 1}</span>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+              <span style={{ fontSize: 10, color: "var(--fg-faint)" }}>
+                Gyorsbillentyű: 1–{CALL_OUTCOMES.length} kimenetel · S = kihagyás
+              </span>
+              <button
+                onClick={advance}
+                disabled={submitting}
+                style={{ fontSize: 12, color: "var(--fg-faint)", background: "none", border: "none", cursor: "pointer" }}
+              >
+                Kihagyás →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="panel" style={{ padding: "48px 20px", textAlign: "center", fontSize: 13, color: "var(--fg-faint)" }}>
+      {children}
+    </div>
+  );
+}
+
+function DoneCard({
+  tally,
+  totalDone,
+  onRestart,
+}: {
+  tally: Record<string, number>;
+  totalDone: number;
+  onRestart: () => void;
+}) {
+  return (
+    <div className="panel mount mount-1" style={{ padding: "32px 24px", textAlign: "center" }}>
+      <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+      <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--fg)", margin: 0 }}>Hívókör kész</h2>
+      <p style={{ fontSize: 13, color: "var(--fg-mute)", marginTop: 6 }}>
+        {totalDone} hívás naplózva ebben a körben.
+      </p>
+      {totalDone > 0 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+          {CALL_OUTCOMES.filter((o) => tally[o.key]).map((o) => (
+            <span key={o.key} style={{ fontSize: 12, color: o.tone, background: "var(--bg-raised)", border: `1px solid ${o.tone}`, padding: "4px 10px", borderRadius: 16 }}>
+              {o.label}: <strong>{tally[o.key]}</strong>
+            </span>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={onRestart}
+        style={{ marginTop: 22, fontSize: 13, fontWeight: 500, color: "var(--indigo)", background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", borderRadius: 8, padding: "9px 18px", cursor: "pointer" }}
+      >
+        Új kör betöltése
+      </button>
+    </div>
+  );
+}
+
+function normalizeUrl(url: string): string {
+  return /^https?:\/\//.test(url) ? url : `https://${url}`;
+}
