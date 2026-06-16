@@ -194,7 +194,7 @@ export default async function DashboardPage() {
         <div className="panel mount mount-2">
           <div className="panel-head">
             <div className="panel-title">Hívandók</div>
-            <Link href="/companies?never_contacted=1" style={{ fontSize: 11, color: "var(--indigo)" }}>Összes →</Link>
+            <Link href="/calls" style={{ fontSize: 11, color: "var(--indigo)" }}>Hívás mód →</Link>
           </div>
           <div>
             {coldCompanies.length === 0 ? (
