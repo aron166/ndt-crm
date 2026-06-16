@@ -177,17 +177,9 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
     const lead = leads.find((l) => l.id === id);
     const label = lead?.serviceInterest || lead?.subject || "Új érdeklődés";
     if (!confirm(`Biztosan törlöd ezt a lead-kártyát: "${label}"?\n\nA cég, a kapcsolattartó és az interakciók megmaradnak — csak a lead-kártya tűnik el a pipeline-ból.`)) return;
+    // Optimistic remove; refresh re-syncs from the server (same shape as moveLead).
     setLeads((prev) => prev.filter((l) => l.id !== id));
-    startTransition(async () => {
-      const res = await deleteLead(id);
-      if (res?.error) {
-        // Re-fetch from the server to restore the card if the delete failed.
-        alert(res.error);
-        router.refresh();
-        return;
-      }
-      router.refresh();
-    });
+    startTransition(async () => { await deleteLead(id); router.refresh(); });
   }
 
   const colLeads = (statusKey: string) =>
