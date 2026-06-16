@@ -81,15 +81,9 @@ export async function getCallQueue(viewId?: number | null): Promise<CallCard[]> 
     });
     if (view) {
       const resolved = await audienceWhere(view.filters, TENANT_ID);
-      where = {
-        AND: [
-          resolved,
-          {
-            pipelineStatus: { in: [...CALLABLE_STATUSES] },
-            NOT: { name: { contains: "F.A." } },
-          },
-        ],
-      };
+      // Intersect the segment with the base callable/alive guardrails so a
+      // segment can only ever NARROW the queue, never bypass the contract.
+      where = { AND: [CALLABLE_WHERE, resolved] };
     }
   }
 
@@ -197,10 +191,11 @@ export async function recordCall(
   const notes = input.notes?.trim() || meta.label;
   const now = new Date();
 
-  const followupDate =
-    input.followupDate && input.followupDate.trim()
-      ? new Date(input.followupDate)
-      : null;
+  const followupRaw = input.followupDate?.trim();
+  const followupDate = followupRaw ? new Date(followupRaw) : null;
+  if (followupDate && Number.isNaN(followupDate.getTime())) {
+    return { error: "Érvénytelen visszahívási dátum" };
+  }
 
   // Core write is atomic: the call log + the status/freshness move land together.
   const [interaction] = await db.$transaction([

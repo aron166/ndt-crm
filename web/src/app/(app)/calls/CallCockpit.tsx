@@ -53,20 +53,25 @@ export default function CallCockpit({
       if (!current || submitting) return;
       setSubmitting(true);
       setError(null);
-      const res = await recordCall({
-        companyId: current.id,
-        personId: current.contact?.personId ?? null,
-        outcome: outcomeKey,
-        notes,
-        followupDate: followupDate || null,
-      });
-      setSubmitting(false);
-      if ("error" in res) {
-        setError(res.error);
-        return;
+      try {
+        const res = await recordCall({
+          companyId: current.id,
+          personId: current.contact?.personId ?? null,
+          outcome: outcomeKey,
+          notes,
+          followupDate: followupDate || null,
+        });
+        if ("error" in res) {
+          setError(res.error);
+          return;
+        }
+        setTally((t) => ({ ...t, [outcomeKey]: (t[outcomeKey] ?? 0) + 1 }));
+        advance();
+      } catch {
+        setError("Hívás naplózása sikertelen");
+      } finally {
+        setSubmitting(false);
       }
-      setTally((t) => ({ ...t, [outcomeKey]: (t[outcomeKey] ?? 0) + 1 }));
-      advance();
     },
     [current, submitting, notes, followupDate, advance],
   );
@@ -74,12 +79,18 @@ export default function CallCockpit({
   async function changeSegment(next: number | null) {
     setLoadingQueue(true);
     setViewId(next);
-    const q = await getCallQueue(next);
-    setQueue(q);
-    setIndex(0);
-    resetCard();
-    setTally({});
-    setLoadingQueue(false);
+    setError(null);
+    try {
+      const q = await getCallQueue(next);
+      setQueue(q);
+      setIndex(0);
+      resetCard();
+      setTally({});
+    } catch {
+      setError("Sor betöltése sikertelen");
+    } finally {
+      setLoadingQueue(false);
+    }
   }
 
   // Keyboard: 1–6 fire the outcome buttons, "s" skips. The whole point is to work
