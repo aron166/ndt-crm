@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, User, Clock, Tag } from "lucide-react";
-import { moveLead } from "@/app/actions/leads";
+import { Building2, User, Clock, Tag, Trash2 } from "lucide-react";
+import { moveLead, deleteLead } from "@/app/actions/leads";
 import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
@@ -38,11 +38,13 @@ function LeadCard({
   lead,
   onDragStart,
   onDragEnd,
+  onDelete,
   dragging,
 }: {
   lead: Lead;
   onDragStart: (id: number) => void;
   onDragEnd: () => void;
+  onDelete: (id: number) => void;
   dragging: boolean;
 }) {
   const router = useRouter();
@@ -63,7 +65,7 @@ function LeadCard({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/leads/${lead.id}`); }
       }}
-      className={cn("rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
+      className={cn("group/lead relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
         border: "1px solid var(--line-soft)",
@@ -83,9 +85,26 @@ function LeadCard({
         e.currentTarget.style.transform = "none";
       }}
     >
+      <button
+        type="button"
+        title="Lead-kártya törlése a pipeline-ból"
+        aria-label="Lead-kártya törlése"
+        draggable={false}
+        onClick={(e) => { e.stopPropagation(); onDelete(lead.id); }}
+        className="absolute opacity-0 group-hover/lead:opacity-100 transition-opacity"
+        style={{
+          top: 6, right: 6, width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+          borderRadius: 5, color: "var(--fg-faint)", background: "var(--bg-hover)",
+        }}
+        onMouseOver={(e) => { e.currentTarget.style.color = "var(--coral)"; }}
+        onMouseOut={(e) => { e.currentTarget.style.color = "var(--fg-faint)"; }}
+      >
+        <Trash2 style={{ width: 12, height: 12 }} />
+      </button>
+
       <Link
         href={`/leads/${lead.id}`}
-        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", display: "block", marginBottom: 6 }}
+        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", display: "block", marginBottom: 6, paddingRight: 18 }}
         onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
         onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
         onClick={(e) => e.stopPropagation()}
@@ -154,6 +173,23 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
     startTransition(async () => { await moveLead(id, statusKey); router.refresh(); });
   }
 
+  function handleDelete(id: number) {
+    const lead = leads.find((l) => l.id === id);
+    const label = lead?.serviceInterest || lead?.subject || "Új érdeklődés";
+    if (!confirm(`Biztosan törlöd ezt a lead-kártyát: "${label}"?\n\nA cég, a kapcsolattartó és az interakciók megmaradnak — csak a lead-kártya tűnik el a pipeline-ból.`)) return;
+    setLeads((prev) => prev.filter((l) => l.id !== id));
+    startTransition(async () => {
+      const res = await deleteLead(id);
+      if (res?.error) {
+        // Re-fetch from the server to restore the card if the delete failed.
+        alert(res.error);
+        router.refresh();
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   const colLeads = (statusKey: string) =>
     leads.filter((l) => (l.status ?? "new") === statusKey);
 
@@ -208,6 +244,7 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
                   lead={lead}
                   onDragStart={setDraggingId}
                   onDragEnd={() => { setDraggingId(null); setHoverCol(null); }}
+                  onDelete={handleDelete}
                   dragging={draggingId === lead.id}
                 />
               ))}
