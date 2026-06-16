@@ -67,7 +67,7 @@ function LeadCard({
         if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/leads/${lead.id}`); }
       }}
-      className={cn("group/lead relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
+      className={cn("relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
         border: "1px solid var(--line-soft)",
@@ -93,10 +93,11 @@ function LeadCard({
         aria-label="Lead-kártya törlése"
         draggable={false}
         onClick={(e) => { e.stopPropagation(); onDelete(lead.id); }}
-        className="absolute opacity-0 group-hover/lead:opacity-100 transition-opacity"
+        className="absolute"
         style={{
           top: 6, right: 6, width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
           borderRadius: 5, color: "var(--fg-faint)", background: "var(--bg-hover)",
+          border: "1px solid var(--line-soft)",
         }}
         onMouseOver={(e) => { e.currentTarget.style.color = "var(--coral)"; }}
         onMouseOut={(e) => { e.currentTarget.style.color = "var(--fg-faint)"; }}
