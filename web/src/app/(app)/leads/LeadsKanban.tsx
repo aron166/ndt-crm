@@ -63,6 +63,8 @@ function LeadCard({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
+        // Only the card itself navigates — let child controls (e.g. delete) handle their own keys.
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/leads/${lead.id}`); }
       }}
       className={cn("group/lead relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
