@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, AlertTriangle, Building2, User, Calendar } from "lucide-react";
-import { moveDeal } from "@/app/actions/deals";
+import { Plus, AlertTriangle, Building2, User, Calendar, Trash2 } from "lucide-react";
+import { moveDeal, deleteDeal } from "@/app/actions/deals";
 import { DealModal } from "./DealModal";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -59,12 +59,14 @@ function DealCard({
   onDragEnd,
   dragging,
   onEdit,
+  onDelete,
 }: {
   deal: Deal;
   onDragStart: (id: number) => void;
   onDragEnd: () => void;
   dragging: boolean;
   onEdit: (deal: Deal) => void;
+  onDelete: (id: number) => void;
 }) {
   const isStale = !deal.stage?.isTerminalWon && !deal.stage?.isTerminalLost && deal.tasks.length === 0;
   const formattedValue = formatValue(deal.value);
@@ -81,9 +83,11 @@ function DealCard({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
+        // Only the card itself opens — let child controls (e.g. delete) handle their own keys.
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(deal); }
       }}
-      className={cn("rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
+      className={cn("relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
         border: `1px solid ${isStale ? "oklch(0.72 0.18 25 / 0.5)" : "var(--line-soft)"}`,
@@ -103,6 +107,24 @@ function DealCard({
         e.currentTarget.style.transform = "none";
       }}
     >
+      <button
+        type="button"
+        title="Deal törlése a pipeline-ból"
+        aria-label="Deal törlése"
+        draggable={false}
+        onClick={(e) => { e.stopPropagation(); onDelete(deal.id); }}
+        className="absolute"
+        style={{
+          top: 6, right: 6, width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+          borderRadius: 5, color: "var(--fg-faint)", background: "var(--bg-hover)",
+          border: "1px solid var(--line-soft)",
+        }}
+        onMouseOver={(e) => { e.currentTarget.style.color = "var(--coral)"; }}
+        onMouseOut={(e) => { e.currentTarget.style.color = "var(--fg-faint)"; }}
+      >
+        <Trash2 style={{ width: 12, height: 12 }} />
+      </button>
+
       {/* Stale warning */}
       {isStale && (
         <div className="flex items-center gap-1.5 mb-2" style={{ fontSize: 10, color: "var(--coral)" }}>
@@ -113,7 +135,7 @@ function DealCard({
 
       {/* Title — presentational only; the parent card handles click + hover */}
       <p
-        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", marginBottom: 6 }}
+        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", marginBottom: 6, paddingRight: 20 }}
       >
         {deal.title}
       </p>
@@ -186,6 +208,14 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
     startTransition(async () => { await moveDeal(id, stageId, newPosition); router.refresh(); });
   }
 
+  function handleDelete(id: number) {
+    const deal = deals.find((d) => d.id === id);
+    if (!confirm(`Biztosan törlöd ezt a deal-t: "${deal?.title ?? ""}"?\n\nA cég, a kapcsolattartó és az interakciók megmaradnak — csak a deal tűnik el a pipeline-ból.`)) return;
+    // Optimistic remove; refresh re-syncs from the server (same shape as moveDeal).
+    setDeals((prev) => prev.filter((d) => d.id !== id));
+    startTransition(async () => { await deleteDeal(id); router.refresh(); });
+  }
+
   const stageDeals = (stageId: number) =>
     deals.filter((d) => d.stageId === stageId).sort((a, b) => a.position - b.position);
 
@@ -250,6 +280,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
                     onDragEnd={() => { setDraggingId(null); setHoverStage(null); }}
                     dragging={draggingId === deal.id}
                     onEdit={(d) => { setEditDeal(d); setModalOpen(true); }}
+                    onDelete={handleDelete}
                   />
                 ))}
 
