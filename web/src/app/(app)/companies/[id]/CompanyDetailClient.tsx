@@ -6,6 +6,7 @@ import { AreaChart } from "@/components/viz/AreaChart";
 import { StackBar } from "@/components/viz/StackBar";
 import { LogInteractionModal } from "@/components/LogInteractionModal";
 import { SendEmailButton } from "@/components/SendEmailButton";
+import { NewQuoteDialog } from "@/app/(app)/quotes/NewQuoteDialog";
 import { AddContactModal } from "./AddContactModal";
 import { personLeftCompany } from "@/app/actions/contacts";
 import { TagInput } from "@/components/tags/TagInput";
@@ -312,6 +313,7 @@ export function CompanyDetailClient({
               contextLabel={company.name}
             />
             <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
+            <NewQuoteDialog presetCompany={{ id: company.id, name: company.name }} triggerLabel="+ Árajánlat" triggerClassName="btn" />
             <button
               className="btn"
               onClick={handleEnrich}

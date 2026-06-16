@@ -47,6 +47,8 @@ model Tenant {
   contentItems           ContentItem[]
   contentAssets          ContentAsset[]
   companyAttributes      CompanyAttribute[]
+  quotes                 Quote[]
+  quoteLineItems         QuoteLineItem[]
 
   @@map("tenants")
 }
@@ -56,12 +58,12 @@ model SavedView {
   tenantId   Int      @map("tenant_id")
   name       String
   entityType String   @map("entity_type") // company | person | deal | task
-  filters    Json                          // URL param bundle: { search, pipeline_status, ... }
+  filters    Json // URL param bundle: { search, pipeline_status, ... }
   isShared   Boolean  @default(true) @map("is_shared")
   position   Int      @default(0)
   createdAt  DateTime @default(now()) @map("created_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant            Tenant     @relation(fields: [tenantId], references: [id])
   // Campaigns that use this (company) view as their target audience (Feature E2).
   campaignAudiences Campaign[] @relation("CampaignAudience")
 
@@ -76,25 +78,26 @@ model SavedView {
 // Person = a human being. Persists across employers.
 // Do NOT collapse this into Contact.
 model Person {
-  id          Int      @id @default(autoincrement())
-  tenantId    Int      @map("tenant_id")
-  firstName   String   @map("first_name")
-  lastName    String   @map("last_name")
+  id          Int       @id @default(autoincrement())
+  tenantId    Int       @map("tenant_id")
+  firstName   String    @map("first_name")
+  lastName    String    @map("last_name")
   email       String?
   phone       String?
-  linkedinUrl String?  @map("linkedin_url")
+  linkedinUrl String?   @map("linkedin_url")
   notes       String?
   deletedAt   DateTime? @map("deleted_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  contacts      Contact[]      // all company relationships this person has had
+  contacts      Contact[] // all company relationships this person has had
   interactions  Interaction[]
   tasks         Task[]         @relation("TaskPerson")
   deals         Deal[]         @relation("DealPerson")
   conversations Conversation[]
   appEvents     AppEvent[]
+  quotes        Quote[]
 
   @@map("persons")
 }
@@ -104,9 +107,9 @@ model Company {
   id                   Int       @id @default(autoincrement())
   tenantId             Int       @map("tenant_id")
   name                 String
-  vatNumber            String?   @map("vat_number")   // 8-digit Hungarian VAT, stripped of branch suffix
-  shortCode            String?   @map("short_code")   // internal code e.g. "ACH", "AGR"
-  status               String?                        // active, inactive, F.A.
+  vatNumber            String?   @map("vat_number") // 8-digit Hungarian VAT, stripped of branch suffix
+  shortCode            String?   @map("short_code") // internal code e.g. "ACH", "AGR"
+  status               String? // active, inactive, F.A.
   accountType          String?   @map("account_type") // Customer, Lead, Vendor
   industryCode         String?   @map("industry_code") // TEÁOR sector A-U
   country              String?
@@ -115,7 +118,7 @@ model Company {
   address              String?
   zipCode              String?   @map("zip_code")
   website              String?
-  notes                String?                        // free-text intel (e.g. BirdsView target research blocks)
+  notes                String? // free-text intel (e.g. BirdsView target research blocks)
   pipelineStatus       String?   @map("pipeline_status") // 0-8 status codes
   lastInteractionDate  DateTime? @map("last_interaction_date")
   lastInteractionOwner String?   @map("last_interaction_owner")
@@ -126,17 +129,17 @@ model Company {
   euVatNumber          String?   @map("eu_vat_number")
   linkedinUrl          String?   @map("linkedin_url")
   leadSource           String?   @map("lead_source")
-  warmth               String?   // cold | warm | hot
+  warmth               String? // cold | warm | hot
   // ── TEÁOR / industry ────────────────────────────────────────────────────
-  teaorCode            String?   @map("teaor_code")         // 4-digit e.g. "2511"
-  teaorDescription     String?   @map("teaor_description")  // "Fémszerkezet gyártása"
+  teaorCode            String?   @map("teaor_code") // 4-digit e.g. "2511"
+  teaorDescription     String?   @map("teaor_description") // "Fémszerkezet gyártása"
   industryEn           String?   @map("industry_en")
   scopeOfActivity      String?   @map("scope_of_activity")
   // ── NDT capability matrix ────────────────────────────────────────────────
-  ndtMethods           String[]  @map("ndt_methods")        // ["VT","PT","MT","UT","RT","DRT","LT","HT","SPECTRO"]
-  productAreas         String[]  @map("product_areas")      // ["w","wp","f","c","t","p"]
-  materials            String[]                             // ["Fe","Al","Cu","AM"]
-  products             String[]                             // GYÁRTMÁNY_01-07
+  ndtMethods           String[]  @map("ndt_methods") // ["VT","PT","MT","UT","RT","DRT","LT","HT","SPECTRO"]
+  productAreas         String[]  @map("product_areas") // ["w","wp","f","c","t","p"]
+  materials            String[] // ["Fe","Al","Cu","AM"]
+  products             String[] // GYÁRTMÁNY_01-07
   isPedCompliant       Boolean?  @map("is_ped_compliant")
   inspectionFrequency  String?   @map("inspection_frequency")
   hasInternalLab       Boolean?  @map("has_internal_lab")
@@ -162,17 +165,18 @@ model Company {
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
   contacts      Contact[]
   leads         Lead[]
   deals         Deal[]
   proposals     Proposal[]
   invoices      Invoice[]
   interactions  Interaction[]
-  tasks         Task[]         @relation("TaskCompany")
+  tasks         Task[]             @relation("TaskCompany")
   conversations Conversation[]
   appEvents     AppEvent[]
   attributes    CompanyAttribute[]
+  quotes        Quote[]
 
   @@unique([tenantId, vatNumber])
   @@map("companies")
@@ -191,13 +195,13 @@ model CompanyAttribute {
   id        Int       @id @default(autoincrement())
   tenantId  Int       @map("tenant_id")
   companyId Int       @map("company_id")
-  attrType  String    @map("attr_type")  // industry | teaor | warmth | account_type | status
-  value     String                       // the stable value (e.g. teaor code "2511", status "active")
-  label     String?                      // human label (e.g. "Fémszerkezet gyártása")
-  source    String?                      // where it came from (excel_import, manual, enrichment)
+  attrType  String    @map("attr_type") // industry | teaor | warmth | account_type | status
+  value     String // the stable value (e.g. teaor code "2511", status "active")
+  label     String? // human label (e.g. "Fémszerkezet gyártása")
+  source    String? // where it came from (excel_import, manual, enrichment)
   isPrimary Boolean   @default(true) @map("is_primary") // the MAIN current value of this attrType
   validFrom DateTime  @default(now()) @map("valid_from")
-  validTo   DateTime? @map("valid_to")   // null = current; set = historical
+  validTo   DateTime? @map("valid_to") // null = current; set = historical
   createdAt DateTime  @default(now()) @map("created_at")
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
@@ -218,8 +222,8 @@ model Contact {
   personId  Int       @map("person_id")
   companyId Int       @map("company_id")
   role      String?
-  email     String?   // work email, may differ from person.email
-  phone     String?   // work phone
+  email     String? // work email, may differ from person.email
+  phone     String? // work phone
   isPrimary Boolean   @default(false) @map("is_primary")
   startedAt DateTime? @map("started_at")
   endedAt   DateTime? @map("ended_at")
@@ -243,11 +247,11 @@ model User {
   role         String   @default("member") // admin, manager, member
   createdAt    DateTime @default(now()) @map("created_at")
 
-  tenant           Tenant        @relation(fields: [tenantId], references: [id])
-  assignedTasks    Task[]        @relation("TaskAssignee")
+  tenant             Tenant        @relation(fields: [tenantId], references: [id])
+  assignedTasks      Task[]        @relation("TaskAssignee")
   loggedInteractions Interaction[]
-  assignedLeads    Lead[]        @relation("LeadAssignee")
-  assignedDeals    Deal[]        @relation("DealAssignee")
+  assignedLeads      Lead[]        @relation("LeadAssignee")
+  assignedDeals      Deal[]        @relation("DealAssignee")
 
   @@map("users")
 }
@@ -262,17 +266,17 @@ model Lead {
   companyId       Int?      @map("company_id")
   contactId       Int?      @map("contact_id")
   assignedToId    Int?      @map("assigned_to_id")
-  source          String?                          // Web, phone, email, referral
-  sourceApp       String?   @map("source_app")      // app slug from the API key that submitted it (betonscan_landing, n8n, ...)
-  status          String?                          // new, contacted, replied, call_booked, qualified, proposal_sent, unqualified, nurture
+  source          String? // Web, phone, email, referral
+  sourceApp       String?   @map("source_app") // app slug from the API key that submitted it (betonscan_landing, n8n, ...)
+  status          String? // new, contacted, replied, call_booked, qualified, proposal_sent, unqualified, nurture
   subject         String?
-  message         String?                          // free-text body from the landing-page / intake form
+  message         String? // free-text body from the landing-page / intake form
   serviceInterest String?   @map("service_interest")
   estimatedValue  Decimal?  @map("estimated_value")
   receivedDate    DateTime? @map("received_date")
   lostReason      String?   @map("lost_reason")
   rawSourceFile   String?   @map("raw_source_file")
-  customFields    Json?     @map("custom_fields")   // marketing passthrough: utm_*, referrer, landing_variant, lead_score, priority, contact snapshot
+  customFields    Json?     @map("custom_fields") // marketing passthrough: utm_*, referrer, landing_variant, lead_score, priority, contact snapshot
   // Lead→deal hand-off: once set, the lead has graduated to the deal pipeline and
   // leaves the active leads board (kept for origin/history, never duplicated).
   // See memory lead-deal-process-tracker-model.
@@ -285,6 +289,7 @@ model Lead {
   contact       Contact? @relation(fields: [contactId], references: [id])
   assignedTo    User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
   convertedDeal Deal?    @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
+  quotes        Quote[]
 
   @@index([tenantId, convertedDealId])
   @@map("leads")
@@ -294,16 +299,16 @@ model Lead {
 // funnel), the counterpart to PipelineStage for deals. Lead.status references
 // LeadStatus.key (stable slug; the label is the editable display name).
 model LeadStatus {
-  id         Int      @id @default(autoincrement())
-  tenantId   Int      @map("tenant_id")
-  key        String                                       // stable slug stored on Lead.status
-  label      String
-  color      String   @default("#6366f1")
-  position   Int      @default(0)
-  isInitial    Boolean @default(false) @map("is_initial")    // where inbound API leads land
-  isTerminal   Boolean @default(false) @map("is_terminal")   // terminal-lost style (greyed)
-  isCommitment Boolean @default(false) @map("is_commitment") // booking = the order (megrendelés); the commitment point
-  createdAt  DateTime @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  key          String // stable slug stored on Lead.status
+  label        String
+  color        String   @default("#6366f1")
+  position     Int      @default(0)
+  isInitial    Boolean  @default(false) @map("is_initial") // where inbound API leads land
+  isTerminal   Boolean  @default(false) @map("is_terminal") // terminal-lost style (greyed)
+  isCommitment Boolean  @default(false) @map("is_commitment") // booking = the order (megrendelés); the commitment point
+  createdAt    DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -334,16 +339,16 @@ model Pipeline {
 }
 
 model PipelineStage {
-  id            Int     @id @default(autoincrement())
-  pipelineId    Int     @map("pipeline_id")
-  name          String
-  color         String  @default("#6366f1")
-  probability   Int     @default(50)           // 0–100 — used for weighted forecast
-  position      Int     @default(0)
-  isTerminalWon  Boolean @default(false) @map("is_terminal_won")
-  isTerminalLost Boolean @default(false) @map("is_terminal_lost")
-  wipLimit      Int?    @map("wip_limit")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id             Int      @id @default(autoincrement())
+  pipelineId     Int      @map("pipeline_id")
+  name           String
+  color          String   @default("#6366f1")
+  probability    Int      @default(50) // 0–100 — used for weighted forecast
+  position       Int      @default(0)
+  isTerminalWon  Boolean  @default(false) @map("is_terminal_won")
+  isTerminalLost Boolean  @default(false) @map("is_terminal_lost")
+  wipLimit       Int?     @map("wip_limit")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   deals    Deal[]
@@ -356,10 +361,10 @@ model PipelineCustomField {
   pipelineId Int     @map("pipeline_id")
   key        String
   label      String
-  type       String  // text | number | date | single_select | multi_select | person | company
+  type       String // text | number | date | single_select | multi_select | person | company
   required   Boolean @default(false)
   position   Int     @default(0)
-  options    Json?   // for select types: ["Option A", "Option B"]
+  options    Json? // for select types: ["Option A", "Option B"]
 
   pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
 
@@ -373,29 +378,30 @@ model Deal {
   pipelineId        Int?      @map("pipeline_id")
   stageId           Int?      @map("stage_id")
   companyId         Int       @map("company_id")
-  personId          Int?      @map("person_id")     // primary contact
+  personId          Int?      @map("person_id") // primary contact
   assignedToId      Int?      @map("assigned_to_id")
   title             String
   value             Decimal?
   currency          String    @default("HUF")
   expectedCloseDate DateTime? @map("expected_close_date")
   lostReason        String?   @map("lost_reason")
-  position          Int       @default(0)            // order within stage
-  customFields      Json?     @map("custom_fields")  // JSONB values keyed by PipelineCustomField.key
+  position          Int       @default(0) // order within stage
+  customFields      Json?     @map("custom_fields") // JSONB values keyed by PipelineCustomField.key
   stageEnteredAt    DateTime? @map("stage_entered_at") // set when the deal enters its current stage; basis for deal_idle_in_stage automations
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  tenant     Tenant         @relation(fields: [tenantId], references: [id])
-  pipeline   Pipeline?      @relation(fields: [pipelineId], references: [id])
-  stage      PipelineStage? @relation(fields: [stageId], references: [id])
-  company    Company        @relation(fields: [companyId], references: [id])
-  person     Person?        @relation("DealPerson", fields: [personId], references: [id])
-  assignedTo User?          @relation("DealAssignee", fields: [assignedToId], references: [id])
-  proposals  Proposal[]
-  tasks      Task[]         @relation("TaskDeal")
-  convertedFromLeads Lead[] @relation("LeadConvertedDeal")
+  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+  pipeline           Pipeline?          @relation(fields: [pipelineId], references: [id])
+  stage              PipelineStage?     @relation(fields: [stageId], references: [id])
+  company            Company            @relation(fields: [companyId], references: [id])
+  person             Person?            @relation("DealPerson", fields: [personId], references: [id])
+  assignedTo         User?              @relation("DealAssignee", fields: [assignedToId], references: [id])
+  proposals          Proposal[]
+  tasks              Task[]             @relation("TaskDeal")
+  convertedFromLeads Lead[]             @relation("LeadConvertedDeal")
   automationFirings  AutomationFiring[]
+  quotes             Quote[]
 
   @@index([pipelineId, stageId, position])
   @@map("deals")
@@ -407,13 +413,13 @@ model Proposal {
   tenantId      Int       @map("tenant_id")
   companyId     Int       @map("company_id")
   dealId        Int?      @map("deal_id")
-  result        String?   // closed_won, closed_lost, pending, proposal
+  result        String? // closed_won, closed_lost, pending, proposal
   lostReason    String?   @map("lost_reason")
   campaign      String?
   sentDate      DateTime? @map("sent_date")
   receivedDate  DateTime? @map("received_date")
   invoiceNumber String?   @map("invoice_number")
-  rawLabel      String?   @map("raw_label")        // original folder/file label from xlsx
+  rawLabel      String?   @map("raw_label") // original folder/file label from xlsx
   rawSourceFile String?   @map("raw_source_file")
   createdAt     DateTime  @default(now()) @map("created_at")
 
@@ -428,7 +434,7 @@ model Invoice {
   id             Int       @id @default(autoincrement())
   tenantId       Int       @map("tenant_id")
   companyId      Int?      @map("company_id")
-  companyName    String?   @map("company_name")    // denormalized — historical records may not link
+  companyName    String?   @map("company_name") // denormalized — historical records may not link
   invoiceNumber  String?   @map("invoice_number")
   netAmount      Decimal?  @map("net_amount")
   currency       String    @default("HUF")
@@ -461,24 +467,24 @@ model Task {
   parentTaskId     Int?      @map("parent_task_id")
   title            String
   description      String?
-  type             String?   // call, email, meeting, document, field_visit, internal
-  category         String?   // revenue_generating, non_revenue
-  status           String    @default("created")     // created, in_progress, done, cancelled
+  type             String? // call, email, meeting, document, field_visit, internal
+  category         String? // revenue_generating, non_revenue
+  status           String    @default("created") // created, in_progress, done, cancelled
   executorType     String    @default("human") @map("executor_type") // human, ai_agent, robot
-  costCode         String?   @map("cost_code")        // KID, MRD, DOD, SZD, VIZSGALAT
-  costQuantity     Decimal?  @map("cost_quantity")    // measured amount (km, m², db, óra…)
-  costUnit         String?   @map("cost_unit")        // dynamic unit label for costQuantity
-  costUnitRate     Decimal?  @map("cost_unit_rate")   // HUF per unit (manual now; rate-card later)
-  costAmount       Decimal?  @map("cost_amount")      // costQuantity × costUnitRate, in HUF — rolls up to the invoice
-  setMembership    String[]  @map("set_membership")   // user-defined set membership
+  costCode         String?   @map("cost_code") // KID, MRD, DOD, SZD, VIZSGALAT
+  costQuantity     Decimal?  @map("cost_quantity") // measured amount (km, m², db, óra…)
+  costUnit         String?   @map("cost_unit") // dynamic unit label for costQuantity
+  costUnitRate     Decimal?  @map("cost_unit_rate") // HUF per unit (manual now; rate-card later)
+  costAmount       Decimal?  @map("cost_amount") // costQuantity × costUnitRate, in HUF — rolls up to the invoice
+  setMembership    String[]  @map("set_membership") // user-defined set membership
   skillRequiredId  Int?      @map("skill_required_id") // FK added in Step 4.5
   dueDate          DateTime? @map("due_date")
   completedAt      DateTime? @map("completed_at")
   estimatedMinutes Int?      @map("estimated_minutes") // normaidő — measured against actual
   actualMinutes    Int?      @map("actual_minutes")
   isRecurring      Boolean   @default(false) @map("is_recurring")
-  recurrenceRule   String?   @map("recurrence_rule")  // RRULE string e.g. "FREQ=WEEKLY;BYDAY=MO"
-  notifyBefore     Int?      @map("notify_before")    // days before due date to notify
+  recurrenceRule   String?   @map("recurrence_rule") // RRULE string e.g. "FREQ=WEEKLY;BYDAY=MO"
+  notifyBefore     Int?      @map("notify_before") // days before due date to notify
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
@@ -503,8 +509,8 @@ model Task {
 model CostRate {
   id        Int      @id @default(autoincrement())
   tenantId  Int      @map("tenant_id")
-  code      String   // KID | MRD | DOD | SZD | VIZSGALAT
-  unit      String?  // default unit label (km, óra, db…)
+  code      String // KID | MRD | DOD | SZD | VIZSGALAT
+  unit      String? // default unit label (km, óra, db…)
   unitRate  Decimal? @map("unit_rate") // default HUF per unit
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -512,6 +518,70 @@ model CostRate {
 
   @@unique([tenantId, code])
   @@map("cost_rates")
+}
+
+// ─────────────────────────────────────────────
+// QUOTES (árajánlat)
+// The NDT quote builder. A Quote is a sendable offer document composed of
+// QuoteLineItems, each priced from the cost codes + rate card (decisions.md #15).
+// Lifecycle: draft → sent → accepted | rejected | expired. Acceptance is NOT an
+// order — the booking is the order (decisions.md #9), so an accepted quote links
+// to a deal but never auto-advances it. Net/VAT/gross are stored (computed at
+// save) so a sent quote is an immutable historical figure even if rates change.
+// ─────────────────────────────────────────────
+
+model Quote {
+  id          Int       @id @default(autoincrement())
+  tenantId    Int       @map("tenant_id")
+  companyId   Int       @map("company_id")
+  personId    Int?      @map("person_id") // contact the quote is addressed to
+  leadId      Int?      @map("lead_id") // origin lead, if quoted from intake
+  dealId      Int?      @map("deal_id") // linked deal (acceptance never auto-advances it)
+  quoteNumber String    @map("quote_number") // per-tenant human id, e.g. AJ-2026-0001
+  title       String
+  status      String    @default("draft") // draft | sent | accepted | rejected | expired
+  currency    String    @default("HUF")
+  vatRate     Decimal   @default(27) @map("vat_rate") // ÁFA %, Hungarian default 27
+  netAmount   Decimal   @default(0) @map("net_amount") // sum of line amounts, stored at save
+  vatAmount   Decimal   @default(0) @map("vat_amount")
+  grossAmount Decimal   @default(0) @map("gross_amount")
+  validUntil  DateTime? @map("valid_until") // ajánlati kötöttség lejárata
+  notes       String? // free-text terms / megjegyzés on the document
+  sentAt      DateTime? @map("sent_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id])
+  company Company         @relation(fields: [companyId], references: [id])
+  person  Person?         @relation(fields: [personId], references: [id])
+  lead    Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  deal    Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  items   QuoteLineItem[]
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, status])
+  @@map("quotes")
+}
+
+model QuoteLineItem {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  quoteId     Int      @map("quote_id")
+  position    Int      @default(0) // display order on the document
+  costCode    String?  @map("cost_code") // KID | MRD | DOD | SZD | VIZSGALAT (optional — free lines allowed)
+  description String // line text shown to the client
+  quantity    Decimal? // measured amount
+  unit        String? // unit label (km, óra, m², db…)
+  unitRate    Decimal? @map("unit_rate") // HUF per unit
+  amount      Decimal? @default(0) // quantity × unitRate, in HUF
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  quote  Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId, position])
+  @@map("quote_line_items")
 }
 
 // ─────────────────────────────────────────────
@@ -524,11 +594,11 @@ model Interaction {
   tenantId   Int      @map("tenant_id")
   companyId  Int?     @map("company_id")
   personId   Int?     @map("person_id")
-  userId     Int?     @map("user_id")   // who logged this
-  type       String?  // call, email, meeting, note, site_visit
-  direction  String?  // inbound, outbound
+  userId     Int?     @map("user_id") // who logged this
+  type       String? // call, email, meeting, note, site_visit
+  direction  String? // inbound, outbound
   notes      String?
-  outcome    String?  // maps to 0-8 status codes
+  outcome    String? // maps to 0-8 status codes
   occurredAt DateTime @default(now()) @map("occurred_at")
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -570,7 +640,7 @@ model EtlRun {
   id                 Int       @id @default(autoincrement())
   tenantId           Int       @map("tenant_id")
   filename           String
-  status             String    // running, success, error
+  status             String // running, success, error
   companiesLoaded    Int?      @map("companies_loaded")
   invoicesLoaded     Int?      @map("invoices_loaded")
   leadsLoaded        Int?      @map("leads_loaded")
@@ -605,11 +675,11 @@ model Tag {
 }
 
 model Tagging {
-  id            Int      @id @default(autoincrement())
-  tagId         Int      @map("tag_id")
-  taggableType  String   @map("taggable_type") // company | person | deal | task | interaction
-  taggableId    Int      @map("taggable_id")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  tagId        Int      @map("tag_id")
+  taggableType String   @map("taggable_type") // company | person | deal | task | interaction
+  taggableId   Int      @map("taggable_id")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
@@ -627,12 +697,12 @@ model Tagging {
 model AuditLog {
   id           Int      @id @default(autoincrement())
   tenantId     Int      @map("tenant_id")
-  actorUserId  String?  @map("actor_user_id")  // Supabase Auth UUID
+  actorUserId  String?  @map("actor_user_id") // Supabase Auth UUID
   actorAgentId String?  @map("actor_agent_id") // Step 5: agent identity
-  action       String   // create | update | delete
+  action       String // create | update | delete
   entityType   String   @map("entity_type")
   entityId     Int      @map("entity_id")
-  changes      Json     // { before: {...} | null, after: {...} | null }
+  changes      Json // { before: {...} | null, after: {...} | null }
   occurredAt   DateTime @default(now()) @map("occurred_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -652,8 +722,8 @@ model AuditLog {
 model Agent {
   id        Int      @id @default(autoincrement())
   name      String
-  role      String   // sales_assistant, intake_bot, mira_cmo, nate_dev
-  owner     String?  // veloQuote, birdsview, cashflow, ndt-crm
+  role      String // sales_assistant, intake_bot, mira_cmo, nate_dev
+  owner     String? // veloQuote, birdsview, cashflow, ndt-crm
   createdAt DateTime @default(now()) @map("created_at")
 
   conversations Conversation[]
@@ -668,7 +738,7 @@ model Conversation {
   agentId   Int?      @map("agent_id")
   personId  Int?      @map("person_id")
   companyId Int?      @map("company_id")
-  channel   String    // web_chat, phone, email, intake_form
+  channel   String // web_chat, phone, email, intake_form
   summary   String?
   startedAt DateTime  @default(now()) @map("started_at")
   endedAt   DateTime? @map("ended_at")
@@ -687,7 +757,7 @@ model Conversation {
 model Message {
   id             Int      @id @default(autoincrement())
   conversationId Int      @map("conversation_id")
-  role           String   // user, assistant, system
+  role           String // user, assistant, system
   content        String
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -705,7 +775,7 @@ model IntegrationCredential {
   id              Int      @id @default(autoincrement())
   tenantId        Int      @map("tenant_id")
   integrationSlug String   @map("integration_slug") // google_maps | google_calendar | resend | twilio
-  credentials     Json                               // { apiKey, ... } — encrypt at rest in Step 6 full build
+  credentials     Json // { apiKey, ... } — encrypt at rest in Step 6 full build
   isActive        Boolean  @default(true) @map("is_active")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -724,9 +794,9 @@ model IntegrationCredential {
 model AppApiKey {
   id         Int       @id @default(autoincrement())
   tenantId   Int       @map("tenant_id")
-  appSlug    String    @map("app_slug")   // betonscan_landing | n8n | birdsview | ...
+  appSlug    String    @map("app_slug") // betonscan_landing | n8n | birdsview | ...
   keyHash    String    @unique @map("key_hash") // SHA-256 hex of the plaintext key
-  label      String?                            // optional human label
+  label      String? // optional human label
   isActive   Boolean   @default(true) @map("is_active")
   createdAt  DateTime  @default(now()) @map("created_at")
   lastUsedAt DateTime? @map("last_used_at")
@@ -738,15 +808,15 @@ model AppApiKey {
 }
 
 model AppEvent {
-  id         Int      @id @default(autoincrement())
-  tenantId   Int      @map("tenant_id")
-  agentId    Int?     @map("agent_id")
-  personId   Int?     @map("person_id")
-  companyId  Int?     @map("company_id")
-  sourceApp  String   @map("source_app")  // veloQuote, birdsview, cashflow
-  eventType  String   @map("event_type")  // quote.created, lead.submitted, proposal.sent
-  payload    Json
-  createdAt  DateTime @default(now()) @map("created_at")
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  agentId   Int?     @map("agent_id")
+  personId  Int?     @map("person_id")
+  companyId Int?     @map("company_id")
+  sourceApp String   @map("source_app") // veloQuote, birdsview, cashflow
+  eventType String   @map("event_type") // quote.created, lead.submitted, proposal.sent
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at")
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id])
   agent   Agent?   @relation(fields: [agentId], references: [id])
@@ -770,16 +840,16 @@ model AutomationRule {
   tenantId      Int       @map("tenant_id")
   name          String
   isActive      Boolean   @default(true) @map("is_active")
-  triggerType   String    @map("trigger_type")   // lead_created | lead_status_changed | deal_stage_changed | deal_idle_in_stage
-  triggerConfig Json?     @map("trigger_config")  // { toStatus?, toStageId?, stageId?, idleDays? }
-  conditions    Json?                             // [{ field, op, value }] AND-ed; empty/null = always
-  actionType    String    @map("action_type")     // create_task
-  actionConfig  Json      @map("action_config")    // { titleTemplate, type, category, dueInDays, descriptionTemplate, assignedToId? }
+  triggerType   String    @map("trigger_type") // lead_created | lead_status_changed | deal_stage_changed | deal_idle_in_stage
+  triggerConfig Json?     @map("trigger_config") // { toStatus?, toStageId?, stageId?, idleDays? }
+  conditions    Json? // [{ field, op, value }] AND-ed; empty/null = always
+  actionType    String    @map("action_type") // create_task
+  actionConfig  Json      @map("action_config") // { titleTemplate, type, category, dueInDays, descriptionTemplate, assignedToId? }
   lastRunAt     DateTime? @map("last_run_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  tenant     Tenant                 @relation(fields: [tenantId], references: [id])
+  tenant     Tenant                @relation(fields: [tenantId], references: [id])
   firings    AutomationFiring[]
   emailSends AutomationEmailSend[]
 
@@ -793,7 +863,7 @@ model AutomationEmailSend {
   id        Int      @id @default(autoincrement())
   tenantId  Int      @map("tenant_id")
   ruleId    Int      @map("rule_id")
-  recipient String   // lowercased recipient email
+  recipient String // lowercased recipient email
   sentAt    DateTime @default(now()) @map("sent_at")
 
   tenant Tenant         @relation(fields: [tenantId], references: [id])
@@ -834,16 +904,16 @@ model AutomationFiring {
 model EnrichmentRun {
   id          Int       @id @default(autoincrement())
   tenantId    Int       @map("tenant_id")
-  entityType  String    @map("entity_type")  // "company" | "person"
-  entityIds   Int[]     @map("entity_ids")   // which IDs were queued
-  status      String    @default("pending")  // pending | running | done | failed
+  entityType  String    @map("entity_type") // "company" | "person"
+  entityIds   Int[]     @map("entity_ids") // which IDs were queued
+  status      String    @default("pending") // pending | running | done | failed
   triggeredBy String?   @map("triggered_by") // user email
   startedAt   DateTime? @map("started_at")
   finishedAt  DateTime? @map("finished_at")
   createdAt   DateTime  @default(now()) @map("created_at")
 
   proposals EnrichmentProposal[]
-  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  tenant    Tenant               @relation(fields: [tenantId], references: [id])
 
   @@map("enrichment_runs")
 }
@@ -852,12 +922,12 @@ model EnrichmentProposal {
   id            Int      @id @default(autoincrement())
   tenantId      Int      @map("tenant_id")
   runId         Int      @map("run_id")
-  entityType    String   @map("entity_type")   // "company" | "person"
+  entityType    String   @map("entity_type") // "company" | "person"
   entityId      Int      @map("entity_id")
-  entityName    String   @map("entity_name")   // denormalized for display
-  changes       Json     // { fieldName: { current, proposed, source, confidence, status } }
+  entityName    String   @map("entity_name") // denormalized for display
+  changes       Json // { fieldName: { current, proposed, source, confidence, status } }
   overallStatus String   @default("pending") @map("overall_status") // pending | partial | approved | rejected
-  rawResponse   String?  @map("raw_response")  // full LLM response for debugging
+  rawResponse   String?  @map("raw_response") // full LLM response for debugging
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -874,17 +944,17 @@ model EnrichmentProposal {
 // strings (codebase convention — no Prisma enums), validated by Zod / the UI.
 
 model Campaign {
-  id          Int      @id @default(autoincrement())
-  tenantId    Int      @map("tenant_id")
-  name        String
-  slug        String                                  // stable handle; auto-created on first content POST
-  project     String?                                 // e.g. "birdsview"
-  description String?
-  isArchived  Boolean  @default(false) @map("is_archived")
+  id             Int      @id @default(autoincrement())
+  tenantId       Int      @map("tenant_id")
+  name           String
+  slug           String // stable handle; auto-created on first content POST
+  project        String? // e.g. "birdsview"
+  description    String?
+  isArchived     Boolean  @default(false) @map("is_archived")
   // Feature E2: the target AUDIENCE = a saved company view (segment). Resolved
   // live (no membership snapshot) so the audience tracks the underlying data.
-  audienceViewId Int?  @map("audience_view_id")
-  createdAt   DateTime @default(now()) @map("created_at")
+  audienceViewId Int?     @map("audience_view_id")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   contentItems ContentItem[]
@@ -897,25 +967,25 @@ model Campaign {
 }
 
 model ContentItem {
-  id          Int       @id @default(autoincrement())
-  tenantId    Int       @map("tenant_id")
-  campaignId  Int?      @map("campaign_id")
-  channel     String                                  // linkedin_personal | linkedin_company | facebook | blog | email | other
-  contentType String    @map("content_type")          // post | article | email | video_script | other
-  title       String
-  body        String                                  // markdown
-  status      String    @default("draft")             // draft | in_review | approved | scheduled | published | rejected
+  id           Int       @id @default(autoincrement())
+  tenantId     Int       @map("tenant_id")
+  campaignId   Int?      @map("campaign_id")
+  channel      String // linkedin_personal | linkedin_company | facebook | blog | email | other
+  contentType  String    @map("content_type") // post | article | email | video_script | other
+  title        String
+  body         String // markdown
+  status       String    @default("draft") // draft | in_review | approved | scheduled | published | rejected
   // INTERNAL angles (BVQ) are never postable — the publish flow is hidden for them.
-  internal    Boolean   @default(false)
+  internal     Boolean   @default(false)
   scheduledFor DateTime? @map("scheduled_for")
-  publishedAt DateTime?  @map("published_at")
-  externalUrl String?    @map("external_url")
-  source      String                                  // content_factory | manual | <app slug>
-  sourceMeta  Json?      @map("source_meta")          // hook refs, week, generator notes
-  metrics     Json?                                   // impressions, reactions, comments, clicks, leads (manual)
-  reviewNote  String?    @map("review_note")          // rejection reason / edit note
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
+  publishedAt  DateTime? @map("published_at")
+  externalUrl  String?   @map("external_url")
+  source       String // content_factory | manual | <app slug>
+  sourceMeta   Json?     @map("source_meta") // hook refs, week, generator notes
+  metrics      Json? // impressions, reactions, comments, clicks, leads (manual)
+  reviewNote   String?   @map("review_note") // rejection reason / edit note
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id])
   campaign Campaign?      @relation(fields: [campaignId], references: [id])
@@ -930,8 +1000,8 @@ model ContentAsset {
   id            Int      @id @default(autoincrement())
   tenantId      Int      @map("tenant_id")
   contentItemId Int      @map("content_item_id")
-  kind          String                                // image | video | file | link
-  url           String                                // URL or storage path (no upload UI this phase)
+  kind          String // image | video | file | link
+  url           String // URL or storage path (no upload UI this phase)
   caption       String?
   position      Int      @default(0)
   createdAt     DateTime @default(now()) @map("created_at")
