@@ -16,11 +16,14 @@ import {
 import type { QuoteDTO } from "@/app/actions/quotes";
 import { costCodeLabel } from "@/lib/tasks/costing";
 
+// Pinned version (not @latest) so font metrics/glyph coverage can't shift under
+// us and a CDN-side change can't break PDF rendering at runtime.
+const ROBOTO_VERSION = "5.2.10";
 Font.register({
   family: "Roboto",
   fonts: [
-    { src: "https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-ext-400-normal.ttf", fontWeight: 400 },
-    { src: "https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-ext-700-normal.ttf", fontWeight: 700 },
+    { src: `https://cdn.jsdelivr.net/fontsource/fonts/roboto@${ROBOTO_VERSION}/latin-ext-400-normal.ttf`, fontWeight: 400 },
+    { src: `https://cdn.jsdelivr.net/fontsource/fonts/roboto@${ROBOTO_VERSION}/latin-ext-700-normal.ttf`, fontWeight: 700 },
   ],
 });
 

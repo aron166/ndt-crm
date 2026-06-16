@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
@@ -197,38 +198,49 @@ export async function createQuote(
   if (!company) return { error: "Cég nem található" };
 
   const year = new Date().getFullYear();
-  const existing = await db.quote.findMany({
-    where: { tenantId: TENANT_ID, quoteNumber: { startsWith: `AJ-${year}-` } },
-    select: { quoteNumber: true },
-  });
-  const quoteNumber = nextQuoteNumber(existing.map((e) => e.quoteNumber), year);
-
   const lines = prepareLines(input.lines);
   const totals = quoteTotals(lines, input.vatRate);
 
-  const created = await db.quote.create({
-    data: {
-      tenantId: TENANT_ID,
-      companyId: input.companyId,
-      personId: input.personId ?? null,
-      leadId: input.leadId ?? null,
-      dealId: input.dealId ?? null,
-      quoteNumber,
-      title: input.title.trim(),
-      status: "draft",
-      vatRate: input.vatRate,
-      netAmount: totals.net,
-      vatAmount: totals.vat,
-      grossAmount: totals.gross,
-      validUntil: input.validUntil ? new Date(input.validUntil) : null,
-      notes: input.notes?.trim() || null,
-      items: { create: lines.map((l) => ({ ...l, tenantId: TENANT_ID })) },
-    },
-  });
+  // Number is computed as max-for-year + 1, guarded by a unique (tenant, number)
+  // index. Two concurrent creates can derive the same number → the loser hits a
+  // P2002; recompute and retry rather than surfacing a generic failure.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const existing = await db.quote.findMany({
+      where: { tenantId: TENANT_ID, quoteNumber: { startsWith: `AJ-${year}-` } },
+      select: { quoteNumber: true },
+    });
+    const quoteNumber = nextQuoteNumber(existing.map((e) => e.quoteNumber), year);
 
-  audit("quote", created.id, "create", null, { quoteNumber, title: created.title, grossAmount: totals.gross }, { tenantId: TENANT_ID });
-  revalidatePath("/quotes");
-  return { id: created.id };
+    try {
+      const created = await db.quote.create({
+        data: {
+          tenantId: TENANT_ID,
+          companyId: input.companyId,
+          personId: input.personId ?? null,
+          leadId: input.leadId ?? null,
+          dealId: input.dealId ?? null,
+          quoteNumber,
+          title: input.title.trim(),
+          status: "draft",
+          vatRate: input.vatRate,
+          netAmount: totals.net,
+          vatAmount: totals.vat,
+          grossAmount: totals.gross,
+          validUntil: input.validUntil ? new Date(input.validUntil) : null,
+          notes: input.notes?.trim() || null,
+          items: { create: lines.map((l) => ({ ...l, tenantId: TENANT_ID })) },
+        },
+      });
+
+      audit("quote", created.id, "create", null, { quoteNumber, title: created.title, grossAmount: totals.gross }, { tenantId: TENANT_ID });
+      revalidatePath("/quotes");
+      return { id: created.id };
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") continue;
+      throw e;
+    }
+  }
+  return { error: "Az árajánlat sorszámának előállítása nem sikerült, próbáld újra" };
 }
 
 export async function updateQuote(
