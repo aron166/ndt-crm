@@ -18,7 +18,7 @@ export type AuditAction = "create" | "update" | "delete";
 export type AuditEntityType =
   | "company" | "person" | "contact"
   | "task" | "interaction" | "tag" | "tagging"
-  | "deal" | "lead" | "proposal" | "invoice"
+  | "deal" | "lead" | "proposal" | "invoice" | "quote"
   | "equipment" | "integration_credential" | "custom_field"
   | "automation_rule"
   | "campaign" | "content_item"
