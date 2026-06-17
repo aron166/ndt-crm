@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
+import { deleteCompany } from "@/app/actions/companies";
+import { deletePerson } from "@/app/actions/persons";
 
 const TENANT_ID = 1;
 
@@ -146,15 +148,24 @@ export async function moveDeal(
   revalidatePath("/deals");
 }
 
-export async function deleteDeal(id: number) {
+export async function deleteDeal(
+  id: number,
+  // Optional cascade: also soft-delete the linked company / person. Both are
+  // recoverable (deletedAt + restore), so this stays non-destructive.
+  cascade?: { company?: boolean; person?: boolean },
+) {
   const before = await db.deal.findFirst({
     where: { id, tenantId: TENANT_ID },
-    select: { title: true, stageId: true, value: true, companyId: true },
+    select: { title: true, stageId: true, value: true, companyId: true, personId: true },
   });
 
   await db.deal.deleteMany({ where: { id, tenantId: TENANT_ID } });
 
   if (before) audit("deal", id, "delete", before, null);
+
+  if (cascade?.company && before?.companyId) await deleteCompany(before.companyId);
+  if (cascade?.person && before?.personId) await deletePerson(before.personId);
+
   revalidatePath("/deals");
 }
 

@@ -6,21 +6,35 @@ import { audit } from "@/lib/audit";
 import { leadStatusLabel, DEFAULT_LEAD_STATUSES } from "@/lib/leads/statuses";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { runAutomations } from "@/lib/automations/engine";
+import { deleteCompany } from "@/app/actions/companies";
+import { deletePerson } from "@/app/actions/persons";
 
 const TENANT_ID = 1;
 
-export async function deleteLead(id: number) {
+export async function deleteLead(
+  id: number,
+  // Optional cascade: also soft-delete the linked company / person. Both are
+  // recoverable (deletedAt + restore), so this stays non-destructive.
+  cascade?: { company?: boolean; person?: boolean },
+) {
   const lead = await db.lead.findFirst({
     where: { id, tenantId: TENANT_ID },
-    select: { subject: true, serviceInterest: true, status: true },
+    select: {
+      subject: true, serviceInterest: true, status: true,
+      companyId: true, contact: { select: { personId: true } },
+    },
   });
   if (!lead) return { error: "Lead nem található" };
 
   // Leads are thin process trackers — deleting one removes the tracker only;
-  // the company, person/contact, interactions and any converted deal persist.
+  // the company, person/contact, interactions and any converted deal persist
+  // unless the caller opts into the cascade below.
   await db.lead.deleteMany({ where: { id, tenantId: TENANT_ID } });
   await audit("lead", id, "delete",
     { subject: lead.subject, serviceInterest: lead.serviceInterest, status: lead.status }, null);
+
+  if (cascade?.company && lead.companyId) await deleteCompany(lead.companyId);
+  if (cascade?.person && lead.contact?.personId) await deletePerson(lead.contact.personId);
 
   revalidatePath("/leads");
   return { success: true };
