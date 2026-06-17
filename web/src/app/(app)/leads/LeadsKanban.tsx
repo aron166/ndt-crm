@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Building2, User, Clock, Tag, Trash2 } from "lucide-react";
 import { moveLead, deleteLead } from "@/app/actions/leads";
+import { DeleteCardDialog, type DeleteCascade } from "@/components/DeleteCardDialog";
 import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
@@ -163,6 +164,7 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [hoverCol, setHoverCol] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Lead | null>(null);
   const [, startTransition] = useTransition();
 
   function handleDrop(statusKey: string) {
@@ -178,17 +180,37 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
 
   function handleDelete(id: number) {
     const lead = leads.find((l) => l.id === id);
-    const label = lead?.serviceInterest || lead?.subject || "Új érdeklődés";
-    if (!confirm(`Biztosan törlöd ezt a lead-kártyát: "${label}"?\n\nA cég, a kapcsolattartó és az interakciók megmaradnak — csak a lead-kártya tűnik el a pipeline-ból.`)) return;
+    if (lead) setPendingDelete(lead);
+  }
+
+  function confirmDelete(cascade: DeleteCascade) {
+    const lead = pendingDelete;
+    if (!lead) return;
+    setPendingDelete(null);
     // Optimistic remove; refresh re-syncs from the server (same shape as moveLead).
-    setLeads((prev) => prev.filter((l) => l.id !== id));
-    startTransition(async () => { await deleteLead(id); router.refresh(); });
+    setLeads((prev) => prev.filter((l) => l.id !== lead.id));
+    startTransition(async () => { await deleteLead(lead.id, cascade); router.refresh(); });
   }
 
   const colLeads = (statusKey: string) =>
     leads.filter((l) => (l.status ?? "new") === statusKey);
 
+  const pendingPerson = pendingDelete?.contact?.person;
+  const pendingPersonName = pendingPerson
+    ? `${pendingPerson.lastName ?? ""} ${pendingPerson.firstName ?? ""}`.trim()
+    : "";
+
   return (
+    <>
+    <DeleteCardDialog
+      open={pendingDelete !== null}
+      kind="lead"
+      label={pendingDelete?.serviceInterest || pendingDelete?.subject || "Új érdeklődés"}
+      company={pendingDelete?.company ?? null}
+      person={pendingPersonName ? { name: pendingPersonName } : null}
+      onConfirm={confirmDelete}
+      onClose={() => setPendingDelete(null)}
+    />
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${statuses.length}, minmax(220px, 1fr))`, gap: 12, alignItems: "start" }}>
       {statuses.map((status) => {
         const cards = colLeads(status.key);
@@ -248,5 +270,6 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
         );
       })}
     </div>
+    </>
   );
 }

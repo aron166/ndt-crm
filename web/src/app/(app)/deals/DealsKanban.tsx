@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Plus, AlertTriangle, Building2, User, Calendar, Trash2 } from "lucide-react";
 import { moveDeal, deleteDeal } from "@/app/actions/deals";
 import { DealModal } from "./DealModal";
+import { DeleteCardDialog, type DeleteCascade } from "@/components/DeleteCardDialog";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -192,6 +193,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
   const [modalOpen, setModalOpen] = useState(false);
   const [editDeal, setEditDeal] = useState<Deal | null>(null);
   const [newStageId, setNewStageId] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Deal | null>(null);
   const [, startTransition] = useTransition();
 
   function handleDrop(stageId: number) {
@@ -210,10 +212,16 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
 
   function handleDelete(id: number) {
     const deal = deals.find((d) => d.id === id);
-    if (!confirm(`Biztosan törlöd ezt a deal-t: "${deal?.title ?? ""}"?\n\nA cég, a kapcsolattartó és az interakciók megmaradnak — csak a deal tűnik el a pipeline-ból.`)) return;
+    if (deal) setPendingDelete(deal);
+  }
+
+  function confirmDelete(cascade: DeleteCascade) {
+    const deal = pendingDelete;
+    if (!deal) return;
+    setPendingDelete(null);
     // Optimistic remove; refresh re-syncs from the server (same shape as moveDeal).
-    setDeals((prev) => prev.filter((d) => d.id !== id));
-    startTransition(async () => { await deleteDeal(id); router.refresh(); });
+    setDeals((prev) => prev.filter((d) => d.id !== deal.id));
+    startTransition(async () => { await deleteDeal(deal.id, cascade); router.refresh(); });
   }
 
   const stageDeals = (stageId: number) =>
@@ -223,8 +231,22 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
     deals.filter((d) => d.stageId === stageId)
       .reduce((s, d) => s + (d.value ? parseFloat(String(d.value)) : 0), 0);
 
+  const pendingDealPerson = pendingDelete?.person;
+  const pendingPersonName = pendingDealPerson
+    ? `${pendingDealPerson.lastName ?? ""} ${pendingDealPerson.firstName ?? ""}`.trim()
+    : "";
+
   return (
     <>
+      <DeleteCardDialog
+        open={pendingDelete !== null}
+        kind="deal"
+        label={pendingDelete?.title ?? ""}
+        company={pendingDelete?.company ?? null}
+        person={pendingPersonName ? { name: pendingPersonName } : null}
+        onConfirm={confirmDelete}
+        onClose={() => setPendingDelete(null)}
+      />
       <DealModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditDeal(null); setNewStageId(null); router.refresh(); }}
