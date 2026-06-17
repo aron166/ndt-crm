@@ -149,12 +149,65 @@ export async function getCallQueue(viewId?: number | null): Promise<CallCard[]> 
   });
 }
 
+/**
+ * Announce a call to the external pipeline (Make webhook). The CRM's outbound
+ * half of the call loop: POST the call-started event to CALL_WEBHOOK_URL so the
+ * Make scenario can dial the phone (Tasker) + start recording. Returns a callId
+ * the caller can thread through to correlate the later transcript result.
+ */
+export interface CallStartInput {
+  companyId: number;
+  personId?: number | null;
+  contactName?: string | null;
+  phone?: string | null;
+}
+
+export async function startCall(
+  input: CallStartInput,
+): Promise<{ callId: string } | { error: string }> {
+  const url = process.env.CALL_WEBHOOK_URL;
+  if (!url) return { error: "Hívás webhook nincs beállítva (CALL_WEBHOOK_URL)" };
+
+  // Scope the company to the tenant before announcing a call for it.
+  const company = await db.company.findFirst({
+    where: { id: input.companyId, tenantId: TENANT_ID, deletedAt: null },
+    select: { id: true, name: true },
+  });
+  if (!company) return { error: "Cég nem található" };
+
+  const callId = crypto.randomUUID();
+  const payload = {
+    event: "call_started",
+    callId,
+    tenantId: TENANT_ID,
+    companyId: company.id,
+    company: company.name,
+    personId: input.personId ?? null,
+    contact: input.contactName ?? null,
+    phone: input.phone ?? null,
+    startedAt: new Date().toISOString(),
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return { error: `Webhook hiba (${res.status})` };
+  } catch {
+    return { error: "Webhook nem elérhető" };
+  }
+  return { callId };
+}
+
 export interface RecordCallInput {
   companyId: number;
   personId?: number | null;
   outcome: string; // CALL_OUTCOMES key
   notes?: string;
   followupDate?: string | null; // yyyy-mm-dd → schedules a follow-up call task
+  durationSec?: number | null; // call length, appended to the interaction note
 }
 
 export interface RecordCallResult {
@@ -183,8 +236,10 @@ export async function recordCall(
   const newStatus = nextStatusFor(input.outcome, company.pipelineStatus);
   const personId = input.personId ?? null;
   // A quick outcome tap needn't carry a typed note — fall back to the label so the
-  // append-only log still says what happened.
-  const notes = input.notes?.trim() || meta.label;
+  // append-only log still says what happened. Append the call length when known.
+  const base = input.notes?.trim() || meta.label;
+  const dur = input.durationSec && input.durationSec > 0 ? Math.round(input.durationSec) : null;
+  const notes = dur ? `${base} · ${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, "0")}` : base;
   const now = new Date();
 
   const followupRaw = input.followupDate?.trim();
