@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { callResultSchema, composeCallNotes } from "@/lib/calls/result";
+import { analyzeCallTranscript } from "@/lib/calls/analyze";
 
 // Call-result intake. The external transcription/analysis pipeline (Make:
 // recorder → Drive → Whisper → AI) posts the finished transcript + analysis
@@ -64,8 +65,11 @@ export async function POST(request: Request) {
   }
 
   const occurredAt = input.occurred_at ? new Date(input.occurred_at) : new Date();
+  // If the pipeline didn't pre-analyze, do it here (Groq, free, best-effort).
+  const analysis =
+    input.analysis ?? (input.transcript ? (await analyzeCallTranscript(input.transcript)) ?? undefined : undefined);
   const notes = composeCallNotes({
-    analysis: input.analysis,
+    analysis,
     transcript: input.transcript,
     durationSec: input.duration_sec,
     callId: input.call_id,
