@@ -47,7 +47,7 @@ export interface CallCard {
   notes: string | null;
   pipelineStatus: string | null;
   lastInteractionDate: string | null; // ISO
-  contact: CallCardContact | null;
+  contacts: CallCardContact[]; // active contacts, primary first; pick which to call
   history: CallCardHistory[];
 }
 
@@ -103,7 +103,6 @@ export async function getCallQueue(viewId?: number | null): Promise<CallCard[]> 
       contacts: {
         where: { endedAt: null },
         orderBy: [{ isPrimary: "desc" }, { startedAt: "desc" }],
-        take: 1,
         select: {
           role: true,
           phone: true,
@@ -122,16 +121,13 @@ export async function getCallQueue(viewId?: number | null): Promise<CallCard[]> 
   });
 
   return rows.map((c) => {
-    const ct = c.contacts[0];
-    const contact: CallCardContact | null = ct
-      ? {
-          personId: ct.person.id,
-          name: `${ct.person.lastName} ${ct.person.firstName}`.trim(),
-          role: ct.role,
-          phone: ct.phone ?? ct.person.phone,
-          email: ct.email ?? ct.person.email,
-        }
-      : null;
+    const contacts: CallCardContact[] = c.contacts.map((ct) => ({
+      personId: ct.person.id,
+      name: `${ct.person.lastName} ${ct.person.firstName}`.trim(),
+      role: ct.role,
+      phone: ct.phone ?? ct.person.phone,
+      email: ct.email ?? ct.person.email,
+    }));
     return {
       id: c.id,
       name: c.name,
@@ -141,7 +137,7 @@ export async function getCallQueue(viewId?: number | null): Promise<CallCard[]> 
       notes: c.notes,
       pipelineStatus: c.pipelineStatus,
       lastInteractionDate: c.lastInteractionDate?.toISOString() ?? null,
-      contact,
+      contacts,
       history: c.interactions.map((i) => ({
         id: i.id,
         type: i.type,

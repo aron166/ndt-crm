@@ -25,8 +25,10 @@ export default function CallCockpit({
 }) {
   const [queue, setQueue] = useState<CallCard[]>(initialQueue);
   const [index, setIndex] = useState(0);
+  const [mode, setMode] = useState<"guided" | "list">("guided");
   const [notes, setNotes] = useState("");
   const [followupDate, setFollowupDate] = useState("");
+  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,10 +38,14 @@ export default function CallCockpit({
   const current = queue[index] ?? null;
   const done = !loadingQueue && index >= queue.length;
   const totalDone = Object.values(tally).reduce((a, b) => a + b, 0);
+  // Which contact to call: the picked one, else the primary (contacts[0]).
+  const activeContact =
+    current?.contacts.find((c) => c.personId === selectedPersonId) ?? current?.contacts[0] ?? null;
 
   const resetCard = useCallback(() => {
     setNotes("");
     setFollowupDate("");
+    setSelectedPersonId(null);
     setError(null);
   }, []);
 
@@ -56,7 +62,7 @@ export default function CallCockpit({
       try {
         const res = await recordCall({
           companyId: current.id,
-          personId: current.contact?.personId ?? null,
+          personId: activeContact?.personId ?? null,
           outcome: outcomeKey,
           notes,
           followupDate: followupDate || null,
@@ -73,7 +79,7 @@ export default function CallCockpit({
         setSubmitting(false);
       }
     },
-    [current, submitting, notes, followupDate, advance],
+    [current, activeContact, submitting, notes, followupDate, advance],
   );
 
   async function changeSegment(next: number | null) {
@@ -124,20 +130,37 @@ export default function CallCockpit({
             Vezetett hívókör · egy érintés = naplózott hívás
           </p>
         </div>
-        <select
-          value={viewId ?? ""}
-          onChange={(e) => changeSegment(e.target.value ? Number(e.target.value) : null)}
-          disabled={loadingQueue || submitting}
-          style={{
-            fontSize: 12, color: "var(--fg-soft)", background: "var(--bg-panel)",
-            border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px",
-          }}
-        >
-          <option value="">Alapértelmezett hívandó-sor</option>
-          {segments.map((s) => (
-            <option key={s.id} value={s.id}>Szegmens: {s.name}</option>
-          ))}
-        </select>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", border: "1px solid var(--line-soft)", borderRadius: 8, overflow: "hidden" }}>
+            {(["guided", "list"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                style={{
+                  fontSize: 12, fontWeight: 500, padding: "7px 12px", cursor: "pointer", border: "none",
+                  background: mode === m ? "var(--indigo-soft)" : "var(--bg-panel)",
+                  color: mode === m ? "var(--indigo)" : "var(--fg-faint)",
+                }}
+              >
+                {m === "guided" ? "Vezetett" : "Lista"}
+              </button>
+            ))}
+          </div>
+          <select
+            value={viewId ?? ""}
+            onChange={(e) => changeSegment(e.target.value ? Number(e.target.value) : null)}
+            disabled={loadingQueue || submitting}
+            style={{
+              fontSize: 12, color: "var(--fg-soft)", background: "var(--bg-panel)",
+              border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px",
+            }}
+          >
+            <option value="">Alapértelmezett hívandó-sor</option>
+            {segments.map((s) => (
+              <option key={s.id} value={s.id}>Szegmens: {s.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Progress + session tally */}
@@ -157,6 +180,18 @@ export default function CallCockpit({
 
       {loadingQueue ? (
         <Empty>Betöltés…</Empty>
+      ) : queue.length === 0 ? (
+        <Empty>Nincs hívandó cég ebben a sorban. 🎉</Empty>
+      ) : mode === "list" ? (
+        <CallList
+          queue={queue}
+          activeIndex={index}
+          onPick={(i) => {
+            setIndex(i);
+            resetCard();
+            setMode("guided");
+          }}
+        />
       ) : done ? (
         <DoneCard tally={tally} totalDone={totalDone} onRestart={() => changeSegment(viewId)} />
       ) : !current ? (
@@ -198,30 +233,54 @@ export default function CallCockpit({
 
           {/* Contact + click-to-call */}
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--line-soft)" }}>
-            {current.contact ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>{current.contact.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 1 }}>
-                    {current.contact.role || "—"}
-                    {current.contact.email && <> · {current.contact.email}</>}
+            {activeContact ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {/* When the company has >1 active contact, let Péter pick who to call. */}
+                {current.contacts.length > 1 && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {current.contacts.map((c) => {
+                      const sel = c.personId === activeContact.personId;
+                      return (
+                        <button
+                          key={c.personId}
+                          onClick={() => setSelectedPersonId(c.personId)}
+                          style={{
+                            fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: 14, cursor: "pointer",
+                            background: sel ? "var(--indigo-soft)" : "var(--bg-raised)",
+                            color: sel ? "var(--indigo)" : "var(--fg-mute)",
+                            border: `1px solid ${sel ? "var(--indigo-line)" : "var(--line-soft)"}`,
+                          }}
+                        >
+                          {c.name}
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
-                {current.contact.phone ? (
-                  <a
-                    href={`tel:${current.contact.phone.replace(/\s+/g, "")}`}
-                    className="font-mono-ndt"
-                    style={{
-                      fontSize: 15, fontWeight: 600, color: "var(--mint)",
-                      background: "var(--mint-soft)", border: "1px solid oklch(0.80 0.13 165 / 0.35)",
-                      padding: "8px 16px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap",
-                    }}
-                  >
-                    📞 {current.contact.phone}
-                  </a>
-                ) : (
-                  <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Nincs telefonszám</span>
                 )}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>{activeContact.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 1 }}>
+                      {activeContact.role || "—"}
+                      {activeContact.email && <> · {activeContact.email}</>}
+                    </div>
+                  </div>
+                  {activeContact.phone ? (
+                    <a
+                      href={`tel:${activeContact.phone.replace(/\s+/g, "")}`}
+                      className="font-mono-ndt"
+                      style={{
+                        fontSize: 15, fontWeight: 600, color: "var(--mint)",
+                        background: "var(--mint-soft)", border: "1px solid oklch(0.80 0.13 165 / 0.35)",
+                        padding: "8px 16px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap",
+                      }}
+                    >
+                      📞 {activeContact.phone}
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Nincs telefonszám</span>
+                  )}
+                </div>
               </div>
             ) : (
               <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>
@@ -325,6 +384,67 @@ export default function CallCockpit({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CallList({
+  queue,
+  activeIndex,
+  onPick,
+}: {
+  queue: CallCard[];
+  activeIndex: number;
+  onPick: (i: number) => void;
+}) {
+  return (
+    <div className="panel mount mount-1" style={{ padding: 0, overflow: "hidden" }}>
+      {queue.map((c, i) => {
+        const ct = c.contacts[0];
+        return (
+          <div
+            key={c.id}
+            onClick={() => onPick(i)}
+            className="tbl-row"
+            style={{
+              display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", cursor: "pointer",
+              borderTop: i === 0 ? "none" : "1px solid var(--line-soft)",
+              background: i === activeIndex ? "var(--bg-raised)" : "transparent",
+            }}
+          >
+            <PipelineStatusBadge status={c.pipelineStatus} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {c.name}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 1 }}>
+                {ct ? ct.name : "Nincs kapcsolattartó"}
+                {ct?.role && <> · {ct.role}</>}
+                {c.contacts.length > 1 && <> · +{c.contacts.length - 1}</>}
+              </div>
+            </div>
+            <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)", flexShrink: 0 }}>
+              {formatRelativeTime(c.lastInteractionDate)}
+            </span>
+            {ct?.phone ? (
+              <a
+                href={`tel:${ct.phone.replace(/\s+/g, "")}`}
+                onClick={(e) => e.stopPropagation()}
+                className="font-mono-ndt"
+                style={{
+                  fontSize: 12, fontWeight: 600, color: "var(--mint)", background: "var(--mint-soft)",
+                  border: "1px solid oklch(0.80 0.13 165 / 0.35)", padding: "5px 10px", borderRadius: 7,
+                  textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
+                }}
+              >
+                📞
+              </a>
+            ) : (
+              <span style={{ width: 30, flexShrink: 0 }} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
