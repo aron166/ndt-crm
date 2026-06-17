@@ -8,6 +8,7 @@ import { CALL_OUTCOMES } from "@/lib/outreach/queue";
 import {
   getCallQueue,
   recordCall,
+  startCall,
   type CallCard,
   type CallSegment,
 } from "@/app/actions/outreach";
@@ -34,6 +35,9 @@ export default function CallCockpit({
   const [error, setError] = useState<string | null>(null);
   const [viewId, setViewId] = useState<number | null>(null);
   const [tally, setTally] = useState<Record<string, number>>({});
+  const [callId, setCallId] = useState<string | null>(null);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [calling, setCalling] = useState(false);
 
   const current = queue[index] ?? null;
   const done = !loadingQueue && index >= queue.length;
@@ -46,8 +50,36 @@ export default function CallCockpit({
     setNotes("");
     setFollowupDate("");
     setSelectedPersonId(null);
+    setCallId(null);
+    setCallStartedAt(null);
     setError(null);
   }, []);
+
+  // Fire the call-started webhook (Make → Tasker dials + recording starts) and
+  // flip the card into "in call" so the outcome buttons can log its duration.
+  const beginCall = useCallback(async () => {
+    if (!current || !activeContact || calling) return;
+    setCalling(true);
+    setError(null);
+    try {
+      const res = await startCall({
+        companyId: current.id,
+        personId: activeContact.personId,
+        contactName: activeContact.name,
+        phone: activeContact.phone,
+      });
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setCallId(res.callId);
+      setCallStartedAt(Date.now());
+    } catch {
+      setError("Hívás indítása sikertelen");
+    } finally {
+      setCalling(false);
+    }
+  }, [current, activeContact, calling]);
 
   const advance = useCallback(() => {
     setIndex((i) => i + 1);
@@ -66,6 +98,7 @@ export default function CallCockpit({
           outcome: outcomeKey,
           notes,
           followupDate: followupDate || null,
+          durationSec: callStartedAt ? Math.round((Date.now() - callStartedAt) / 1000) : null,
         });
         if ("error" in res) {
           setError(res.error);
@@ -79,7 +112,7 @@ export default function CallCockpit({
         setSubmitting(false);
       }
     },
-    [current, activeContact, submitting, notes, followupDate, advance],
+    [current, activeContact, submitting, notes, followupDate, callStartedAt, advance],
   );
 
   async function changeSegment(next: number | null) {
@@ -281,6 +314,28 @@ export default function CallCockpit({
                     <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Nincs telefonszám</span>
                   )}
                 </div>
+                {/* Trigger the phone (Make → Tasker) + recording. The tel: link above
+                    stays as the manual fallback. */}
+                {callId ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--mint)" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--mint)" }} />
+                    Hívás folyamatban — válassz kimenetelt a befejezéshez
+                  </div>
+                ) : (
+                  <button
+                    onClick={beginCall}
+                    disabled={calling || !activeContact.phone}
+                    style={{
+                      alignSelf: "flex-start", fontSize: 13, fontWeight: 600, color: "var(--indigo)",
+                      background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)",
+                      borderRadius: 8, padding: "8px 16px",
+                      cursor: calling || !activeContact.phone ? "default" : "pointer",
+                      opacity: calling || !activeContact.phone ? 0.5 : 1,
+                    }}
+                  >
+                    {calling ? "Indítás…" : "📞 Hívás indítása"}
+                  </button>
+                )}
               </div>
             ) : (
               <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>
