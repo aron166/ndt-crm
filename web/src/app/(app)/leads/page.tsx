@@ -162,9 +162,13 @@ export default async function LeadsPage({
   const statuses = await getLeadStatuses(TENANT_ID);
   const initialKey = statuses.find((s) => s.isInitial)?.key ?? "new";
   const ACTIVE = { tenantId: TENANT_ID, convertedDealId: null, outcome: "open" } as const;
+  const knownKeys = statuses.map((s) => s.key);
+  // A lead whose status was deleted at /leads/setup has no column — it lands in
+  // the entry column instead of vanishing from the board (which would make the
+  // "Aktív · N" count disagree with the sum of the columns).
   const colWhere = (key: string) =>
     key === initialKey
-      ? { ...ACTIVE, OR: [{ status: key }, { status: null }] } // unknown/null status lands in the entry column
+      ? { ...ACTIVE, OR: [{ status: key }, { status: null }, { status: { notIn: knownKeys } }] }
       : { ...ACTIVE, status: key };
 
   // One bounded query per column (newest first) + a count per column for the
@@ -200,7 +204,9 @@ export default async function LeadsPage({
 
   const leadsForClient = leads.map((l) => ({
     ...l,
-    status: l.status ?? initialKey,
+    // Same normalization as colWhere, so the client renders the card in the
+    // column the server counted it in.
+    status: l.status && knownKeys.includes(l.status) ? l.status : initialKey,
     estimatedValue: l.estimatedValue != null ? Number(l.estimatedValue) : null,
     customFields: (l.customFields ?? null) as Record<string, unknown> | null,
     lastContactAt: extras.get(l.id)?.lastContactAt ?? null,
