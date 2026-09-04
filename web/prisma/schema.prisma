@@ -282,6 +282,14 @@ model Lead {
   // See memory lead-deal-process-tracker-model.
   convertedDealId Int?      @map("converted_deal_id")
   convertedAt     DateTime? @map("converted_at")
+  // Outcome is orthogonal to the stage: open | won | lost. `won` is the only door
+  // into the deal pipeline (triggers lead→deal conversion); won/lost leave the
+  // active board. lostReason keeps the why (call-outcome key or free text).
+  outcome         String    @default("open")
+  closedAt        DateTime? @map("closed_at")
+  // Inbound channel (cold_email | landing | linkedin | meta_ads | referral | import | manual) + campaign tag.
+  channel         String?
+  campaign        String?
   createdAt       DateTime  @default(now()) @map("created_at")
 
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
@@ -289,9 +297,13 @@ model Lead {
   contact       Contact? @relation(fields: [contactId], references: [id])
   assignedTo    User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
   convertedDeal Deal?    @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
+  interactions  Interaction[]
+  tasks         Task[]   @relation("TaskLead")
+  firings       AutomationFiring[]
   quotes        Quote[]
 
   @@index([tenantId, convertedDealId])
+  @@index([tenantId, outcome, status])
   @@map("leads")
 }
 
@@ -464,6 +476,7 @@ model Task {
   companyId        Int?      @map("company_id")
   dealId           Int?      @map("deal_id")
   personId         Int?      @map("person_id")
+  leadId           Int?      @map("lead_id")          // the lead this task serves (e.g. a callback)
   parentTaskId     Int?      @map("parent_task_id")
   title            String
   description      String?
@@ -493,9 +506,11 @@ model Task {
   company    Company? @relation("TaskCompany", fields: [companyId], references: [id])
   deal       Deal?    @relation("TaskDeal", fields: [dealId], references: [id])
   person     Person?  @relation("TaskPerson", fields: [personId], references: [id])
+  lead       Lead?    @relation("TaskLead", fields: [leadId], references: [id], onDelete: SetNull)
   parentTask Task?    @relation("SubTasks", fields: [parentTaskId], references: [id])
   subTasks   Task[]   @relation("SubTasks")
 
+  @@index([tenantId, leadId])
   @@map("tasks")
 }
 
@@ -594,6 +609,7 @@ model Interaction {
   tenantId   Int      @map("tenant_id")
   companyId  Int?     @map("company_id")
   personId   Int?     @map("person_id")
+  leadId     Int?     @map("lead_id") // the lead this touch belongs to (exact per-lead history)
   userId     Int?     @map("user_id") // who logged this
   type       String? // call, email, meeting, note, site_visit
   direction  String? // inbound, outbound
@@ -605,8 +621,10 @@ model Interaction {
   tenant  Tenant   @relation(fields: [tenantId], references: [id])
   company Company? @relation(fields: [companyId], references: [id])
   person  Person?  @relation(fields: [personId], references: [id])
+  lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
   user    User?    @relation(fields: [userId], references: [id])
 
+  @@index([tenantId, leadId])
   @@map("interactions")
 }
 
@@ -840,10 +858,10 @@ model AutomationRule {
   tenantId      Int       @map("tenant_id")
   name          String
   isActive      Boolean   @default(true) @map("is_active")
-  triggerType   String    @map("trigger_type") // lead_created | lead_status_changed | deal_stage_changed | deal_idle_in_stage
+  triggerType   String    @map("trigger_type") // lead_created | lead_status_changed | deal_stage_changed | deal_idle_in_stage | lead_idle
   triggerConfig Json?     @map("trigger_config") // { toStatus?, toStageId?, stageId?, idleDays? }
   conditions    Json? // [{ field, op, value }] AND-ed; empty/null = always
-  actionType    String    @map("action_type") // create_task
+  actionType    String    @map("action_type") // create_task | send_email | change_lead_status | assign_lead | webhook_out
   actionConfig  Json      @map("action_config") // { titleTemplate, type, category, dueInDays, descriptionTemplate, assignedToId? }
   lastRunAt     DateTime? @map("last_run_at")
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -883,15 +901,18 @@ model AutomationFiring {
   id             Int      @id @default(autoincrement())
   tenantId       Int      @map("tenant_id")
   ruleId         Int      @map("rule_id")
-  dealId         Int      @map("deal_id")
+  dealId         Int?     @map("deal_id")
+  leadId         Int?     @map("lead_id")            // lead_idle firings: once per (rule, lead)
   stageEnteredAt DateTime @map("stage_entered_at")
   firedAt        DateTime @default(now()) @map("fired_at")
 
   tenant Tenant         @relation(fields: [tenantId], references: [id])
   rule   AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  deal   Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal   Deal?          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  lead   Lead?          @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@unique([ruleId, dealId, stageEnteredAt])
+  @@unique([ruleId, leadId])
   @@index([tenantId])
   @@map("automation_firings")
 }

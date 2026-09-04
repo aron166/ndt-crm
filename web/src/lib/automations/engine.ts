@@ -127,6 +127,7 @@ export function buildCreateTaskData(
     companyId: event.companyId,
     personId: event.personId,
     dealId: event.dealId ?? null,
+    leadId: event.leadId ?? null,
     title: renderTemplate(cfg.titleTemplate, event),
     description: cfg.descriptionTemplate ? renderTemplate(cfg.descriptionTemplate, event) : null,
     type: cfg.type ?? null,

@@ -3,9 +3,12 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { leadStatusLabel, DEFAULT_LEAD_STATUSES } from "@/lib/leads/statuses";
-import { getLeadStatuses } from "@/lib/leads/queries";
-import { runAutomations } from "@/lib/automations/engine";
+import { DEFAULT_LEAD_STATUSES } from "@/lib/leads/statuses";
+import {
+  changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome,
+} from "@/lib/leads/service";
+import type { LeadOutcome } from "@/lib/leads/outcomes";
+import { userLeadCtx } from "@/lib/actor";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 
@@ -41,49 +44,10 @@ export async function deleteLead(
 }
 
 export async function moveLead(leadId: number, newStatus: string) {
-  const statuses = await getLeadStatuses(TENANT_ID);
-  if (!statuses.some((s) => s.key === newStatus)) return { error: "Ismeretlen státusz" };
-
-  // Single query pulls the entity context the audit + automation engine need
-  // (company name, person, condition fields) — no follow-up per-row lookups.
-  const before = await db.lead.findFirst({
-    where: { id: leadId, tenantId: TENANT_ID },
-    select: {
-      status: true, companyId: true, source: true, serviceInterest: true,
-      estimatedValue: true,
-      company: { select: { name: true } },
-      contact: { select: { personId: true } },
-    },
-  });
-  if (!before) return { error: "Lead nem található" };
-  if (before.status === newStatus) return { success: true };
-
-  await db.lead.updateMany({
-    where: { id: leadId, tenantId: TENANT_ID },
-    data: { status: newStatus },
-  });
-
-  audit("lead", leadId, "update",
-    { status: before.status, statusLabel: leadStatusLabel(before.status, statuses) },
-    { status: newStatus, statusLabel: leadStatusLabel(newStatus, statuses) },
-  );
-
-  await runAutomations({
-    type: "lead_status_changed",
-    tenantId: TENANT_ID,
-    companyId: before.companyId,
-    personId: before.contact?.personId ?? null,
-    companyName: before.company?.name ?? null,
-    toStatus: newStatus,
-    fields: {
-      company: before.company?.name ?? null,
-      status: newStatus,
-      source: before.source,
-      serviceInterest: before.serviceInterest,
-      estimatedValue: before.estimatedValue != null ? Number(before.estimatedValue) : null,
-    },
-  });
-
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await changeLeadStatus(leadId, newStatus, ctx);
+  if ("error" in res) return res;
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
   return { success: true };
@@ -93,97 +57,64 @@ export async function updateLeadStatus(leadId: number, newStatus: string) {
   return moveLead(leadId, newStatus);
 }
 
-/**
- * Convert a lead into a Deal in the default (first, non-archived) pipeline,
- * linked to the same company + person. Stamps the lead's convertedDealId/
- * convertedAt so it hands off to the deal pipeline (leaves the active leads
- * board, kept for history) and audits the hand-off.
- */
+/** Lead → deal hand-off (the `won` door). Logic lives in lib/leads/service.ts. */
 export async function convertLeadToDeal(leadId: number) {
-  const lead = await db.lead.findFirst({
-    where: { id: leadId, tenantId: TENANT_ID },
-    include: {
-      company: { select: { id: true, name: true } },
-      contact: { select: { personId: true } },
-    },
-  });
-  if (!lead) return { error: "Lead nem található" };
-  if (!lead.companyId || !lead.company) return { error: "A leadhez nincs cég társítva" };
-
-  const pipeline = await db.pipeline.findFirst({
-    where: { tenantId: TENANT_ID, isArchived: false },
-    orderBy: { position: "asc" },
-    include: { stages: { orderBy: { position: "asc" }, take: 1 } },
-  });
-  if (!pipeline) return { error: "Nincs pipeline — hozz létre egyet előbb" };
-
-  const firstStage = pipeline.stages[0];
-  if (!firstStage) {
-    return { error: "A pipeline-nak nincs egyetlen szakasza sem — előbb hozz létre egyet" };
-  }
-
-  // Snapshot the fields we need so TS narrowing survives the transaction closure.
-  const companyId = lead.companyId;
-  const companyName = lead.company.name;
-  const personId = lead.contact?.personId ?? null;
-  const title = lead.serviceInterest?.trim() || `${companyName} — érdeklődés`;
-  const value = lead.estimatedValue ?? null;
-
-  // Convert atomically in one transaction: create the deal, then claim the lead.
-  // `convertedDealId` is the single source of truth for "this lead has graduated"
-  // — the conditional updateMany is the race guard, so a double-click / second
-  // tab that loses the race gets claim.count 0 and throws, rolling back the deal
-  // we just created (no duplicate). Once set, the lead leaves the active leads
-  // board; the deal is the process tracker from here on. The lead entity is kept
-  // (origin/UTM history), linked to its deal, never duplicated across both boards.
-  let dealId: number;
-  try {
-    dealId = await db.$transaction(async (tx) => {
-      const maxPos = await tx.deal.aggregate({
-        where: { tenantId: TENANT_ID, stageId: firstStage.id },
-        _max: { position: true },
-      });
-      const deal = await tx.deal.create({
-        data: {
-          tenantId: TENANT_ID,
-          title,
-          companyId,
-          personId,
-          pipelineId: pipeline.id,
-          stageId: firstStage.id,
-          value,
-          currency: "HUF",
-          position: (maxPos._max.position ?? -1) + 1,
-          stageEnteredAt: new Date(),
-        },
-        select: { id: true },
-      });
-
-      const claim = await tx.lead.updateMany({
-        where: { id: leadId, tenantId: TENANT_ID, convertedDealId: null },
-        data: { convertedDealId: deal.id, convertedAt: new Date() },
-      });
-      if (claim.count === 0) throw new Error("LEAD_ALREADY_CONVERTED");
-
-      return deal.id;
-    });
-  } catch (e) {
-    if (e instanceof Error && e.message === "LEAD_ALREADY_CONVERTED") {
-      return { error: "A lead már át lett alakítva deallé" };
-    }
-    throw e;
-  }
-
-  audit("deal", dealId, "create", null, { title, fromLeadId: leadId });
-  audit("lead", leadId, "update",
-    { convertedDealId: null },
-    { convertedDealId: dealId },
-  );
-
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await setLeadOutcome(leadId, "won", ctx);
+  if ("error" in res) return res;
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/deals");
-  return { success: true, dealId };
+  return { success: true, dealId: res.dealId };
+}
+
+/** open | won | lost from the card / detail dropdown. */
+export async function setLeadOutcomeAction(leadId: number, outcome: LeadOutcome, lostReason?: string | null) {
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await setLeadOutcome(leadId, outcome, ctx, lostReason);
+  if ("error" in res) return res;
+  revalidatePath("/leads");
+  revalidatePath(`/leads/${leadId}`);
+  if (outcome === "won") revalidatePath("/deals");
+  return { success: true, dealId: res.dealId };
+}
+
+export async function assignLeadAction(leadId: number, assignedToId: number | null) {
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await assignLead(leadId, assignedToId, ctx);
+  if ("error" in res) return res;
+  revalidatePath("/leads");
+  revalidatePath(`/leads/${leadId}`);
+  return { success: true };
+}
+
+/**
+ * "Hívás eredménye" — the UI adapter over the shared logLeadCallOutcome. The
+ * note-required / callback rules are validated in the service, not here.
+ */
+export async function logLeadCall(leadId: number, input: {
+  outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
+}) {
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await logLeadCallOutcome(
+    leadId,
+    {
+      outcome: input.outcome,
+      note: input.note,
+      ...(input.callbackAt ? { callbackAt: input.callbackAt } : {}),
+      ...(input.demoWith ? { demoWith: input.demoWith } : {}),
+    },
+    ctx,
+  );
+  if ("error" in res) return { error: res.error };
+  revalidatePath("/leads");
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/tasks");
+  return res;
 }
 
 /**

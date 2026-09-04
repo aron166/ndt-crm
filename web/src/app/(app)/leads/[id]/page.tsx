@@ -36,23 +36,35 @@ export default async function LeadDetailPage({
 
   const personId = lead.contact?.person?.id ?? null;
 
-  const [interactions, auditEntries] = await Promise.all([
+  const [interactions, auditEntries, statuses, users, openTasks] = await Promise.all([
+    // Per-lead touches first-class (leadId), plus the person/company timeline
+    // so older/company-level history still shows. Newest first, bounded.
     db.interaction.findMany({
       where: {
         tenantId: TENANT_ID,
         OR: [
+          { leadId },
           ...(lead.companyId ? [{ companyId: lead.companyId }] : []),
           ...(personId ? [{ personId }] : []),
         ],
       },
-      include: { person: { select: { id: true, firstName: true, lastName: true } } },
+      include: {
+        person: { select: { id: true, firstName: true, lastName: true } },
+        user: { select: { name: true } },
+      },
       orderBy: { occurredAt: "desc" },
       take: 50,
     }),
     getEntityHistory("lead", leadId),
+    getLeadStatuses(TENANT_ID),
+    db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    db.task.findMany({
+      where: { tenantId: TENANT_ID, leadId, status: { in: ["created", "in_progress"] } },
+      select: { id: true, title: true, dueDate: true, type: true, assignedTo: { select: { name: true } } },
+      orderBy: { dueDate: "asc" },
+      take: 20,
+    }),
   ]);
-
-  const statuses = await getLeadStatuses(TENANT_ID);
 
   return (
     <div className="mount">
@@ -76,6 +88,8 @@ export default async function LeadDetailPage({
         interactions={serializeDates(interactions)}
         auditEntries={serializeDates(auditEntries)}
         statuses={statuses}
+        users={users}
+        openTasks={serializeDates(openTasks)}
       />
     </div>
   );
