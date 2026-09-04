@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  triggerMatches, conditionsPass, renderTemplate, buildCreateTaskData, runAutomations, auditRuleTask,
+  triggerMatches, conditionsPass, renderTemplate, buildCreateTaskData, runAutomations,
+  auditRuleTask, runLeadAction,
 } from "./engine";
 import type { AutomationEvent, CreateTaskActionConfig } from "./types";
 import { db } from "@/lib/db";
@@ -242,5 +243,41 @@ describe("runAutomations (orchestrator)", () => {
   it("never throws even if the rule query fails", async () => {
     mockDb.automationRule.findMany.mockRejectedValue(new Error("db down"));
     await expect(runAutomations(leadCreated())).resolves.toBeUndefined();
+  });
+});
+
+describe("runLeadAction / runAutomationAction (v2 actions)", () => {
+  const mockDb = db as unknown as { automationRule: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> }; company: { findFirst: ReturnType<typeof vi.fn> } };
+  beforeEach(() => { vi.clearAllMocks(); mockDb.company.findFirst.mockResolvedValue(null); });
+
+  it("webhook_out POSTs the event JSON and fires; non-http URL is a no-op", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok", { status: 200 }));
+    const ev = leadCreated({ leadId: 5 });
+    expect(await runLeadAction("webhook_out", { url: "https://n8n.local/hook" }, ev)).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://n8n.local/hook");
+    const body = JSON.parse(String((init as RequestInit).body));
+    expect(body).toMatchObject({ event: "lead_created", leadId: 5, company: "Acme Kft." });
+    expect(await runLeadAction("webhook_out", { url: "ftp://x" }, ev)).toBe(false);
+    fetchMock.mockRestore();
+  });
+
+  it("webhook_out throws on a non-2xx so the rule is reported, not stamped", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("nope", { status: 500 }));
+    await expect(runLeadAction("webhook_out", { url: "https://x.y/z" }, leadCreated())).rejects.toThrow("webhook_out 500");
+    fetchMock.mockRestore();
+  });
+
+  it("lead actions are no-ops without a leadId", async () => {
+    expect(await runLeadAction("change_lead_status", { toStatus: "call_1" }, leadCreated({ leadId: null }))).toBe(false);
+    expect(await runLeadAction("assign_lead", { assignedToId: 2 }, leadCreated())).toBe(false);
+  });
+
+  it("orchestrator stamps lastRunAt only when a v2 action actually fired", async () => {
+    mockDb.automationRule.findMany.mockResolvedValue([
+      { id: 7, triggerType: "lead_created", triggerConfig: null, conditions: null, actionType: "webhook_out", actionConfig: { url: "nope" } },
+    ]);
+    await runAutomations(leadCreated({ leadId: 1 }));
+    expect(mockDb.automationRule.update).not.toHaveBeenCalled();
   });
 });

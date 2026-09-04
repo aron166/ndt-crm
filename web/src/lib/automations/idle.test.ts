@@ -9,6 +9,10 @@ vi.mock("@/lib/db", () => ({
   db: {
     automationRule: { findMany: vi.fn(), update: vi.fn() },
     deal: { findMany: vi.fn() },
+    lead: { findMany: vi.fn() },
+    task: { create: vi.fn(), findMany: vi.fn() },
+    interaction: { groupBy: vi.fn() },
+    automationFiring: { create: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -112,5 +116,52 @@ describe("runIdleAutomations", () => {
     const res = await runIdleAutomations(new Date("2026-06-07T00:00:00.000Z"));
     expect(res.tasksCreated).toBe(0);
     expect(mockDb.deal.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("lead_idle", () => {
+  const m = db as unknown as {
+    automationRule: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+    lead: { findMany: ReturnType<typeof vi.fn> };
+    automationFiring: { create: ReturnType<typeof vi.fn> };
+    task: { create: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
+    interaction: { groupBy: ReturnType<typeof vi.fn> };
+  };
+  const now = new Date("2026-09-10T07:00:00.000Z");
+  const rule = { id: 3, tenantId: 1, triggerType: "lead_idle", isActive: true, triggerConfig: { idleDays: 3 }, conditions: null, actionType: "create_task", actionConfig: { titleTemplate: "Kövesd: {company}" } };
+  const lead = { id: 42, status: "call_1", outcome: "open", channel: null, source: null, serviceInterest: null, companyId: 10, createdAt: new Date("2026-09-01T00:00:00Z"), estimatedValue: null, company: { name: "Acme" }, contact: { personId: 20 } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.automationRule.findMany.mockResolvedValue([rule]);
+    m.automationRule.update.mockResolvedValue({});
+    m.lead.findMany.mockResolvedValue([lead]);
+    m.task.findMany.mockResolvedValue([]);
+    m.automationFiring.create.mockResolvedValue({});
+    m.task.create.mockResolvedValue({ id: 1 });
+  });
+
+  it("fires for a lead whose last contact is older than idleDays (claim first, then task)", async () => {
+    m.interaction.groupBy.mockResolvedValue([]); // never contacted → createdAt counts
+    const res = await runIdleAutomations(now);
+    expect(res.tasksCreated).toBe(1);
+    expect(m.automationFiring.create).toHaveBeenCalledWith({ data: { tenantId: 1, ruleId: 3, leadId: 42, stageEnteredAt: lead.createdAt } });
+    expect(m.task.create.mock.calls[0][0].data).toMatchObject({ leadId: 42, title: "Kövesd: Acme" });
+  });
+
+  it("skips a lead contacted recently", async () => {
+    m.interaction.groupBy.mockImplementation(async (args: { by: string[] }) =>
+      args.by[0] === "leadId" ? [{ leadId: 42, _max: { occurredAt: new Date("2026-09-09T12:00:00Z") } }] : []);
+    const res = await runIdleAutomations(now);
+    expect(res.tasksCreated).toBe(0);
+    expect(m.automationFiring.create).not.toHaveBeenCalled();
+  });
+
+  it("a duplicate firing claim (P2002) skips without creating a task", async () => {
+    m.interaction.groupBy.mockResolvedValue([]);
+    m.automationFiring.create.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "x" }));
+    const res = await runIdleAutomations(now);
+    expect(res.tasksCreated).toBe(0);
+    expect(m.task.create).not.toHaveBeenCalled();
   });
 });

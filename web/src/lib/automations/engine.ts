@@ -5,8 +5,11 @@ import type {
   AutomationEvent,
   Condition,
   ConditionOp,
+  AssignLeadActionConfig,
+  ChangeLeadStatusActionConfig,
   CreateTaskActionConfig,
   SendEmailActionConfig,
+  WebhookOutActionConfig,
   TriggerConfig,
   TriggerType,
 } from "./types";
@@ -88,6 +91,7 @@ export function triggerMatches(
     case "deal_stage_changed":
       return cfg.toStageId == null || cfg.toStageId === event.toStageId;
     case "deal_idle_in_stage":
+    case "lead_idle":
       // Evaluated by the scheduled job, not the event-driven path.
       return false;
     default:
@@ -191,6 +195,121 @@ export async function auditRuleTask(
   }
 }
 
+// ── Lead-scoped + outbound actions (v2) ─────────────────────────────
+
+/**
+ * Execute one non-task/email action. Returns false when the action is a no-op
+ * for this event (e.g. no leadId), so the caller skips the lastRunAt stamp.
+ * Lead writes here do NOT re-fire automations (no cascading rule chains — a
+ * status→status rule pair would loop otherwise).
+ */
+export async function runLeadAction(
+  actionType: string,
+  actionConfig: unknown,
+  ev: AutomationEvent,
+): Promise<boolean> {
+  if (actionType === "webhook_out") {
+    const cfg = actionConfig as WebhookOutActionConfig;
+    if (!cfg?.url || !/^https?:\/\//i.test(cfg.url)) return false;
+    const { companyName, ...rest } = ev;
+    const res = await fetch(cfg.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: ev.type, ...rest, company: companyName ?? null, firedAt: new Date().toISOString() }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) throw new Error(`webhook_out ${res.status}`);
+    return true;
+  }
+  if (!ev.leadId) return false;
+  if (actionType === "change_lead_status") {
+    const cfg = actionConfig as ChangeLeadStatusActionConfig;
+    if (!cfg?.toStatus) return false;
+    const { changeLeadStatus } = await import("@/lib/leads/service");
+    const r = await changeLeadStatus(ev.leadId, cfg.toStatus, systemCtx(ev.tenantId), { fireAutomations: false });
+    if ("error" in r) throw new Error(r.error);
+    return true;
+  }
+  if (actionType === "assign_lead") {
+    const cfg = actionConfig as AssignLeadActionConfig;
+    if (cfg?.assignedToId == null) return false;
+    const { assignLead } = await import("@/lib/leads/service");
+    const r = await assignLead(ev.leadId, Number(cfg.assignedToId), systemCtx(ev.tenantId));
+    if ("error" in r) throw new Error(r.error);
+    return true;
+  }
+  return false;
+}
+
+function systemCtx(tenantId: number) {
+  return { tenantId, userId: null, actor: "agent" as const, actorAgentId: "automation" };
+}
+
+/**
+ * Execute one rule's action for an event. Returns true when it fired (the
+ * caller stamps lastRunAt), false when the action was a no-op for this event.
+ * Shared by the event-driven orchestrator and the idle (cron) evaluators.
+ */
+export async function runAutomationAction(
+  rule: { id: number; actionType: string; actionConfig: unknown },
+  ev: AutomationEvent,
+): Promise<boolean> {
+  if (rule.actionType === "create_task") {
+    const cfg = rule.actionConfig as unknown as CreateTaskActionConfig;
+    if (!cfg?.titleTemplate) return false;
+    const data = buildCreateTaskData(cfg, ev);
+    const task = await db.task.create({ data, select: { id: true } });
+    // Rule-created tasks are audited with the rule as the actor (Codex Batch A
+    // #6b, #61). auditRuleTask never throws — the task is already committed.
+    await auditRuleTask(task.id, data, rule.id, ev.tenantId);
+  } else if (rule.actionType === "send_email") {
+    const cfg = rule.actionConfig as unknown as SendEmailActionConfig;
+    if (!cfg?.subjectTemplate || !cfg?.bodyTemplate) return false;
+    const to = await resolveRecipientEmail(ev);
+    if (!to) return false; // no address on file — skip (not an error)
+    const recipient = to.trim().toLowerCase();
+
+    // "Send once per recipient": skip if this rule already emailed them.
+    if (cfg.sendOnce) {
+      const prior = await db.automationEmailSend.findUnique({
+        where: { ruleId_recipient: { ruleId: rule.id, recipient } },
+        select: { id: true },
+      });
+      if (prior) return false;
+    }
+
+    // Dynamic import keeps the server-only Resend module out of the unit-test
+    // import graph for this otherwise-pure engine module.
+    const { sendEmail } = await import("@/lib/integrations/resend");
+    const result = await sendEmail({
+      to,
+      subject: renderTemplate(cfg.subjectTemplate, ev),
+      text: renderTemplate(cfg.bodyTemplate, ev, false),
+      companyId: ev.companyId,
+      personId: ev.personId,
+    });
+    if (!result.ok) {
+      reportError("automations.send_email", new Error(result.error), { ruleId: rule.id, trigger: ev.type });
+      return false;
+    }
+    if (cfg.sendOnce) {
+      // Record the send. A P2002 unique-violation just means another worker
+      // beat us (already recorded) — fine to ignore; any OTHER error must be
+      // surfaced, not swallowed (a lost record could re-send next run).
+      try {
+        await db.automationEmailSend.create({ data: { tenantId: ev.tenantId, ruleId: rule.id, recipient } });
+      } catch (err) {
+        if ((err as { code?: string }).code !== "P2002") {
+          reportError("automations.email_send_record", err, { ruleId: rule.id });
+        }
+      }
+    }
+  } else {
+    if (!(await runLeadAction(rule.actionType, rule.actionConfig, ev))) return false;
+  }
+  return true;
+}
+
 // ── Orchestrator (DB-backed) ────────────────────────────────────────
 
 /**
@@ -249,57 +368,7 @@ export async function runAutomations(event: AutomationEvent): Promise<void> {
         if (!triggerMatches(rule.triggerType as TriggerType, rule.triggerConfig, ev)) continue;
         if (!conditionsPass(rule.conditions, ev.fields)) continue;
 
-        if (rule.actionType === "create_task") {
-          const cfg = rule.actionConfig as unknown as CreateTaskActionConfig;
-          if (!cfg?.titleTemplate) continue;
-          const data = buildCreateTaskData(cfg, ev);
-          const task = await db.task.create({ data, select: { id: true } });
-          await auditRuleTask(task.id, data, rule.id, ev.tenantId);
-        } else if (rule.actionType === "send_email") {
-          const cfg = rule.actionConfig as unknown as SendEmailActionConfig;
-          if (!cfg?.subjectTemplate || !cfg?.bodyTemplate) continue;
-          const to = await resolveRecipientEmail(ev);
-          if (!to) continue; // no address on file — skip (not an error)
-          const recipient = to.trim().toLowerCase();
-
-          // "Send once per recipient": skip if this rule already emailed them.
-          if (cfg.sendOnce) {
-            const prior = await db.automationEmailSend.findUnique({
-              where: { ruleId_recipient: { ruleId: rule.id, recipient } },
-              select: { id: true },
-            });
-            if (prior) continue;
-          }
-
-          // Dynamic import keeps the server-only Resend module out of the unit-test
-          // import graph for this otherwise-pure engine module.
-          const { sendEmail } = await import("@/lib/integrations/resend");
-          const result = await sendEmail({
-            to,
-            subject: renderTemplate(cfg.subjectTemplate, ev),
-            text: renderTemplate(cfg.bodyTemplate, ev, false),
-            companyId: ev.companyId,
-            personId: ev.personId,
-          });
-          if (!result.ok) {
-            reportError("automations.send_email", new Error(result.error), { ruleId: rule.id, trigger: ev.type });
-            continue;
-          }
-          if (cfg.sendOnce) {
-            // Record the send. A P2002 unique-violation just means another worker
-            // beat us (already recorded) — fine to ignore; any OTHER error must be
-            // surfaced, not swallowed (a lost record could re-send next run).
-            try {
-              await db.automationEmailSend.create({ data: { tenantId: ev.tenantId, ruleId: rule.id, recipient } });
-            } catch (err) {
-              if ((err as { code?: string }).code !== "P2002") {
-                reportError("automations.email_send_record", err, { ruleId: rule.id });
-              }
-            }
-          }
-        } else {
-          continue;
-        }
+        if (!(await runAutomationAction(rule, ev))) continue;
         await db.automationRule.update({ where: { id: rule.id }, data: { lastRunAt: new Date() } });
       } catch (err) {
         reportError("automations.rule", err, { ruleId: rule.id, trigger: event.type });

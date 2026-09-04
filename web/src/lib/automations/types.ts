@@ -7,12 +7,19 @@
 export const TRIGGER_TYPES = [
   "lead_created",
   "lead_status_changed",
+  "lead_idle",
   "deal_stage_changed",
   "deal_idle_in_stage",
 ] as const;
 export type TriggerType = (typeof TRIGGER_TYPES)[number];
 
-export const ACTION_TYPES = ["create_task", "send_email"] as const;
+export const ACTION_TYPES = [
+  "create_task",
+  "send_email",
+  "change_lead_status",
+  "assign_lead",
+  "webhook_out",
+] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 
 export const CONDITION_OPS = [
@@ -39,9 +46,16 @@ export interface TriggerConfig {
   toStageId?: number;
   /** deal_idle_in_stage: the stage to watch (optional — any stage if unset). */
   stageId?: number;
-  /** deal_idle_in_stage: fire once a deal has sat this many days. */
+  /** deal_idle_in_stage / lead_idle: fire once idle this many days. */
   idleDays?: number;
+  /** lead_idle: only leads in this status (optional — any open lead if unset). */
+  status?: string;
 }
+
+export interface ChangeLeadStatusActionConfig { toStatus: string }
+export interface AssignLeadActionConfig { assignedToId: number }
+/** POST the event as JSON to a URL (n8n / voice agent seam). http(s) only, 5s timeout. */
+export interface WebhookOutActionConfig { url: string }
 
 export interface CreateTaskActionConfig {
   /** Task title; supports {company}/{message}/{sourceApp} placeholders. */
