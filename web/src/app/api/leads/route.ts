@@ -61,12 +61,15 @@ export async function POST(request: Request) {
     await runAutomations({
       type: "lead_created",
       tenantId: key.tenantId,
+      leadId: result.leadId,
       companyId: result.companyId,
       personId: result.personId,
       companyName: parsed.data.company_name,
       fields: {
         company: parsed.data.company_name,
         source: parsed.data.source ?? null,
+        channel: parsed.data.channel,
+        campaign: parsed.data.campaign ?? null,
         serviceInterest: parsed.data.service_interest ?? null,
         message: parsed.data.message ?? null,
         sourceApp: key.appSlug,

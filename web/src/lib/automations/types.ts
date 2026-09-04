@@ -73,6 +73,8 @@ export interface AutomationEvent {
   companyId: number | null;
   personId: number | null;
   dealId?: number | null;
+  /** Lead-scoped triggers carry the lead so lead actions (status/assign) can target it. */
+  leadId?: number | null;
   companyName?: string | null;
   /** lead_status_changed: the status the lead just entered. */
   toStatus?: string;

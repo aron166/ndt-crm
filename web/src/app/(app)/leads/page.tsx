@@ -22,7 +22,7 @@ export default async function LeadsPage({
   // Counts power the toggle. Converted leads have graduated to the deal pipeline
   // and are excluded from the active board — see lead-deal-process-tracker model.
   const [activeCount, convertedCount] = await Promise.all([
-    db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: null } }),
+    db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: null, outcome: "open" } }),
     db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: { not: null } } }),
   ]);
 
@@ -147,7 +147,7 @@ export default async function LeadsPage({
   }
 
   const leads = await db.lead.findMany({
-    where: { tenantId: TENANT_ID, convertedDealId: null },
+    where: { tenantId: TENANT_ID, convertedDealId: null, outcome: "open" },
     include: {
       company: { select: { id: true, name: true } },
       contact: {

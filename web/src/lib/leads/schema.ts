@@ -22,6 +22,13 @@ export const leadIntakeSchema = z
     service_interest: optStr,
     source: z.preprocess(emptyToUndef, z.string().trim().max(100).default("web")),
     source_app: optStr, // falls back to the API key's appSlug if omitted
+    // Inbound channel + campaign tag (Phase 2). Defaults to "landing" — the
+    // landing pages were the only caller before channels existed.
+    channel: z.preprocess(
+      emptyToUndef,
+      z.enum(["cold_email", "landing", "linkedin", "meta_ads", "referral", "import", "manual"]).default("landing"),
+    ),
+    campaign: optStr,
 
     // Marketing passthrough — stored on lead.customFields.
     utm_source: optStr,

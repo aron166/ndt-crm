@@ -3,11 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, User, Mail, Phone, Globe, ArrowRightCircle, CheckCircle2, Pencil, Trash2 } from "lucide-react";
-import { convertLeadToDeal, updateLeadStatus, deleteLead } from "@/app/actions/leads";
+import { Building2, User, Mail, Phone, Globe, CheckCircle2, Pencil, Trash2, PhoneCall, CalendarClock } from "lucide-react";
+import { setLeadOutcomeAction, updateLeadStatus, deleteLead, assignLeadAction } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
+import { CallOutcomeModal } from "../CallOutcomeModal";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
+import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, type LeadOutcome } from "@/lib/leads/outcomes";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
 
 interface Interaction {
@@ -17,7 +19,17 @@ interface Interaction {
   notes: string | null;
   outcome: string | null;
   occurredAt: string | Date;
+  leadId?: number | null;
   person: { id: number; firstName: string | null; lastName: string | null } | null;
+  user?: { name: string } | null;
+}
+
+interface OpenTask {
+  id: number;
+  title: string;
+  dueDate: string | Date | null;
+  type: string | null;
+  assignedTo: { name: string } | null;
 }
 
 interface AuditEntry {
@@ -36,6 +48,8 @@ interface Lead {
   serviceInterest: string | null;
   message: string | null;
   lostReason: string | null;
+  outcome: string;
+  assignedToId: number | null;
   estimatedValue: number | null;
   receivedDate: string | Date | null;
   convertedDealId: number | null;
@@ -59,19 +73,27 @@ export function LeadDetailClient({
   interactions,
   auditEntries,
   statuses,
+  users,
+  openTasks,
 }: {
   lead: Lead;
   interactions: Interaction[];
   auditEntries: AuditEntry[];
   statuses: LeadStatusDef[];
+  users: { id: number; name: string }[];
+  openTasks: OpenTask[];
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(lead.status ?? "new");
-  const [converting, startConvert] = useTransition();
+  const [outcome, setOutcome] = useState<string>(lead.outcome);
+  const [outcomePending, startOutcome] = useTransition();
   const [statusPending, startStatus] = useTransition();
   const [converted, setConverted] = useState<number | null>(lead.convertedDealId ?? null);
   const [editing, setEditing] = useState(false);
+  const [logging, setLogging] = useState(false);
   const [deleting, startDelete] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const closed = outcome !== "open" || converted !== null;
 
   function handleDelete() {
     const label = lead.serviceInterest || lead.subject || `Lead #${lead.id}`;
@@ -98,17 +120,23 @@ export function LeadDetailClient({
     startStatus(async () => { await updateLeadStatus(lead.id, next); router.refresh(); });
   }
 
-  function handleConvert() {
-    startConvert(async () => {
-      const res = await convertLeadToDeal(lead.id);
-      if (res?.success && res.dealId) {
-        setConverted(res.dealId);
-        router.refresh();
-        return;
-      }
-      // Lost the race (already converted) or another error — resync from server
-      // so the button reflects the real convertedDealId state.
-      if (res?.error) router.refresh();
+  function handleOutcome(next: LeadOutcome) {
+    const prev = outcome;
+    setOutcome(next);
+    setActionError(null);
+    startOutcome(async () => {
+      const res = await setLeadOutcomeAction(lead.id, next);
+      if ("error" in res) { setOutcome(prev); setActionError(res.error); router.refresh(); return; }
+      if (res.dealId) setConverted(res.dealId);
+      router.refresh();
+    });
+  }
+
+  function handleAssign(v: string) {
+    startStatus(async () => {
+      const res = await assignLeadAction(lead.id, v === "" ? null : Number(v));
+      if ("error" in res) setActionError(res.error);
+      router.refresh();
     });
   }
 
@@ -144,7 +172,7 @@ export function LeadDetailClient({
           <select
             value={status}
             onChange={(e) => handleStatusChange(e.target.value)}
-            disabled={statusPending}
+            disabled={statusPending || closed}
             className="font-mono-ndt"
             style={{
               fontSize: 12, padding: "6px 10px", borderRadius: 6,
@@ -157,19 +185,44 @@ export function LeadDetailClient({
             ))}
           </select>
 
-          {converted ? (
+          {/* Outcome — orthogonal to the stage. `won` is the door to the deal pipeline. */}
+          <select
+            value={outcome}
+            onChange={(e) => handleOutcome(e.target.value as LeadOutcome)}
+            disabled={outcomePending}
+            className="font-mono-ndt"
+            title="Kimenetel"
+            style={{
+              fontSize: 12, padding: "6px 10px", borderRadius: 6, fontWeight: 600,
+              background: outcome === "won" ? "var(--mint-soft)" : outcome === "lost" ? "oklch(0.7 0.15 25 / 0.15)" : "var(--bg-panel)",
+              border: `1px solid ${outcome === "won" ? "var(--mint)" : outcome === "lost" ? "var(--coral)" : "var(--line-soft)"}`,
+              color: outcome === "won" ? "var(--mint)" : outcome === "lost" ? "var(--coral)" : "var(--fg)", outline: "none",
+            }}
+          >
+            {LEAD_OUTCOMES.map((o) => (
+              <option key={o} value={o}>{LEAD_OUTCOME_LABEL[o]}</option>
+            ))}
+          </select>
+
+          {converted && (
             <Link href="/deals" className="btn" style={{ gap: 6, color: "var(--mint)" }}>
               <CheckCircle2 style={{ width: 14, height: 14 }} />
               Deal #{converted}
             </Link>
-          ) : (
-            <button onClick={handleConvert} disabled={converting} className="btn primary" style={{ gap: 6 }}>
-              <ArrowRightCircle style={{ width: 14, height: 14 }} />
-              {converting ? "Konvertálás…" : "Konvertálás Deallé"}
-            </button>
           )}
+
+          <button onClick={() => setLogging(true)} disabled={closed} className="btn primary" style={{ gap: 6 }} title={closed ? "Lezárt lead" : undefined}>
+            <PhoneCall style={{ width: 14, height: 14 }} />
+            Hívás eredménye
+          </button>
         </div>
       </div>
+
+      {actionError && (
+        <div className="panel" style={{ marginBottom: 12 }}>
+          <div className="panel-pad" style={{ fontSize: 13, color: "var(--coral)" }}>{actionError}</div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, alignItems: "start" }}>
         {/* Left: entity + source */}
@@ -242,6 +295,26 @@ export function LeadDetailClient({
                 <span style={{ color: "var(--fg-mute)" }}>Státusz</span>
                 <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{leadStatusLabel(status, statuses)}</span>
               </div>
+              <div className="flex justify-between" style={{ fontSize: 12 }}>
+                <span style={{ color: "var(--fg-mute)" }}>Kimenetel</span>
+                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>
+                  {LEAD_OUTCOME_LABEL[outcome as LeadOutcome] ?? outcome}
+                  {outcome === "lost" && lead.lostReason ? ` · ${callOutcomeLabel(lead.lostReason)}` : ""}
+                </span>
+              </div>
+              <div className="flex justify-between items-center" style={{ fontSize: 12 }}>
+                <span style={{ color: "var(--fg-mute)" }}>Felelős</span>
+                <select
+                  defaultValue={lead.assignedToId ?? ""}
+                  onChange={(e) => handleAssign(e.target.value)}
+                  disabled={statusPending}
+                  className="font-mono-ndt"
+                  style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "var(--bg-0)", border: "1px solid var(--line-soft)", color: "var(--fg)" }}
+                >
+                  <option value="">— nincs —</option>
+                  {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
               {marketing.length > 0 && (
                 <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 6 }}>
                   {marketing.map(([k, v]) => (
@@ -267,8 +340,29 @@ export function LeadDetailClient({
             </div>
           )}
 
+          {openTasks.length > 0 && (
+            <div className="panel">
+              <div className="panel-head"><div className="panel-title">Nyitott feladatok · {openTasks.length}</div></div>
+              <div className="panel-pad space-y-2">
+                {openTasks.map((t) => {
+                  const tone = callbackTone(t.dueDate);
+                  return (
+                    <div key={t.id} className="flex items-center gap-2" style={{ fontSize: 12 }}>
+                      <CalendarClock style={{ width: 12, height: 12, color: tone === "overdue" ? "var(--coral)" : tone === "soon" ? "var(--amber)" : "var(--fg-faint)" }} />
+                      <Link href="/tasks" className="row-link" style={{ color: "var(--fg)", flex: 1 }}>{t.title}</Link>
+                      {t.assignedTo && <span style={{ color: "var(--fg-faint)" }}>{t.assignedTo.name}</span>}
+                      <span className="font-mono-ndt" style={{ color: tone === "overdue" ? "var(--coral)" : "var(--fg-mute)", fontSize: 11 }}>
+                        {t.dueDate ? formatDateTime(t.dueDate) : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="panel">
-            <div className="panel-head"><div className="panel-title">Interakciók · {interactions.length}</div></div>
+            <div className="panel-head"><div className="panel-title">Hívások és interakciók · {interactions.length}</div></div>
             <div className="panel-pad">
               {interactions.length === 0 ? (
                 <div style={{ fontSize: 12, color: "var(--fg-mute)", padding: "8px 0" }}>Nincs rögzített interakció.</div>
@@ -281,6 +375,12 @@ export function LeadDetailClient({
                         <div className="flex items-center gap-2" style={{ fontSize: 12, marginBottom: 2 }}>
                           <span style={{ color: "var(--fg)", fontWeight: 500 }}>{interactionTypeLabel(r.type)}</span>
                           {r.direction && <span style={{ color: "var(--fg-mute)" }}>· {interactionDirectionLabel(r.direction)}</span>}
+                          {r.outcome && (
+                            <span className="font-mono-ndt" style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: "var(--bg-hover)", color: "var(--fg-soft)" }}>
+                              {callOutcomeLabel(r.outcome)}
+                            </span>
+                          )}
+                          {r.user?.name && <span style={{ color: "var(--fg-faint)", fontSize: 11 }}>· {r.user.name}</span>}
                           <span className="font-mono-ndt" style={{ color: "var(--fg-faint)", fontSize: 10, marginLeft: "auto" }}>{formatDateTime(r.occurredAt)}</span>
                         </div>
                         {r.notes && <p style={{ fontSize: 12, color: "var(--fg-soft)", lineHeight: 1.4 }}>{r.notes}</p>}
@@ -309,6 +409,14 @@ export function LeadDetailClient({
           )}
         </div>
       </div>
+
+      <CallOutcomeModal
+        open={logging}
+        onClose={() => setLogging(false)}
+        leadId={lead.id}
+        title={[personName, lead.company?.name].filter(Boolean).join(" · ") || null}
+        onLogged={() => router.refresh()}
+      />
 
       <LeadEditModal
         open={editing}
