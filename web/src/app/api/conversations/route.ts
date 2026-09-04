@@ -7,11 +7,10 @@ import { conversationIntakeSchema } from "@/lib/hub/schema";
 
 // Agent-conversation ingestion (conversations + messages).
 //
-// Auth: Authorization: Bearer <per-app key> (preferred — tenant comes from the
-// key) or, transitionally, the shared service-role key (deprecated).
+// Auth: Authorization: Bearer <per-app key> — tenant comes from the key.
 
 export async function POST(request: Request) {
-  const ctx = await authenticateIngest(request, "/api/conversations");
+  const ctx = await authenticateIngest(request);
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   if (!rateLimit(ctx.keyId)) {
@@ -34,15 +33,18 @@ export async function POST(request: Request) {
   }
   const body = parsed.data;
 
-  // App-key callers can't write outside their key's tenant; a mismatched body
-  // tenantId is a misconfigured caller, so fail loudly instead of ignoring it.
-  if (!ctx.legacyServiceKey && body.tenantId !== undefined && body.tenantId !== ctx.tenantId) {
-    return NextResponse.json(
-      { error: "tenantId does not match the API key's tenant" },
-      { status: 403 },
-    );
+  const tenantId = ctx.tenantId;
+
+  // Every referenced entity must belong to the key's tenant — a foreign id is
+  // a caller bug (or a probe), never a cross-tenant write.
+  const [agentOk, personOk, companyOk] = await Promise.all([
+    body.agentId ? db.agent.findFirst({ where: { id: body.agentId }, select: { id: true } }) /* agents are portfolio-global */ : true,
+    body.personId ? db.person.findFirst({ where: { id: body.personId, tenantId, deletedAt: null }, select: { id: true } }) : true,
+    body.companyId ? db.company.findFirst({ where: { id: body.companyId, tenantId, deletedAt: null }, select: { id: true } }) : true,
+  ]);
+  if (!agentOk || !personOk || !companyOk) {
+    return NextResponse.json({ error: "Unknown agentId, personId, or companyId for this tenant" }, { status: 400 });
   }
-  const tenantId = ctx.legacyServiceKey ? (body.tenantId ?? 1) : ctx.tenantId;
 
   try {
     const conversation = await db.conversation.create({
@@ -78,7 +80,7 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
       return NextResponse.json(
-        { error: "Unknown tenantId, agentId, personId, or companyId reference" },
+        { error: "Unknown agentId, personId, or companyId reference" },
         { status: 400 },
       );
     }

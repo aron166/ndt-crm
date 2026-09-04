@@ -5,6 +5,8 @@ import {
 import type { AutomationEvent, CreateTaskActionConfig } from "./types";
 import { db } from "@/lib/db";
 
+vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
+
 vi.mock("@/lib/db", () => ({
   db: {
     automationRule: { findMany: vi.fn(), update: vi.fn() },

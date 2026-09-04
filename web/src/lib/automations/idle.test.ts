@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import { runIdleAutomations } from "./idle";
 import { db } from "@/lib/db";
 
+vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
+
 vi.mock("@/lib/db", () => ({
   db: {
     automationRule: { findMany: vi.fn(), update: vi.fn() },

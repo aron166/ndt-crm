@@ -168,6 +168,22 @@ export async function resolveRecipientEmail(event: AutomationEvent): Promise<str
   return null;
 }
 
+/**
+ * Audit a task an automation rule created (system actor, attributed to the
+ * rule). Dynamic import keeps next/server + Supabase out of the unit-test graph.
+ */
+export async function auditRuleTask(
+  taskId: number,
+  data: Prisma.TaskUncheckedCreateInput,
+  ruleId: number,
+  tenantId: number,
+): Promise<void> {
+  const { audit } = await import("@/lib/audit");
+  audit("task", taskId, "create", null,
+    { title: data.title, type: data.type ?? null, dueDate: data.dueDate ?? null, dealId: data.dealId ?? null, ruleId },
+    { tenantId, actor: "system", actorAgentId: `automation_rule:${ruleId}` });
+}
+
 // ── Orchestrator (DB-backed) ────────────────────────────────────────
 
 /**
@@ -229,7 +245,9 @@ export async function runAutomations(event: AutomationEvent): Promise<void> {
         if (rule.actionType === "create_task") {
           const cfg = rule.actionConfig as unknown as CreateTaskActionConfig;
           if (!cfg?.titleTemplate) continue;
-          await db.task.create({ data: buildCreateTaskData(cfg, ev) });
+          const data = buildCreateTaskData(cfg, ev);
+          const task = await db.task.create({ data, select: { id: true } });
+          await auditRuleTask(task.id, data, rule.id, ev.tenantId);
         } else if (rule.actionType === "send_email") {
           const cfg = rule.actionConfig as unknown as SendEmailActionConfig;
           if (!cfg?.subjectTemplate || !cfg?.bodyTemplate) continue;
