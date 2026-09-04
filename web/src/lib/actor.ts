@@ -13,12 +13,31 @@ export interface Actor {
   email: string | null;
 }
 
+/**
+ * Canonical form for matching a login email against `users.email`: trimmed,
+ * lowercased; for Gmail (gmail.com / googlemail.com) dots and +tags in the local
+ * part are dropped, because Gmail delivers `balogh.aron16+x@` and `balogharon16@`
+ * to the same mailbox and Áron signs in with both spellings.
+ */
+export function normalizeEmail(raw: string | null | undefined): string | null {
+  const e = raw?.trim().toLowerCase();
+  if (!e || !e.includes("@")) return null;
+  const [local, domain] = e.split("@");
+  if (domain === "gmail.com" || domain === "googlemail.com") {
+    return `${local.split("+")[0].replace(/\./g, "")}@gmail.com`;
+  }
+  return `${local}@${domain}`;
+}
+
 export async function getActor(tenantId: number): Promise<Actor> {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
-  const email = data.user?.email?.trim().toLowerCase() ?? null;
+  const email = normalizeEmail(data.user?.email);
   if (!email) return { userId: null, email: null };
-  const user = await db.user.findFirst({ where: { tenantId, email }, select: { id: true } });
+  // ponytail: users is a handful of rows per tenant — compare in memory rather than
+  // storing a normalized column. Add `users.email_normalized` if the table grows.
+  const users = await db.user.findMany({ where: { tenantId }, select: { id: true, email: true } });
+  const user = users.find((u) => normalizeEmail(u.email) === email);
   return { userId: user?.id ?? null, email };
 }
 
