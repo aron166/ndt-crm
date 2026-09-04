@@ -228,12 +228,18 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
     const lead = leads.find((l) => l.id === draggingId);
     if (!lead || lead.status === statusKey) { setDraggingId(null); setHoverCol(null); return; }
 
-    setLeads((prev) => prev.map((l) => l.id === draggingId ? { ...l, status: statusKey } : l));
     const id = draggingId;
+    const prevStatus = lead.status;
+    setLeads((prev) => prev.map((l) => l.id === id ? { ...l, status: statusKey } : l));
     setDraggingId(null); setHoverCol(null);
     startTransition(async () => {
       const res = await moveLead(id, statusKey);
-      if (res && "error" in res) setError(res.error);
+      if (res && "error" in res) {
+        // Failed move rolls back NOW and says why — never a silent optimistic card.
+        setLeads((prev) => prev.map((l) => l.id === id ? { ...l, status: prevStatus } : l));
+        setError(res.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -253,11 +259,12 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
 
   function handleOutcome(id: number, outcome: LeadOutcome) {
     if (outcome === "open") return;
-    // Won/lost leave the active board — optimistic remove, server re-syncs.
+    // Won/lost leave the active board — optimistic remove; a failure puts it back.
+    const snapshot = leads;
     setLeads((prev) => prev.filter((l) => l.id !== id));
     startTransition(async () => {
       const res = await setLeadOutcomeAction(id, outcome);
-      if (res && "error" in res) setError(res.error);
+      if (res && "error" in res) { setLeads(snapshot); setError(res.error); return; }
       router.refresh();
     });
   }

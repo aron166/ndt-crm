@@ -116,8 +116,14 @@ export function LeadDetailClient({
     .filter(([, v]) => v !== undefined && v !== null && v !== "");
 
   function handleStatusChange(next: string) {
+    const prev = status;
     setStatus(next);
-    startStatus(async () => { await updateLeadStatus(lead.id, next); router.refresh(); });
+    setActionError(null);
+    startStatus(async () => {
+      const res = await updateLeadStatus(lead.id, next);
+      if (res && "error" in res) { setStatus(prev); setActionError(res.error); return; }
+      router.refresh();
+    });
   }
 
   function handleOutcome(next: LeadOutcome) {
