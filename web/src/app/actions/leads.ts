@@ -44,7 +44,9 @@ export async function deleteLead(
 }
 
 export async function moveLead(leadId: number, newStatus: string) {
-  const res = await changeLeadStatus(leadId, newStatus, await userLeadCtx(TENANT_ID));
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await changeLeadStatus(leadId, newStatus, ctx);
   if ("error" in res) return res;
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
@@ -57,7 +59,9 @@ export async function updateLeadStatus(leadId: number, newStatus: string) {
 
 /** Lead → deal hand-off (the `won` door). Logic lives in lib/leads/service.ts. */
 export async function convertLeadToDeal(leadId: number) {
-  const res = await setLeadOutcome(leadId, "won", await userLeadCtx(TENANT_ID));
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await setLeadOutcome(leadId, "won", ctx);
   if ("error" in res) return res;
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
@@ -67,7 +71,9 @@ export async function convertLeadToDeal(leadId: number) {
 
 /** open | won | lost from the card / detail dropdown. */
 export async function setLeadOutcomeAction(leadId: number, outcome: LeadOutcome, lostReason?: string | null) {
-  const res = await setLeadOutcome(leadId, outcome, await userLeadCtx(TENANT_ID), lostReason);
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await setLeadOutcome(leadId, outcome, ctx, lostReason);
   if ("error" in res) return res;
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
@@ -76,7 +82,9 @@ export async function setLeadOutcomeAction(leadId: number, outcome: LeadOutcome,
 }
 
 export async function assignLeadAction(leadId: number, assignedToId: number | null) {
-  const res = await assignLead(leadId, assignedToId, await userLeadCtx(TENANT_ID));
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await assignLead(leadId, assignedToId, ctx);
   if ("error" in res) return res;
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
@@ -90,6 +98,8 @@ export async function assignLeadAction(leadId: number, assignedToId: number | nu
 export async function logLeadCall(leadId: number, input: {
   outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
 }) {
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
   const res = await logLeadCallOutcome(
     leadId,
     {
@@ -98,7 +108,7 @@ export async function logLeadCall(leadId: number, input: {
       ...(input.callbackAt ? { callbackAt: input.callbackAt } : {}),
       ...(input.demoWith ? { demoWith: input.demoWith } : {}),
     },
-    await userLeadCtx(TENANT_ID),
+    ctx,
   );
   if ("error" in res) return { error: res.error };
   revalidatePath("/leads");
