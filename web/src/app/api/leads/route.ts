@@ -5,6 +5,8 @@ import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { leadIntakeSchema } from "@/lib/leads/schema";
 import { ingestLead } from "@/lib/leads/ingest";
 import { runAutomations } from "@/lib/automations/engine";
+import { serializeDates } from "@/lib/serialize";
+import { leadListQuerySchema, LEAD_API_SELECT } from "@/lib/leads/api";
 
 // Public lead-intake endpoint (Platform Foundation #4).
 //
@@ -14,7 +16,7 @@ import { runAutomations } from "@/lib/automations/engine";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
   "Access-Control-Max-Age": "86400",
 };
@@ -25,6 +27,29 @@ function json(body: unknown, status: number) {
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+/** GET /api/leads?status=&outcome=&assigned_to=&page=&page_size= — paginated, newest first. */
+export async function GET(request: Request) {
+  const key = await validateAppKey(request);
+  if (!key) return json({ error: "Unauthorized" }, 401);
+  if (!rateLimit(key.keyId)) return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
+
+  const q = leadListQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!q.success) return json({ error: "Validation failed", details: q.error.flatten() }, 400);
+  const { status, outcome, assigned_to, page, page_size } = q.data;
+
+  const where = {
+    tenantId: key.tenantId,
+    ...(status ? { status } : {}),
+    ...(outcome ? { outcome } : {}),
+    ...(assigned_to ? { assignedToId: assigned_to } : {}),
+  };
+  const [items, total] = await Promise.all([
+    db.lead.findMany({ where, select: LEAD_API_SELECT, orderBy: { createdAt: "desc" }, skip: (page - 1) * page_size, take: page_size }),
+    db.lead.count({ where }),
+  ]);
+  return json({ ok: true, items: serializeDates(items), page, page_size, total, total_pages: Math.ceil(total / page_size) }, 200);
 }
 
 export async function POST(request: Request) {
