@@ -3,16 +3,20 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, User, Clock, Tag, Trash2 } from "lucide-react";
-import { moveLead, deleteLead } from "@/app/actions/leads";
+import { Building2, Phone, Clock, CalendarClock, Trash2, PhoneCall } from "lucide-react";
+import { moveLead, deleteLead, setLeadOutcomeAction } from "@/app/actions/leads";
 import { DeleteCardDialog, type DeleteCascade } from "@/components/DeleteCardDialog";
-import { formatRelativeTime } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { CallOutcomeModal } from "./CallOutcomeModal";
+import { cn, formatDateTime } from "@/lib/utils";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
+import {
+  LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, type LeadOutcome,
+} from "@/lib/leads/outcomes";
 
 interface Lead {
   id: number;
   status: string | null;
+  outcome: string;
   source: string | null;
   sourceApp: string | null;
   subject: string | null;
@@ -20,40 +24,52 @@ interface Lead {
   message: string | null;
   estimatedValue: number | null;
   createdAt: string | Date;
+  lastContactAt: string | null;
+  callbackDueAt: string | null;
   customFields: Record<string, unknown> | null;
   company: { id: number; name: string } | null;
   contact: {
     id: number;
     phone: string | null;
     email: string | null;
-    person: { id: number; firstName: string | null; lastName: string | null } | null;
+    person: { id: number; firstName: string | null; lastName: string | null; phone: string | null } | null;
   } | null;
 }
 
 interface LeadsKanbanProps {
   statuses: LeadStatusDef[];
   leads: Lead[];
+  /** Total leads per column (the board shows at most `columnLimit` of them). */
+  columnTotals: Record<string, number>;
+  columnLimit: number;
+}
+
+function personNameOf(lead: Lead): string | null {
+  const p = lead.contact?.person;
+  if (p) return `${p.lastName ?? ""} ${p.firstName ?? ""}`.trim() || null;
+  return (lead.customFields?.contact_name as string | undefined) ?? null;
+}
+function phoneOf(lead: Lead): string | null {
+  return lead.contact?.phone ?? lead.contact?.person?.phone ?? (lead.customFields?.contact_phone as string | undefined) ?? null;
 }
 
 function LeadCard({
-  lead,
-  onDragStart,
-  onDragEnd,
-  onDelete,
-  dragging,
+  lead, onDragStart, onDragEnd, onDelete, onCall, onOutcome, dragging,
 }: {
   lead: Lead;
   onDragStart: (id: number) => void;
   onDragEnd: () => void;
   onDelete: (id: number) => void;
+  onCall: (id: number) => void;
+  onOutcome: (id: number, outcome: LeadOutcome) => void;
   dragging: boolean;
 }) {
   const router = useRouter();
-  const person = lead.contact?.person;
-  const personName = person
-    ? `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()
-    : (lead.customFields?.contact_name as string | undefined) ?? null;
-  const sourceTag = lead.sourceApp || lead.source;
+  const personName = personNameOf(lead);
+  const phone = phoneOf(lead);
+  const days = daysSince(lead.lastContactAt);
+  const cbTone = callbackTone(lead.callbackDueAt);
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   return (
     <div
@@ -64,26 +80,23 @@ function LeadCard({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        // Only the card itself navigates — let child controls (e.g. delete) handle their own keys.
         if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/leads/${lead.id}`); }
       }}
       className={cn("relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
-        border: "1px solid var(--line-soft)",
+        border: `1px solid ${cbTone === "overdue" ? "var(--coral)" : "var(--line-soft)"}`,
         padding: "10px 12px", cursor: "grab",
         boxShadow: "inset 0 1px 0 oklch(1 0 0 / 0.05)",
         transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
         willChange: "transform",
       }}
       onMouseOver={(e) => {
-        e.currentTarget.style.borderColor = "var(--indigo-line)";
         e.currentTarget.style.boxShadow = "var(--glow-indigo)";
         e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseOut={(e) => {
-        e.currentTarget.style.borderColor = "var(--line-soft)";
         e.currentTarget.style.boxShadow = "inset 0 1px 0 oklch(1 0 0 / 0.05)";
         e.currentTarget.style.transform = "none";
       }}
@@ -97,8 +110,7 @@ function LeadCard({
         className="absolute"
         style={{
           top: 6, right: 6, width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
-          borderRadius: 5, color: "var(--fg-faint)", background: "var(--bg-hover)",
-          border: "1px solid var(--line-soft)",
+          borderRadius: 5, color: "var(--fg-faint)", background: "var(--bg-hover)", border: "1px solid var(--line-soft)",
         }}
         onMouseOver={(e) => { e.currentTarget.style.color = "var(--coral)"; }}
         onMouseOut={(e) => { e.currentTarget.style.color = "var(--fg-faint)"; }}
@@ -106,65 +118,109 @@ function LeadCard({
         <Trash2 style={{ width: 12, height: 12 }} />
       </button>
 
+      {/* Person (headline) */}
       <Link
         href={`/leads/${lead.id}`}
-        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", display: "block", marginBottom: 6, paddingRight: 18 }}
+        onClick={stop}
+        style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35, color: "var(--fg)", display: "block", marginBottom: 3, paddingRight: 24 }}
         onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
         onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
-        onClick={(e) => e.stopPropagation()}
       >
-        {lead.serviceInterest || lead.subject || "Új érdeklődés"}
+        {personName ?? lead.serviceInterest ?? lead.subject ?? "Névtelen érdeklődő"}
       </Link>
 
-      {lead.message && (
-        <p style={{ fontSize: 11, color: "var(--fg-mute)", lineHeight: 1.4, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-          {lead.message}
-        </p>
+      {lead.company && (
+        <Link
+          href={`/companies/${lead.company.id}`}
+          className="flex items-center gap-1.5"
+          style={{ fontSize: 11, color: "var(--fg-mute)", marginBottom: 4 }}
+          onClick={stop}
+          onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
+          onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}
+        >
+          <Building2 style={{ width: 10, height: 10, flexShrink: 0 }} />
+          <span className="truncate">{lead.company.name}</span>
+        </Link>
       )}
 
-      <div style={{ borderTop: "1px dashed var(--line-soft)", paddingTop: 8, marginTop: 4, display: "flex", flexDirection: "column", gap: 3 }}>
-        {lead.company && (
-          <Link
-            href={`/companies/${lead.company.id}`}
-            className="flex items-center gap-1.5"
-            style={{ fontSize: 11, color: "var(--fg-mute)" }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-            onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}
+      {phone && (
+        <a
+          href={`tel:${phone.replace(/\s+/g, "")}`}
+          className="flex items-center gap-1.5 font-mono-ndt"
+          style={{ fontSize: 12, color: "var(--sky)", marginBottom: 6 }}
+          onClick={stop}
+        >
+          <Phone style={{ width: 11, height: 11, flexShrink: 0 }} />
+          {phone}
+        </a>
+      )}
+
+      {cbTone !== null || lead.callbackDueAt ? (
+        <div
+          className="flex items-center gap-1 font-mono-ndt"
+          title="Visszahívás esedékes"
+          style={{
+            fontSize: 10, padding: "2px 7px", borderRadius: 4, marginBottom: 6, width: "fit-content",
+            background: cbTone === "overdue" ? "var(--coral)" : cbTone === "soon" ? "oklch(0.7 0.15 25 / 0.18)" : "var(--bg-hover)",
+            color: cbTone === "overdue" ? "white" : cbTone === "soon" ? "var(--coral)" : "var(--fg-mute)",
+            fontWeight: cbTone ? 700 : 500,
+          }}
+        >
+          <CalendarClock style={{ width: 10, height: 10 }} />
+          {formatDateTime(lead.callbackDueAt)}
+        </div>
+      ) : null}
+
+      <div style={{ borderTop: "1px dashed var(--line-soft)", paddingTop: 7, marginTop: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+        <span
+          className="flex items-center gap-1 font-mono-ndt"
+          title="Utolsó kapcsolatfelvétel óta"
+          style={{ fontSize: 10, color: days === null ? "var(--amber)" : days > 7 ? "var(--coral)" : "var(--fg-faint)" }}
+        >
+          <Clock style={{ width: 10, height: 10 }} />
+          {days === null ? "soha" : days === 0 ? "ma" : `${days} napja`}
+        </span>
+        <div className="flex items-center gap-1" onClick={stop}>
+          <button
+            type="button"
+            className="btn sm"
+            title="Hívás eredménye"
+            aria-label="Hívás eredménye"
+            draggable={false}
+            onClick={() => onCall(lead.id)}
+            style={{ padding: "2px 7px", gap: 4, fontSize: 10, height: 22 }}
           >
-            <Building2 style={{ width: 10, height: 10, flexShrink: 0 }} />
-            <span className="truncate">{lead.company.name}</span>
-          </Link>
-        )}
-        {personName && (
-          <div className="flex items-center gap-1.5" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
-            <User style={{ width: 10, height: 10, flexShrink: 0 }} />
-            <span className="truncate">{personName}</span>
-          </div>
-        )}
-        <div className="flex items-center justify-between" style={{ marginTop: 2 }}>
-          {sourceTag && (
-            <span className="flex items-center gap-1 font-mono-ndt" style={{ fontSize: 9, color: "var(--fg-faint)", background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 20 }}>
-              <Tag style={{ width: 9, height: 9 }} />
-              {sourceTag}
-            </span>
-          )}
-          <span className="flex items-center gap-1 font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)" }}>
-            <Clock style={{ width: 10, height: 10 }} />
-            {formatRelativeTime(lead.createdAt)}
-          </span>
+            <PhoneCall style={{ width: 11, height: 11 }} />
+            Hívás
+          </button>
+          {/* The "green dropdown, bottom-right": outcome is orthogonal to the column. */}
+          <select
+            value={lead.outcome}
+            aria-label="Kimenetel"
+            draggable={false}
+            onChange={(e) => onOutcome(lead.id, e.target.value as LeadOutcome)}
+            className="font-mono-ndt"
+            style={{
+              fontSize: 10, height: 22, padding: "0 4px", borderRadius: 4, fontWeight: 700,
+              background: "var(--mint-soft)", color: "var(--mint)", border: "1px solid var(--mint)", outline: "none",
+            }}
+          >
+            {LEAD_OUTCOMES.map((o) => <option key={o} value={o}>{LEAD_OUTCOME_LABEL[o]}</option>)}
+          </select>
         </div>
       </div>
     </div>
   );
 }
 
-export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps) {
+export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, columnLimit }: LeadsKanbanProps) {
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [hoverCol, setHoverCol] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Lead | null>(null);
+  const [callingId, setCallingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function handleDrop(statusKey: string) {
@@ -172,10 +228,20 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
     const lead = leads.find((l) => l.id === draggingId);
     if (!lead || lead.status === statusKey) { setDraggingId(null); setHoverCol(null); return; }
 
-    setLeads((prev) => prev.map((l) => l.id === draggingId ? { ...l, status: statusKey } : l));
     const id = draggingId;
+    const prevStatus = lead.status;
+    setLeads((prev) => prev.map((l) => l.id === id ? { ...l, status: statusKey } : l));
     setDraggingId(null); setHoverCol(null);
-    startTransition(async () => { await moveLead(id, statusKey); router.refresh(); });
+    startTransition(async () => {
+      const res = await moveLead(id, statusKey);
+      if (res && "error" in res) {
+        // Failed move rolls back NOW and says why — never a silent optimistic card.
+        setLeads((prev) => prev.map((l) => l.id === id ? { ...l, status: prevStatus } : l));
+        setError(res.error);
+        return;
+      }
+      router.refresh();
+    });
   }
 
   function handleDelete(id: number) {
@@ -187,18 +253,26 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
     const lead = pendingDelete;
     if (!lead) return;
     setPendingDelete(null);
-    // Optimistic remove; refresh re-syncs from the server (same shape as moveLead).
     setLeads((prev) => prev.filter((l) => l.id !== lead.id));
     startTransition(async () => { await deleteLead(lead.id, cascade); router.refresh(); });
   }
 
-  const colLeads = (statusKey: string) =>
-    leads.filter((l) => (l.status ?? "new") === statusKey);
+  function handleOutcome(id: number, outcome: LeadOutcome) {
+    if (outcome === "open") return;
+    // Won/lost leave the active board — optimistic remove; a failure puts it back.
+    const snapshot = leads;
+    setLeads((prev) => prev.filter((l) => l.id !== id));
+    startTransition(async () => {
+      const res = await setLeadOutcomeAction(id, outcome);
+      if (res && "error" in res) { setLeads(snapshot); setError(res.error); return; }
+      router.refresh();
+    });
+  }
 
-  const pendingPerson = pendingDelete?.contact?.person;
-  const pendingPersonName = pendingPerson
-    ? `${pendingPerson.lastName ?? ""} ${pendingPerson.firstName ?? ""}`.trim()
-    : "";
+  const colLeads = (statusKey: string) => leads.filter((l) => l.status === statusKey);
+
+  const pendingPersonName = pendingDelete ? personNameOf(pendingDelete) ?? "" : "";
+  const calling = callingId != null ? leads.find((l) => l.id === callingId) ?? null : null;
 
   return (
     <>
@@ -211,9 +285,25 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
       onConfirm={confirmDelete}
       onClose={() => setPendingDelete(null)}
     />
+    <CallOutcomeModal
+      open={callingId !== null}
+      onClose={() => setCallingId(null)}
+      leadId={callingId ?? 0}
+      title={calling ? [personNameOf(calling), calling.company?.name].filter(Boolean).join(" · ") : null}
+      onLogged={() => router.refresh()}
+    />
+    {error && (
+      <div className="panel" style={{ marginBottom: 12 }}>
+        <div className="panel-pad flex items-center justify-between" style={{ fontSize: 13, color: "var(--coral)" }}>
+          {error}
+          <button className="btn sm" onClick={() => setError(null)}>OK</button>
+        </div>
+      </div>
+    )}
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${statuses.length}, minmax(220px, 1fr))`, gap: 12, alignItems: "start" }}>
       {statuses.map((status) => {
         const cards = colLeads(status.key);
+        const total = columnTotals[status.key] ?? cards.length;
         const isHover = hoverCol === status.key;
 
         return (
@@ -221,9 +311,6 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
             key={status.key}
             className="kcol mount"
             style={{
-              // The commitment column (booking = the order) gets a permanent
-              // accent so the "this is where it becomes a megrendelés" boundary
-              // reads at a glance, not just from the label.
               background: isHover
                 ? `${status.color}10`
                 : status.isCommitment ? `${status.color}0d` : "oklch(0.18 0.014 255 / 0.5)",
@@ -251,7 +338,9 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
                   Megrendelés
                 </span>
               )}
-              <span className="kcol-count font-mono-ndt">{cards.length}</span>
+              <span className="kcol-count font-mono-ndt" title={total > cards.length ? `A legújabb ${columnLimit} látszik` : undefined}>
+                {total > cards.length ? `${cards.length} / ${total}` : total}
+              </span>
             </div>
 
             <div className="kcol-body">
@@ -262,6 +351,8 @@ export function LeadsKanban({ statuses, leads: initialLeads }: LeadsKanbanProps)
                   onDragStart={setDraggingId}
                   onDragEnd={() => { setDraggingId(null); setHoverCol(null); }}
                   onDelete={handleDelete}
+                  onCall={setCallingId}
+                  onOutcome={handleOutcome}
                   dragging={draggingId === lead.id}
                 />
               ))}
