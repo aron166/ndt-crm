@@ -82,7 +82,7 @@ function FilterGroup({
         {open
           ? <ChevronDown className="size-3.5" style={{ color: "var(--fg-faint)", flexShrink: 0 }} />
           : <ChevronRight className="size-3.5" style={{ color: "var(--fg-faint)", flexShrink: 0 }} />}
-        <span style={{ fontSize: 14.5, fontWeight: 600, color: selectedCount ? "var(--fg)" : "var(--fg-soft)" }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: selectedCount ? "var(--fg)" : "var(--fg-soft)" }}>
           {label}
         </span>
         {selectedCount > 0 && (
@@ -127,7 +127,7 @@ function FilterGroup({
                   <span className="flex items-center justify-center" style={{ width: 14, height: 14, borderRadius: 4, border: `1px solid ${on ? "var(--indigo)" : "var(--line-soft)"}`, flexShrink: 0 }}>
                     {on && <Check className="size-3" />}
                   </span>
-                  <span style={{ fontSize: 14.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+                  <span style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
                   {o.hint && <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: "auto", flexShrink: 0 }}>{o.hint}</span>}
                 </button>
               );

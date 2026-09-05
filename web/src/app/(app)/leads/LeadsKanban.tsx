@@ -122,7 +122,7 @@ function LeadCard({
       <Link
         href={`/leads/${lead.id}`}
         onClick={stop}
-        style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35, color: "var(--fg)", display: "block", marginBottom: 3, paddingRight: 24 }}
+        style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35, color: "var(--fg)", display: "block", marginBottom: 3, paddingRight: 24 }}
         onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
         onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
       >
@@ -133,7 +133,7 @@ function LeadCard({
         <Link
           href={`/companies/${lead.company.id}`}
           className="flex items-center gap-1.5"
-          style={{ fontSize: 11, color: "var(--fg-mute)", marginBottom: 4 }}
+          style={{ fontSize: 12, color: "var(--fg-mute)", marginBottom: 4 }}
           onClick={stop}
           onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
           onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}
@@ -160,7 +160,7 @@ function LeadCard({
           className="flex items-center gap-1 font-mono-ndt"
           title="Visszahívás esedékes"
           style={{
-            fontSize: 10, padding: "2px 7px", borderRadius: 4, marginBottom: 6, width: "fit-content",
+            fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 6, width: "fit-content",
             background: cbTone === "overdue" ? "var(--coral)" : cbTone === "soon" ? "oklch(0.7 0.15 25 / 0.18)" : "var(--bg-hover)",
             color: cbTone === "overdue" ? "white" : cbTone === "soon" ? "var(--coral)" : "var(--fg-mute)",
             fontWeight: cbTone ? 700 : 500,
@@ -175,7 +175,7 @@ function LeadCard({
         <span
           className="flex items-center gap-1 font-mono-ndt"
           title="Utolsó kapcsolatfelvétel óta"
-          style={{ fontSize: 10, color: days === null ? "var(--amber)" : days > 7 ? "var(--coral)" : "var(--fg-faint)" }}
+          style={{ fontSize: 12, color: days === null ? "var(--amber)" : days > 7 ? "var(--coral)" : "var(--fg-faint)" }}
         >
           <Clock style={{ width: 10, height: 10 }} />
           {days === null ? "soha" : days === 0 ? "ma" : `${days} napja`}
@@ -188,7 +188,7 @@ function LeadCard({
             aria-label="Hívás eredménye"
             draggable={false}
             onClick={() => onCall(lead.id)}
-            style={{ padding: "2px 7px", gap: 4, fontSize: 10, height: 22 }}
+            style={{ padding: "2px 7px", gap: 4, fontSize: 12, height: 22 }}
           >
             <PhoneCall style={{ width: 11, height: 11 }} />
             Hívás
@@ -201,7 +201,7 @@ function LeadCard({
             onChange={(e) => onOutcome(lead.id, e.target.value as LeadOutcome)}
             className="font-mono-ndt"
             style={{
-              fontSize: 10, height: 22, padding: "0 4px", borderRadius: 4, fontWeight: 700,
+              fontSize: 12, height: 22, padding: "0 4px", borderRadius: 4, fontWeight: 700,
               background: "var(--mint-soft)", color: "var(--mint)", border: "1px solid var(--mint)", outline: "none",
             }}
           >
@@ -294,7 +294,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
     />
     {error && (
       <div className="panel" style={{ marginBottom: 12 }}>
-        <div className="panel-pad flex items-center justify-between" style={{ fontSize: 13, color: "var(--coral)" }}>
+        <div className="panel-pad flex items-center justify-between" style={{ fontSize: 14, color: "var(--coral)" }}>
           {error}
           <button className="btn sm" onClick={() => setError(null)}>OK</button>
         </div>
@@ -330,7 +330,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
                   className="font-mono-ndt"
                   title="Az időpont lefoglalása maga a megrendelés"
                   style={{
-                    fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                    fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
                     color: status.color, background: `${status.color}1f`,
                     border: `1px solid ${status.color}55`, borderRadius: 4, padding: "1px 5px",
                   }}

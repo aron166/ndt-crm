@@ -226,7 +226,7 @@ export function LeadDetailClient({
 
       {actionError && (
         <div className="panel" style={{ marginBottom: 12 }}>
-          <div className="panel-pad" style={{ fontSize: 13, color: "var(--coral)" }}>{actionError}</div>
+          <div className="panel-pad" style={{ fontSize: 14, color: "var(--coral)" }}>{actionError}</div>
         </div>
       )}
 
@@ -262,12 +262,12 @@ export function LeadDetailClient({
             <div className="panel-head"><div className="panel-title">Kapcsolattartó</div></div>
             <div className="panel-pad space-y-3">
               {personName ? (
-                <Link href={`/persons/${person!.id}`} className="flex items-center gap-2" style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>
+                <Link href={`/persons/${person!.id}`} className="flex items-center gap-2" style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>
                   <User style={{ width: 13, height: 13, color: "var(--indigo)" }} />
                   {personName}
                 </Link>
               ) : (
-                <div className="flex items-center gap-2" style={{ fontSize: 13, color: "var(--fg-mute)" }}>
+                <div className="flex items-center gap-2" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
                   <User style={{ width: 13, height: 13 }} />
                   {(cf.contact_name as string) || "Névtelen"}
                 </div>
@@ -315,7 +315,7 @@ export function LeadDetailClient({
                   onChange={(e) => handleAssign(e.target.value)}
                   disabled={statusPending}
                   className="font-mono-ndt"
-                  style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "var(--bg-0)", border: "1px solid var(--line-soft)", color: "var(--fg)" }}
+                  style={{ fontSize: 12, padding: "2px 6px", borderRadius: 5, background: "var(--bg-0)", border: "1px solid var(--line-soft)", color: "var(--fg)" }}
                 >
                   <option value="">— nincs —</option>
                   {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -324,7 +324,7 @@ export function LeadDetailClient({
               {marketing.length > 0 && (
                 <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 6 }}>
                   {marketing.map(([k, v]) => (
-                    <div key={k} className="flex justify-between" style={{ fontSize: 11 }}>
+                    <div key={k} className="flex justify-between" style={{ fontSize: 12 }}>
                       <span className="font-mono-ndt" style={{ color: "var(--fg-faint)" }}>{k}</span>
                       <span className="font-mono-ndt" style={{ color: "var(--fg-soft)", textAlign: "right" }}>{String(v)}</span>
                     </div>
@@ -341,7 +341,7 @@ export function LeadDetailClient({
             <div className="panel">
               <div className="panel-head"><div className="panel-title">Üzenet</div></div>
               <div className="panel-pad">
-                <p style={{ fontSize: 13, lineHeight: 1.6, color: "var(--fg-soft)", whiteSpace: "pre-wrap" }}>{lead.message}</p>
+                <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-soft)", whiteSpace: "pre-wrap" }}>{lead.message}</p>
               </div>
             </div>
           )}
@@ -357,7 +357,7 @@ export function LeadDetailClient({
                       <CalendarClock style={{ width: 12, height: 12, color: tone === "overdue" ? "var(--coral)" : tone === "soon" ? "var(--amber)" : "var(--fg-faint)" }} />
                       <Link href="/tasks" className="row-link" style={{ color: "var(--fg)", flex: 1 }}>{t.title}</Link>
                       {t.assignedTo && <span style={{ color: "var(--fg-faint)" }}>{t.assignedTo.name}</span>}
-                      <span className="font-mono-ndt" style={{ color: tone === "overdue" ? "var(--coral)" : "var(--fg-mute)", fontSize: 11 }}>
+                      <span className="font-mono-ndt" style={{ color: tone === "overdue" ? "var(--coral)" : "var(--fg-mute)", fontSize: 12 }}>
                         {t.dueDate ? formatDateTime(t.dueDate) : "—"}
                       </span>
                     </div>
@@ -382,12 +382,12 @@ export function LeadDetailClient({
                           <span style={{ color: "var(--fg)", fontWeight: 500 }}>{interactionTypeLabel(r.type)}</span>
                           {r.direction && <span style={{ color: "var(--fg-mute)" }}>· {interactionDirectionLabel(r.direction)}</span>}
                           {r.outcome && (
-                            <span className="font-mono-ndt" style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: "var(--bg-hover)", color: "var(--fg-soft)" }}>
+                            <span className="font-mono-ndt" style={{ fontSize: 12, padding: "1px 6px", borderRadius: 10, background: "var(--bg-hover)", color: "var(--fg-soft)" }}>
                               {callOutcomeLabel(r.outcome)}
                             </span>
                           )}
-                          {r.user?.name && <span style={{ color: "var(--fg-faint)", fontSize: 11 }}>· {r.user.name}</span>}
-                          <span className="font-mono-ndt" style={{ color: "var(--fg-faint)", fontSize: 10, marginLeft: "auto" }}>{formatDateTime(r.occurredAt)}</span>
+                          {r.user?.name && <span style={{ color: "var(--fg-faint)", fontSize: 12 }}>· {r.user.name}</span>}
+                          <span className="font-mono-ndt" style={{ color: "var(--fg-faint)", fontSize: 12, marginLeft: "auto" }}>{formatDateTime(r.occurredAt)}</span>
                         </div>
                         {r.notes && <p style={{ fontSize: 12, color: "var(--fg-soft)", lineHeight: 1.4 }}>{r.notes}</p>}
                       </div>
@@ -404,7 +404,7 @@ export function LeadDetailClient({
               <div className="panel-pad">
                 <div className="space-y-2">
                   {auditEntries.slice(0, 12).map((a) => (
-                    <div key={a.id} className="flex items-center justify-between" style={{ fontSize: 11 }}>
+                    <div key={a.id} className="flex items-center justify-between" style={{ fontSize: 12 }}>
                       <span className="font-mono-ndt" style={{ color: "var(--fg-mute)" }}>{a.action}</span>
                       <span className="font-mono-ndt" style={{ color: "var(--fg-faint)" }}>{formatRelativeTime(a.occurredAt)}</span>
                     </div>
