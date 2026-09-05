@@ -16,6 +16,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import {
   updateCampaign, setCampaignAudience, setCampaignArchived,
 } from "@/app/actions/campaigns";
+import { FormField } from "@/components/ui/FormField";
 
 interface Campaign {
   id: number;
@@ -215,14 +216,12 @@ export function CampaignDetailClient({
             <DialogTitle>Kampány szerkesztése</DialogTitle>
           </DialogHeader>
           <form onSubmit={saveEdit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Név *</label>
+            <FormField label="Név" required>
               <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Leírás</label>
+            </FormField>
+            <FormField label="Leírás">
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
-            </div>
+            </FormField>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={isPending}>Mégse</Button>

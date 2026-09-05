@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updatePerson } from "@/app/actions/persons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormField } from "@/components/ui/FormField";
 
 interface Person {
   id: number; firstName: string | null; lastName: string | null;
@@ -46,30 +47,24 @@ export function EditPersonModal({ open, onClose, person }: Props) {
         </DialogHeader>
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div className="field-group">
-              <label className="field-label">Vezetéknév *</label>
+            <FormField label="Vezetéknév" required>
               <input name="lastName" className="input-ds" defaultValue={person.lastName ?? ""} required />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Keresztnév *</label>
+            </FormField>
+            <FormField label="Keresztnév" required>
               <input name="firstName" className="input-ds" defaultValue={person.firstName ?? ""} required />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Email</label>
+            </FormField>
+            <FormField label="Email">
               <input name="email" className="input-ds" defaultValue={person.email ?? ""} type="email" />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Telefon</label>
+            </FormField>
+            <FormField label="Telefon">
               <input name="phone" className="input-ds" defaultValue={person.phone ?? ""} type="tel" />
-            </div>
-            <div className="field-group" style={{ gridColumn: "1 / -1" }}>
-              <label className="field-label">LinkedIn URL</label>
+            </FormField>
+            <FormField label="LinkedIn URL" full>
               <input name="linkedinUrl" className="input-ds" defaultValue={person.linkedinUrl ?? ""} />
-            </div>
-            <div className="field-group" style={{ gridColumn: "1 / -1" }}>
-              <label className="field-label">Megjegyzés</label>
+            </FormField>
+            <FormField label="Megjegyzés" full>
               <textarea name="notes" className="input-ds" rows={3} defaultValue={person.notes ?? ""} style={{ resize: "vertical" }} />
-            </div>
+            </FormField>
           </div>
 
           {error && <div style={{ fontSize: 12, color: "var(--coral)", padding: "6px 10px", background: "var(--coral-soft)", borderRadius: 5 }}>{error}</div>}

@@ -6,6 +6,7 @@ import {
   Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { createQuote, searchCompaniesForQuote } from "@/app/actions/quotes";
+import { FormField } from "@/components/ui/FormField";
 
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "7px 10px", fontSize: 13,
@@ -79,8 +80,7 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
 
         <div className="flex flex-col gap-3">
           {!presetCompany && (
-            <div>
-              <label style={{ fontSize: 11, color: "var(--fg-faint)" }}>Cég</label>
+            <FormField label="Cég">
               {companyId ? (
                 <div className="flex items-center justify-between gap-2 mt-1" style={inputStyle}>
                   <span>{companyLabel}</span>
@@ -106,15 +106,14 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
                   )}
                 </div>
               )}
-            </div>
+            </FormField>
           )}
 
-          <div>
-            <label style={{ fontSize: 11, color: "var(--fg-faint)" }}>Tárgy</label>
+          <FormField label="Tárgy">
             <input style={{ ...inputStyle, marginTop: 4 }} value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="pl. Hegesztési varratok UT vizsgálata" />
-          </div>
+          </FormField>
 
           {error && <span style={{ fontSize: 12, color: "var(--coral)" }}>⚠ {error}</span>}
 

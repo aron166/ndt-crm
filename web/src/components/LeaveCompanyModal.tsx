@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormField } from "@/components/ui/FormField";
 
 interface Props {
   open: boolean;
@@ -27,8 +28,7 @@ export function LeaveCompanyModal({ open, personName, companyName, onConfirm, on
             <strong style={{ color: "var(--fg)" }}>{personName}</strong> mikor hagyta el a(z){" "}
             <strong style={{ color: "var(--fg)" }}>{companyName}</strong> céget?
           </p>
-          <div className="field-group">
-            <label className="field-label">Kilépés dátuma</label>
+          <FormField label="Kilépés dátuma">
             <input
               type="date"
               className="input-ds"
@@ -36,7 +36,7 @@ export function LeaveCompanyModal({ open, personName, companyName, onConfirm, on
               max={today}
               onChange={(e) => setDate(e.target.value)}
             />
-          </div>
+          </FormField>
           <p style={{ margin: 0, fontSize: 11, color: "var(--fg-faint)" }}>
             Egy „Utánkövetés" feladat automatikusan létrejön 2 hetes határidővel.
           </p>

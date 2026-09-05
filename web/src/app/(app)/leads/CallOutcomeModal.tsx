@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { logLeadCall } from "@/app/actions/leads";
 import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
+import { FormField } from "@/components/ui/FormField";
 
 // "Hívás eredménye" — the core lead interaction. Validation (note required,
 // callback needs date+hour, meeting needs who) is enforced SERVER-side in
@@ -61,23 +62,20 @@ export function CallOutcomeModal({
           {title && <p className="text-sm" style={{ color: "var(--fg-mute)" }}>{title}</p>}
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="field-label">Eredmény *</label>
+          <FormField label="Eredmény" required>
             <select style={inputStyle} value={outcome} onChange={(e) => setOutcome(e.target.value)} autoFocus>
               {CALL_OUTCOMES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
             </select>
-          </div>
+          </FormField>
 
           {outcome === "callback_requested" && (
-            <div>
-              <label className="field-label">Visszahívás időpontja (dátum + óra) *</label>
+            <FormField label="Visszahívás időpontja (dátum + óra)" required>
               <input type="datetime-local" style={inputStyle} value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} required />
-            </div>
+            </FormField>
           )}
 
           {outcome === "meeting_booked" && (
-            <div>
-              <label className="field-label">Kivel lesz a demó? *</label>
+            <FormField label="Kivel lesz a demó?" required>
               <div className="flex gap-4" style={{ fontSize: 13 }}>
                 {(["aron", "peter"] as const).map((w) => (
                   <label key={w} className="flex items-center gap-1.5" style={{ cursor: "pointer" }}>
@@ -86,14 +84,13 @@ export function CallOutcomeModal({
                   </label>
                 ))}
               </div>
-            </div>
+            </FormField>
           )}
 
-          <div>
-            <label className="field-label">Megjegyzés *</label>
+          <FormField label="Megjegyzés" required>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={4} required
               placeholder="Mi hangzott el? Mi a következő lépés?" />
-          </div>
+          </FormField>
 
           {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
 

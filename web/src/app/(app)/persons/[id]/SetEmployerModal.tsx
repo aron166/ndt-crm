@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { EntitySearch } from "@/components/EntitySearch";
 import { setCurrentEmployer } from "@/app/actions/contacts";
 import { useRouter } from "next/navigation";
+import { FormField } from "@/components/ui/FormField";
 
 interface Props {
   open: boolean;
@@ -106,45 +107,37 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           {mode === "find" ? (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Cég keresése *
-              </label>
+            <FormField label="Cég keresése" required>
               <EntitySearch
                 endpoint="/api/search/companies"
                 placeholder="Cég neve, adószám..."
                 value={company}
                 onChange={setCompany}
               />
-            </div>
+            </FormField>
           ) : (
             <>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Új cég neve *</label>
+              <FormField label="Új cég neve" required>
                 <Input name="newCompanyName" placeholder="Pl. NDT Global Kft." autoFocus required={mode === "create"} />
-              </div>
+              </FormField>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Adószám</label>
+                <FormField label="Adószám">
                   <Input name="newCompanyVat" placeholder="12345678-2-01" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Város</label>
+                </FormField>
+                <FormField label="Város">
                   <Input name="newCompanyCity" placeholder="Budapest" />
-                </div>
+                </FormField>
               </div>
             </>
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Beosztás</label>
+            <FormField label="Beosztás">
               <Input name="role" placeholder="pl. Mérnök, Vezető..." />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Kezdés dátuma</label>
+            </FormField>
+            <FormField label="Kezdés dátuma">
               <Input name="startedAt" type="date" />
-            </div>
+            </FormField>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
