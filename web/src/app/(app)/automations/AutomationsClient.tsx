@@ -569,7 +569,7 @@ function RuleForm({
                   <option value="">— válassz —</option>
                   {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
-                <p style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>Csak lead-triggerekkel működik. Az így beállított státusz nem indít újabb szabályt (nincs láncolás).</p>
+                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Csak lead-triggerekkel működik. Az így beállított státusz nem indít újabb szabályt (nincs láncolás).</p>
               </div>
             )}
             {form.actionType === "assign_lead" && (
@@ -585,7 +585,7 @@ function RuleForm({
               <div>
                 <label className="field-label">Webhook URL</label>
                 <input style={inputStyle} value={form.webhookUrl} onChange={(e) => set("webhookUrl", e.target.value)} placeholder="https://n8n.example.com/webhook/…" />
-                <p style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát.</p>
+                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát.</p>
               </div>
             )}
 
