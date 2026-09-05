@@ -1,6 +1,9 @@
 # Feature inventory + cut list — 2026-09-04 (Kai, read-only audit; Áron decides)
 
 **Áron's ruling (2026-09-04): delete Equalizer ONLY. Everything else HOLD.**
+Exception, not a feature cut: `lib/service-auth.ts` goes with Codex Batch A #3 —
+it is a security fix (the legacy shared-key auth path), already approved in
+`CODEX_REVIEW_2026-09-04.md`, and no route imports it any more.
 Díjszabás (`/rate-card`) judged not useful, but `CostRate` feeds task costing + quote line
 prices — keep until the future auto-quote replaces it. Later roadmap (not now): árajánlat
 (quotes) pulls lead/contact/company data → szerződés (auto contract generation) → Stripe
@@ -14,7 +17,7 @@ Deletion PR by Nate AFTER Phase 1 merges. Áron strikes/keeps each line.
 - [ ] Analytics + Invoices pages (`/analytics`, `/analytics/invoices`, `/invoices`) — 2026-05-13, page-inline Prisma, read-only; keep `Invoice` model only if ETL still writes it
 - [ ] 4 placeholder integration cards: google_calendar, twilio, szamlazz, nav (no lib module)
 - [ ] Dead models: `Equipment`, `Proposal`, `Agent` (coordinate with `etl/prisma/schema.prisma`)
-- [ ] Legacy service-role key path (`lib/service-auth.ts`) — also Codex Batch A #3
+- [x] Legacy service-role key path (`lib/service-auth.ts`) — Codex Batch A #3, deleted in PR #61 (security fix, see the exception above)
 
 ## Tier 2 — probably delete (Áron's call)
 - [ ] Marketing content queue (`/marketing`, `/marketing/[id]`, `POST /api/content`, models `ContentItem`/`ContentAsset`) — external "content factory" producer never built

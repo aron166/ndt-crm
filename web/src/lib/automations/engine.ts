@@ -178,10 +178,17 @@ export async function auditRuleTask(
   ruleId: number,
   tenantId: number,
 ): Promise<void> {
-  const { audit } = await import("@/lib/audit");
-  audit("task", taskId, "create", null,
-    { title: data.title, type: data.type ?? null, dueDate: data.dueDate ?? null, dealId: data.dealId ?? null, ruleId },
-    { tenantId, actor: "system", actorAgentId: `automation_rule:${ruleId}` });
+  // The task is already committed. A failure here (dynamic import, audit
+  // registration) must be reported but never propagate: it would abort the
+  // caller before `lastRunAt` is stamped, for a row that already exists.
+  try {
+    const { audit } = await import("@/lib/audit");
+    audit("task", taskId, "create", null,
+      { title: data.title, type: data.type ?? null, dueDate: data.dueDate ?? null, dealId: data.dealId ?? null, ruleId },
+      { tenantId, actor: "system", actorAgentId: `automation_rule:${ruleId}` });
+  } catch (err) {
+    reportError("automations.audit_rule_task", err, { taskId, ruleId });
+  }
 }
 
 // ── Orchestrator (DB-backed) ────────────────────────────────────────
