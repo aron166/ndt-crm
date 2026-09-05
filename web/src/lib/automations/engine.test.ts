@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  triggerMatches, conditionsPass, renderTemplate, buildCreateTaskData, runAutomations,
+  triggerMatches, conditionsPass, renderTemplate, buildCreateTaskData, runAutomations, auditRuleTask,
 } from "./engine";
 import type { AutomationEvent, CreateTaskActionConfig } from "./types";
 import { db } from "@/lib/db";
+import { audit } from "@/lib/audit";
+
+vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 
 vi.mock("@/lib/db", () => ({
   db: {
@@ -157,6 +160,29 @@ describe("runAutomations (orchestrator)", () => {
       ...over,
     };
   }
+
+  // CodeRabbit (#61): the task row is already committed when auditRuleTask runs.
+  // If auditing blew up it aborted the rule before `lastRunAt` was stamped.
+  it("a failing audit does not abort the rule after the task is committed", async () => {
+    mockDb.automationRule.findMany.mockResolvedValue([dbRule({ id: 1 })]);
+    mockDb.task.create.mockResolvedValue({ id: 99 });
+    mockDb.automationRule.update.mockResolvedValue({});
+    vi.mocked(audit).mockImplementationOnce(() => { throw new Error("audit down"); });
+
+    await runAutomations(leadCreated());
+
+    expect(mockDb.task.create).toHaveBeenCalledTimes(1);
+    expect(mockDb.automationRule.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 1 } }),
+    );
+  });
+
+  it("auditRuleTask swallows and reports an audit failure", async () => {
+    vi.mocked(audit).mockImplementationOnce(() => { throw new Error("audit down"); });
+    await expect(
+      auditRuleTask(99, { tenantId: 1, title: "x" } as never, 1, 1),
+    ).resolves.toBeUndefined();
+  });
 
   it("isolates a failing rule and still runs the rest", async () => {
     mockDb.automationRule.findMany.mockResolvedValue([dbRule({ id: 1 }), dbRule({ id: 2 })]);

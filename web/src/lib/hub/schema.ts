@@ -21,12 +21,8 @@ const payloadWithinLimit = (payload: unknown) =>
 
 export const appEventSchema = z
   .object({
-    // Honored only on the deprecated service-role-key path; app-key callers
-    // get their tenant from the key itself (mismatches are rejected in-route).
-    tenantId: id.optional(),
-    // Optional for app-key callers (falls back to the key's appSlug);
-    // the route 400s when neither is available.
-    sourceApp: z.string().trim().min(1).max(64).optional(),
+    // tenantId / sourceApp are NOT accepted from the body — both come from the
+    // app key (unknown keys are ignored, so older callers keep working).
     eventType: z.string().trim().min(1).max(128),
     payload: z.record(z.string(), z.unknown()),
     agentId: id.optional(),
@@ -42,7 +38,6 @@ export type AppEventIntake = z.infer<typeof appEventSchema>;
 
 export const conversationIntakeSchema = z
   .object({
-    tenantId: id.optional(),
     agentId: id.optional(),
     personId: id.optional(),
     companyId: id.optional(),

@@ -8,7 +8,6 @@ import {
 
 describe("appEventSchema", () => {
   const valid = {
-    sourceApp: "birdsview",
     eventType: "lead.submitted",
     payload: { foo: "bar" },
   };
@@ -19,10 +18,9 @@ describe("appEventSchema", () => {
     if (r.success) expect(r.data.eventType).toBe("quote.created");
   });
 
-  it("accepts optional FK ids and tenantId as positive integers", () => {
+  it("accepts optional FK ids as positive integers", () => {
     const r = appEventSchema.safeParse({
       ...valid,
-      tenantId: 1,
       agentId: 2,
       personId: 3,
       companyId: 4,
@@ -30,16 +28,16 @@ describe("appEventSchema", () => {
     expect(r.success).toBe(true);
   });
 
-  it("allows sourceApp to be omitted (route falls back to the key's appSlug)", () => {
-    const { sourceApp: _omit, ...rest } = valid;
-    expect(appEventSchema.safeParse(rest).success).toBe(true);
+  it("ignores body tenantId / sourceApp (both come from the app key)", () => {
+    const r = appEventSchema.safeParse({ ...valid, tenantId: 99, sourceApp: "spoof" });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data).not.toHaveProperty("sourceApp");
+    if (r.success) expect(r.data).not.toHaveProperty("tenantId");
   });
 
   it("rejects missing eventType or payload", () => {
-    expect(appEventSchema.safeParse({ sourceApp: "x", payload: {} }).success).toBe(false);
-    expect(
-      appEventSchema.safeParse({ sourceApp: "x", eventType: "y" }).success,
-    ).toBe(false);
+    expect(appEventSchema.safeParse({ payload: {} }).success).toBe(false);
+    expect(appEventSchema.safeParse({ eventType: "y" }).success).toBe(false);
   });
 
   it("rejects a non-object payload", () => {
@@ -48,15 +46,11 @@ describe("appEventSchema", () => {
   });
 
   it("rejects non-positive or non-integer ids", () => {
-    expect(appEventSchema.safeParse({ ...valid, tenantId: 0 }).success).toBe(false);
     expect(appEventSchema.safeParse({ ...valid, agentId: -1 }).success).toBe(false);
     expect(appEventSchema.safeParse({ ...valid, companyId: 1.5 }).success).toBe(false);
   });
 
-  it("rejects overlong sourceApp / eventType", () => {
-    expect(
-      appEventSchema.safeParse({ ...valid, sourceApp: "x".repeat(65) }).success,
-    ).toBe(false);
+  it("rejects overlong eventType", () => {
     expect(
       appEventSchema.safeParse({ ...valid, eventType: "x".repeat(129) }).success,
     ).toBe(false);

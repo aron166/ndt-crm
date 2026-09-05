@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { decrypt, isEncrypted } from "@/lib/crypto";
 import { audit } from "@/lib/audit";
+import { reportError } from "@/lib/report-error";
 
 const TENANT_ID = 1;
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -59,7 +60,8 @@ export async function sendTestEmail(): Promise<SendEmailResult> {
 }
 
 export type SendEmailResult =
-  | { ok: true; id: string }
+  /** `warning` is set when the email went out but logging it failed (reported). */
+  | { ok: true; id: string; warning?: string }
   | { ok: false; error: string };
 
 /**
@@ -130,8 +132,11 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         data: { lastInteractionDate: new Date(), updatedAt: new Date() },
       });
     }
-  } catch {
-    // The email was sent; a failed log must not turn a success into an error.
+  } catch (err) {
+    // The email was sent, so this is not a failure — but a hole in the
+    // append-only trail must be observable, never silent.
+    reportError("resend.log", err, { companyId, personId, resendId: id });
+    return { ok: true, id, warning: "Az email elment, de az utólagos CRM-naplózás nem sikerült." };
   }
 
   return { ok: true, id };

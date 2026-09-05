@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
-import { conditionsPass, buildCreateTaskData } from "./engine";
+import { conditionsPass, buildCreateTaskData, auditRuleTask } from "./engine";
 import type { AutomationEvent, CreateTaskActionConfig, TriggerConfig } from "./types";
 
 export interface IdleRunResult {
@@ -70,16 +70,18 @@ export async function runIdleAutomations(now: Date = new Date()): Promise<IdleRu
         if (!conditionsPass(rule.conditions, event.fields)) continue;
 
         try {
-          await db.$transaction(async (tx) => {
+          const data = buildCreateTaskData(cfg, event, now);
+          const task = await db.$transaction(async (tx) => {
             await tx.automationFiring.create({
               data: {
                 tenantId: rule.tenantId, ruleId: rule.id,
                 dealId: deal.id, stageEnteredAt: deal.stageEnteredAt!,
               },
             });
-            await tx.task.create({ data: buildCreateTaskData(cfg, event, now) });
+            return tx.task.create({ data, select: { id: true } });
           });
           tasksCreated++;
+          if (task?.id) await auditRuleTask(task.id, data, rule.id, rule.tenantId);
         } catch (err) {
           // Unique (rule, deal, stageEnteredAt) violation = already fired for this
           // stage entry → expected on every subsequent run, skip silently.
