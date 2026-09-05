@@ -55,6 +55,18 @@ function parseRuleForm(formData: FormData): RuleInput | { error: string } {
     if (typeof actionConfig.bodyTemplate !== "string" || !actionConfig.bodyTemplate.trim()) {
       return { error: "Az email szövege kötelező" };
     }
+  } else if (actionType === "change_lead_status") {
+    if (typeof actionConfig.toStatus !== "string" || !actionConfig.toStatus.trim()) {
+      return { error: "A célstátusz kötelező" };
+    }
+  } else if (actionType === "assign_lead") {
+    if (!Number.isInteger(Number(actionConfig.assignedToId)) || Number(actionConfig.assignedToId) <= 0) {
+      return { error: "A felelős kötelező" };
+    }
+  } else if (actionType === "webhook_out") {
+    if (typeof actionConfig.url !== "string" || !/^https?:\/\//i.test(actionConfig.url.trim())) {
+      return { error: "Érvényes http(s) webhook URL kötelező" };
+    }
   } else {
     if (typeof actionConfig.titleTemplate !== "string" || !actionConfig.titleTemplate.trim()) {
       return { error: "A létrehozandó feladat címe kötelező" };
@@ -72,6 +84,10 @@ function parseRuleForm(formData: FormData): RuleInput | { error: string } {
 
   const trigParsed = parseJson<Record<string, unknown>>(formData.get("triggerConfig"));
   if (!trigParsed.ok) return { error: "Érvénytelen trigger JSON" };
+  if (triggerType === "lead_idle" || triggerType === "deal_idle_in_stage") {
+    const d = Number(trigParsed.value?.idleDays);
+    if (!Number.isFinite(d) || d <= 0) return { error: "A tétlen napok száma legalább 1" };
+  }
   const triggerConfig =
     trigParsed.value && typeof trigParsed.value === "object" &&
     Object.keys(trigParsed.value).length > 0 ? trigParsed.value : null;

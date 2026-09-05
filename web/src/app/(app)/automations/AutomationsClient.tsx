@@ -12,6 +12,7 @@ import {
 const TRIGGERS = [
   { v: "lead_created", l: "Új lead érkezett" },
   { v: "lead_status_changed", l: "Lead státusz változott" },
+  { v: "lead_idle", l: "Lead X napja nem volt megkeresve (időzített)" },
   { v: "deal_stage_changed", l: "Deal fázis változott" },
   { v: "deal_idle_in_stage", l: "Deal X napja egy fázisban (időzített)" },
 ] as const;
@@ -47,6 +48,10 @@ const LEAD_FIELDS = [
   { key: "message", label: "Üzenet" },
   { key: "sourceApp", label: "Forrás app" },
   { key: "status", label: "Státusz" },
+  { key: "outcome", label: "Kimenetel (open/won/lost)" },
+  { key: "channel", label: "Csatorna (channel)" },
+  { key: "callOutcome", label: "Hívás eredménye (kulcs)" },
+  { key: "idleDays", label: "Tétlen napok (lead_idle)" },
   // Company attributes (auto-merged by the engine for richer targeting):
   { key: "company_warmth", label: "Cég — hőfok" },
   { key: "company_pipeline", label: "Cég — pipeline státusz" },
@@ -82,6 +87,7 @@ interface RuleRow {
 
 interface Opt { key: string; label: string }
 interface StageOpt { id: number; label: string }
+interface UserOpt { id: number; name: string }
 
 interface FormState {
   name: string;
@@ -100,6 +106,10 @@ interface FormState {
   subjectTemplate: string;
   bodyTemplate: string;
   sendOnce: boolean;
+  toStatus2: string;
+  assignedToId: string;
+  webhookUrl: string;
+  leadIdleStatus: string;
 }
 
 const EMPTY: FormState = {
@@ -119,6 +129,10 @@ const EMPTY: FormState = {
   subjectTemplate: "",
   bodyTemplate: "",
   sendOnce: true,
+  toStatus2: "",
+  assignedToId: "",
+  webhookUrl: "",
+  leadIdleStatus: "",
 };
 
 // ── Shared input styles ─────────────────────────────────────────────
@@ -155,15 +169,20 @@ function fromRule(r: RuleRow): FormState {
     subjectTemplate: ac.subjectTemplate ? String(ac.subjectTemplate) : "",
     bodyTemplate: ac.bodyTemplate ? String(ac.bodyTemplate) : "",
     sendOnce: ac.sendOnce !== false,
+    toStatus2: ac.toStatus ? String(ac.toStatus) : "",
+    assignedToId: ac.assignedToId != null ? String(ac.assignedToId) : "",
+    webhookUrl: ac.url ? String(ac.url) : "",
+    leadIdleStatus: tc.status ? String(tc.status) : "",
   };
 }
 
 export function AutomationsClient({
-  rules, leadStatuses, stages,
+  rules, leadStatuses, stages, users,
 }: {
   rules: RuleRow[];
   leadStatuses: Opt[];
   stages: StageOpt[];
+  users: UserOpt[];
 }) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(EMPTY);
@@ -197,6 +216,11 @@ export function AutomationsClient({
           ...(form.stageId ? { stageId: Number(form.stageId) } : {}),
           idleDays: Number(form.idleDays) || 0,
         };
+      case "lead_idle":
+        return {
+          ...(form.leadIdleStatus ? { status: form.leadIdleStatus } : {}),
+          idleDays: Number(form.idleDays) || 0,
+        };
       default:
         return {};
     }
@@ -206,11 +230,12 @@ export function AutomationsClient({
     e.preventDefault();
     if (!form.name.trim()) { setError("Név kötelező"); return; }
     const isEmail = form.actionType === "send_email";
+    const isTask = form.actionType === "create_task";
     let dueInDays: number | undefined;
     if (isEmail) {
       if (!form.subjectTemplate.trim()) { setError("Az email tárgya kötelező"); return; }
       if (!form.bodyTemplate.trim()) { setError("Az email szövege kötelező"); return; }
-    } else {
+    } else if (isTask) {
       if (!form.titleTemplate.trim()) { setError("A létrehozandó feladat címe kötelező"); return; }
       if (form.dueInDays !== "") {
         dueInDays = Number(form.dueInDays);
@@ -227,12 +252,18 @@ export function AutomationsClient({
       .filter((c) => c.field && c.op)
       .map((c) => ({ field: c.field, op: c.op, value: c.value }));
     data.set("conditions", JSON.stringify(conds));
+    const otherAction: Record<string, unknown> =
+      form.actionType === "change_lead_status" ? { toStatus: form.toStatus2 }
+      : form.actionType === "assign_lead" ? { assignedToId: Number(form.assignedToId) || null }
+      : form.actionType === "webhook_out" ? { url: form.webhookUrl.trim() }
+      : {};
     data.set("actionConfig", JSON.stringify(isEmail
       ? {
           subjectTemplate: form.subjectTemplate.trim(),
           bodyTemplate: form.bodyTemplate.trim(),
           sendOnce: form.sendOnce,
         }
+      : !isTask ? otherAction
       : {
           titleTemplate: form.titleTemplate.trim(),
           type: form.taskType || undefined,
@@ -291,7 +322,7 @@ export function AutomationsClient({
 
       {showForm && (
         <RuleForm
-          form={form} set={set} stages={stages} leadStatuses={leadStatuses}
+          form={form} set={set} stages={stages} leadStatuses={leadStatuses} users={users}
           editing={editingId != null} error={error} pending={pending}
           onSubmit={handleSubmit} onCancel={closeForm}
           addCondition={() => set("conditions", [...form.conditions, { field: fieldsForTrigger(form.triggerType)[0].key, op: "eq", value: "" }])}
@@ -333,8 +364,9 @@ function describeTrigger(r: RuleRow, leadStatuses: Opt[], stages: StageOpt[]): s
     const s = stages.find((x) => x.id === Number(tc.toStageId));
     return `${base} → ${s?.label ?? tc.toStageId}`;
   }
-  if (r.triggerType === "deal_idle_in_stage") {
-    return `${base} (${tc.idleDays ?? "?"} nap)`;
+  if (r.triggerType === "deal_idle_in_stage" || r.triggerType === "lead_idle") {
+    const st = tc.status ? ` · ${leadStatuses.find((x) => x.key === tc.status)?.label ?? tc.status}` : "";
+    return `${base} (${tc.idleDays ?? "?"} nap)${st}`;
   }
   return base;
 }
@@ -346,9 +378,11 @@ function RuleCard({
   onToggle: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const ac = (rule.actionConfig ?? {}) as Record<string, unknown>;
-  const isEmail = rule.actionType === "send_email";
-  const actionSummary = isEmail
-    ? `email: „${(ac.subjectTemplate as string | undefined) ?? "—"}”`
+  const actionSummary =
+    rule.actionType === "send_email" ? `email: „${(ac.subjectTemplate as string | undefined) ?? "—"}”`
+    : rule.actionType === "change_lead_status" ? `lead státusz → ${leadStatuses.find((s) => s.key === ac.toStatus)?.label ?? ac.toStatus}`
+    : rule.actionType === "assign_lead" ? `felelős → #${ac.assignedToId}`
+    : rule.actionType === "webhook_out" ? `webhook → ${ac.url}`
     : `feladat: „${(ac.titleTemplate as string | undefined) ?? "—"}”`;
   const condCount = Array.isArray(rule.conditions) ? rule.conditions.length : 0;
   return (
@@ -387,12 +421,12 @@ function RuleCard({
 // ── Builder form ────────────────────────────────────────────────────
 
 function RuleForm({
-  form, set, stages, leadStatuses, editing, error, pending, onSubmit, onCancel,
+  form, set, stages, leadStatuses, users, editing, error, pending, onSubmit, onCancel,
   addCondition, updateCondition, removeCondition,
 }: {
   form: FormState;
   set: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
-  stages: StageOpt[]; leadStatuses: Opt[];
+  stages: StageOpt[]; leadStatuses: Opt[]; users: UserOpt[];
   editing: boolean; error: string | null; pending: boolean;
   onSubmit: (e: React.FormEvent) => void; onCancel: () => void;
   addCondition: () => void;
@@ -455,10 +489,25 @@ function RuleForm({
                 </div>
               </>
             )}
+            {form.triggerType === "lead_idle" && (
+              <>
+                <div>
+                  <label className="field-label">Lead státusz (üres = bármelyik nyitott)</label>
+                  <select style={inputStyle} value={form.leadIdleStatus} onChange={(e) => set("leadIdleStatus", e.target.value)}>
+                    <option value="">Bármelyik</option>
+                    {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">Napok az utolsó kapcsolat óta</label>
+                  <input type="number" min={1} style={inputStyle} value={form.idleDays} onChange={(e) => set("idleDays", e.target.value)} />
+                </div>
+              </>
+            )}
           </div>
-          {form.triggerType === "deal_idle_in_stage" && (
+          {(form.triggerType === "deal_idle_in_stage" || form.triggerType === "lead_idle") && (
             <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 6 }}>
-              Az időzített triggert egy ütemezett feladat értékeli ki (hamarosan). A szabály már most menthető.
+              Az időzített triggert a napi ütemezett futás (07:00 UTC) értékeli ki; egy szabály leadenként / fázisonként egyszer fut le.
             </p>
           )}
         </div>
@@ -507,8 +556,38 @@ function RuleForm({
               <select style={inputStyle} value={form.actionType} onChange={(e) => set("actionType", e.target.value)}>
                 <option value="create_task">Feladat létrehozása</option>
                 <option value="send_email">Email küldése</option>
+                <option value="change_lead_status">Lead státusz módosítása</option>
+                <option value="assign_lead">Lead felelős beállítása</option>
+                <option value="webhook_out">Webhook hívása (POST JSON)</option>
               </select>
             </div>
+
+            {form.actionType === "change_lead_status" && (
+              <div>
+                <label className="field-label">Új státusz</label>
+                <select style={inputStyle} value={form.toStatus2} onChange={(e) => set("toStatus2", e.target.value)}>
+                  <option value="">— válassz —</option>
+                  {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Csak lead-triggerekkel működik. Az így beállított státusz nem indít újabb szabályt (nincs láncolás).</p>
+              </div>
+            )}
+            {form.actionType === "assign_lead" && (
+              <div>
+                <label className="field-label">Felelős</label>
+                <select style={inputStyle} value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
+                  <option value="">— válassz —</option>
+                  {users.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
+                </select>
+              </div>
+            )}
+            {form.actionType === "webhook_out" && (
+              <div>
+                <label className="field-label">Webhook URL</label>
+                <input style={inputStyle} value={form.webhookUrl} onChange={(e) => set("webhookUrl", e.target.value)} placeholder="https://n8n.example.com/webhook/…" />
+                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát.</p>
+              </div>
+            )}
 
             {form.actionType === "send_email" ? (
               <>
@@ -529,7 +608,7 @@ function RuleForm({
                   Csak egyszer küldd el címzettenként (ne ismételje)
                 </label>
               </>
-            ) : (
+            ) : form.actionType !== "create_task" ? null : (
               <>
                 <div>
                   <label className="field-label">Feladat címe</label>
