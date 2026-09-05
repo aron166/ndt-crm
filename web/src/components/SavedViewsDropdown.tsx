@@ -74,7 +74,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
           padding: "5px 10px",
           background: activeView ? "var(--indigo-soft)" : "var(--bg-panel)",
           border: `1px solid ${activeView ? "var(--indigo-line)" : "var(--line-soft)"}`,
-          borderRadius: 6, fontSize: 12,
+          borderRadius: 6, fontSize: 14,
           color: activeView ? "var(--indigo)" : "var(--fg-soft)",
           cursor: "pointer",
           transition: "border-color .15s, background .15s",
@@ -83,7 +83,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
         <Bookmark style={{ width: 12, height: 12 }} />
         {activeView ? activeView.name : "Nézetek"}
         {views.length > 0 && !activeView && (
-          <span className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)" }}>
+          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
             {views.length}
           </span>
         )}
@@ -108,7 +108,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
           >
             {views.length > 0 && (
               <>
-                <div style={{ padding: "8px 12px 4px", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)" }}>
+                <div style={{ padding: "8px 12px 4px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)" }}>
                   Mentett nézetek
                 </div>
                 {views.map((v) => {
@@ -121,7 +121,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
                       onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
                     >
                       <div style={{ flex: 1 }} onClick={() => applyView(v)}>
-                        <span style={{ fontSize: 13, color: active ? "var(--indigo)" : "var(--fg-soft)", fontWeight: active ? 500 : 400 }}>
+                        <span style={{ fontSize: 14, color: active ? "var(--indigo)" : "var(--fg-soft)", fontWeight: active ? 500 : 400 }}>
                           {v.name}
                         </span>
                       </div>
@@ -146,7 +146,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
               <button
                 onClick={() => setSaving(true)}
                 className="flex items-center gap-2 w-full"
-                style={{ padding: "8px 12px", background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--fg-mute)", transition: "background .12s" }}
+                style={{ padding: "8px 12px", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--fg-mute)", transition: "background .12s" }}
                 onMouseOver={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
                 onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
               >
@@ -164,7 +164,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
                   onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setSaving(false); }}
                   placeholder="Nézet neve…"
                   style={{
-                    flex: 1, padding: "4px 8px", fontSize: 12,
+                    flex: 1, padding: "4px 8px", fontSize: 14,
                     background: "var(--bg-0)", border: "1px solid var(--line-soft)",
                     borderRadius: 4, color: "var(--fg)", outline: "none",
                   }}
@@ -173,7 +173,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
                   onClick={handleSave}
                   disabled={!name.trim() || isPending}
                   style={{
-                    padding: "4px 10px", borderRadius: 4, fontSize: 12,
+                    padding: "4px 10px", borderRadius: 4, fontSize: 14,
                     background: "var(--indigo)", color: "white", border: "none",
                     cursor: name.trim() ? "pointer" : "default",
                     opacity: name.trim() ? 1 : 0.5,
@@ -185,7 +185,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
             )}
 
             {!hasFilters && views.length === 0 && (
-              <div style={{ padding: "12px", fontSize: 12, color: "var(--fg-faint)", textAlign: "center" }}>
+              <div style={{ padding: "12px", fontSize: 14, color: "var(--fg-faint)", textAlign: "center" }}>
                 Szűrj rá valamire, majd mentsd el nézetre.
               </div>
             )}

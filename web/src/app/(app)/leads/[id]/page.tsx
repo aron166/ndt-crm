@@ -71,7 +71,7 @@ export default async function LeadDetailPage({
       <div style={{ marginBottom: 16 }}>
         <Link
           href="/leads"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--fg-mute)" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
           className="row-link"
         >
           <ArrowLeft style={{ width: 14, height: 14 }} />

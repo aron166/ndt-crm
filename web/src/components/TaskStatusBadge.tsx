@@ -15,7 +15,7 @@ export function TaskStatusBadge({ status }: { status: string }) {
       className="inline-flex items-center gap-1.5 font-mono-ndt"
       style={{
         height: 20, padding: "0 8px",
-        fontSize: 11, fontWeight: 500,
+        fontSize: 12, fontWeight: 500,
         borderRadius: 999,
         border: `1px solid ${s.border}`,
         background: s.bg,

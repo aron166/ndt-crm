@@ -6,7 +6,7 @@ import { upsertCostRate, type CostRateEntry } from "@/app/actions/cost-rates";
 import { costCodeLabel, costCodeUnitHint } from "@/lib/tasks/costing";
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 10px", fontSize: 13,
+  width: "100%", padding: "6px 10px", fontSize: 14,
   background: "var(--bg-0)", border: "1px solid var(--line-soft)",
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
@@ -56,7 +56,7 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
         <thead>
           <tr>
             {["Költségkód", "Egység", "Egységár (Ft)"].map((h) => (
-              <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)" }}>{h}</th>
+              <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)" }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -80,7 +80,7 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
           {pending ? "Mentés…" : "Mentés"}
         </button>
         {msg && (
-          <span style={{ fontSize: 12, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
+          <span style={{ fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
             {msg.ok ? "✓ " : "⚠ "}{msg.text}
           </span>
         )}

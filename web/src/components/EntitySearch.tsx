@@ -107,20 +107,20 @@ export function EntitySearch({
             <li key={opt.id}>
               <button
                 type="button"
-                style={{ width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 13, color: "var(--fg-soft)", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "background .1s" }}
+                style={{ width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 14, color: "var(--fg-soft)", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "background .1s" }}
                 onMouseOver={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
                 onMouseOut={(e) => (e.currentTarget.style.background = "none")}
                 onClick={() => handleSelect(opt)}
               >
                 <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.label}</span>
-                {opt.sub && <span style={{ fontSize: 11, color: "var(--fg-faint)", flexShrink: 0, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.sub}</span>}
+                {opt.sub && <span style={{ fontSize: 12, color: "var(--fg-faint)", flexShrink: 0, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.sub}</span>}
               </button>
             </li>
           ))}
         </ul>
       )}
       {open && !loading && options.length === 0 && query.length > 1 && (
-        <div style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", padding: "8px 12px", fontSize: 12, color: "var(--fg-faint)" }}>
+        <div style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", padding: "8px 12px", fontSize: 14, color: "var(--fg-faint)" }}>
           Nincs találat
         </div>
       )}

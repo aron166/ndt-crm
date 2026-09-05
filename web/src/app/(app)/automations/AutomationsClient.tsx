@@ -124,7 +124,7 @@ const EMPTY: FormState = {
 // ── Shared input styles ─────────────────────────────────────────────
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 10px", fontSize: 13,
+  width: "100%", padding: "6px 10px", fontSize: 14,
   background: "var(--bg-0)", border: "1px solid var(--line-soft)",
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
@@ -286,7 +286,7 @@ export function AutomationsClient({
       </div>
 
       {error && !showForm && (
-        <div className="panel"><div className="panel-pad" style={{ fontSize: 13, color: "var(--coral)" }}>{error}</div></div>
+        <div className="panel"><div className="panel-pad" style={{ fontSize: 14, color: "var(--coral)" }}>{error}</div></div>
       )}
 
       {showForm && (
@@ -302,7 +302,7 @@ export function AutomationsClient({
 
       {/* Rule list */}
       {rules.length === 0 ? (
-        <div className="panel"><div className="panel-pad" style={{ fontSize: 13, color: "var(--fg-mute)" }}>
+        <div className="panel"><div className="panel-pad" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
           Még nincs automatizálási szabály. Hozz létre egyet a fenti gombbal.
         </div></div>
       ) : (
@@ -358,16 +358,16 @@ function RuleCard({
           <div className="flex items-center gap-2" style={{ marginBottom: 3 }}>
             <Zap style={{ width: 14, height: 14, color: rule.isActive ? "var(--indigo)" : "var(--fg-faint)" }} />
             <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{rule.name}</span>
-            {!rule.isActive && <span style={{ fontSize: 10, color: "var(--fg-faint)" }}>inaktív</span>}
+            {!rule.isActive && <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>inaktív</span>}
           </div>
-          <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+          <div style={{ fontSize: 14, color: "var(--fg-mute)" }}>
             {describeTrigger(rule, leadStatuses, stages)}
             {condCount > 0 && <span style={{ color: "var(--fg-faint)" }}> · {condCount} feltétel</span>}
             <span style={{ color: "var(--fg-faint)" }}> → {actionSummary}</span>
           </div>
         </div>
         <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
-          <label className="flex items-center gap-1.5" style={{ fontSize: 11, color: "var(--fg-mute)", cursor: "pointer" }}>
+          <label className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--fg-mute)", cursor: "pointer" }}>
             <input type="checkbox" checked={rule.isActive} onChange={onToggle} disabled={pending} />
             aktív
           </label>
@@ -411,7 +411,7 @@ function RuleForm({
 
         {/* Trigger */}
         <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Trigger — amikor…</div>
+          <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Trigger — amikor…</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="field-label">Esemény</label>
@@ -457,7 +457,7 @@ function RuleForm({
             )}
           </div>
           {form.triggerType === "deal_idle_in_stage" && (
-            <p style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 6 }}>
+            <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 6 }}>
               Az időzített triggert egy ütemezett feladat értékeli ki (hamarosan). A szabály már most menthető.
             </p>
           )}
@@ -466,13 +466,13 @@ function RuleForm({
         {/* Conditions */}
         <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
           <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)" }}>Feltételek (opcionális, ÉS kapcsolat)</div>
-            <button type="button" onClick={addCondition} className="btn" style={{ gap: 5, padding: "3px 8px", fontSize: 11 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)" }}>Feltételek (opcionális, ÉS kapcsolat)</div>
+            <button type="button" onClick={addCondition} className="btn" style={{ gap: 5, padding: "3px 8px", fontSize: 12 }}>
               <Plus style={{ width: 12, height: 12 }} /> Feltétel
             </button>
           </div>
           {form.conditions.length === 0 ? (
-            <p style={{ fontSize: 12, color: "var(--fg-faint)" }}>Nincs feltétel — a szabály minden ilyen eseményre lefut.</p>
+            <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>Nincs feltétel — a szabály minden ilyen eseményre lefut.</p>
           ) : (
             <div className="space-y-2">
               {form.conditions.map((c, i) => {
@@ -500,7 +500,7 @@ function RuleForm({
 
         {/* Action */}
         <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Művelet</div>
+          <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Művelet</div>
           <div className="space-y-3">
             <div>
               <label className="field-label">Művelet típusa</label>
@@ -520,11 +520,11 @@ function RuleForm({
                   <label className="field-label">Üzenet</label>
                   <textarea style={{ ...inputStyle, minHeight: 120, resize: "vertical" }} value={form.bodyTemplate} onChange={(e) => set("bodyTemplate", e.target.value)} placeholder={"Tisztelt Cím!\n\n..."} />
                 </div>
-                <p style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+                <p style={{ fontSize: 12, color: "var(--fg-faint)" }}>
                   Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}. A címzettet a lead/cég
                   elsődleges kapcsolattartójának emailje adja. A Resend integrációnak beállítva kell lennie.
                 </p>
-                <label className="flex items-center gap-2" style={{ fontSize: 13, color: "var(--fg-soft)", cursor: "pointer" }}>
+                <label className="flex items-center gap-2" style={{ fontSize: 14, color: "var(--fg-soft)", cursor: "pointer" }}>
                   <input type="checkbox" checked={form.sendOnce} onChange={(e) => set("sendOnce", e.target.checked)} />
                   Csak egyszer küldd el címzettenként (ne ismételje)
                 </label>
@@ -534,7 +534,7 @@ function RuleForm({
                 <div>
                   <label className="field-label">Feladat címe</label>
                   <input style={inputStyle} value={form.titleTemplate} onChange={(e) => set("titleTemplate", e.target.value)} placeholder="pl. Lead megkeresése: {company}" />
-                  <p style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}</p>
+                  <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>

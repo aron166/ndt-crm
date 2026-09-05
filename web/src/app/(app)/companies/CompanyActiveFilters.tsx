@@ -42,7 +42,7 @@ function CompanyActiveFiltersInner({ chips }: { chips: ActiveChip[] }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 mb-4" style={{ fontSize: 12 }}>
+    <div className="flex flex-wrap items-center gap-2 mb-4" style={{ fontSize: 14 }}>
       <span style={{ color: "var(--fg-faint)" }}>Szűrő:</span>
       {chips.map((chip, i) => (
         <button
@@ -52,7 +52,7 @@ function CompanyActiveFiltersInner({ chips }: { chips: ActiveChip[] }) {
           className="flex items-center gap-1 rounded-full px-2 py-0.5 transition-colors"
           style={{
             background: "var(--indigo-soft)", color: "var(--indigo)",
-            fontSize: 11, fontFamily: "var(--font-mono)",
+            fontSize: 12, fontFamily: "var(--font-mono)",
           }}
           title="Eltávolítás"
         >
@@ -64,7 +64,7 @@ function CompanyActiveFiltersInner({ chips }: { chips: ActiveChip[] }) {
         <button
           type="button"
           onClick={clearAll}
-          style={{ color: "var(--fg-faint)", fontSize: 11, marginLeft: 2 }}
+          style={{ color: "var(--fg-faint)", fontSize: 12, marginLeft: 2 }}
         >
           × mind törlése
         </button>

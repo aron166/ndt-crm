@@ -82,14 +82,14 @@ function StatusRow({
           <GripVertical style={{ width: 14, height: 14, color: "var(--fg-faint)" }} />
         </span>
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: status.color, flexShrink: 0, boxShadow: `0 0 6px ${status.color}` }} />
-        <span style={{ flex: 1, fontSize: 13, color: "var(--fg)" }}>{status.label}</span>
-        {status.isInitial && <span className="badge-ds indigo" style={{ fontSize: 10 }}>Kezdő</span>}
+        <span style={{ flex: 1, fontSize: 14, color: "var(--fg)" }}>{status.label}</span>
+        {status.isInitial && <span className="badge-ds indigo" style={{ fontSize: 12 }}>Kezdő</span>}
         {status.isCommitment && (
-          <span style={{ fontSize: 10, fontWeight: 600, color: "#16a34a", background: "#16a34a1f", border: "1px solid #16a34a55", borderRadius: 4, padding: "1px 6px" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#16a34a", background: "#16a34a1f", border: "1px solid #16a34a55", borderRadius: 4, padding: "1px 6px" }}>
             Megrendelés
           </span>
         )}
-        {status.isTerminal && <span className="badge-ds coral" style={{ fontSize: 10 }}>Lezárt</span>}
+        {status.isTerminal && <span className="badge-ds coral" style={{ fontSize: 12 }}>Lezárt</span>}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
           onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
@@ -197,7 +197,7 @@ export function LeadStatusSetupClient({ statuses }: { statuses: LeadStatus[] }) 
     return (
       <div className="panel">
         <div className="panel-pad" style={{ textAlign: "center", padding: "32px 0" }}>
-          <p style={{ fontSize: 13, color: "var(--fg-mute)", marginBottom: 16 }}>
+          <p style={{ fontSize: 14, color: "var(--fg-mute)", marginBottom: 16 }}>
             Még nincsenek lead státuszok.
           </p>
           <Button
@@ -277,7 +277,7 @@ export function LeadStatusSetupClient({ statuses }: { statuses: LeadStatus[] }) 
         ) : (
           <button
             className="flex items-center gap-2"
-            style={{ fontSize: 13, color: "var(--indigo)", padding: "8px 0", background: "none", border: "none", cursor: "pointer" }}
+            style={{ fontSize: 14, color: "var(--indigo)", padding: "8px 0", background: "none", border: "none", cursor: "pointer" }}
             onClick={() => setAdding(true)}
           >
             <Plus style={{ width: 14, height: 14 }} /> Státusz hozzáadása

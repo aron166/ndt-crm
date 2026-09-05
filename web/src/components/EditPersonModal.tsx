@@ -67,7 +67,7 @@ export function EditPersonModal({ open, onClose, person }: Props) {
             </FormField>
           </div>
 
-          {error && <div style={{ fontSize: 12, color: "var(--coral)", padding: "6px 10px", background: "var(--coral-soft)", borderRadius: 5 }}>{error}</div>}
+          {error && <div style={{ fontSize: 14, color: "var(--coral)", padding: "6px 10px", background: "var(--coral-soft)", borderRadius: 5 }}>{error}</div>}
 
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
             <button type="button" className="btn" onClick={onClose} disabled={pending}>Mégse</button>

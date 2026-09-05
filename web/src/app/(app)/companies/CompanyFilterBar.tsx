@@ -82,12 +82,12 @@ function FilterGroup({
         {open
           ? <ChevronDown className="size-3.5" style={{ color: "var(--fg-faint)", flexShrink: 0 }} />
           : <ChevronRight className="size-3.5" style={{ color: "var(--fg-faint)", flexShrink: 0 }} />}
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: selectedCount ? "var(--fg)" : "var(--fg-soft)" }}>
+        <span style={{ fontSize: 14.5, fontWeight: 600, color: selectedCount ? "var(--fg)" : "var(--fg-soft)" }}>
           {label}
         </span>
         {selectedCount > 0 && (
           <span className="rounded-full px-1.5 font-mono-ndt"
-            style={{ fontSize: 10, background: "var(--indigo-soft)", color: "var(--indigo)" }}>
+            style={{ fontSize: 12, background: "var(--indigo-soft)", color: "var(--indigo)" }}>
             {selectedCount}
           </span>
         )}
@@ -103,14 +103,14 @@ function FilterGroup({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Szűrés név szerint…"
             className="w-full"
-            style={{ padding: "5px 8px 5px 26px", fontSize: 12, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none" }}
+            style={{ padding: "5px 8px 5px 26px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none" }}
           />
         </div>
       )}
 
       <div style={searchable ? { maxHeight: 168, overflowY: "auto", paddingRight: 2 } : undefined}>
         {visible.length === 0 ? (
-          <div style={{ fontSize: 12, color: "var(--fg-faint)", padding: "4px 2px" }}>Nincs találat</div>
+          <div style={{ fontSize: 14, color: "var(--fg-faint)", padding: "4px 2px" }}>Nincs találat</div>
         ) : searchable ? (
           // Long list → row checklist (name leads, hint muted).
           <div className="flex flex-col gap-0.5">
@@ -127,8 +127,8 @@ function FilterGroup({
                   <span className="flex items-center justify-center" style={{ width: 14, height: 14, borderRadius: 4, border: `1px solid ${on ? "var(--indigo)" : "var(--line-soft)"}`, flexShrink: 0 }}>
                     {on && <Check className="size-3" />}
                   </span>
-                  <span style={{ fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
-                  {o.hint && <span className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)", marginLeft: "auto", flexShrink: 0 }}>{o.hint}</span>}
+                  <span style={{ fontSize: 14.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+                  {o.hint && <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: "auto", flexShrink: 0 }}>{o.hint}</span>}
                 </button>
               );
             })}
@@ -255,7 +255,7 @@ function CompanyFilterBarInner({ facets }: { facets: CompanyFacets }) {
         <SlidersHorizontal className="size-3.5" />
         Szűrők
         {activeCount > 0 && (
-          <span className="font-mono-ndt" style={{ fontSize: 10 }}>({activeCount})</span>
+          <span className="font-mono-ndt" style={{ fontSize: 12 }}>({activeCount})</span>
         )}
       </button>
 

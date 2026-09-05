@@ -18,7 +18,7 @@ export default async function PipelineSetupPage() {
 
   return (
     <div className="mount" style={{ maxWidth: 720 }}>
-      <Link href="/deals" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--fg-mute)", marginBottom: 16 }} className="row-link">
+      <Link href="/deals" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)", marginBottom: 16 }} className="row-link">
         <ArrowLeft style={{ width: 14, height: 14 }} />
         Vissza a pipeline-hoz
       </Link>

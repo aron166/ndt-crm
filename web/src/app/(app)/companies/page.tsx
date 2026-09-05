@@ -172,7 +172,7 @@ export default async function CompaniesPage({
         <div className="flex items-center gap-3">
           <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
             Cégek
-            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", fontWeight: 400 }}>
+            <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-faint)", fontWeight: 400 }}>
               {total.toLocaleString("hu-HU")}
             </span>
           </h1>
@@ -193,7 +193,7 @@ export default async function CompaniesPage({
       </div>
 
       {/* Table — no outer card, rows float on the page */}
-      <table className="mount mount-1" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <table className="mount mount-1" style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
         <thead>
           <tr>
             {["", "Cég", "Pipeline", "Területe"].map((h, i) => (
@@ -202,7 +202,7 @@ export default async function CompaniesPage({
                 style={{
                   textAlign: "left",
                   padding: "0 14px 8px",
-                  fontSize: 10, fontWeight: 600,
+                  fontSize: 12, fontWeight: 600,
                   textTransform: "uppercase", letterSpacing: "0.12em",
                   color: "var(--fg-faint)",
                   borderBottom: "1px solid var(--line-soft)",
@@ -218,9 +218,9 @@ export default async function CompaniesPage({
           {companies.length === 0 && (
             <tr>
               <td colSpan={4} style={{ padding: "56px 14px", textAlign: "center" }}>
-                <div style={{ color: "var(--fg-faint)", fontSize: 13 }}>Nincs találat</div>
+                <div style={{ color: "var(--fg-faint)", fontSize: 14 }}>Nincs találat</div>
                 {activeChips.length > 0 && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: "var(--fg-faint)" }}>
+                  <div style={{ marginTop: 6, fontSize: 14, color: "var(--fg-faint)" }}>
                     <Link href="/companies" style={{ color: "var(--indigo)" }}>Szűrő törlése</Link>
                   </div>
                 )}
@@ -246,7 +246,7 @@ export default async function CompaniesPage({
                       className="font-mono-ndt flex items-center justify-center"
                       style={{
                         width: 28, height: 28, borderRadius: 6,
-                        fontSize: 10, fontWeight: 700,
+                        fontSize: 12, fontWeight: 700,
                         background: avatarBg(c.id), color: "oklch(0.10 0 0 / 0.7)",
                         letterSpacing: "0.02em",
                       }}
@@ -258,11 +258,11 @@ export default async function CompaniesPage({
 
                 {/* Name + VAT */}
                 <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)", maxWidth: 340 }}>
-                  <Link href={`/companies/${c.id}`} className="tbl-link" style={{ fontSize: 13 }}>
+                  <Link href={`/companies/${c.id}`} className="tbl-link" style={{ fontSize: 14 }}>
                     {c.name}
                   </Link>
                   {c.vatNumber && (
-                    <span className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)", marginLeft: 8 }}>
+                    <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: 8 }}>
                       {c.vatNumber}
                     </span>
                   )}
@@ -274,7 +274,7 @@ export default async function CompaniesPage({
                   {!isTerminal && (
                     <span
                       className="font-mono-ndt"
-                      style={{ fontSize: 10, color: FRESHNESS_COLOR[freshness], marginLeft: 8 }}
+                      style={{ fontSize: 12, color: FRESHNESS_COLOR[freshness], marginLeft: 8 }}
                     >
                       {relTime}
                     </span>
@@ -282,10 +282,10 @@ export default async function CompaniesPage({
                 </td>
 
                 {/* City */}
-                <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)", fontSize: 12, whiteSpace: "nowrap" }}>
+                <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)", fontSize: 14, whiteSpace: "nowrap" }}>
                   {c.city ?? "—"}
                   {c.county && (
-                    <span style={{ color: "var(--fg-faint)", marginLeft: 6, fontSize: 10 }}>{c.county}</span>
+                    <span style={{ color: "var(--fg-faint)", marginLeft: 6, fontSize: 12 }}>{c.county}</span>
                   )}
                 </td>
               </tr>
@@ -296,13 +296,13 @@ export default async function CompaniesPage({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+        <div className="flex items-center justify-between mt-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
           <span>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString("hu-HU")}</span>
           <div className="flex gap-2">
             {page > 1 && (
               <Link
                 href={pageHref(page - 1)}
-                style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 11 }}
+                style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
               >
                 ← Előző
               </Link>
@@ -310,7 +310,7 @@ export default async function CompaniesPage({
             {page < totalPages && (
               <Link
                 href={pageHref(page + 1)}
-                style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 11 }}
+                style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
               >
                 Következő →
               </Link>

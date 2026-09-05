@@ -22,7 +22,7 @@ export default function AppError({
         Valami hiba történt.
       </p>
       {error.digest && (
-        <p className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+        <p className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
           {error.digest}
         </p>
       )}

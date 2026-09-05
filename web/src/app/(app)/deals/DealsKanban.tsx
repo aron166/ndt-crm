@@ -128,7 +128,7 @@ function DealCard({
 
       {/* Stale warning */}
       {isStale && (
-        <div className="flex items-center gap-1.5 mb-2" style={{ fontSize: 10, color: "var(--coral)" }}>
+        <div className="flex items-center gap-1.5 mb-2" style={{ fontSize: 12, color: "var(--coral)" }}>
           <AlertTriangle style={{ width: 11, height: 11 }} />
           <span className="font-mono-ndt">Nincs következő lépés</span>
         </div>
@@ -136,7 +136,7 @@ function DealCard({
 
       {/* Title — presentational only; the parent card handles click + hover */}
       <p
-        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", marginBottom: 6, paddingRight: 20 }}
+        style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", marginBottom: 6, paddingRight: 20 }}
       >
         {deal.title}
       </p>
@@ -153,7 +153,7 @@ function DealCard({
         <Link
           href={`/companies/${deal.company.id}`}
           className="flex items-center gap-1.5"
-          style={{ fontSize: 11, color: "var(--fg-mute)" }}
+          style={{ fontSize: 12, color: "var(--fg-mute)" }}
           onClick={(e) => e.stopPropagation()}
           onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
           onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}
@@ -165,7 +165,7 @@ function DealCard({
           <Link
             href={`/persons/${deal.person!.id}`}
             className="flex items-center gap-1.5"
-            style={{ fontSize: 11, color: "var(--fg-faint)" }}
+            style={{ fontSize: 12, color: "var(--fg-faint)" }}
             onClick={(e) => e.stopPropagation()}
             onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
             onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}
@@ -175,7 +175,7 @@ function DealCard({
           </Link>
         )}
         {deal.expectedCloseDate && (
-          <div className="flex items-center gap-1.5 font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)" }}>
+          <div className="flex items-center gap-1.5 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
             <Calendar style={{ width: 10, height: 10 }} />
             {formatDate(deal.expectedCloseDate)}
           </div>
@@ -287,7 +287,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
                 <span className="kcol-title">{stage.name}</span>
                 <span className="kcol-count font-mono-ndt">{cards.length}</span>
                 {colValue > 0 && (
-                  <span className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)", marginLeft: 4 }}>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: 4 }}>
                     {Math.round(colValue).toLocaleString("hu-HU")}
                   </span>
                 )}
@@ -310,7 +310,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
                   <button
                     onClick={() => { setNewStageId(stage.id); setEditDeal(null); setModalOpen(true); }}
                     className="btn ghost"
-                    style={{ justifyContent: "flex-start", width: "100%", height: 30, fontSize: 12, color: "var(--fg-mute)" }}
+                    style={{ justifyContent: "flex-start", width: "100%", height: 30, fontSize: 14, color: "var(--fg-mute)" }}
                   >
                     <Plus style={{ width: 11, height: 11 }} />
                     Deal hozzáadása

@@ -78,7 +78,7 @@ export function CampaignDetailClient({
     <div className="mount">
       <div style={{ marginBottom: 16 }}>
         <Link href="/marketing/campaigns" className="row-link"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--fg-mute)" }}>
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}>
           <ArrowLeft style={{ width: 14, height: 14 }} />
           Vissza a kampányokhoz
         </Link>
@@ -89,7 +89,7 @@ export function CampaignDetailClient({
           <h1 className="page-title flex items-center gap-2">
             {campaign.name}
             {campaign.isArchived && (
-              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "var(--bg-0)", color: "var(--fg-faint)", fontFamily: "var(--font-mono)" }}>
+              <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 20, background: "var(--bg-0)", color: "var(--fg-faint)", fontFamily: "var(--font-mono)" }}>
                 archivált
               </span>
             )}
@@ -126,25 +126,25 @@ export function CampaignDetailClient({
         </div>
 
         <div className="flex flex-wrap items-center gap-2" style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Szegmens:</label>
+          <label style={{ fontSize: 14, color: "var(--fg-faint)" }}>Szegmens:</label>
           <select
             value={campaign.audienceViewId ?? ""}
             onChange={(e) => pickAudience(e.target.value ? Number(e.target.value) : null)}
             disabled={isPending}
-            style={{ padding: "6px 10px", fontSize: 13, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none", minWidth: 200 }}
+            style={{ padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none", minWidth: 200 }}
           >
             <option value="">— Nincs célközönség —</option>
             {companyViews.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
           {campaign.audienceViewId !== null && (
-            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--indigo)" }}>
+            <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--indigo)" }}>
               {audience.count.toLocaleString("hu-HU")} cég
             </span>
           )}
         </div>
 
         {companyViews.length === 0 && campaign.audienceViewId === null && (
-          <p style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+          <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>
             Nincs mentett cégszegmens. A <Link href="/companies" style={{ color: "var(--indigo)" }}>Cégek</Link> oldalon
             szűrj, majd mentsd el nézetként — itt választhatóvá válik.
           </p>
@@ -152,14 +152,14 @@ export function CampaignDetailClient({
 
         {campaign.audienceViewId !== null && (
           audience.count === 0 ? (
-            <p style={{ fontSize: 13, color: "var(--fg-mute)" }}>Ez a szegmens jelenleg egyetlen céget sem ad vissza.</p>
+            <p style={{ fontSize: 14, color: "var(--fg-mute)" }}>Ez a szegmens jelenleg egyetlen céget sem ad vissza.</p>
           ) : (
             <div style={{ border: "1px solid var(--line-soft)", borderRadius: 8, overflow: "hidden" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead>
                   <tr>
                     {["Cég", "Adószám", "Város", "Pipeline"].map((h) => (
-                      <th key={h} style={{ textAlign: "left", padding: "8px 12px", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", borderBottom: "1px solid var(--line-soft)" }}>{h}</th>
+                      <th key={h} style={{ textAlign: "left", padding: "8px 12px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", borderBottom: "1px solid var(--line-soft)" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -169,7 +169,7 @@ export function CampaignDetailClient({
                       <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg)" }}>{c.name}</td>
                       <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)" }} className="font-mono-ndt">{c.vatNumber ?? "—"}</td>
                       <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)" }}>
-                        {c.city ?? "—"}{c.county && <span style={{ color: "var(--fg-faint)", marginLeft: 6, fontSize: 11 }}>{c.county}</span>}
+                        {c.city ?? "—"}{c.county && <span style={{ color: "var(--fg-faint)", marginLeft: 6, fontSize: 12 }}>{c.county}</span>}
                       </td>
                       <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)" }}><PipelineStatusBadge status={c.pipelineStatus} /></td>
                     </tr>
@@ -177,7 +177,7 @@ export function CampaignDetailClient({
                 </tbody>
               </table>
               {audience.count > audience.preview.length && (
-                <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--fg-faint)", background: "var(--bg-0)" }} className="font-mono-ndt">
+                <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--fg-faint)", background: "var(--bg-0)" }} className="font-mono-ndt">
                   Első {audience.preview.length} a {audience.count.toLocaleString("hu-HU")} cégből — a teljes lista a CSV exportban.
                 </div>
               )}
@@ -189,17 +189,17 @@ export function CampaignDetailClient({
       {/* ── Tartalmak (content items) ── */}
       <section>
         <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", marginBottom: 12 }}>
-          Tartalmak <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>{contentItems.length}</span>
+          Tartalmak <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{contentItems.length}</span>
         </h2>
         {contentItems.length === 0 ? (
-          <p style={{ fontSize: 13, color: "var(--fg-faint)" }}>Ehhez a kampányhoz még nincs tartalom.</p>
+          <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>Ehhez a kampányhoz még nincs tartalom.</p>
         ) : (
           <div className="space-y-2">
             {contentItems.map((i) => (
               <Link key={i.id} href={`/marketing/${i.id}`} className="tbl-row flex items-center justify-between gap-3"
                 style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", textDecoration: "none" }}>
-                <span style={{ fontSize: 13, color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</span>
-                <span className="flex items-center gap-3 font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 14, color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</span>
+                <span className="flex items-center gap-3 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", whiteSpace: "nowrap" }}>
                   <span>{CHANNEL_LABELS[i.channel as ContentChannel] ?? i.channel}</span>
                   <span>{STATUS_LABELS[i.status as ContentStatus] ?? i.status}</span>
                   <span>{formatRelativeTime(new Date(i.updatedAt))}</span>

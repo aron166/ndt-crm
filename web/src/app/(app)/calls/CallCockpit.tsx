@@ -159,7 +159,7 @@ export default function CallCockpit({
           <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg)", margin: 0 }}>
             Hívás mód
           </h1>
-          <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 3 }}>
+          <p style={{ fontSize: 14, color: "var(--fg-faint)", marginTop: 3 }}>
             Vezetett hívókör · egy érintés = naplózott hívás
           </p>
         </div>
@@ -170,7 +170,7 @@ export default function CallCockpit({
                 key={m}
                 onClick={() => setMode(m)}
                 style={{
-                  fontSize: 12, fontWeight: 500, padding: "7px 12px", cursor: "pointer", border: "none",
+                  fontSize: 14, fontWeight: 500, padding: "7px 12px", cursor: "pointer", border: "none",
                   background: mode === m ? "var(--indigo-soft)" : "var(--bg-panel)",
                   color: mode === m ? "var(--indigo)" : "var(--fg-faint)",
                 }}
@@ -184,7 +184,7 @@ export default function CallCockpit({
             onChange={(e) => changeSegment(e.target.value ? Number(e.target.value) : null)}
             disabled={loadingQueue || submitting}
             style={{
-              fontSize: 12, color: "var(--fg-soft)", background: "var(--bg-panel)",
+              fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-panel)",
               border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px",
             }}
           >
@@ -198,14 +198,14 @@ export default function CallCockpit({
 
       {/* Progress + session tally */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+        <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
           {queue.length === 0 ? "0 / 0" : `${Math.min(index + 1, queue.length)} / ${queue.length}`}
         </span>
         <div style={{ flex: 1, height: 5, background: "var(--bg-raised)", borderRadius: 4, overflow: "hidden", minWidth: 80 }}>
           <div style={{ height: "100%", width: `${queue.length ? (index / queue.length) * 100 : 0}%`, background: "var(--indigo)", transition: "width .2s" }} />
         </div>
         {totalDone > 0 && (
-          <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--mint)", background: "var(--mint-soft)", padding: "2px 9px", borderRadius: 10 }}>
+          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)", background: "var(--mint-soft)", padding: "2px 9px", borderRadius: 10 }}>
             {totalDone} ma
           </span>
         )}
@@ -236,12 +236,12 @@ export default function CallCockpit({
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <h2 style={{ fontSize: 19, fontWeight: 600, color: "var(--fg)", margin: 0, letterSpacing: "-0.01em" }}>
+                  <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--fg)", margin: 0, letterSpacing: "-0.01em" }}>
                     {current.name}
                   </h2>
                   <PipelineStatusBadge status={current.pipelineStatus} />
                 </div>
-                <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
+                <div style={{ fontSize: 14, color: "var(--fg-faint)", marginTop: 4 }}>
                   {[current.city, current.county].filter(Boolean).join(", ") || "—"}
                   {current.website && (
                     <>
@@ -254,10 +254,10 @@ export default function CallCockpit({
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+                <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
                   Utolsó: {formatRelativeTime(current.lastInteractionDate)}
                 </div>
-                <Link href={`/companies/${current.id}`} style={{ fontSize: 11, color: "var(--indigo)" }}>
+                <Link href={`/companies/${current.id}`} style={{ fontSize: 12, color: "var(--indigo)" }}>
                   Megnyitás →
                 </Link>
               </div>
@@ -278,7 +278,7 @@ export default function CallCockpit({
                           key={c.personId}
                           onClick={() => setSelectedPersonId(c.personId)}
                           style={{
-                            fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: 14, cursor: "pointer",
+                            fontSize: 14, fontWeight: 500, padding: "4px 10px", borderRadius: 14, cursor: "pointer",
                             background: sel ? "var(--indigo-soft)" : "var(--bg-raised)",
                             color: sel ? "var(--indigo)" : "var(--fg-mute)",
                             border: `1px solid ${sel ? "var(--indigo-line)" : "var(--line-soft)"}`,
@@ -293,7 +293,7 @@ export default function CallCockpit({
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>{activeContact.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 1 }}>
+                    <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>
                       {activeContact.role || "—"}
                       {activeContact.email && <> · {activeContact.email}</>}
                     </div>
@@ -303,7 +303,7 @@ export default function CallCockpit({
                       href={`tel:${activeContact.phone.replace(/\s+/g, "")}`}
                       className="font-mono-ndt"
                       style={{
-                        fontSize: 15, fontWeight: 600, color: "var(--mint)",
+                        fontSize: 16, fontWeight: 600, color: "var(--mint)",
                         background: "var(--mint-soft)", border: "1px solid oklch(0.80 0.13 165 / 0.35)",
                         padding: "8px 16px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap",
                       }}
@@ -311,13 +311,13 @@ export default function CallCockpit({
                       📞 {activeContact.phone}
                     </a>
                   ) : (
-                    <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Nincs telefonszám</span>
+                    <span style={{ fontSize: 14, color: "var(--fg-faint)" }}>Nincs telefonszám</span>
                   )}
                 </div>
                 {/* Trigger the phone (Make → Tasker) + recording. The tel: link above
                     stays as the manual fallback. */}
                 {callId ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--mint)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--mint)" }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--mint)" }} />
                     Hívás folyamatban — válassz kimenetelt a befejezéshez
                   </div>
@@ -326,7 +326,7 @@ export default function CallCockpit({
                     onClick={beginCall}
                     disabled={calling || !activeContact.phone}
                     style={{
-                      alignSelf: "flex-start", fontSize: 13, fontWeight: 600, color: "var(--indigo)",
+                      alignSelf: "flex-start", fontSize: 14, fontWeight: 600, color: "var(--indigo)",
                       background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)",
                       borderRadius: 8, padding: "8px 16px",
                       cursor: calling || !activeContact.phone ? "default" : "pointer",
@@ -338,7 +338,7 @@ export default function CallCockpit({
                 )}
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+              <div style={{ fontSize: 14, color: "var(--fg-faint)" }}>
                 Nincs rögzített kapcsolattartó —{" "}
                 <Link href={`/companies/${current.id}`} style={{ color: "var(--indigo)" }}>adj hozzá egyet</Link>
               </div>
@@ -347,7 +347,7 @@ export default function CallCockpit({
 
           {/* Company intel */}
           {current.notes && (
-            <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--line-soft)", fontSize: 12, color: "var(--fg-mute)", whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto" }}>
+            <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--line-soft)", fontSize: 14, color: "var(--fg-mute)", whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto" }}>
               {current.notes}
             </div>
           )}
@@ -355,12 +355,12 @@ export default function CallCockpit({
           {/* History */}
           {current.history.length > 0 && (
             <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--line-soft)" }}>
-              <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)", marginBottom: 8 }}>
+              <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)", marginBottom: 8 }}>
                 Előzmény
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {current.history.map((h) => (
-                  <div key={h.id} style={{ display: "flex", gap: 8, fontSize: 12 }}>
+                  <div key={h.id} style={{ display: "flex", gap: 8, fontSize: 14 }}>
                     <span className="font-mono-ndt" style={{ color: "var(--fg-faint)", flexShrink: 0, width: 64 }}>
                       {formatRelativeTime(h.occurredAt)}
                     </span>
@@ -382,24 +382,24 @@ export default function CallCockpit({
               placeholder="Jegyzet a hívásról (opcionális)…"
               rows={2}
               style={{
-                width: "100%", fontSize: 13, color: "var(--fg)", background: "var(--bg-raised)",
+                width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)",
                 border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical",
               }}
             />
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--fg-mute)" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--fg-mute)" }}>
               Visszahívás:
               <input
                 type="date"
                 value={followupDate}
                 onChange={(e) => setFollowupDate(e.target.value)}
-                style={{ fontSize: 12, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "5px 8px" }}
+                style={{ fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "5px 8px" }}
               />
               {followupDate && <span style={{ color: "var(--fg-faint)" }}>→ feladat készül</span>}
             </label>
           </div>
 
           {error && (
-            <div style={{ padding: "0 20px 10px", fontSize: 12, color: "var(--coral)" }}>{error}</div>
+            <div style={{ padding: "0 20px 10px", fontSize: 14, color: "var(--coral)" }}>{error}</div>
           )}
 
           {/* Outcome buttons */}
@@ -412,26 +412,26 @@ export default function CallCockpit({
                   disabled={submitting}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    fontSize: 13, fontWeight: 500, color: o.tone,
+                    fontSize: 14, fontWeight: 500, color: o.tone,
                     background: "var(--bg-raised)", border: `1px solid ${o.tone}`,
                     borderRadius: 8, padding: "10px 8px", cursor: submitting ? "default" : "pointer",
                     opacity: submitting ? 0.5 : 1,
                   }}
                   className="tbl-row"
                 >
-                  <span className="font-mono-ndt" style={{ fontSize: 10, opacity: 0.6 }}>{i + 1}</span>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, opacity: 0.6 }}>{i + 1}</span>
                   {o.label}
                 </button>
               ))}
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-              <span style={{ fontSize: 10, color: "var(--fg-faint)" }}>
+              <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>
                 Gyorsbillentyű: 1–{CALL_OUTCOMES.length} kimenetel · S = kihagyás
               </span>
               <button
                 onClick={advance}
                 disabled={submitting}
-                style={{ fontSize: 12, color: "var(--fg-faint)", background: "none", border: "none", cursor: "pointer" }}
+                style={{ fontSize: 14, color: "var(--fg-faint)", background: "none", border: "none", cursor: "pointer" }}
               >
                 Kihagyás →
               </button>
@@ -472,13 +472,13 @@ function CallList({
               <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {c.name}
               </div>
-              <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 1 }}>
+              <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>
                 {ct ? ct.name : "Nincs kapcsolattartó"}
                 {ct?.role && <> · {ct.role}</>}
                 {c.contacts.length > 1 && <> · +{c.contacts.length - 1}</>}
               </div>
             </div>
-            <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)", flexShrink: 0 }}>
+            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", flexShrink: 0 }}>
               {formatRelativeTime(c.lastInteractionDate)}
             </span>
             {ct?.phone ? (
@@ -487,7 +487,7 @@ function CallList({
                 onClick={(e) => e.stopPropagation()}
                 className="font-mono-ndt"
                 style={{
-                  fontSize: 12, fontWeight: 600, color: "var(--mint)", background: "var(--mint-soft)",
+                  fontSize: 14, fontWeight: 600, color: "var(--mint)", background: "var(--mint-soft)",
                   border: "1px solid oklch(0.80 0.13 165 / 0.35)", padding: "5px 10px", borderRadius: 7,
                   textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
                 }}
@@ -506,7 +506,7 @@ function CallList({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="panel" style={{ padding: "48px 20px", textAlign: "center", fontSize: 13, color: "var(--fg-faint)" }}>
+    <div className="panel" style={{ padding: "48px 20px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
       {children}
     </div>
   );
@@ -524,14 +524,14 @@ function DoneCard({
   return (
     <div className="panel mount mount-1" style={{ padding: "32px 24px", textAlign: "center" }}>
       <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
-      <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--fg)", margin: 0 }}>Hívókör kész</h2>
-      <p style={{ fontSize: 13, color: "var(--fg-mute)", marginTop: 6 }}>
+      <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--fg)", margin: 0 }}>Hívókör kész</h2>
+      <p style={{ fontSize: 14, color: "var(--fg-mute)", marginTop: 6 }}>
         {totalDone} hívás naplózva ebben a körben.
       </p>
       {totalDone > 0 && (
         <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
           {CALL_OUTCOMES.filter((o) => tally[o.key]).map((o) => (
-            <span key={o.key} style={{ fontSize: 12, color: o.tone, background: "var(--bg-raised)", border: `1px solid ${o.tone}`, padding: "4px 10px", borderRadius: 16 }}>
+            <span key={o.key} style={{ fontSize: 14, color: o.tone, background: "var(--bg-raised)", border: `1px solid ${o.tone}`, padding: "4px 10px", borderRadius: 16 }}>
               {o.label}: <strong>{tally[o.key]}</strong>
             </span>
           ))}
@@ -539,7 +539,7 @@ function DoneCard({
       )}
       <button
         onClick={onRestart}
-        style={{ marginTop: 22, fontSize: 13, fontWeight: 500, color: "var(--indigo)", background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", borderRadius: 8, padding: "9px 18px", cursor: "pointer" }}
+        style={{ marginTop: 22, fontSize: 14, fontWeight: 500, color: "var(--indigo)", background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", borderRadius: 8, padding: "9px 18px", cursor: "pointer" }}
       >
         Új kör betöltése
       </button>

@@ -60,7 +60,7 @@ export default function LoginPage() {
           <h1 style={{ fontSize: 20, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>
             Helm CRM
           </h1>
-          <p style={{ fontSize: 11, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>
+          <p style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>
             Controllabor · EU
           </p>
         </div>
@@ -80,7 +80,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 6 }}>
                 Email
               </label>
               <input
@@ -93,7 +93,7 @@ export default function LoginPage() {
                 style={{
                   width: "100%", height: 36, padding: "0 12px",
                   background: "var(--bg-raised)", border: "1px solid var(--line)",
-                  borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none",
+                  borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none",
                   fontFamily: "inherit",
                 }}
                 onFocus={(e) => {
@@ -108,7 +108,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 6 }}>
                 Jelszó
               </label>
               <input
@@ -120,7 +120,7 @@ export default function LoginPage() {
                 style={{
                   width: "100%", height: 36, padding: "0 12px",
                   background: "var(--bg-raised)", border: "1px solid var(--line)",
-                  borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none",
+                  borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none",
                   fontFamily: "inherit",
                 }}
                 onFocus={(e) => {
@@ -135,7 +135,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p style={{ fontSize: 12, color: "var(--coral)" }}>{error}</p>
+              <p style={{ fontSize: 14, color: "var(--coral)" }}>{error}</p>
             )}
 
             <button
@@ -145,7 +145,7 @@ export default function LoginPage() {
                 width: "100%", height: 36, marginTop: 4,
                 background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
                 border: "1px solid var(--indigo-dim)",
-                borderRadius: 6, color: "white", fontSize: 13, fontWeight: 500,
+                borderRadius: 6, color: "white", fontSize: 14, fontWeight: 500,
                 cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1,
                 boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6)",
                 fontFamily: "inherit",

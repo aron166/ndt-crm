@@ -38,7 +38,7 @@ function ConfidenceBar({ value }: { value: number }) {
       <div style={{ width: 48, height: 3, background: "var(--line-soft)", borderRadius: 2, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 2 }} />
       </div>
-      <span style={{ fontSize: 10, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)" }}>{pct}%</span>
+      <span style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)" }}>{pct}%</span>
     </div>
   );
 }
@@ -59,7 +59,7 @@ function ProposalCard({ proposal, onApplied }: { proposal: Proposal; onApplied: 
     return (
       <div style={{ padding: "12px 16px", background: "var(--bg-raised)", borderRadius: 6, display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ color: "var(--mint)", fontSize: 14 }}>✓</span>
-        <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>{proposal.entityName} — alkalmazva</span>
+        <span style={{ fontSize: 14, color: "var(--fg-mute)" }}>{proposal.entityName} — alkalmazva</span>
       </div>
     );
   }
@@ -78,19 +78,19 @@ function ProposalCard({ proposal, onApplied }: { proposal: Proposal; onApplied: 
       {/* Header */}
       <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line-soft)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>{proposal.entityName}</span>
-          <span style={{ fontSize: 10, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{proposal.entityName}</span>
+          <span style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase" }}>
             {proposal.entityType === "company" ? "cég" : "személy"}
           </span>
         </div>
         {fields.length > 0 && (
           <div style={{ display: "flex", gap: 4 }}>
             <button onClick={() => setSelected(new Set(fields.map(([k]) => k)))}
-              style={{ fontSize: 11, padding: "2px 8px", border: "1px solid var(--mint)", color: "var(--mint)", background: "transparent", borderRadius: 4, cursor: "pointer" }}>
+              style={{ fontSize: 12, padding: "2px 8px", border: "1px solid var(--mint)", color: "var(--mint)", background: "transparent", borderRadius: 4, cursor: "pointer" }}>
               Mind
             </button>
             <button onClick={() => setSelected(new Set())}
-              style={{ fontSize: 11, padding: "2px 8px", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", background: "transparent", borderRadius: 4, cursor: "pointer" }}>
+              style={{ fontSize: 12, padding: "2px 8px", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", background: "transparent", borderRadius: 4, cursor: "pointer" }}>
               Egyik sem
             </button>
           </div>
@@ -100,20 +100,20 @@ function ProposalCard({ proposal, onApplied }: { proposal: Proposal; onApplied: 
       {/* No changes */}
       {fields.length === 0 && (
         <div style={{ padding: "12px 16px" }}>
-          <div style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: debug?.facts ? 10 : 0 }}>
+          <div style={{ fontSize: 14, color: "var(--fg-faint)", marginBottom: debug?.facts ? 10 : 0 }}>
             Nem találtunk változtatnivalót.
           </div>
           {debug?.facts && (
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {(debug.facts as string[]).map((f: string, i: number) => (
-                <div key={i} style={{ fontSize: 10, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", padding: "2px 0", borderBottom: "1px solid var(--line-soft)" }}>
+                <div key={i} style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", padding: "2px 0", borderBottom: "1px solid var(--line-soft)" }}>
                   {f}
                 </div>
               ))}
             </div>
           )}
           {proposal.rawResponse?.startsWith("ERROR:") && (
-            <div style={{ fontSize: 11, color: "var(--coral)", fontFamily: "var(--font-mono-ndt)", marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: "var(--coral)", fontFamily: "var(--font-mono-ndt)", marginTop: 4 }}>
               {proposal.rawResponse}
             </div>
           )}
@@ -137,20 +137,20 @@ function ProposalCard({ proposal, onApplied }: { proposal: Proposal; onApplied: 
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-mute)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono-ndt)" }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-mute)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono-ndt)" }}>
                       {FIELD_LABELS[key] ?? key}
                     </span>
-                    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 3, border: `1px solid ${SOURCE_COLOR[change.source] ?? "var(--line)"}`, color: SOURCE_COLOR[change.source] ?? "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase" }}>
+                    <span style={{ fontSize: 12, padding: "1px 6px", borderRadius: 3, border: `1px solid ${SOURCE_COLOR[change.source] ?? "var(--line)"}`, color: SOURCE_COLOR[change.source] ?? "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase" }}>
                       {change.source.replace("_", " ")}
                     </span>
                     <ConfidenceBar value={change.confidence} />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12, color: "var(--fg-faint)", textDecoration: "line-through", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 14, color: "var(--fg-faint)", textDecoration: "line-through", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {change.current ?? "(üres)"}
                     </span>
-                    <span style={{ color: "var(--fg-faint)", fontSize: 11 }}>→</span>
-                    <span style={{ fontSize: 12, color: "var(--mint)", fontWeight: 500, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ color: "var(--fg-faint)", fontSize: 12 }}>→</span>
+                    <span style={{ fontSize: 14, color: "var(--mint)", fontWeight: 500, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {change.proposed}
                     </span>
                   </div>
@@ -161,10 +161,10 @@ function ProposalCard({ proposal, onApplied }: { proposal: Proposal; onApplied: 
 
           {/* Footer */}
           <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 11, color: "var(--fg-faint)" }}>{selected.size}/{fields.length} kiválasztva</span>
+            <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>{selected.size}/{fields.length} kiválasztva</span>
             <button onClick={handleApply} disabled={isPending || selected.size === 0}
               style={{
-                fontSize: 12, fontWeight: 600, padding: "6px 14px",
+                fontSize: 14, fontWeight: 600, padding: "6px 14px",
                 background: selected.size > 0 ? "var(--indigo)" : "var(--bg-hover)",
                 color: selected.size > 0 ? "white" : "var(--fg-faint)",
                 border: "none", borderRadius: 5, cursor: selected.size > 0 ? "pointer" : "not-allowed",
@@ -203,15 +203,15 @@ export function EnrichmentDrawer({ proposals, onClose }: Props) {
         {/* Header */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--line-soft)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg)", display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg)", display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ color: "var(--indigo)" }}>✦</span> Enrichment eredmények
             </div>
-            <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 2, fontFamily: "var(--font-mono-ndt)" }}>
+            <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 2, fontFamily: "var(--font-mono-ndt)" }}>
               {totalWithChanges} javasolt változtatás · {appliedCount} alkalmazva
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Link href="/enrichment" style={{ fontSize: 11, color: "var(--indigo)", textDecoration: "none" }}>
+            <Link href="/enrichment" style={{ fontSize: 12, color: "var(--indigo)", textDecoration: "none" }}>
               Összes futtatás →
             </Link>
             <button onClick={onClose} style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg-mute)", cursor: "pointer", fontSize: 16 }}>
@@ -223,7 +223,7 @@ export function EnrichmentDrawer({ proposals, onClose }: Props) {
         {/* Proposals list */}
         <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: 10 }}>
           {proposals.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--fg-faint)", fontSize: 13 }}>
+            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--fg-faint)", fontSize: 14 }}>
               Nincs eredmény.
             </div>
           ) : proposals.map(p => (
