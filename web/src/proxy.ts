@@ -42,6 +42,7 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname === "/api/events" ||
     request.nextUrl.pathname === "/api/conversations" ||
     request.nextUrl.pathname === "/api/leads" ||
+    request.nextUrl.pathname.startsWith("/api/leads/") ||
     request.nextUrl.pathname === "/api/content" ||
     request.nextUrl.pathname === "/api/calls/result" ||
     request.nextUrl.pathname === "/api/cron/automations" ||
