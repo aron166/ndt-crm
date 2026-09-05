@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EntitySearch } from "@/components/EntitySearch";
 import { updateLead } from "@/app/actions/leads";
+import { FormField } from "@/components/ui/FormField";
 
 export interface LeadEditInitial {
   id: number;
@@ -68,41 +69,34 @@ export function LeadEditModal({ open, onClose, onSaved, initial }: LeadEditModal
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="field-label">Tárgy</label>
+          <FormField label="Tárgy">
             <Input name="subject" defaultValue={initial.subject ?? ""} placeholder="Rövid tárgy" autoFocus />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="field-label">Szolgáltatás / érdeklődés</label>
+          <FormField label="Szolgáltatás / érdeklődés">
             <Input name="serviceInterest" defaultValue={initial.serviceInterest ?? ""} placeholder="pl. UT vizsgálat" />
-          </div>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="field-label">Csatorna</label>
+            <FormField label="Csatorna">
               <Input name="source" defaultValue={initial.source ?? ""} placeholder="pl. web, telefon, ajánlás" />
-            </div>
-            <div>
-              <label className="field-label">Becsült érték (HUF)</label>
+            </FormField>
+            <FormField label="Becsült érték (HUF)">
               <Input type="number" name="estimatedValue" defaultValue={initial.estimatedValue ?? ""} placeholder="pl. 850000" min={0} />
-            </div>
+            </FormField>
           </div>
 
-          <div>
-            <label className="field-label">Cég</label>
+          <FormField label="Cég">
             <EntitySearch endpoint="/api/search/companies" placeholder="Keresés..." value={company} onChange={setCompany} />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="field-label">Üzenet</label>
+          <FormField label="Üzenet">
             <Textarea name="message" defaultValue={initial.message ?? ""} placeholder="A lead üzenete / megjegyzés" rows={4} />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="field-label">Elvesztés oka</label>
+          <FormField label="Elvesztés oka">
             <Input name="lostReason" defaultValue={initial.lostReason ?? ""} placeholder="Ha elveszett, miért" />
-          </div>
+          </FormField>
 
           {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
 

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { createCampaign } from "@/app/actions/campaigns";
+import { FormField } from "@/components/ui/FormField";
 
 interface CampaignRow {
   id: number;
@@ -102,14 +103,12 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
             <DialogTitle>Új kampány</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Név *</label>
+            <FormField label="Név" required>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Pl. Q3 NDT outreach" autoFocus />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Leírás</label>
+            </FormField>
+            <FormField label="Leírás">
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcionális" rows={3} />
-            </div>
+            </FormField>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>Mégse</Button>

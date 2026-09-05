@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { EntitySearch } from "@/components/EntitySearch";
 import { addContact, createPersonAndLink } from "@/app/actions/contacts";
 import { useRouter } from "next/navigation";
+import { FormField } from "@/components/ui/FormField";
 
 interface AddContactModalProps {
   open: boolean;
@@ -88,46 +89,38 @@ export function AddContactModal({ open, onClose, companyId }: AddContactModalPro
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           {mode === "find" ? (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Személy keresése *
-              </label>
+            <FormField label="Személy keresése" required>
               <EntitySearch
                 endpoint="/api/search/persons"
                 placeholder="Név, email..."
                 value={person}
                 onChange={setPerson}
               />
-            </div>
+            </FormField>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Keresztnév</label>
+                <FormField label="Keresztnév">
                   <Input name="firstName" placeholder="Béla" autoFocus />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Vezetéknév</label>
+                </FormField>
+                <FormField label="Vezetéknév">
                   <Input name="lastName" placeholder="Kovács" />
-                </div>
+                </FormField>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+                <FormField label="Email">
                   <Input name="email" type="email" placeholder="bela@ceg.hu" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Telefon</label>
+                </FormField>
+                <FormField label="Telefon">
                   <Input name="phone" placeholder="+36 30..." />
-                </div>
+                </FormField>
               </div>
             </>
           )}
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Beosztás</label>
+          <FormField label="Beosztás">
             <Input name="role" placeholder="pl. Mérnök, Vezető..." />
-          </div>
+          </FormField>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

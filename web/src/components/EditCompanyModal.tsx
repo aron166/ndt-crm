@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateCompany } from "@/app/actions/companies";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormField } from "@/components/ui/FormField";
 
 interface Company {
   id: number; name: string; vatNumber: string | null;
@@ -66,61 +67,50 @@ export function EditCompanyModal({ open, onClose, company }: Props) {
         </DialogHeader>
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div className="field-group" style={{ gridColumn: "1 / -1" }}>
-              <label className="field-label">Cég neve *</label>
+            <FormField label="Cég neve" required full>
               <input name="name" className="input-ds" defaultValue={company.name} required />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Adószám</label>
+            </FormField>
+            <FormField label="Adószám">
               <input name="vatNumber" className="input-ds" defaultValue={company.vatNumber ?? ""} />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Website</label>
+            </FormField>
+            <FormField label="Website">
               <input name="website" className="input-ds" defaultValue={company.website ?? ""} />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Státusz</label>
+            </FormField>
+            <FormField label="Státusz">
               <select name="status" className="input-ds" defaultValue={company.status ?? "active"}>
                 <option value="active">Aktív</option>
                 <option value="inactive">Inaktív</option>
                 <option value="fa">F.A.</option>
               </select>
-            </div>
-            <div className="field-group">
-              <label className="field-label">Partner kategória</label>
+            </FormField>
+            <FormField label="Partner kategória">
               <select name="accountType" className="input-ds" defaultValue={company.accountType ?? ""}>
                 <option value="">—</option>
                 <option value="Prospect">Prospect</option>
                 <option value="Customer">Ügyfél</option>
                 <option value="Vendor">Szállító</option>
               </select>
-            </div>
-            <div className="field-group">
-              <label className="field-label">Pipeline státusz</label>
+            </FormField>
+            <FormField label="Pipeline státusz">
               <select name="pipelineStatus" className="input-ds" defaultValue={company.pipelineStatus ?? ""}>
                 {PIPELINE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-            </div>
-            <div className="field-group">
-              <label className="field-label">Ország</label>
+            </FormField>
+            <FormField label="Ország">
               <input name="country" className="input-ds" defaultValue={company.country ?? "Magyarország"} />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Megye</label>
+            </FormField>
+            <FormField label="Megye">
               <input name="county" className="input-ds" defaultValue={company.county ?? ""} />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Város</label>
+            </FormField>
+            <FormField label="Város">
               <input name="city" className="input-ds" defaultValue={company.city ?? ""} />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Irányítószám</label>
+            </FormField>
+            <FormField label="Irányítószám">
               <input name="zipCode" className="input-ds" defaultValue={company.zipCode ?? ""} />
-            </div>
-            <div className="field-group" style={{ gridColumn: "1 / -1" }}>
-              <label className="field-label">Utca, házszám</label>
+            </FormField>
+            <FormField label="Utca, házszám" full>
               <input name="address" className="input-ds" defaultValue={company.address ?? ""} />
-            </div>
+            </FormField>
           </div>
 
           {error && <div style={{ fontSize: 12, color: "var(--coral)", padding: "6px 10px", background: "var(--coral-soft)", borderRadius: 5 }}>{error}</div>}

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { sendCrmEmail } from "@/app/actions/email";
+import { FormField } from "@/components/ui/FormField";
 
 interface SendEmailModalProps {
   open: boolean;
@@ -59,18 +60,15 @@ export function SendEmailModal({
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Címzett *</label>
+          <FormField label="Címzett" required>
             <Input name="to" type="email" defaultValue={defaultTo ?? ""} placeholder="nev@ceg.hu" required autoFocus={!defaultTo} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Tárgy *</label>
+          </FormField>
+          <FormField label="Tárgy" required>
             <Input name="subject" placeholder="Tárgy" required autoFocus={!!defaultTo} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Üzenet *</label>
+          </FormField>
+          <FormField label="Üzenet" required>
             <Textarea name="text" rows={8} placeholder="Írd meg az üzenetet..." required />
-          </div>
+          </FormField>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

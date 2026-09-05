@@ -15,6 +15,7 @@ import { createTask, updateTask } from "@/app/actions/tasks";
 import { COST_CODES, computeCostAmount, costCodeUnitHint } from "@/lib/tasks/costing";
 import { getCostRates, type CostRateEntry } from "@/app/actions/cost-rates";
 import { formatHUF } from "@/lib/utils";
+import { FormField } from "@/components/ui/FormField";
 
 interface TaskFormData {
   id?: number;
@@ -153,8 +154,7 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Cím *</label>
+          <FormField label="Cím" required>
             <Input
               name="title"
               defaultValue={initial?.title}
@@ -162,27 +162,24 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
               required
               autoFocus
             />
-          </div>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Típus</label>
+            <FormField label="Típus">
               <Select value={type ?? "internal"} onValueChange={(v) => v && setType(v)}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Határidő</label>
+            </FormField>
+            <FormField label="Határidő">
               <Input type="date" name="dueDate" defaultValue={dueDateValue} />
-            </div>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Tervezett perc</label>
+            <FormField label="Tervezett perc">
               <Input
                 type="number"
                 name="estimatedMinutes"
@@ -190,33 +187,30 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
                 placeholder="pl. 30"
                 min={1}
               />
-            </div>
+            </FormField>
             {isEdit && (
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Státusz</label>
+              <FormField label="Státusz">
                 <Select value={status ?? "created"} onValueChange={(v) => v && setStatus(v)}>
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
-              </div>
+              </FormField>
             )}
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Leírás</label>
+          <FormField label="Leírás">
             <Textarea
               name="description"
               defaultValue={initial?.description ?? ""}
               placeholder="Megjegyzések..."
               rows={2}
             />
-          </div>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Cég</label>
+            <FormField label="Cég">
               <EntitySearch
                 endpoint="/api/search/companies"
                 placeholder="Keresés..."
@@ -224,9 +218,8 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
                 onChange={setCompany}
                 disabled={contextLocked && !!initial?.companyId}
               />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Személy</label>
+            </FormField>
+            <FormField label="Személy">
               <EntitySearch
                 endpoint="/api/search/persons"
                 placeholder="Keresés..."
@@ -234,7 +227,7 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
                 onChange={setPerson}
                 disabled={contextLocked && !!initial?.personId}
               />
-            </div>
+            </FormField>
           </div>
 
           <details
@@ -248,8 +241,7 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
               )}
             </summary>
             <div className="px-3 pb-3 space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Költségkód</label>
+              <FormField label="Költségkód">
                 <Select value={costCode || "none"} onValueChange={handleCostCodeChange}>
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -259,10 +251,9 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </FormField>
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Mennyiség</label>
+                <FormField label="Mennyiség">
                   <Input
                     type="number"
                     inputMode="decimal"
@@ -272,17 +263,15 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
                     onChange={(e) => setCostQuantity(e.target.value)}
                     placeholder="pl. 80"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Egység</label>
+                </FormField>
+                <FormField label="Egység">
                   <Input
                     value={costUnit}
                     onChange={(e) => setCostUnit(e.target.value)}
                     placeholder={costCodeUnitHint(costCode) || "pl. m²"}
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Egységár (Ft)</label>
+                </FormField>
+                <FormField label="Egységár (Ft)">
                   <Input
                     type="number"
                     inputMode="decimal"
@@ -292,7 +281,7 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
                     onChange={(e) => setCostUnitRate(e.target.value)}
                     placeholder="pl. 300"
                   />
-                </div>
+                </FormField>
               </div>
               <p className="text-xs text-slate-500">
                 Összeg:{" "}
