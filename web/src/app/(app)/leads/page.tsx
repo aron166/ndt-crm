@@ -38,7 +38,7 @@ export default async function LeadsPage({
         href="/leads"
         className="rounded-full font-mono-ndt"
         style={{
-          height: 26, padding: "0 12px", fontSize: 11, lineHeight: "26px",
+          height: 26, padding: "0 12px", fontSize: 12, lineHeight: "26px",
           background: showConverted ? "var(--bg-panel)" : "var(--indigo-soft)",
           color: showConverted ? "var(--fg-mute)" : "var(--indigo)",
           border: `1px solid ${showConverted ? "var(--line-soft)" : "var(--indigo-line)"}`,
@@ -50,7 +50,7 @@ export default async function LeadsPage({
         href="/leads?view=closed"
         className="rounded-full font-mono-ndt"
         style={{
-          height: 26, padding: "0 12px", fontSize: 11, lineHeight: "26px",
+          height: 26, padding: "0 12px", fontSize: 12, lineHeight: "26px",
           background: showConverted ? "var(--mint-soft)" : "var(--bg-panel)",
           color: showConverted ? "var(--mint)" : "var(--fg-mute)",
           border: `1px solid ${showConverted ? "oklch(0.80 0.13 165 / 0.35)" : "var(--line-soft)"}`,
@@ -87,7 +87,7 @@ export default async function LeadsPage({
 
         <div className="panel">
           {converted.length === 0 ? (
-            <div className="panel-pad" style={{ fontSize: 13, color: "var(--fg-mute)" }}>
+            <div className="panel-pad" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
               Még nincs lezárt lead.
             </div>
           ) : (
@@ -100,7 +100,7 @@ export default async function LeadsPage({
                   <div
                     key={l.id}
                     className="flex items-center gap-3"
-                    style={{ padding: "12px 16px", borderBottom: "1px solid var(--line-soft)", fontSize: 13 }}
+                    style={{ padding: "12px 16px", borderBottom: "1px solid var(--line-soft)", fontSize: 14 }}
                   >
                     <Link href={`/leads/${l.id}`} className="row-link" style={{ flex: 1, color: "var(--fg)" }}>
                       {l.serviceInterest || l.subject || "Érdeklődés"}
@@ -111,7 +111,7 @@ export default async function LeadsPage({
                       </Link>
                     )}
                     <span className="truncate" style={{ width: 150, color: "var(--fg-faint)" }}>{personName || "—"}</span>
-                    <span className="font-mono-ndt" style={{ width: 90, color: "var(--fg-faint)", fontSize: 11 }}>
+                    <span className="font-mono-ndt" style={{ width: 90, color: "var(--fg-faint)", fontSize: 12 }}>
                       {formatRelativeTime(l.closedAt ?? l.convertedAt)}
                     </span>
                     {l.convertedDealId ? (
@@ -133,13 +133,13 @@ export default async function LeadsPage({
 
         {/* Pagination — same pattern as /companies */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+          <div className="flex items-center justify-between mt-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
             <span>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, convertedCount)} / {convertedCount.toLocaleString("hu-HU")}</span>
             <div className="flex gap-2">
               {page > 1 && (
                 <Link
                   href={pageHref(page - 1)}
-                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 11 }}
+                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
                 >
                   ← Előző
                 </Link>
@@ -147,7 +147,7 @@ export default async function LeadsPage({
               {page < totalPages && (
                 <Link
                   href={pageHref(page + 1)}
-                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 11 }}
+                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
                 >
                   Következő →
                 </Link>
