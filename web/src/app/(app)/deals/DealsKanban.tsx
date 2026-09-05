@@ -263,7 +263,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
       />
 
       {/* Kanban */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${pipeline.stages.length}, minmax(240px, 1fr))`, gap: 12, alignItems: "start" }}>
+      <div className="kboard">
         {pipeline.stages.map((stage) => {
           const cards = stageDeals(stage.id);
           const colValue = stageValue(stage.id);

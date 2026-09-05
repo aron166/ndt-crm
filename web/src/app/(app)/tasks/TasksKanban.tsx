@@ -314,7 +314,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
       </div>
 
       {/* Kanban grid */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(4, minmax(250px, 1fr))", alignItems: "start" }}>
+      <div className="kboard">
         {COLUMNS.map((col) => {
           const cards = colTasks(col.key);
           const mins = totalEst(col.key);

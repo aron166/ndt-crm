@@ -300,7 +300,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
         </div>
       </div>
     )}
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${statuses.length}, minmax(220px, 1fr))`, gap: 12, alignItems: "start" }}>
+    <div className="kboard">
       {statuses.map((status) => {
         const cards = colLeads(status.key);
         const total = columnTotals[status.key] ?? cards.length;

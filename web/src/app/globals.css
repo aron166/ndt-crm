@@ -201,7 +201,8 @@
   }
 
   html {
-    font-size: 14px;
+    font-size: 16px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     font-family: var(--font-sans);
     font-feature-settings: 'cv11', 'ss01';
@@ -389,7 +390,7 @@
   border-bottom: 1px solid var(--line-soft);
 }
 .panel-title {
-  font-size: 12px; font-weight: 600;
+  font-size: 13px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--fg-mute);
   display: flex; align-items: center; gap: 8px;
@@ -405,7 +406,7 @@
 .kcol-head {
   display: flex; align-items: center; gap: 8px;
   flex-shrink: 0;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--line-soft);
 }
 .kcol-dot {
@@ -414,7 +415,7 @@
   flex-shrink: 0;
 }
 .kcol-title {
-  font-size: 12px; font-weight: 600;
+  font-size: 14px; font-weight: 600;
   color: var(--fg-soft);
   letter-spacing: 0.02em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -422,7 +423,7 @@
 .kcol-count {
   margin-left: auto;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 13px;
   background: var(--bg-raised);
   color: var(--fg-mute);
   padding: 1px 7px;
@@ -430,8 +431,22 @@
 }
 .kcol-body {
   flex: 1; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 10px;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px;
+}
+
+/* Kanban board: fixed-width columns that scroll horizontally instead of
+   squeezing every stage into the viewport (Áron, 2026-09-04 — the 8-stage lead
+   board was unreadable at minmax(220px,1fr)). Shared by leads/deals/tasks. */
+.kboard {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 320px;
+  gap: 12px;
+  align-items: start;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 8px;
 }
 .kcol.mount { animation: kcol-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) both; }
 @keyframes kcol-in {
@@ -566,13 +581,13 @@
 }
 
 .divider { height: 1px; background: var(--line-soft); margin: 16px 0; }
-.field-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-faint); font-weight: 600; margin-bottom: 4px; }
-.field-value { font-size: 13px; color: var(--fg); }
-.field-value.mono { font-family: var(--font-mono); font-size: 12px; }
+.field-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-faint); font-weight: 600; margin-bottom: 4px; }
+.field-value { font-size: 14px; color: var(--fg); }
+.field-value.mono { font-family: var(--font-mono); font-size: 13px; }
 
 .split-grid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
 
-.h-section { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--fg-mute); }
+.h-section { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--fg-mute); }
 
 .row-link { color: var(--fg); cursor: pointer; }
 .row-link:hover { color: oklch(0.85 0.10 278); }
