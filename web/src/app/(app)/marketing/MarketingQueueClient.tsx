@@ -27,7 +27,7 @@ interface QueueItem {
 }
 
 const selectStyle: React.CSSProperties = {
-  padding: "6px 10px", fontSize: 13,
+  padding: "6px 10px", fontSize: 14,
   background: "var(--bg-0)", border: "1px solid var(--line-soft)",
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
@@ -116,7 +116,7 @@ export function MarketingQueueClient({
 
       {filtered.length === 0 ? (
         <div className="panel">
-          <div className="panel-pad" style={{ textAlign: "center", padding: "40px 0", color: "var(--fg-mute)", fontSize: 13 }}>
+          <div className="panel-pad" style={{ textAlign: "center", padding: "40px 0", color: "var(--fg-mute)", fontSize: 14 }}>
             Nincs tartalom ezekkel a szűrőkkel.
           </div>
         </div>
@@ -129,8 +129,8 @@ export function MarketingQueueClient({
               <section key={section}>
                 <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor(section), boxShadow: `0 0 8px ${statusColor(section)}` }} />
-                  <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>{statusLabel(section)}</h2>
-                  <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>{sectionItems.length}</span>
+                  <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{statusLabel(section)}</h2>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{sectionItems.length}</span>
                 </div>
                 <div className="space-y-2">
                   {sectionItems.map((item) => (
@@ -148,16 +148,16 @@ export function MarketingQueueClient({
                       onMouseOut={(e) => { e.currentTarget.style.borderColor = "var(--line-soft)"; }}
                     >
                       <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 5 }}>
-                        <span className="font-mono-ndt" style={{ fontSize: 9, color: statusColor(item.status), background: `${statusColor(item.status)}1a`, border: `1px solid ${statusColor(item.status)}40`, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        <span className="font-mono-ndt" style={{ fontSize: 12, color: statusColor(item.status), background: `${statusColor(item.status)}1a`, border: `1px solid ${statusColor(item.status)}40`, borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                           {channelLabel(item.channel)}
                         </span>
                         {item.internal && (
-                          <span className="flex items-center gap-1" style={{ fontSize: 9, color: "#f59e0b", background: "#f59e0b1a", border: "1px solid #f59e0b40", borderRadius: 4, padding: "1px 6px" }}>
+                          <span className="flex items-center gap-1" style={{ fontSize: 12, color: "#f59e0b", background: "#f59e0b1a", border: "1px solid #f59e0b40", borderRadius: 4, padding: "1px 6px" }}>
                             <Lock style={{ width: 9, height: 9 }} /> Belső
                           </span>
                         )}
                         {item.campaignName && (
-                          <span style={{ fontSize: 10, color: "var(--fg-faint)" }}>{item.campaignName}</span>
+                          <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>{item.campaignName}</span>
                         )}
                         {item.externalUrl && (
                           <ExternalLink style={{ width: 11, height: 11, color: "var(--fg-faint)" }} />
@@ -166,10 +166,10 @@ export function MarketingQueueClient({
                       <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)", marginBottom: 3, lineHeight: 1.3 }}>
                         {item.title}
                       </div>
-                      <p style={{ fontSize: 12, color: "var(--fg-mute)", lineHeight: 1.45, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      <p style={{ fontSize: 14, color: "var(--fg-mute)", lineHeight: 1.45, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                         {item.excerpt}
                       </p>
-                      <div className="flex items-center gap-1 font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)" }}>
+                      <div className="flex items-center gap-1 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
                         <Clock style={{ width: 10, height: 10 }} />
                         {formatRelativeTime(item.updatedAt)} · {item.source}
                       </div>

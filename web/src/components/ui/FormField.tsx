@@ -27,9 +27,9 @@ export function FormField({ label, required, hint, error, full, children }: Form
       <label className="field-label">{label}{required ? " *" : ""}</label>
       {children}
       {error ? (
-        <p style={{ fontSize: 12, color: "var(--coral)", marginTop: 4 }}>{error}</p>
+        <p style={{ fontSize: 14, color: "var(--coral)", marginTop: 4 }}>{error}</p>
       ) : hint ? (
-        <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>{hint}</p>
+        <p style={{ fontSize: 14, color: "var(--fg-faint)", marginTop: 4 }}>{hint}</p>
       ) : null}
     </div>
   );

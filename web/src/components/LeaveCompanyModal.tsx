@@ -24,7 +24,7 @@ export function LeaveCompanyModal({ open, personName, companyName, onConfirm, on
           <DialogTitle>Kilépés rögzítése</DialogTitle>
         </DialogHeader>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--fg-soft)" }}>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--fg-soft)" }}>
             <strong style={{ color: "var(--fg)" }}>{personName}</strong> mikor hagyta el a(z){" "}
             <strong style={{ color: "var(--fg)" }}>{companyName}</strong> céget?
           </p>
@@ -37,7 +37,7 @@ export function LeaveCompanyModal({ open, personName, companyName, onConfirm, on
               onChange={(e) => setDate(e.target.value)}
             />
           </FormField>
-          <p style={{ margin: 0, fontSize: 11, color: "var(--fg-faint)" }}>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--fg-faint)" }}>
             Egy „Utánkövetés" feladat automatikusan létrejön 2 hetes határidővel.
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

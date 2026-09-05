@@ -116,13 +116,13 @@ export function TasksClient({ tasks }: TasksClientProps) {
       {logModal}
 
       <div className="rounded-xl overflow-hidden" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)" }}>
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 13 }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 14 }}>
           <thead>
             <tr>
               {["", "Feladat", "Típus", "Határidő", "Cég / Személy", "Státusz", ""].map((h, i) => (
                 <th key={i} style={{
                   textAlign: "left", padding: i === 0 ? "10px 12px" : "10px 16px",
-                  fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em",
+                  fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em",
                   color: "var(--fg-faint)", borderBottom: "1px solid var(--line-soft)",
                   background: "oklch(0.20 0.014 255 / 0.5)",
                   display: i >= 2 && i <= 4 ? undefined : undefined,
@@ -171,22 +171,22 @@ export function TasksClient({ tasks }: TasksClientProps) {
                       {t.title}
                     </Link>
                     {t._count.subTasks > 0 && (
-                      <span className="font-mono-ndt" style={{ marginLeft: 8, fontSize: 10, color: "var(--fg-faint)" }}>
+                      <span className="font-mono-ndt" style={{ marginLeft: 8, fontSize: 12, color: "var(--fg-faint)" }}>
                         ↳ {t._count.subTasks}
                       </span>
                     )}
                   </td>
                   <td style={{ padding: "8px 16px" }}>
-                    <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-mute)", textTransform: "capitalize" }}>
+                    <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)", textTransform: "capitalize" }}>
                       {(t.type ?? "").replace("_", " ")}
                     </span>
                   </td>
                   <td style={{ padding: "8px 16px" }}>
-                    <span className="font-mono-ndt" style={{ fontSize: 11, color: overdue ? "var(--coral)" : today ? "var(--amber)" : "var(--fg-faint)", fontWeight: overdue || today ? 600 : 400 }}>
+                    <span className="font-mono-ndt" style={{ fontSize: 12, color: overdue ? "var(--coral)" : today ? "var(--amber)" : "var(--fg-faint)", fontWeight: overdue || today ? 600 : 400 }}>
                       {t.dueDate ? formatDate(t.dueDate) : "—"}{overdue && " ⚠"}
                     </span>
                   </td>
-                  <td style={{ padding: "8px 16px", fontSize: 12, color: "var(--fg-mute)" }}>
+                  <td style={{ padding: "8px 16px", fontSize: 14, color: "var(--fg-mute)" }}>
                     {t.company && <Link href={`/companies/${t.company.id}`} style={{ color: "var(--fg-mute)" }} onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")} onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}>{t.company.name}</Link>}
                     {t.person && <span>{t.company && " · "}<Link href={`/persons/${t.person.id}`} style={{ color: "var(--fg-faint)" }} onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")} onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}>{t.person.lastName} {t.person.firstName}</Link></span>}
                     {!t.company && !t.person && <span style={{ color: "var(--fg-faint)" }}>—</span>}

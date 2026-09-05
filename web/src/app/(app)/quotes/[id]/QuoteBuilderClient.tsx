@@ -13,7 +13,7 @@ import { QUOTE_STATUS_META, type QuoteStatus } from "@/lib/quotes/status";
 import { formatHUF, formatDate } from "@/lib/utils";
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 9px", fontSize: 13,
+  width: "100%", padding: "6px 9px", fontSize: 14,
   background: "var(--bg-0)", border: "1px solid var(--line-soft)",
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
@@ -156,7 +156,7 @@ export function QuoteBuilderClient({
             <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)" }}>
               {quote.quoteNumber}
             </h1>
-            <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 9px", borderRadius: 6, color: meta.color, background: meta.bg }}>
+            <span style={{ fontSize: 14, fontWeight: 600, padding: "2px 9px", borderRadius: 6, color: meta.color, background: meta.bg }}>
               {meta.label}
             </span>
           </div>
@@ -180,18 +180,18 @@ export function QuoteBuilderClient({
       <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12 }} className="p-5 mb-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label style={{ fontSize: 11, color: "var(--fg-faint)" }}>Tárgy</label>
+            <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Tárgy</label>
             <input style={{ ...inputStyle, marginTop: 4 }} value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div>
-            <label style={{ fontSize: 11, color: "var(--fg-faint)" }}>Címzett (kapcsolattartó)</label>
+            <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Címzett (kapcsolattartó)</label>
             <select style={{ ...inputStyle, marginTop: 4 }} value={personId ?? ""} onChange={(e) => setPersonId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">—</option>
               {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 11, color: "var(--fg-faint)" }}>Ajánlati kötöttség (érvényes eddig)</label>
+            <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Ajánlati kötöttség (érvényes eddig)</label>
             <input type="date" style={{ ...inputStyle, marginTop: 4 }} value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
           </div>
         </div>
@@ -200,7 +200,7 @@ export function QuoteBuilderClient({
       {/* Line items */}
       <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12 }} className="p-5 mb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>Tételek</h2>
+          <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>Tételek</h2>
           <button className="btn inline-flex items-center gap-1.5" onClick={addLine}><Plus className="size-3.5" /> Sor</button>
         </div>
 
@@ -208,7 +208,7 @@ export function QuoteBuilderClient({
           <thead>
             <tr>
               {["Kód", "Megnevezés", "Menny.", "Egység", "Egységár", "Összeg", ""].map((h, i) => (
-                <th key={i} style={{ textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "4px 6px", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fg-faint)" }}>{h}</th>
+                <th key={i} style={{ textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "4px 6px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fg-faint)" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -252,10 +252,10 @@ export function QuoteBuilderClient({
         {/* Totals */}
         <div className="flex justify-end mt-4">
           <div style={{ width: 280 }}>
-            <div className="flex justify-between py-1" style={{ fontSize: 13, color: "var(--fg-soft)" }}>
+            <div className="flex justify-between py-1" style={{ fontSize: 14, color: "var(--fg-soft)" }}>
               <span>Nettó összesen</span><span>{formatHUF(totals.net)}</span>
             </div>
-            <div className="flex items-center justify-between py-1" style={{ fontSize: 13, color: "var(--fg-soft)" }}>
+            <div className="flex items-center justify-between py-1" style={{ fontSize: 14, color: "var(--fg-soft)" }}>
               <span className="inline-flex items-center gap-1">
                 ÁFA
                 <input type="number" inputMode="decimal" step="any" min={0}
@@ -265,7 +265,7 @@ export function QuoteBuilderClient({
               </span>
               <span>{formatHUF(totals.vat)}</span>
             </div>
-            <div className="flex justify-between py-2 mt-1" style={{ fontSize: 15, fontWeight: 600, color: "var(--fg)", borderTop: "1px solid var(--line-soft)" }}>
+            <div className="flex justify-between py-2 mt-1" style={{ fontSize: 16, fontWeight: 600, color: "var(--fg)", borderTop: "1px solid var(--line-soft)" }}>
               <span>Bruttó összesen</span><span>{formatHUF(totals.gross)}</span>
             </div>
           </div>
@@ -274,7 +274,7 @@ export function QuoteBuilderClient({
 
       {/* Notes */}
       <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12 }} className="p-5 mb-4">
-        <label style={{ fontSize: 11, color: "var(--fg-faint)" }}>Megjegyzés (a dokumentumon megjelenik)</label>
+        <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Megjegyzés (a dokumentumon megjelenik)</label>
         <textarea rows={3} style={{ ...inputStyle, marginTop: 4, resize: "vertical" }} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="pl. fizetési feltételek, az ár tartalmazza a kiszállást…" />
       </div>
 
@@ -284,8 +284,8 @@ export function QuoteBuilderClient({
           Törlés
         </button>
         <div className="flex items-center gap-3">
-          {msg && <span style={{ fontSize: 12, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>{msg.ok ? "✓ " : "⚠ "}{msg.text}</span>}
-          {quote.sentAt && <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Elküldve: {formatDate(quote.sentAt)}</span>}
+          {msg && <span style={{ fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>{msg.ok ? "✓ " : "⚠ "}{msg.text}</span>}
+          {quote.sentAt && <span style={{ fontSize: 14, color: "var(--fg-faint)" }}>Elküldve: {formatDate(quote.sentAt)}</span>}
           <button className="btn primary" disabled={pending} onClick={handleSave}>{pending ? "Mentés…" : "Mentés"}</button>
         </div>
       </div>

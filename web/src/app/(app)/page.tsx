@@ -107,18 +107,18 @@ export default async function DashboardPage() {
           <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg)", margin: 0, textTransform: "capitalize" }}>
             {weekday}
           </h1>
-          <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 3, fontFamily: "var(--font-mono-ndt)" }}>
+          <p style={{ fontSize: 14, color: "var(--fg-faint)", marginTop: 3, fontFamily: "var(--font-mono-ndt)" }}>
             {dateStr}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {overdueTasks.length > 0 && (
-            <Link href="/tasks" style={{ fontSize: 11, color: "var(--coral)", background: "var(--coral-soft)", padding: "3px 10px", borderRadius: 20, textDecoration: "none", fontWeight: 500 }}>
+            <Link href="/tasks" style={{ fontSize: 12, color: "var(--coral)", background: "var(--coral-soft)", padding: "3px 10px", borderRadius: 20, textDecoration: "none", fontWeight: 500 }}>
               {overdueTasks.length} lejárt feladat
             </Link>
           )}
           {weekTasks > 0 && (
-            <Link href="/tasks" style={{ fontSize: 11, color: "var(--amber)", background: "var(--amber-soft)", padding: "3px 10px", borderRadius: 20, textDecoration: "none", fontWeight: 500 }}>
+            <Link href="/tasks" style={{ fontSize: 12, color: "var(--amber)", background: "var(--amber-soft)", padding: "3px 10px", borderRadius: 20, textDecoration: "none", fontWeight: 500 }}>
               {weekTasks} a héten esedékes
             </Link>
           )}
@@ -137,7 +137,7 @@ export default async function DashboardPage() {
             <div className="font-mono-ndt" style={{ fontSize: 24, fontWeight: 600, color: s.color, letterSpacing: "-0.02em", lineHeight: 1 }}>
               {s.value}
             </div>
-            <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 5, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 5, textTransform: "uppercase", letterSpacing: "0.08em" }}>
               {s.label}
             </div>
           </Link>
@@ -153,16 +153,16 @@ export default async function DashboardPage() {
             <div className="panel-title">
               Feladatok
               {todayTasks.length > 0 && (
-                <span className="font-mono-ndt" style={{ marginLeft: 6, fontSize: 10, color: "var(--amber)", background: "var(--amber-soft)", padding: "1px 6px", borderRadius: 10 }}>
+                <span className="font-mono-ndt" style={{ marginLeft: 6, fontSize: 12, color: "var(--amber)", background: "var(--amber-soft)", padding: "1px 6px", borderRadius: 10 }}>
                   {todayTasks.length} ma
                 </span>
               )}
             </div>
-            <Link href="/tasks" style={{ fontSize: 11, color: "var(--indigo)" }}>Összes →</Link>
+            <Link href="/tasks" style={{ fontSize: 12, color: "var(--indigo)" }}>Összes →</Link>
           </div>
           <div>
             {overdueTasks.length === 0 && todayTasks.length === 0 ? (
-              <div style={{ padding: "32px 20px", textAlign: "center", fontSize: 12, color: "var(--fg-faint)" }}>
+              <div style={{ padding: "32px 20px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
                 Nincs esedékes feladat
               </div>
             ) : (
@@ -171,8 +171,8 @@ export default async function DashboardPage() {
                   <Link key={t.id} href={`/tasks/${t.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--line-soft)", textDecoration: "none" }} className="tbl-row">
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--coral)", boxShadow: "0 0 8px var(--coral)", flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
-                      {t.company && <div style={{ fontSize: 10, color: "var(--fg-faint)", marginTop: 1 }}>{t.company.name}</div>}
+                      <div style={{ fontSize: 14, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
+                      {t.company && <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>{t.company.name}</div>}
                     </div>
                   </Link>
                 ))}
@@ -180,8 +180,8 @@ export default async function DashboardPage() {
                   <Link key={t.id} href={`/tasks/${t.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--line-soft)", textDecoration: "none" }} className="tbl-row">
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--indigo)", boxShadow: "0 0 6px oklch(0.66 0.19 278 / 0.6)", flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
-                      {t.company && <div style={{ fontSize: 10, color: "var(--fg-faint)", marginTop: 1 }}>{t.company.name}</div>}
+                      <div style={{ fontSize: 14, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
+                      {t.company && <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>{t.company.name}</div>}
                     </div>
                   </Link>
                 ))}
@@ -194,11 +194,11 @@ export default async function DashboardPage() {
         <div className="panel mount mount-2">
           <div className="panel-head">
             <div className="panel-title">Hívandók</div>
-            <Link href="/calls" style={{ fontSize: 11, color: "var(--indigo)" }}>Hívás mód →</Link>
+            <Link href="/calls" style={{ fontSize: 12, color: "var(--indigo)" }}>Hívás mód →</Link>
           </div>
           <div>
             {coldCompanies.length === 0 ? (
-              <div style={{ padding: "32px 20px", textAlign: "center", fontSize: 12, color: "var(--fg-faint)" }}>
+              <div style={{ padding: "32px 20px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
                 Nincs hívandó cég
               </div>
             ) : coldCompanies.map((c) => {
@@ -206,10 +206,10 @@ export default async function DashboardPage() {
               return (
                 <Link key={c.id} href={`/companies/${c.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 16px", borderBottom: "1px solid var(--line-soft)", textDecoration: "none" }} className="tbl-row">
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
-                    <div style={{ fontSize: 10, marginTop: 1 }}><PipelineStatusBadge status={c.pipelineStatus} /></div>
+                    <div style={{ fontSize: 14, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                    <div style={{ fontSize: 12, marginTop: 1 }}><PipelineStatusBadge status={c.pipelineStatus} /></div>
                   </div>
-                  <span className="font-mono-ndt" style={{ fontSize: 10, color: FRESHNESS_COLOR[fresh], flexShrink: 0 }}>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, color: FRESHNESS_COLOR[fresh], flexShrink: 0 }}>
                     {formatRelativeTime(c.lastInteractionDate)}
                   </span>
                 </Link>
@@ -225,7 +225,7 @@ export default async function DashboardPage() {
           </div>
           <div>
             {recentInteractions.length === 0 ? (
-              <div style={{ padding: "32px 20px", textAlign: "center", fontSize: 12, color: "var(--fg-faint)" }}>
+              <div style={{ padding: "32px 20px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
                 Nincs aktivitás
               </div>
             ) : recentInteractions.map((r) => {
@@ -235,7 +235,7 @@ export default async function DashboardPage() {
                 <div key={r.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--line-soft)" }}>
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, marginTop: 4, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: "var(--fg-soft)", fontWeight: 500 }}>
+                    <div style={{ fontSize: 14, color: "var(--fg-soft)", fontWeight: 500 }}>
                       <span style={{ color }}>{label}</span>
                       {r.company && (
                         <Link href={`/companies/${r.company.id}`} style={{ marginLeft: 5, color: "var(--fg-mute)", textDecoration: "none", fontWeight: 400 }}>
@@ -248,7 +248,7 @@ export default async function DashboardPage() {
                         </Link>
                       )}
                     </div>
-                    <div className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)", marginTop: 1 }}>
+                    <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>
                       {formatRelativeTime(r.occurredAt)}
                     </div>
                   </div>
@@ -264,7 +264,7 @@ export default async function DashboardPage() {
         <div className="panel mount mount-4">
           <div className="panel-head">
             <div className="panel-title">Pipeline · {pipelineTotal} nyitott deal</div>
-            <Link href="/deals" style={{ fontSize: 11, color: "var(--indigo)" }}>Kanban →</Link>
+            <Link href="/deals" style={{ fontSize: 12, color: "var(--indigo)" }}>Kanban →</Link>
           </div>
           <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
             {/* Progress bar */}
@@ -281,9 +281,9 @@ export default async function DashboardPage() {
               {pipeline.map((s) => (
                 <div key={s.stage_name} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: `${s.color}12`, border: `1px solid ${s.color}30`, borderRadius: 6 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, color: "var(--fg-mute)" }}>{s.stage_name}</span>
-                  <span className="font-mono-ndt" style={{ fontSize: 13, fontWeight: 600, color: s.color }}>{Number(s.cnt)}</span>
-                  <span className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)" }}>
+                  <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>{s.stage_name}</span>
+                  <span className="font-mono-ndt" style={{ fontSize: 14, fontWeight: 600, color: s.color }}>{Number(s.cnt)}</span>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
                     {s.total_value > 0 ? `${(s.total_value / 1_000_000).toFixed(1)}M` : "—"}
                   </span>
                 </div>

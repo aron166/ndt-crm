@@ -55,7 +55,7 @@ export function AnalyticsClient({
           <div className="panel-head">
             <div className="panel-title">Havi forgalom · elmúlt 24 hónap (M HUF)</div>
             {monthSeries.length > 0 && (
-              <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--mint)" }}>
+              <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)" }}>
                 {monthSeries.reduce((s, v) => s + v, 0).toFixed(1)}M összesen
               </span>
             )}
@@ -67,16 +67,16 @@ export function AnalyticsClient({
                 <div style={{ display: "flex", gap: 4, marginTop: 10, overflowX: "auto", paddingBottom: 4 }}>
                   {revenueByMonth.map((r, i) => (
                     <div key={i} style={{ textAlign: "center", flexShrink: 0, minWidth: 36 }}>
-                      <div className="font-mono-ndt" style={{ fontSize: 9, color: r.total > 0 ? "var(--mint)" : "var(--fg-faint)" }}>
+                      <div className="font-mono-ndt" style={{ fontSize: 12, color: r.total > 0 ? "var(--mint)" : "var(--fg-faint)" }}>
                         {r.total > 0 ? (r.total / 1_000_000).toFixed(0) : "—"}
                       </div>
-                      <div style={{ fontSize: 8, color: "var(--fg-faint)" }}>{monthLabels[i]}</div>
+                      <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{monthLabels[i]}</div>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <p style={{ fontSize: 13, color: "var(--fg-faint)", textAlign: "center", padding: "32px 0" }}>
+              <p style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center", padding: "32px 0" }}>
                 Nincs számla adat az elmúlt 24 hónapra.
               </p>
             )}
@@ -100,14 +100,14 @@ export function AnalyticsClient({
                     padding: "12px 14px",
                     background: "var(--bg-0)",
                     border: "1px solid var(--line-soft)",
-                    fontSize: 13, color: "var(--fg-soft)",
+                    fontSize: 14, color: "var(--fg-soft)",
                     transition: "border-color .15s, background .15s",
                   }}
                   onMouseOver={(e) => { e.currentTarget.style.borderColor = "var(--indigo-line)"; e.currentTarget.style.background = "var(--indigo-soft)"; }}
                   onMouseOut={(e) => { e.currentTarget.style.borderColor = "var(--line-soft)"; e.currentTarget.style.background = "var(--bg-0)"; }}
                 >
                   <span>{label}</span>
-                  <span className="font-mono-ndt" style={{ fontSize: 11, color: accent ?? "var(--indigo)" }}>{count}</span>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, color: accent ?? "var(--indigo)" }}>{count}</span>
                 </a>
               ))}
             </div>

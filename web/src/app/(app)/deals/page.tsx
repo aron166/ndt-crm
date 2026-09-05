@@ -91,11 +91,11 @@ export default async function DealsPage({
         <div>
           <h1 className="page-title" style={{ gap: 12 }}>
             Pipeline
-            <span className="font-mono-ndt" style={{ fontSize: 13, color: "var(--fg-mute)", fontWeight: 400 }}>
+            <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-mute)", fontWeight: 400 }}>
               · {openDeals} aktív
             </span>
             {staleDeals > 0 && (
-              <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--coral)", fontWeight: 500 }}>
+              <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--coral)", fontWeight: 500 }}>
                 · {staleDeals} lejárt ⚠
               </span>
             )}
@@ -117,7 +117,7 @@ export default async function DealsPage({
                   href={`/deals?pipeline=${p.id}`}
                   className="font-mono-ndt rounded"
                   style={{
-                    fontSize: 12, padding: "3px 10px",
+                    fontSize: 14, padding: "3px 10px",
                     background: p.id === activePipeline.id ? "var(--bg-hover)" : "transparent",
                     color: p.id === activePipeline.id ? "var(--fg)" : "var(--fg-mute)",
                   }}

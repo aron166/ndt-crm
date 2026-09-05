@@ -9,7 +9,7 @@ import { createQuote, searchCompaniesForQuote } from "@/app/actions/quotes";
 import { FormField } from "@/components/ui/FormField";
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "7px 10px", fontSize: 13,
+  width: "100%", padding: "7px 10px", fontSize: 14,
   background: "var(--bg-0)", border: "1px solid var(--line-soft)",
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
@@ -84,7 +84,7 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
               {companyId ? (
                 <div className="flex items-center justify-between gap-2 mt-1" style={inputStyle}>
                   <span>{companyLabel}</span>
-                  <button type="button" style={{ color: "var(--fg-faint)", fontSize: 12 }}
+                  <button type="button" style={{ color: "var(--fg-faint)", fontSize: 14 }}
                     onClick={() => { setCompanyId(null); setCompanyLabel(""); setQuery(""); }}>módosít</button>
                 </div>
               ) : (
@@ -97,7 +97,7 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
                       {results.map((c) => (
                         <button key={c.id} type="button"
                           className="block w-full text-left px-3 py-2 hover:bg-[var(--bg-0)]"
-                          style={{ fontSize: 13 }}
+                          style={{ fontSize: 14 }}
                           onClick={() => { setCompanyId(c.id); setCompanyLabel(c.name); setResults([]); }}>
                           {c.name}{c.city ? <span style={{ color: "var(--fg-faint)" }}> · {c.city}</span> : null}
                         </button>
@@ -115,7 +115,7 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
               placeholder="pl. Hegesztési varratok UT vizsgálata" />
           </FormField>
 
-          {error && <span style={{ fontSize: 12, color: "var(--coral)" }}>⚠ {error}</span>}
+          {error && <span style={{ fontSize: 14, color: "var(--coral)" }}>⚠ {error}</span>}
 
           <div className="flex justify-end gap-2 mt-1">
             <button className="btn" onClick={() => setOpen(false)} disabled={pending}>Mégse</button>

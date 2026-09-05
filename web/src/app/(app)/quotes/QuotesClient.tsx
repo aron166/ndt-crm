@@ -10,7 +10,7 @@ import { formatHUF, formatDate, formatRelativeTime } from "@/lib/utils";
 function StatusBadge({ status }: { status: keyof typeof QUOTE_STATUS_META }) {
   const m = QUOTE_STATUS_META[status];
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, color: m.color, background: m.bg }}>
+    <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 6, color: m.color, background: m.bg }}>
       {m.label}
     </span>
   );
@@ -48,7 +48,7 @@ export function QuotesClient({ quotes }: { quotes: QuoteListItem[] }) {
           <button key={f.key} onClick={() => setFilter(f.key)}
             className="rounded-md px-2.5 py-1"
             style={{
-              fontSize: 12, fontWeight: 500,
+              fontSize: 14, fontWeight: 500,
               color: filter === f.key ? "var(--fg)" : "var(--fg-soft)",
               background: filter === f.key ? "var(--bg-panel)" : "transparent",
               border: `1px solid ${filter === f.key ? "var(--line-soft)" : "transparent"}`,
@@ -69,7 +69,7 @@ export function QuotesClient({ quotes }: { quotes: QuoteListItem[] }) {
             <thead>
               <tr style={{ borderBottom: "1px solid var(--line-soft)" }}>
                 {["Sorszám", "Cég", "Tárgy", "Állapot", "Bruttó", "Érvényes", "Létrehozva"].map((h, i) => (
-                  <th key={h} style={{ textAlign: i === 4 ? "right" : "left", padding: "10px 12px", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)" }}>{h}</th>
+                  <th key={h} style={{ textAlign: i === 4 ? "right" : "left", padding: "10px 12px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)" }}>{h}</th>
                 ))}
               </tr>
             </thead>

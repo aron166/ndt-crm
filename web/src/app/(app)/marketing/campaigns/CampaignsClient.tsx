@@ -59,7 +59,7 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
     <div className="mount">
       <div style={{ marginBottom: 16 }}>
         <Link href="/marketing" className="row-link"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--fg-mute)" }}>
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}>
           <ArrowLeft style={{ width: 14, height: 14 }} />
           Vissza a marketinghez
         </Link>
@@ -77,7 +77,7 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
 
       {campaigns.length === 0 ? (
         <div className="panel">
-          <div className="panel-pad" style={{ textAlign: "center", padding: "48px 0", color: "var(--fg-mute)", fontSize: 13 }}>
+          <div className="panel-pad" style={{ textAlign: "center", padding: "48px 0", color: "var(--fg-mute)", fontSize: 14 }}>
             <Megaphone className="size-6 mx-auto mb-2" style={{ opacity: 0.5 }} />
             Még nincs kampány. Hozz létre egyet, és rendelj hozzá célközönséget.
           </div>
@@ -88,8 +88,8 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
           {archived.length > 0 && (
             <div>
               <div className="flex items-center gap-2" style={{ marginBottom: 10 }}>
-                <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-faint)" }}>Archivált</h2>
-                <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>{archived.length}</span>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg-faint)" }}>Archivált</h2>
+                <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{archived.length}</span>
               </div>
               <CampaignGroup rows={archived} />
             </div>
@@ -125,7 +125,7 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
 
 function CampaignGroup({ rows }: { rows: CampaignRow[] }) {
   if (rows.length === 0) {
-    return <p style={{ fontSize: 13, color: "var(--fg-faint)" }}>Nincs aktív kampány.</p>;
+    return <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>Nincs aktív kampány.</p>;
   }
   return (
     <div className="space-y-2">
@@ -143,12 +143,12 @@ function CampaignGroup({ rows }: { rows: CampaignRow[] }) {
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{c.name}</div>
             {c.description && (
-              <div style={{ fontSize: 12, color: "var(--fg-mute)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 480 }}>
+              <div style={{ fontSize: 14, color: "var(--fg-mute)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 480 }}>
                 {c.description}
               </div>
             )}
           </div>
-          <div className="flex items-center gap-4 font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)", whiteSpace: "nowrap" }}>
+          <div className="flex items-center gap-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", whiteSpace: "nowrap" }}>
             <span className="flex items-center gap-1" title="Célközönség">
               <Users className="size-3.5" />
               {c.audienceName ?? "—"}

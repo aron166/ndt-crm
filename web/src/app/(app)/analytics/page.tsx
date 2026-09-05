@@ -150,7 +150,7 @@ export default async function AnalyticsPage({
         <div>
           <h1 className="page-title">
             Analytics
-            <span className="font-mono-ndt" style={{ fontSize: 13, color: "var(--fg-mute)", fontWeight: 400 }}>
+            <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-mute)", fontWeight: 400 }}>
               · Controllabor Kft.
             </span>
           </h1>
@@ -171,7 +171,7 @@ export default async function AnalyticsPage({
               href={`/analytics?range=${key}`}
               className="font-mono-ndt rounded"
               style={{
-                fontSize: 11, padding: "3px 10px",
+                fontSize: 12, padding: "3px 10px",
                 background: range === key ? "var(--bg-hover)" : "transparent",
                 color: range === key ? "var(--fg)" : "var(--fg-mute)",
               }}
@@ -189,7 +189,7 @@ export default async function AnalyticsPage({
           <Link href="/companies" className="k-value font-mono-ndt" style={{ textDecoration: "none" }}>
             {totalCompanies.toLocaleString("hu-HU")}
           </Link>
-          <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
             {contacted.toLocaleString("hu-HU")} érintett ·{" "}
             <Link href="/companies?never_contacted=1" style={{ color: "var(--amber)", textDecoration: "none" }}>
               {neverContacted.toLocaleString("hu-HU")} soha
@@ -203,7 +203,7 @@ export default async function AnalyticsPage({
         <Link href="/persons" className="kpi" style={{ "--accent": "var(--sky)" } as React.CSSProperties}>
           <div className="k-label">Személyek</div>
           <div className="k-value font-mono-ndt">{totalPersons.toLocaleString("hu-HU")}</div>
-          <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
             2023-as kontakt snapshot
           </div>
         </Link>
@@ -213,7 +213,7 @@ export default async function AnalyticsPage({
           <div className="k-value font-mono-ndt" style={{ fontSize: 22 }}>
             {(totalRevenue / 1_000_000).toFixed(1)}M
           </div>
-          <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>2010–2023 · 2016 számla</div>
+          <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>2010–2023 · 2016 számla</div>
           <div className="k-spark">
             <Sparkline data={revenueSeries.slice(-12)} width={80} height={28} color="var(--mint)" />
           </div>
@@ -222,7 +222,7 @@ export default async function AnalyticsPage({
         <Link href={`/analytics?range=${range}#interactions`} className="kpi" style={{ "--accent": "var(--amber)" } as React.CSSProperties}>
           <div className="k-label">Interakciók ({range.toUpperCase()})</div>
           <div className="k-value font-mono-ndt">{recentInteractions.toLocaleString("hu-HU")}</div>
-          <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
             {openTasks > 0 ? `${openTasks} nyitott feladat` : "Nincs nyitott feladat"}
           </div>
         </Link>
@@ -232,7 +232,7 @@ export default async function AnalyticsPage({
       <div className="panel mount mount-2">
         <div className="panel-head">
           <div className="panel-title">Pipeline státusz megoszlás</div>
-          <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-mute)" }}>
+          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
             {totalCompanies.toLocaleString("hu-HU")} cég
           </span>
         </div>
@@ -251,11 +251,11 @@ export default async function AnalyticsPage({
                 key={p.status}
                 href={`/companies?pipeline_status=${p.status}`}
                 className="flex items-center gap-2"
-                style={{ fontSize: 12, color: "var(--fg-soft)" }}
+                style={{ fontSize: 14, color: "var(--fg-soft)" }}
               >
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color, flexShrink: 0, boxShadow: `0 0 4px ${p.color}` }} />
                 <PipelineStatusBadge status={p.status} />
-                <span className="font-mono-ndt ml-auto" style={{ fontSize: 11, color: "var(--fg-mute)" }}>
+                <span className="font-mono-ndt ml-auto" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
                   {p.count.toLocaleString("hu-HU")}
                 </span>
               </Link>
@@ -268,7 +268,7 @@ export default async function AnalyticsPage({
       <div className="panel mount mount-3">
         <div className="panel-head">
           <div className="panel-title">Forgalom · éves bontás (M HUF)</div>
-          <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--mint)" }}>
+          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)" }}>
             {(totalRevenue / 1_000_000).toFixed(1)}M HUF összesen
           </span>
         </div>
@@ -282,10 +282,10 @@ export default async function AnalyticsPage({
                 style={{ textAlign: "center", flexShrink: 0, minWidth: 44, textDecoration: "none" }}
                 title={`Számlák: ${r.year}`}
               >
-                <div className="font-mono-ndt" style={{ fontSize: 11, color: "var(--mint)", fontWeight: 500 }}>
+                <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)", fontWeight: 500 }}>
                   {(r.total / 1_000_000).toFixed(0)}M
                 </div>
-                <div style={{ fontSize: 10, color: "var(--fg-faint)" }}>{r.year}</div>
+                <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{r.year}</div>
               </Link>
             ))}
           </div>
@@ -334,7 +334,7 @@ export default async function AnalyticsPage({
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)", boxShadow: "0 0 6px var(--amber)" }} />
               Hívandók (90+ nap inaktív)
             </div>
-            <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--coral)" }}>
+            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--coral)" }}>
               {coldCompanies.length} cég
             </span>
           </div>
@@ -355,11 +355,11 @@ export default async function AnalyticsPage({
                     </td>
                     <td>
                       {c.lastInteractionDate ? (
-                        <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--amber)" }}>
+                        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--amber)" }}>
                           {formatDate(c.lastInteractionDate)}
                         </span>
                       ) : (
-                        <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--coral)" }}>Soha</span>
+                        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--coral)" }}>Soha</span>
                       )}
                     </td>
                   </tr>

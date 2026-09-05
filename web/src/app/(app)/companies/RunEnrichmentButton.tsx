@@ -26,7 +26,7 @@ export function RunEnrichmentButton({ companyIds }: Props) {
       title={`Enrichment futtatása ${Math.min(companyIds.length, 20)} cégre`}
       style={{
         display: "flex", alignItems: "center", gap: 6,
-        fontSize: 12, fontWeight: 500,
+        fontSize: 14, fontWeight: 500,
         padding: "5px 10px",
         background: "transparent",
         border: "1px solid var(--line-soft)",

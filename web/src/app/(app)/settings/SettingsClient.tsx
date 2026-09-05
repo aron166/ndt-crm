@@ -133,15 +133,15 @@ function IntegrationCard({
               ? <CheckCircle style={{ width: 14, height: 14, color: "var(--mint)" }} />
               : <Circle style={{ width: 14, height: 14, color: "var(--fg-faint)" }} />
             }
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>{integration.name}</span>
-            <span style={{ fontSize: 10, color: "var(--fg-faint)", background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 20 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{integration.name}</span>
+            <span style={{ fontSize: 12, color: "var(--fg-faint)", background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 20 }}>
               {integration.category}
             </span>
             {!integration.available && (
-              <span style={{ fontSize: 10, color: "var(--fg-faint)", fontFamily: "var(--font-mono)" }}>hamarosan</span>
+              <span style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono)" }}>hamarosan</span>
             )}
           </div>
-          <p style={{ fontSize: 12, color: "var(--fg-mute)", margin: 0, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 14, color: "var(--fg-mute)", margin: 0, lineHeight: 1.5 }}>
             {integration.description}
           </p>
         </div>
@@ -160,7 +160,7 @@ function IntegrationCard({
                   <button
                     onClick={handleTest}
                     disabled={isPending}
-                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: "pointer" }}
+                    style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: "pointer" }}
                   >
                     {isPending ? "Küldés..." : "Teszt küldése"}
                   </button>
@@ -168,7 +168,7 @@ function IntegrationCard({
                 <button
                   onClick={handleDisconnect}
                   disabled={isPending}
-                  style={{ fontSize: 11, padding: "4px 10px", borderRadius: 5, background: "transparent", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", cursor: "pointer" }}
+                  style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "transparent", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", cursor: "pointer" }}
                 >
                   Lecsatlakozás
                 </button>
@@ -176,7 +176,7 @@ function IntegrationCard({
             ) : (
               <button
                 onClick={() => setExpanded((e) => !e)}
-                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: "pointer" }}
+                style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: "pointer" }}
               >
                 Csatlakozás
               </button>
@@ -186,7 +186,7 @@ function IntegrationCard({
       </div>
 
       {testMsg && (
-        <p role="status" aria-live="polite" style={{ marginTop: 10, fontSize: 12, color: testMsg.ok ? "var(--mint)" : "var(--coral)" }}>
+        <p role="status" aria-live="polite" style={{ marginTop: 10, fontSize: 14, color: testMsg.ok ? "var(--mint)" : "var(--coral)" }}>
           {testMsg.ok ? "✓ " : "⚠ "}{testMsg.text}
         </p>
       )}
@@ -195,14 +195,14 @@ function IntegrationCard({
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 8 }}>
           {integration.fields.map((f) => (
             <div key={f.key}>
-              <label style={{ fontSize: 11, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>{f.label}</label>
+              <label style={{ fontSize: 12, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>{f.label}</label>
               <input
                 type={f.type ?? "text"}
                 value={values[f.key] ?? ""}
                 onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
                 placeholder={f.placeholder}
                 style={{
-                  width: "100%", padding: "6px 10px", fontSize: 12,
+                  width: "100%", padding: "6px 10px", fontSize: 14,
                   background: "var(--bg-0)", border: "1px solid var(--line-soft)",
                   borderRadius: 5, color: "var(--fg)", outline: "none",
                   fontFamily: "var(--font-mono)",
@@ -211,13 +211,13 @@ function IntegrationCard({
             </div>
           ))}
           <div className="flex gap-2 justify-end" style={{ marginTop: 4 }}>
-            <button onClick={() => setExpanded(false)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 5, background: "transparent", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", cursor: "pointer" }}>
+            <button onClick={() => setExpanded(false)} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "transparent", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", cursor: "pointer" }}>
               Mégsem
             </button>
             <button
               onClick={handleSave}
               disabled={isPending || !Object.values(values).some(Boolean)}
-              style={{ fontSize: 11, padding: "4px 12px", borderRadius: 5, background: "var(--indigo)", color: "white", border: "none", cursor: "pointer", opacity: Object.values(values).some(Boolean) ? 1 : 0.5 }}
+              style={{ fontSize: 12, padding: "4px 12px", borderRadius: 5, background: "var(--indigo)", color: "white", border: "none", cursor: "pointer", opacity: Object.values(values).some(Boolean) ? 1 : 0.5 }}
             >
               Mentés
             </button>
@@ -260,7 +260,7 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
 
   return (
     <div className="mount space-y-5">
-      <div className="flex items-center gap-3" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+      <div className="flex items-center gap-3" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
         <KeyRound style={{ width: 14, height: 14, color: "var(--indigo)" }} />
         Per-app kulcsok a <code style={{ fontFamily: "var(--font-mono)", color: "var(--sky)" }}>POST /api/leads</code> végponthoz. A kulcs csak hash-elve tárolódik — a teljes érték egyszer jelenik meg, létrehozáskor.
       </div>
@@ -271,21 +271,21 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
         <div className="panel-pad space-y-3">
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div>
-              <label style={{ fontSize: 11, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>App azonosító</label>
+              <label style={{ fontSize: 12, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>App azonosító</label>
               <input
                 value={appSlug}
                 onChange={(e) => setAppSlug(e.target.value)}
                 placeholder="betonscan_landing"
-                style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)", outline: "none", fontFamily: "var(--font-mono)" }}
+                style={{ width: "100%", padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)", outline: "none", fontFamily: "var(--font-mono)" }}
               />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>Címke (opcionális)</label>
+              <label style={{ fontSize: 12, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>Címke (opcionális)</label>
               <input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="BetonScan landing oldal"
-                style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)", outline: "none" }}
+                style={{ width: "100%", padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)", outline: "none" }}
               />
             </div>
           </div>
@@ -298,11 +298,11 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
 
           {created && (
             <div style={{ marginTop: 4, padding: "12px 14px", borderRadius: 8, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)" }}>
-              <div style={{ fontSize: 11, color: "var(--amber)", marginBottom: 6, fontWeight: 500 }}>
+              <div style={{ fontSize: 12, color: "var(--amber)", marginBottom: 6, fontWeight: 500 }}>
                 ⚠ Másold ki most — ez az érték többé nem jelenik meg.
               </div>
               <div className="flex items-center gap-2">
-                <code style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg)", wordBreak: "break-all" }}>{created.plaintext}</code>
+                <code style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg)", wordBreak: "break-all" }}>{created.plaintext}</code>
                 <button onClick={copyKey} className="btn" style={{ gap: 5, flexShrink: 0 }}>
                   {copied ? <Check style={{ width: 13, height: 13, color: "var(--mint)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                   {copied ? "Másolva" : "Másolás"}
@@ -318,17 +318,17 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
         <div className="panel-head"><div className="panel-title">Kulcsok</div></div>
         <div className="panel-pad">
           {appKeys.length === 0 ? (
-            <div style={{ fontSize: 12, color: "var(--fg-mute)", padding: "8px 0" }}>Még nincs kulcs.</div>
+            <div style={{ fontSize: 14, color: "var(--fg-mute)", padding: "8px 0" }}>Még nincs kulcs.</div>
           ) : (
             <div className="space-y-2">
               {appKeys.map((k) => (
                 <div key={k.id} className="flex items-center justify-between" style={{ padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
                   <div style={{ minWidth: 0 }}>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono-ndt" style={{ fontSize: 12, color: k.isActive ? "var(--fg)" : "var(--fg-faint)", textDecoration: k.isActive ? "none" : "line-through" }}>{k.appSlug}</span>
-                      {!k.isActive && <span style={{ fontSize: 10, color: "var(--coral)" }}>visszavonva</span>}
+                      <span className="font-mono-ndt" style={{ fontSize: 14, color: k.isActive ? "var(--fg)" : "var(--fg-faint)", textDecoration: k.isActive ? "none" : "line-through" }}>{k.appSlug}</span>
+                      {!k.isActive && <span style={{ fontSize: 12, color: "var(--coral)" }}>visszavonva</span>}
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--fg-faint)" }}>
+                    <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>
                       {k.label ? `${k.label} · ` : ""}{k.lastUsedAt ? `utoljára ${formatRelativeTime(k.lastUsedAt)}` : "még nem használt"}
                     </div>
                   </div>
@@ -400,14 +400,14 @@ export function SettingsClient({ tenant, connectedIntegrations, appKeys }: Setti
 
       {tab === "integrations" && (
         <div className="mount space-y-6">
-          <div className="flex items-center gap-3" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+          <div className="flex items-center gap-3" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
             <Zap style={{ width: 14, height: 14, color: "var(--indigo)" }} />
             API kulcsok titkosítva tárolódnak. Integrációk bővíthetők — minden új integrációhoz csak egy <code style={{ fontFamily: "var(--font-mono)", color: "var(--sky)" }}>/lib/integrations/&lt;slug&gt;.ts</code> fájl kell.
           </div>
 
           {categories.map((cat) => (
             <div key={cat}>
-              <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--fg-faint)", marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--fg-faint)", marginBottom: 8 }}>
                 {cat}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>

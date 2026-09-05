@@ -160,7 +160,7 @@ export function ImportWizard() {
     return (
       <div style={panel} className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--fg)" }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--fg)" }}>
             {done ? "Importálás kész" : "Előnézet (még nem mentett)"}
           </h2>
           {done && <CheckCircle2 className="size-5" style={{ color: "var(--mint)" }} />}
@@ -238,7 +238,7 @@ export function ImportWizard() {
     <div style={panel} className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--fg)" }}>Oszlopok párosítása</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--fg)" }}>Oszlopok párosítása</h2>
           <p className="text-xs text-slate-400 mt-0.5">
             {fileName} · {activeSheet?.rows.length ?? 0} sor · {entity === "company" ? "Cégek" : "Személyek"}
           </p>
@@ -327,7 +327,7 @@ export function ImportWizard() {
 }
 
 // ── Small presentational helpers ───────────────────────────────
-const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)" };
+const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)" };
 const td: React.CSSProperties = { padding: "8px 12px", color: "var(--fg-soft)" };
 
 function EntityToggle({ entity, onChange }: { entity: ImportEntity; onChange: (e: ImportEntity) => void }) {
@@ -354,7 +354,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent: 
   return (
     <div className="rounded-lg p-3" style={{ background: "var(--bg-raised)", border: "1px solid var(--line-soft)" }}>
       <div className="font-mono-ndt" style={{ fontSize: 22, fontWeight: 700, color: accent }}>{value}</div>
-      <div style={{ fontSize: 11, color: "var(--fg-mute)" }}>{label}</div>
+      <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>{label}</div>
     </div>
   );
 }
@@ -362,7 +362,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent: 
 function StatusPill({ status, detail }: { status: string; detail?: string }) {
   const color = status === "új" ? "var(--mint)" : status === "hiba" ? "var(--coral)" : status === "kihagyva" ? "var(--amber)" : "var(--fg-mute)";
   return (
-    <span title={detail} className="font-mono-ndt" style={{ fontSize: 11, color }}>
+    <span title={detail} className="font-mono-ndt" style={{ fontSize: 12, color }}>
       {status}{detail ? ` · ${detail}` : ""}
     </span>
   );

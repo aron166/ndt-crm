@@ -13,7 +13,7 @@ import { FormField } from "@/components/ui/FormField";
 // lib/leads/service.ts; the `required` attributes here are just UX.
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 10px", fontSize: 13,
+  width: "100%", padding: "6px 10px", fontSize: 14,
   background: "var(--bg-0)", border: "1px solid var(--line-soft)",
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
@@ -76,7 +76,7 @@ export function CallOutcomeModal({
 
           {outcome === "meeting_booked" && (
             <FormField label="Kivel lesz a demó?" required>
-              <div className="flex gap-4" style={{ fontSize: 13 }}>
+              <div className="flex gap-4" style={{ fontSize: 14 }}>
                 {(["aron", "peter"] as const).map((w) => (
                   <label key={w} className="flex items-center gap-1.5" style={{ cursor: "pointer" }}>
                     <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />

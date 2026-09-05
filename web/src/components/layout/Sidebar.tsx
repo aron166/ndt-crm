@@ -226,8 +226,8 @@ export function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>Helm CRM</div>
-              <div style={{ fontSize: 10, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Controllabor</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>Helm CRM</div>
+              <div style={{ fontSize: 12, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Controllabor</div>
             </div>
           </>
         )}
@@ -254,7 +254,7 @@ export function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
             {!collapsed && (
               <div
                 style={{
-                  fontSize: 10, fontWeight: 600, color: "var(--fg-faint)",
+                  fontSize: 12, fontWeight: 600, color: "var(--fg-faint)",
                   letterSpacing: "0.12em", textTransform: "uppercase",
                   padding: "10px 8px 5px",
                 }}
@@ -274,7 +274,7 @@ export function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
                       className="relative flex items-center gap-2.5 rounded transition-colors duration-150"
                       style={{
                         height: 32, padding: "0 8px",
-                        fontSize: 13, fontWeight: 500,
+                        fontSize: 14, fontWeight: 500,
                         color: active ? "var(--fg)" : "var(--fg-soft)",
                         background: active
                           ? "linear-gradient(90deg, oklch(0.66 0.19 278 / 0.18), oklch(0.66 0.19 278 / 0.04))"
@@ -315,7 +315,7 @@ export function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
                             right: collapsed ? 3 : undefined,
                             minWidth: 16, height: 16, padding: "0 4px",
                             display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 9, fontWeight: 700, lineHeight: 1,
+                            fontSize: 12, fontWeight: 700, lineHeight: 1,
                             color: "white", background: "var(--indigo)",
                             borderRadius: 8,
                             boxShadow: "0 0 8px oklch(0.66 0.19 278 / 0.5)",

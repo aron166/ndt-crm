@@ -95,10 +95,10 @@ function StageRow({
           <GripVertical style={{ width: 14, height: 14, color: "var(--fg-faint)" }} />
         </span>
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: stage.color, flexShrink: 0, boxShadow: `0 0 6px ${stage.color}` }} />
-        <span style={{ flex: 1, fontSize: 13, color: "var(--fg)" }}>{stage.name}</span>
-        <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-mute)" }}>{stage.probability}%</span>
-        {stage.isTerminalWon && <span className="badge-ds mint" style={{ fontSize: 10 }}>Nyert</span>}
-        {stage.isTerminalLost && <span className="badge-ds coral" style={{ fontSize: 10 }}>Veszített</span>}
+        <span style={{ flex: 1, fontSize: 14, color: "var(--fg)" }}>{stage.name}</span>
+        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>{stage.probability}%</span>
+        {stage.isTerminalWon && <span className="badge-ds mint" style={{ fontSize: 12 }}>Nyert</span>}
+        {stage.isTerminalLost && <span className="badge-ds coral" style={{ fontSize: 12 }}>Veszített</span>}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer" }}
           onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
@@ -265,12 +265,12 @@ function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId:
         style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)", cursor: "pointer" }}
         onClick={() => setEditing(true)}
       >
-        <span style={{ fontSize: 10, color: "var(--fg-faint)", fontFamily: "var(--font-mono)", background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 4 }}>
+        <span style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono)", background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 4 }}>
           {field.type}
         </span>
-        <span style={{ flex: 1, fontSize: 13, color: "var(--fg)" }}>{field.label}</span>
-        <span className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)" }}>{field.key}</span>
-        {field.required && <span className="badge-ds coral" style={{ fontSize: 9 }}>kötelező</span>}
+        <span style={{ flex: 1, fontSize: 14, color: "var(--fg)" }}>{field.label}</span>
+        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{field.key}</span>
+        {field.required && <span className="badge-ds coral" style={{ fontSize: 12 }}>kötelező</span>}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
           onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
@@ -294,7 +294,7 @@ function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId:
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none" }}
+            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none" }}
           >
             {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
@@ -308,11 +308,11 @@ function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId:
             onChange={(e) => setOptions(e.target.value)}
             rows={4}
             placeholder={"Opció 1\nOpció 2\nOpció 3"}
-            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 12, resize: "vertical", outline: "none", fontFamily: "var(--font-mono)" }}
+            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, resize: "vertical", outline: "none", fontFamily: "var(--font-mono)" }}
           />
         </div>
       )}
-      <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 13, color: "var(--fg-soft)" }}>
+      <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 14, color: "var(--fg-soft)" }}>
         <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
         Kötelező mező
       </label>
@@ -357,7 +357,7 @@ function AddCustomFieldForm({ pipelineId, position, onDone }: { pipelineId: numb
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none" }}
+            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none" }}
           >
             {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
@@ -368,7 +368,7 @@ function AddCustomFieldForm({ pipelineId, position, onDone }: { pipelineId: numb
           <label className="field-label">Opciók (soronként egy)</label>
           <textarea rows={3} value={options} onChange={(e) => setOptions(e.target.value)}
             placeholder={"UT\nRT\nMT"}
-            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 12, resize: "vertical", outline: "none", fontFamily: "var(--font-mono)" }} />
+            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, resize: "vertical", outline: "none", fontFamily: "var(--font-mono)" }} />
         </div>
       )}
       <div className="flex gap-2">
@@ -460,7 +460,7 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
             )}
 
             {pipeline.stages.length === 0 && addingStage !== pipeline.id && (
-              <p style={{ fontSize: 13, color: "var(--fg-faint)", textAlign: "center", padding: "24px 0" }}>
+              <p style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center", padding: "24px 0" }}>
                 Nincs fázis. Adj hozzá egyet a pipeline működéséhez.
               </p>
             )}
@@ -470,7 +470,7 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
           <div style={{ borderTop: "1px solid var(--line-soft)" }}>
             <button
               className="flex items-center gap-2 w-full"
-              style={{ padding: "12px 20px", background: "none", border: "none", cursor: "pointer", color: "var(--fg-soft)", fontSize: 13, fontWeight: 500 }}
+              style={{ padding: "12px 20px", background: "none", border: "none", cursor: "pointer", color: "var(--fg-soft)", fontSize: 14, fontWeight: 500 }}
               onClick={() => setExpandedFields((prev) => {
                 const next = new Set(prev);
                 next.has(pipeline.id) ? next.delete(pipeline.id) : next.add(pipeline.id);
@@ -482,7 +482,7 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
                 : <ChevronRight style={{ width: 14, height: 14 }} />
               }
               Egyéni mezők
-              <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)", marginLeft: 4 }}>
+              <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: 4 }}>
                 {pipeline.customFields.length}
               </span>
             </button>
@@ -501,7 +501,7 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
                 ) : (
                   <button
                     className="flex items-center gap-2"
-                    style={{ fontSize: 12, color: "var(--indigo)", padding: "6px 0", background: "none", border: "none", cursor: "pointer" }}
+                    style={{ fontSize: 14, color: "var(--indigo)", padding: "6px 0", background: "none", border: "none", cursor: "pointer" }}
                     onClick={() => setAddingField(pipeline.id)}
                   >
                     <Plus style={{ width: 12, height: 12 }} /> Mező hozzáadása

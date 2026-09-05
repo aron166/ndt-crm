@@ -46,7 +46,7 @@ export function CompanyMetadataTab({ companyId, attributes }: Props) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
         <span className="h-section" style={{ margin: 0 }}>Metaadatok</span>
       </div>
-      <p style={{ fontSize: 12, color: "var(--fg-mute)", marginBottom: 18, lineHeight: 1.5 }}>
+      <p style={{ fontSize: 14, color: "var(--fg-mute)", marginBottom: 18, lineHeight: 1.5 }}>
         Minden érték módosítható, és a korábbi érték megmarad előzményként — nincs felülírás.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
@@ -105,7 +105,7 @@ function AttrSection({ companyId, type, attributes }: { companyId: number; type:
     <div style={{ borderBottom: "1px solid var(--line-soft)", paddingBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
         <span className="field-label" style={{ margin: 0 }}>{def.label}</span>
-        {def.multi && <span style={{ fontSize: 10, color: "var(--fg-faint)" }}>(több is lehet, egy a fő)</span>}
+        {def.multi && <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>(több is lehet, egy a fő)</span>}
       </div>
 
       {/* Current primary */}
@@ -117,9 +117,9 @@ function AttrSection({ companyId, type, attributes }: { companyId: number; type:
               {def.multi && <span className="badge-ds indigo" style={{ marginLeft: 8 }}>fő</span>}
             </span>
           ) : (
-            <span style={{ fontSize: 13, color: "var(--fg-faint)" }}>nincs megadva</span>
+            <span style={{ fontSize: 14, color: "var(--fg-faint)" }}>nincs megadva</span>
           )}
-          <button className="btn" style={{ padding: "2px 10px", fontSize: 11 }} onClick={() => { setValue(primary?.value ?? ""); setLabel(primary?.label ?? ""); setEditing(true); }} disabled={pending}>
+          <button className="btn" style={{ padding: "2px 10px", fontSize: 12 }} onClick={() => { setValue(primary?.value ?? ""); setLabel(primary?.label ?? ""); setEditing(true); }} disabled={pending}>
             {primary ? "Módosítás" : "Beállítás"}
           </button>
         </div>
@@ -127,8 +127,8 @@ function AttrSection({ companyId, type, attributes }: { companyId: number; type:
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <AttrValueInput def={def} val={value} onVal={setValue} lbl={label} onLbl={setLabel} autoFocus />
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn primary" style={{ padding: "3px 12px", fontSize: 12 }} onClick={savePrimary} disabled={pending}>Mentés</button>
-            <button className="btn" style={{ padding: "3px 12px", fontSize: 12 }} onClick={() => { setEditing(false); setError(null); }} disabled={pending}>Mégse</button>
+            <button className="btn primary" style={{ padding: "3px 12px", fontSize: 14 }} onClick={savePrimary} disabled={pending}>Mentés</button>
+            <button className="btn" style={{ padding: "3px 12px", fontSize: 14 }} onClick={() => { setEditing(false); setError(null); }} disabled={pending}>Mégse</button>
           </div>
         </div>
       )}
@@ -137,7 +137,7 @@ function AttrSection({ companyId, type, attributes }: { companyId: number; type:
       {def.multi && (secondaries.length > 0 || adding) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
           {secondaries.map((s) => (
-            <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "2px 6px 2px 10px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 14, fontSize: 12 }}>
+            <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "2px 6px 2px 10px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 14, fontSize: 14 }}>
               {attrValueLabel(type, s.value, s.label)}
               <button onClick={() => removeSecondary(s.id)} disabled={pending} title="Lezárás (előzménybe kerül)" style={{ display: "grid", placeItems: "center", color: "var(--fg-faint)" }}>
                 <X style={{ width: 12, height: 12 }} />
@@ -151,29 +151,29 @@ function AttrSection({ companyId, type, attributes }: { companyId: number; type:
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
             <AttrValueInput def={def} val={newVal} onVal={setNewVal} lbl={newLabel} onLbl={setNewLabel} autoFocus />
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn primary" style={{ padding: "3px 12px", fontSize: 12 }} onClick={addSecondary} disabled={pending}>Hozzáadás</button>
-              <button className="btn" style={{ padding: "3px 12px", fontSize: 12 }} onClick={() => { setAdding(false); setError(null); }} disabled={pending}>Mégse</button>
+              <button className="btn primary" style={{ padding: "3px 12px", fontSize: 14 }} onClick={addSecondary} disabled={pending}>Hozzáadás</button>
+              <button className="btn" style={{ padding: "3px 12px", fontSize: 14 }} onClick={() => { setAdding(false); setError(null); }} disabled={pending}>Mégse</button>
             </div>
           </div>
         ) : (
-          <button className="btn ghost" style={{ marginTop: 8, padding: "2px 8px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }} onClick={() => setAdding(true)} disabled={pending}>
+          <button className="btn ghost" style={{ marginTop: 8, padding: "2px 8px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }} onClick={() => setAdding(true)} disabled={pending}>
             <Plus style={{ width: 12, height: 12 }} /> További {def.label}
           </button>
         )
       )}
 
-      {error && <div style={{ fontSize: 12, color: "var(--coral)", marginTop: 8 }}>{error}</div>}
+      {error && <div style={{ fontSize: 14, color: "var(--coral)", marginTop: 8 }}>{error}</div>}
 
       {/* History */}
       {history.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <button onClick={() => setShowHistory((s) => !s)} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--fg-mute)" }}>
+          <button onClick={() => setShowHistory((s) => !s)} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--fg-mute)" }}>
             <History style={{ width: 12, height: 12 }} /> Korábbi értékek ({history.length})
           </button>
           {showHistory && (
             <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
               {history.map((h) => (
-                <div key={h.id} style={{ fontSize: 11, color: "var(--fg-mute)", display: "flex", gap: 8 }}>
+                <div key={h.id} style={{ fontSize: 12, color: "var(--fg-mute)", display: "flex", gap: 8 }}>
                   <span style={{ color: "var(--fg-soft)" }}>{attrValueLabel(type, h.value, h.label)}</span>
                   <span style={{ color: "var(--fg-faint)", fontFamily: "var(--font-mono)" }}>
                     {formatDate(h.validFrom)} → {h.validTo ? formatDate(h.validTo) : "?"}

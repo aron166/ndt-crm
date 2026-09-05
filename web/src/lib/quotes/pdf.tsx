@@ -33,15 +33,15 @@ const fmtQty = (n: number | null) => (n == null ? "" : new Intl.NumberFormat("hu
 const fmtDate = (d: Date | null) => (d ? new Intl.DateTimeFormat("hu-HU").format(d) : "—");
 
 const styles = StyleSheet.create({
-  page: { fontFamily: "Roboto", fontSize: 9, paddingTop: 40, paddingBottom: 56, paddingHorizontal: 44, color: "#1f2937" },
+  page: { fontFamily: "Roboto", fontSize: 12, paddingTop: 40, paddingBottom: 56, paddingHorizontal: 44, color: "#1f2937" },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 },
   title: { fontSize: 22, fontWeight: 700, color: "#111827" },
-  quoteNo: { fontSize: 11, color: "#6b7280", marginTop: 2 },
+  quoteNo: { fontSize: 12, color: "#6b7280", marginTop: 2 },
   issuer: { textAlign: "right", maxWidth: 240 },
-  issuerName: { fontSize: 12, fontWeight: 700 },
+  issuerName: { fontSize: 14, fontWeight: 700 },
   partiesRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
   partyBlock: { maxWidth: 240 },
-  label: { fontSize: 7.5, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 },
+  label: { fontSize: 12.5, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 },
   metaRow: { flexDirection: "row", gap: 24, marginBottom: 18 },
   metaItem: { },
   strong: { fontWeight: 700 },
@@ -53,13 +53,13 @@ const styles = StyleSheet.create({
   cNum: { width: 60, textAlign: "right" },
   cUnit: { width: 40, textAlign: "center" },
   cAmt: { width: 78, textAlign: "right" },
-  thText: { fontSize: 7.5, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" },
+  thText: { fontSize: 12.5, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" },
   totals: { marginTop: 10, alignSelf: "flex-end", width: 220 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
   grossRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, marginTop: 4, borderTopWidth: 1, borderColor: "#e5e7eb" },
-  grossText: { fontSize: 12, fontWeight: 700, color: "#111827" },
+  grossText: { fontSize: 14, fontWeight: 700, color: "#111827" },
   notes: { marginTop: 24, paddingTop: 10, borderTopWidth: 1, borderColor: "#e5e7eb", color: "#4b5563" },
-  footer: { position: "absolute", bottom: 24, left: 44, right: 44, textAlign: "center", fontSize: 7.5, color: "#9ca3af", borderTopWidth: 1, borderColor: "#f3f4f6", paddingTop: 6 },
+  footer: { position: "absolute", bottom: 24, left: 44, right: 44, textAlign: "center", fontSize: 12.5, color: "#9ca3af", borderTopWidth: 1, borderColor: "#f3f4f6", paddingTop: 6 },
 });
 
 function QuoteDocument({ quote, issuerName }: { quote: QuoteDTO; issuerName: string }) {

@@ -38,24 +38,24 @@ export function DeleteCardDialog({ open, kind, label, company, person, onConfirm
           <DialogTitle>{kind === "lead" ? "Lead-kártya törlése" : "Deal törlése"}</DialogTitle>
         </DialogHeader>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--fg-soft)" }}>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--fg-soft)" }}>
             Biztosan törlöd ezt a {cardWord}: <strong style={{ color: "var(--fg)" }}>{label}</strong>?
           </p>
 
           {(company || person) && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <p style={{ margin: 0, fontSize: 11, color: "var(--fg-faint)" }}>
+              <p style={{ margin: 0, fontSize: 12, color: "var(--fg-faint)" }}>
                 Alapból csak a kártya tűnik el. Opcionálisan a kapcsolódó rekordok is törölhetők
                 (visszaállíthatók):
               </p>
               {company && (
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--fg-soft)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--fg-soft)" }}>
                   <input type="checkbox" checked={delCompany} onChange={(e) => setDelCompany(e.target.checked)} />
                   A(z) <strong style={{ color: "var(--fg)" }}>{company.name}</strong> cég törlése is
                 </label>
               )}
               {person && (
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--fg-soft)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--fg-soft)" }}>
                   <input type="checkbox" checked={delPerson} onChange={(e) => setDelPerson(e.target.checked)} />
                   <strong style={{ color: "var(--fg)" }}>{person.name}</strong> személy törlése is
                 </label>
@@ -63,7 +63,7 @@ export function DeleteCardDialog({ open, kind, label, company, person, onConfirm
             </div>
           )}
 
-          <p style={{ margin: 0, fontSize: 11, color: "var(--fg-faint)" }}>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--fg-faint)" }}>
             Az interakciók megmaradnak (csak hozzáfűzhető napló).
             {delCompany && " A cég minden más kapcsolatából is eltűnik — később visszaállítható."}
           </p>
