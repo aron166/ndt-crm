@@ -5,7 +5,7 @@ import { runAutomations } from "@/lib/automations/engine";
 import { getLeadStatuses } from "./queries";
 import { leadStatusLabel } from "./statuses";
 import {
-  callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES,
+  callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
   type LeadOutcome,
 } from "./outcomes";
 
@@ -180,6 +180,17 @@ export async function setLeadOutcome(
   const before = await loadLead(leadId, ctx.tenantId);
   if (!before) return { error: "Lead nem található" };
 
+  // A reason is MANDATORY on lost (Péter, 2026-09-07) — no "manual" placeholder.
+  // An already-lost lead keeps its stored reason if the caller sends none.
+  let reason: string | undefined;
+  if (outcome === "lost") {
+    reason = lostReason?.trim() || before.lostReason?.trim() || undefined;
+    if (!reason || reason.length < LOST_REASON_MIN) {
+      return { error: "A vesztett kimenetelhez indok kötelező (min. 3 karakter)" };
+    }
+    reason = reason.slice(0, LOST_REASON_MAX);
+  }
+
   let dealId: number | undefined;
   if (outcome === "won") {
     const conv = await convertLeadToDeal(leadId, ctx);
@@ -193,7 +204,7 @@ export async function setLeadOutcome(
   const data: Prisma.LeadUpdateManyMutationInput = {
     outcome,
     closedAt: outcome === "open" ? null : new Date(),
-    ...(outcome === "lost" ? { lostReason: lostReason?.trim() || before.lostReason || "manual" } : {}),
+    ...(outcome === "lost" ? { lostReason: reason } : {}),
   };
   if (before.outcome !== outcome || outcome === "lost") {
     await db.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data });

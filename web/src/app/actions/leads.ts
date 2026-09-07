@@ -97,6 +97,7 @@ export async function assignLeadAction(leadId: number, assignedToId: number | nu
  */
 export async function logLeadCall(leadId: number, input: {
   outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
+  lostReason?: string | null;
 }) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
@@ -107,6 +108,7 @@ export async function logLeadCall(leadId: number, input: {
       note: input.note,
       ...(input.callbackAt ? { callbackAt: input.callbackAt } : {}),
       ...(input.demoWith ? { demoWith: input.demoWith } : {}),
+      ...(input.lostReason ? { lostReason: input.lostReason } : {}),
     },
     ctx,
   );
@@ -128,7 +130,7 @@ export async function updateLead(id: number, formData: FormData) {
     where: { id, tenantId: TENANT_ID },
     select: {
       subject: true, serviceInterest: true, source: true,
-      estimatedValue: true, message: true, lostReason: true, companyId: true,
+      estimatedValue: true, message: true, lostReason: true, companyId: true, outcome: true,
     },
   });
   if (!before) return { error: "Lead nem található" };
@@ -146,6 +148,11 @@ export async function updateLead(id: number, formData: FormData) {
   const source = text("source");
   const message = text("message");
   const lostReason = text("lostReason");
+  // Editing must not be a back door around the mandatory-reason rule: a lost lead
+  // keeps a reason (setLeadOutcome enforces it on the way in).
+  if (before.outcome === "lost" && lostReason === null) {
+    return { error: "A vesztett kimenetelhez indok kötelező" };
+  }
 
   let estimatedValue: number | null | undefined = undefined;
   const valueRaw = formData.get("estimatedValue");

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import type { LeadCtx } from "./service";
-import { LEAD_OUTCOMES } from "./outcomes";
+import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
 
 // Shared bits of the lead write API (/api/leads/:id*). Same per-app-key auth
 // as POST /api/leads: the key carries the tenant; the service-role key is NOT
@@ -48,7 +48,7 @@ export const leadPatchSchema = z
   .object({
     status: z.string().trim().min(1).max(64).optional(),
     outcome: z.enum(LEAD_OUTCOMES).optional(),
-    lost_reason: z.string().trim().max(500).optional(),
+    lost_reason: z.string().trim().min(LOST_REASON_MIN).max(LOST_REASON_MAX).optional(),
     assigned_to_id: z.number().int().positive().nullable().optional(),
     /** Shallow-merged into lead.custom_fields (null value deletes a key). */
     custom_fields: z.record(z.string().max(100), z.unknown()).optional(),
@@ -57,6 +57,12 @@ export const leadPatchSchema = z
   // lost_reason is only read by setLeadOutcome; alone it would 200 with an unchanged lead.
   .refine((d) => d.lost_reason === undefined || d.outcome === "lost", {
     message: "lost_reason requires outcome=lost", path: ["lost_reason"],
+  })
+  // …and the other direction: closing a lead as lost without saying why is exactly
+  // the gap Péter flagged. setLeadOutcome enforces it too (an already-lost lead may
+  // reuse its stored reason), this makes the API say so up front.
+  .refine((d) => d.outcome !== "lost" || d.lost_reason !== undefined, {
+    message: "outcome=lost requires lost_reason", path: ["lost_reason"],
   })
   .refine((d) => new TextEncoder().encode(JSON.stringify(d.custom_fields ?? {})).length <= 16 * 1024, {
     message: "custom_fields exceeds 16KB", path: ["custom_fields"],
@@ -69,6 +75,7 @@ export const leadInteractionWireSchema = z.object({
   note: z.string().optional(),
   callback_at: z.preprocess(emptyToUndef, z.string().optional()),
   demo_with: z.preprocess(emptyToUndef, z.string().optional()),
+  lost_reason: z.preprocess(emptyToUndef, z.string().optional()),
   assigned_to_id: optInt,
 });
 export function toCallOutcomeInput(w: z.infer<typeof leadInteractionWireSchema>) {
@@ -77,6 +84,7 @@ export function toCallOutcomeInput(w: z.infer<typeof leadInteractionWireSchema>)
     note: w.note,
     ...(w.callback_at ? { callbackAt: w.callback_at } : {}),
     ...(w.demo_with ? { demoWith: w.demo_with } : {}),
+    ...(w.lost_reason ? { lostReason: w.lost_reason } : {}),
     ...(w.assigned_to_id ? { assignedToId: w.assigned_to_id } : {}),
   };
 }

@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { logLeadCall } from "@/app/actions/leads";
-import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX } from "@/lib/leads/outcomes";
 import { FormField } from "@/components/ui/FormField";
 
 // "Hívás eredménye" — the core lead interaction. Validation (note required,
@@ -31,11 +31,12 @@ export function CallOutcomeModal({
   const [note, setNote] = useState("");
   const [callbackAt, setCallbackAt] = useState("");
   const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
+  const [lostReason, setLostReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function reset() {
-    setOutcome("no_answer"); setNote(""); setCallbackAt(""); setDemoWith("aron"); setError(null);
+    setOutcome("no_answer"); setNote(""); setCallbackAt(""); setDemoWith("aron"); setLostReason(""); setError(null);
   }
   function handleClose() { reset(); onClose(); }
 
@@ -48,6 +49,7 @@ export function CallOutcomeModal({
         // datetime-local is wall-clock; Date parses it as local time → ISO for the wire.
         callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
         demoWith: outcome === "meeting_booked" ? demoWith : null,
+        lostReason: isLostCallOutcome(outcome) ? lostReason : null,
       });
       if ("error" in res) { setError(res.error); return; }
       reset(); onClose(); onLogged?.();
@@ -84,6 +86,20 @@ export function CallOutcomeModal({
                   </label>
                 ))}
               </div>
+            </FormField>
+          )}
+
+          {isLostCallOutcome(outcome) && (
+            <FormField label="Miért veszett el? (kötelező)" required>
+              <input
+                style={inputStyle}
+                value={lostReason}
+                onChange={(e) => setLostReason(e.target.value)}
+                required
+                minLength={3}
+                maxLength={LOST_REASON_MAX}
+                placeholder="pl. Van saját szkennerük · Nincs betonszerkezetük · Ár túl magas"
+              />
             </FormField>
           )}
 

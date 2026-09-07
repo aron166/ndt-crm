@@ -10,7 +10,7 @@ import { CallOutcomeModal } from "./CallOutcomeModal";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import {
-  LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, type LeadOutcome,
+  LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, promptLostReason, type LeadOutcome,
 } from "@/lib/leads/outcomes";
 
 interface Lead {
@@ -259,11 +259,18 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
 
   function handleOutcome(id: number, outcome: LeadOutcome) {
     if (outcome === "open") return;
+    // A lost lead must say WHY (Péter, 2026-09-07). The server rejects it either
+    // way; this asks before we optimistically pull the card off the board.
+    let reason: string | null = null;
+    if (outcome === "lost") {
+      reason = promptLostReason();
+      if (reason === null) return;
+    }
     // Won/lost leave the active board — optimistic remove; a failure puts it back.
     const snapshot = leads;
     setLeads((prev) => prev.filter((l) => l.id !== id));
     startTransition(async () => {
-      const res = await setLeadOutcomeAction(id, outcome);
+      const res = await setLeadOutcomeAction(id, outcome, reason);
       if (res && "error" in res) { setLeads(snapshot); setError(res.error); return; }
       router.refresh();
     });
