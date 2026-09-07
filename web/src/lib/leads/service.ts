@@ -2,12 +2,13 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { audit, type AuditOptions } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
-import { getLeadStatuses } from "./queries";
+import { getLeadStatuses, getQualificationQuestions } from "./queries";
 import { leadStatusLabel } from "./statuses";
 import {
   callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
   type LeadOutcome,
 } from "./outcomes";
+import { parseAnswers, answersFrom } from "./qualification";
 
 // The ONE write path for lead process changes — used by the server actions (UI)
 // and the public /api/leads routes alike, so the rules can't drift between the
@@ -214,6 +215,45 @@ export async function setLeadOutcome(
       auditOpts(ctx));
   }
   return { success: true, dealId };
+}
+
+/**
+ * Setter tab — merge free-text qualification answers onto the lead. The ONE write
+ * path (UI action + PATCH /api/leads/:id both land here).
+ *
+ * Merge, not replace: a surface showing only some questions must not wipe the
+ * rest. Every slug the caller SUBMITTED is authoritative, so submitting a blank
+ * clears that one answer. Unknown slugs are rejected — a typo'd key would sit in
+ * the JSON forever, invisible because no question renders it.
+ */
+export async function setLeadQualification(
+  leadId: number,
+  answers: Record<string, string>,
+  ctx: LeadCtx,
+): Promise<Result> {
+  const lead = await db.lead.findFirst({
+    where: { id: leadId, tenantId: ctx.tenantId },
+    select: { qualification: true },
+  });
+  if (!lead) return { error: "Lead nem található" };
+
+  const questions = await getQualificationQuestions(ctx.tenantId);
+  const parsed = parseAnswers(answers, questions);
+  if ("error" in parsed) return { error: parsed.error };
+
+  const before = answersFrom(lead.qualification);
+  const merged: Record<string, string> = { ...before };
+  for (const slug of Object.keys(answers)) delete merged[slug];
+  Object.assign(merged, parsed);
+
+  if (JSON.stringify(before) === JSON.stringify(merged)) return { success: true };
+
+  await db.lead.updateMany({
+    where: { id: leadId, tenantId: ctx.tenantId },
+    data: { qualification: merged },
+  });
+  audit("lead", leadId, "update", { qualification: before }, { qualification: merged }, auditOpts(ctx));
+  return { success: true };
 }
 
 export interface LogCallResult {

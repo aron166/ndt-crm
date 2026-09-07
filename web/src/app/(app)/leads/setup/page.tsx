@@ -2,14 +2,19 @@ import { db } from "@/lib/db";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LeadStatusSetupClient } from "./LeadStatusSetupClient";
+import { QualificationQuestionsClient } from "./QualificationQuestionsClient";
+import { getQualificationQuestions } from "@/lib/leads/queries";
 
 const TENANT_ID = 1;
 
 export default async function LeadStatusSetupPage() {
-  const statuses = await db.leadStatus.findMany({
-    where: { tenantId: TENANT_ID },
-    orderBy: { position: "asc" },
-  });
+  const [statuses, questions] = await Promise.all([
+    db.leadStatus.findMany({
+      where: { tenantId: TENANT_ID },
+      orderBy: { position: "asc" },
+    }),
+    getQualificationQuestions(TENANT_ID),
+  ]);
 
   return (
     <div className="mount">
@@ -35,6 +40,7 @@ export default async function LeadStatusSetupPage() {
       </div>
 
       <LeadStatusSetupClient statuses={statuses} />
+      <QualificationQuestionsClient questions={questions} />
     </div>
   );
 }

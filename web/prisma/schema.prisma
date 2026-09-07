@@ -14,6 +14,9 @@ model Tenant {
   id        Int      @id @default(autoincrement())
   name      String
   slug      String   @unique
+  // Per-tenant config bag. First key: `qualificationQuestions` — the ordered
+  // setter question list ({ slug, label }[]). See lib/leads/qualification.ts.
+  settings  Json?
   createdAt DateTime @default(now()) @map("created_at")
 
   companies              Company[]
@@ -287,6 +290,10 @@ model Lead {
   // active board. lostReason keeps the why (call-outcome key or free text).
   outcome         String    @default("open")
   closedAt        DateTime? @map("closed_at")
+  // Setter tab: free-text qualification answers keyed by question slug. The
+  // question LIST is tenant config (tenants.settings.qualificationQuestions),
+  // so changing the questions never needs a migration.
+  qualification   Json?
   // Inbound channel (cold_email | landing | linkedin | meta_ads | referral | import | manual) + campaign tag.
   channel         String?
   campaign        String?

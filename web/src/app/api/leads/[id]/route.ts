@@ -4,7 +4,7 @@ import { reportError } from "@/lib/report-error";
 import { audit } from "@/lib/audit";
 import { serializeDates } from "@/lib/serialize";
 import { json, leadApiCtx, parseLeadId, readJson, leadPatchSchema, LEAD_API_SELECT } from "@/lib/leads/api";
-import { changeLeadStatus, setLeadOutcome, assignLead } from "@/lib/leads/service";
+import { changeLeadStatus, setLeadOutcome, assignLead, setLeadQualification } from "@/lib/leads/service";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -36,7 +36,7 @@ export async function GET(request: Request, { params }: Params) {
   return json({ ok: true, lead: serializeDates({ ...lead, interactions, openTasks }) });
 }
 
-/** PATCH /api/leads/:id — status | outcome (+lost_reason) | assigned_to_id | custom_fields merge. */
+/** PATCH /api/leads/:id — status | outcome (+lost_reason) | assigned_to_id | custom_fields / qualification merge. */
 export async function PATCH(request: Request, { params }: Params) {
   const auth = await leadApiCtx(request);
   if ("res" in auth) return auth.res;
@@ -69,6 +69,10 @@ export async function PATCH(request: Request, { params }: Params) {
       await db.lead.updateMany({ where: { id, tenantId: ctx.tenantId }, data: { customFields: merged as Prisma.InputJsonValue } });
       audit("lead", id, "update", { customFields: before }, { customFields: merged },
         { tenantId: ctx.tenantId, actor: "agent", actorAgentId: ctx.actorAgentId });
+    }
+    if (body.qualification) {
+      const r = await setLeadQualification(id, body.qualification, ctx);
+      if ("error" in r) return json({ error: r.error }, 400);
     }
     if (body.status !== undefined) {
       const r = await changeLeadStatus(id, body.status, ctx);

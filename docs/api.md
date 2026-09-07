@@ -69,7 +69,8 @@ Filters: `status` (column key), `outcome` (`open|won|lost`), `assigned_to` (user
 
 ### `GET /api/leads/:id` — detail
 
-Returns the lead with `company`, `contact.person`, the last 50 `interactions`
+Returns the lead with `qualification` (the setter answers), `company`,
+`contact.person`, the last 50 `interactions`
 (newest first: `type`, `direction`, `outcome`, `notes`, `occurred_at`, `user_id`) and
 `openTasks` (e.g. the pending callback).
 
@@ -92,8 +93,9 @@ curl -X PATCH $CRM/api/leads/12 \
 | `lost_reason` | only valid together with `outcome: "lost"`, and mandatory with it |
 | `assigned_to_id` | user id or `null` |
 | `custom_fields` | shallow-merged; a `null` value deletes the key (≤16 KB) |
+| `qualification` | setter answers, **merged**: `{ "<question slug>": "<free text>" }`. Every submitted slug is authoritative, so `""` clears that answer. A slug the tenant does not currently ask about is a `400` — see below |
 
-Order applied: assign → custom_fields → status → outcome. First failure returns
+Order applied: assign → custom_fields → qualification → status → outcome. First failure returns
 `400 { error }` (earlier steps stay applied). Response: `{ ok, lead }`.
 
 ### `POST /api/leads/:id/interactions` — log a call outcome
@@ -121,6 +123,24 @@ curl -X POST $CRM/api/leads/12/interactions \
 
 Any earlier open callback task for the lead is marked done (the call happened).
 A closed lead (`won`/`lost`) rejects with `400` — re-open it first via PATCH.
+
+### Setter qualification questions
+
+The **answers** live on the lead (`qualification`); the **question list** is tenant
+config (`tenants.settings.qualificationQuestions`, an ordered `{ slug, label }[]`,
+edited at `/leads/setup`). They are split on purpose: re-wording a question keeps
+the answers attached, and removing one does not destroy what was already captured.
+
+```bash
+curl -X PATCH $CRM/api/leads/12 \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "qualification": { "area_m2": "kb. 400", "deadline": "" } }'
+# → sets area_m2, clears deadline, leaves every other answer alone
+```
+
+`GET /api/leads/:id` returns the current slugs; an unknown slug is rejected rather
+than stored, because a typo'd key would sit in the JSON forever with no question
+to render it. Answers are ≤2000 chars each.
 
 ## Ecosystem hub
 
