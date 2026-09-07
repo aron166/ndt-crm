@@ -356,7 +356,7 @@ export function CompanyDetailClient({
       </div>
 
       {/* Tabs */}
-      <div className="tabs-ds" style={{ marginTop: 18 }}>
+      <div className="tabs-ds" style={{ marginTop: 18 }} aria-busy={switching}>
         {TABS.map(({ key, label }) => (
           <button key={key} className={`tab-ds ${tab === key ? "active" : ""}`} onClick={() => setTab(key)}>
             {label}
@@ -366,13 +366,11 @@ export function CompanyDetailClient({
 
       {/* While a tab body is still rendering (useDeferredValue), the new pill is
           already lit but the OLD body is on screen — and was still clickable.
-          Dim it and turn off pointer events so a click can't fire against a tab
-          the user believes they left. (Vanda, PR #83.) */}
-      <div
-        aria-busy={switching}
-        inert={switching}
-        style={{ opacity: switching ? 0.55 : 1, pointerEvents: switching ? "none" : undefined, transition: "opacity 120ms" }}
-      >
+          `inert` blocks pointer AND keyboard against the tab the user just left.
+          No dimming: useDeferredValue always paints one urgent frame with the old
+          value, so an opacity transition fires on EVERY switch including the
+          instant ones. (Vanda, PR #83.) */}
+      <div inert={switching}>
 
       {/* Overview */}
       {shownTab === "overview" && (

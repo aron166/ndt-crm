@@ -318,7 +318,7 @@ export function PersonDetailClient({
 
       {/* Tabs + content */}
       <div style={{ marginTop: 18 }}>
-        <div className="tabs-ds">
+        <div className="tabs-ds" aria-busy={switching}>
           {TABS.map(({ key, label, count }) => (
             <button key={key} className={`tab-ds ${tab === key ? "active" : ""}`} onClick={() => setTab(key)}>
               {label}
@@ -340,13 +340,10 @@ export function PersonDetailClient({
 
         <div className="split-grid" style={{ marginTop: 16 }}>
           {/* Left: tab content. While the deferred body is still rendering the new
-              pill is lit but the OLD body is on screen — dim it and kill pointer
-              events so a click can't land on a tab the user left. (Vanda, PR #83.) */}
-          <div
-            aria-busy={switching}
-            inert={switching}
-            style={{ opacity: switching ? 0.55 : 1, pointerEvents: switching ? "none" : undefined, transition: "opacity 120ms" }}
-          >
+              pill is lit but the OLD body is on screen — `inert` stops a click or
+              a Tab key landing on the tab the user left. No dimming: the urgent
+              pass fires on every switch, so it would flash. (Vanda, PR #83.) */}
+          <div inert={switching}>
             {/* Activity */}
             {shownTab === "activity" && (
               <div className="panel mount">
