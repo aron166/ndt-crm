@@ -53,6 +53,9 @@ export async function moveLead(leadId: number, newStatus: string) {
   if ("error" in res) return res;
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
+  // Moving the card completes the lead's open callback task (changeLeadStatus →
+  // completeOpenLeadCallTasks), so the task surfaces are stale too.
+  revalidatePath("/tasks");
   return { success: true };
 }
 
@@ -411,6 +414,11 @@ export async function saveQualificationQuestions(text: string) {
  * lead call task — the caller then shows no prompt at all.
  */
 export async function getLeadStagePrompt(taskId: number) {
+  // Server actions are publicly callable by id — this one reads lead/contact
+  // metadata, so it needs the same auth gate as every other lead action.
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return null;
+
   const task = await db.task.findFirst({
     where: { id: taskId, tenantId: TENANT_ID },
     select: { leadId: true, type: true },
