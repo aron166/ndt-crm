@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import type { LeadCtx } from "./service";
 import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
+import { ANSWER_MAX } from "./qualification";
 
 // Shared bits of the lead write API (/api/leads/:id*). Same per-app-key auth
 // as POST /api/leads: the key carries the tenant; the service-role key is NOT
@@ -52,6 +53,12 @@ export const leadPatchSchema = z
     assigned_to_id: z.number().int().positive().nullable().optional(),
     /** Shallow-merged into lead.custom_fields (null value deletes a key). */
     custom_fields: z.record(z.string().max(100), z.unknown()).optional(),
+    /**
+     * Setter answers, merged into lead.qualification. Keys must be slugs the
+     * tenant currently asks about (validated server-side against the question
+     * list); an empty string clears an answer.
+     */
+    qualification: z.record(z.string().max(50), z.string().max(ANSWER_MAX)).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: "Empty patch" })
   // lost_reason is only read by setLeadOutcome; alone it would 200 with an unchanged lead.
@@ -93,7 +100,7 @@ export const LEAD_API_SELECT = {
   id: true, status: true, outcome: true, closedAt: true, lostReason: true,
   assignedToId: true, source: true, sourceApp: true, channel: true, campaign: true,
   subject: true, serviceInterest: true, message: true, estimatedValue: true,
-  customFields: true, convertedDealId: true, receivedDate: true, createdAt: true,
+  customFields: true, qualification: true, convertedDealId: true, receivedDate: true, createdAt: true,
   company: { select: { id: true, name: true, city: true, vatNumber: true } },
   contact: {
     select: {

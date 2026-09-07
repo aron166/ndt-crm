@@ -1,14 +1,16 @@
 "use server";
 
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { DEFAULT_LEAD_STATUSES, STAGE_DESCRIPTION_PLACEHOLDER, STAGE_DESCRIPTION_MAX } from "@/lib/leads/statuses";
 import {
-  changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome,
+  changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome, setLeadQualification,
 } from "@/lib/leads/service";
 import type { LeadOutcome } from "@/lib/leads/outcomes";
 import { userLeadCtx } from "@/lib/actor";
+import { parseQuestionLines } from "@/lib/leads/qualification";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 
@@ -360,6 +362,41 @@ export async function reorderLeadStatuses(orderedIds: number[]) {
       }),
     ),
   );
+  revalidatePath("/leads/setup");
+  revalidatePath("/leads");
+  return { success: true };
+}
+
+
+// ── Setter tab: qualification answers + the tenant's question list ──
+
+/** Setter answers — the logic lives in the shared lib/leads/service.ts. */
+export async function saveLeadQualification(leadId: number, answers: Record<string, string>) {
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+  const res = await setLeadQualification(leadId, answers, ctx);
+  if ("error" in res) return res;
+  revalidatePath(`/leads/${leadId}`);
+  return { success: true };
+}
+
+/** Replace the tenant's setter question list (one `slug|label` per line). */
+export async function saveQualificationQuestions(text: string) {
+  const parsed = parseQuestionLines(text);
+  if ("error" in parsed) return parsed;
+
+  const before = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
+  const settings = { ...((before?.settings ?? {}) as Record<string, unknown>), qualificationQuestions: parsed };
+  await db.tenant.update({
+    where: { id: TENANT_ID },
+    // Prisma's InputJsonValue rejects an interface without an index signature;
+    // the value IS plain JSON, so the double cast is the whole story.
+    data: { settings: settings as unknown as Prisma.InputJsonValue },
+  });
+  await audit("tenant", TENANT_ID, "update",
+    { qualificationQuestions: (before?.settings as Record<string, unknown> | null)?.qualificationQuestions ?? null },
+    { qualificationQuestions: parsed });
+
   revalidatePath("/leads/setup");
   revalidatePath("/leads");
   return { success: true };

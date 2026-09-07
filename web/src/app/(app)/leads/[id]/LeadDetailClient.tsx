@@ -6,8 +6,10 @@ import Link from "next/link";
 import { Building2, User, Mail, Phone, Globe, CheckCircle2, Pencil, Trash2, PhoneCall, CalendarClock } from "lucide-react";
 import { setLeadOutcomeAction, updateLeadStatus, deleteLead, assignLeadAction } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
+import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
+import type { QualificationQuestion } from "@/lib/leads/qualification";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
@@ -75,6 +77,8 @@ export function LeadDetailClient({
   statuses,
   users,
   openTasks,
+  questions,
+  qualification,
 }: {
   lead: Lead;
   interactions: Interaction[];
@@ -82,6 +86,8 @@ export function LeadDetailClient({
   statuses: LeadStatusDef[];
   users: { id: number; name: string }[];
   openTasks: OpenTask[];
+  questions: QualificationQuestion[];
+  qualification: Record<string, string>;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(lead.status ?? "new");
@@ -384,6 +390,8 @@ export function LeadDetailClient({
               </div>
             </div>
           )}
+
+          <LeadQualificationPanel leadId={lead.id} questions={questions} answers={qualification} />
 
           <div className="panel">
             <div className="panel-head"><div className="panel-title">Hívások és interakciók · {interactions.length}</div></div>

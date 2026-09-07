@@ -4,7 +4,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { serializeDates } from "@/lib/serialize";
 import { getEntityHistory } from "@/app/actions/audit";
-import { getLeadStatuses } from "@/lib/leads/queries";
+import { getLeadStatuses, getQualificationQuestions } from "@/lib/leads/queries";
+import { answersFrom } from "@/lib/leads/qualification";
 import { LeadDetailClient } from "./LeadDetailClient";
 
 const TENANT_ID = 1;
@@ -36,7 +37,7 @@ export default async function LeadDetailPage({
 
   const personId = lead.contact?.person?.id ?? null;
 
-  const [interactions, auditEntries, statuses, users, openTasks] = await Promise.all([
+  const [interactions, auditEntries, statuses, users, openTasks, questions] = await Promise.all([
     // Per-lead touches first-class (leadId), plus the person/company timeline
     // so older/company-level history still shows. Newest first, bounded.
     db.interaction.findMany({
@@ -64,6 +65,7 @@ export default async function LeadDetailPage({
       orderBy: { dueDate: "asc" },
       take: 20,
     }),
+    getQualificationQuestions(TENANT_ID),
   ]);
 
   return (
@@ -90,6 +92,8 @@ export default async function LeadDetailPage({
         statuses={statuses}
         users={users}
         openTasks={serializeDates(openTasks)}
+        questions={questions}
+        qualification={answersFrom(lead.qualification)}
       />
     </div>
   );
