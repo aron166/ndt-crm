@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ANSWER_MAX } from "./qualification";
 
 // Public lead-intake payload (POST /api/leads).
 // Landing pages (BetonScan/BirdsView) and automations (n8n) post this shape.
@@ -40,6 +41,17 @@ export const leadIntakeSchema = z
     landing_variant: optStr,
     lead_score: z.preprocess(emptyToUndef, z.coerce.number().optional()),
     priority: optStr,
+
+    // Qualification answers keyed by the permanent slugs in the locked
+    // qualification model (birdsview/27_qualification_model.md): `gate` plus
+    // either the Branch A seven (situation, concrete, goal, size, postcode,
+    // timing, own_device) or the Branch B three (hook, use_case, work).
+    // Same shape as the setter tab writes, so both land on leads.qualification.
+    // Deliberately open (z.record) — adding a question must never need a deploy.
+    qualification: z.record(z.string().max(50), z.string().max(ANSWER_MAX)).optional(),
+    // Caller asks for the intro material (termékismertető). Recorded only —
+    // the CRM cannot attach a PDF yet (send_email automations are text-only).
+    send_intro: z.boolean().optional(),
   })
   .refine((d) => Boolean(d.contact_email || d.contact_phone), {
     message: "At least one of contact_email or contact_phone is required",
