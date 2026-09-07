@@ -6,7 +6,7 @@ import { getLeadStatuses, getQualificationQuestions } from "./queries";
 import { leadStatusLabel } from "./statuses";
 import {
   callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
-  type LeadOutcome,
+  RECALL_STATUS, type LeadOutcome,
 } from "./outcomes";
 import { parseAnswers, answersFrom } from "./qualification";
 
@@ -55,6 +55,26 @@ function eventFields(lead: LeadRow, over: Record<string, string | number | null>
   };
 }
 
+/**
+ * The lead's open callback/call tasks are done — the call happened, or the card
+ * moved on. Shared by changeLeadStatus and logLeadCallOutcome so the two
+ * directions of the task↔kanban sync cannot drift, and so a second callback task
+ * can never exist alongside the first (Péter: "duplication structurally
+ * impossible"). Takes a tx client so it can run inside the outcome transaction.
+ */
+export async function completeOpenLeadCallTasks(
+  tx: Pick<typeof db, "task">,
+  leadId: number,
+  tenantId: number,
+  now: Date,
+): Promise<number> {
+  const { count } = await tx.task.updateMany({
+    where: { tenantId, leadId, type: "call", status: { in: ["created", "in_progress"] } },
+    data: { status: "done", completedAt: now },
+  });
+  return count;
+}
+
 /** Move a lead to another column. Fires lead_status_changed automations. */
 export async function changeLeadStatus(
   leadId: number,
@@ -70,6 +90,16 @@ export async function changeLeadStatus(
   if (before.status === newStatus) return { success: true, changed: false };
 
   await db.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data: { status: newStatus } });
+  // Moving the card is acting on the lead → its open callback task is done.
+  // EXCEPT into `recall`, which IS "call this back later": closing the reminder
+  // there would silently delete the only thing telling anyone to call.
+  const now = new Date();
+  const closedTasks = newStatus === RECALL_STATUS
+    ? 0
+    : await completeOpenLeadCallTasks(db, leadId, ctx.tenantId, now);
+  if (closedTasks > 0) {
+    audit("lead", leadId, "update", { openCallTasks: closedTasks }, { openCallTasks: 0 }, auditOpts(ctx));
+  }
   audit("lead", leadId, "update",
     { status: before.status, statusLabel: leadStatusLabel(before.status, statuses) },
     { status: newStatus, statusLabel: leadStatusLabel(newStatus, statuses) },
@@ -309,10 +339,9 @@ export async function logLeadCallOutcome(
       select: { id: true },
     });
     // The call happened → any earlier open callback task for this lead is done.
-    await tx.task.updateMany({
-      where: { tenantId: ctx.tenantId, leadId, type: "call", status: { in: ["created", "in_progress"] } },
-      data: { status: "done", completedAt: now },
-    });
+    // Runs BEFORE the create below, inside the same transaction, so a lead can
+    // never end up with two open callback tasks.
+    await completeOpenLeadCallTasks(tx, leadId, ctx.tenantId, now);
     const task = plan.callbackAt
       ? await tx.task.create({
           data: {

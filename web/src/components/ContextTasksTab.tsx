@@ -22,6 +22,7 @@ interface Task {
   category: string | null;
   companyId: number | null;
   personId: number | null;
+  leadId: number | null;
   parentTaskId: number | null;
   costCode: string | null;
   costQuantity: number | null;
@@ -61,6 +62,7 @@ export function ContextTasksTab({
       type: task.type,
       companyId: task.companyId ?? companyId ?? null,
       personId: task.personId ?? personId ?? null,
+      leadId: task.leadId,
       companyName,
       personName,
     });

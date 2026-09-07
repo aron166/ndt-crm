@@ -23,6 +23,7 @@ interface SubTask {
   description: string | null;
   companyId: number | null;
   personId: number | null;
+  leadId: number | null;
   parentTaskId: number | null;
   company: { id: number; name: string } | null;
   person: { id: number; firstName: string | null; lastName: string | null } | null;
@@ -45,6 +46,7 @@ interface Task {
   description: string | null;
   companyId: number | null;
   personId: number | null;
+  leadId: number | null;
   parentTaskId: number | null;
   costCode: string | null;
   costQuantity: number | null;
@@ -65,6 +67,7 @@ export function TaskDetailClient({ task }: { task: Task }) {
     type: string | null;
     companyId: number | null;
     personId: number | null;
+    leadId: number | null;
     company?: { name: string } | null;
     person?: { firstName: string | null; lastName: string | null } | null;
   }) {
@@ -76,6 +79,7 @@ export function TaskDetailClient({ task }: { task: Task }) {
       type: t.type,
       companyId: t.companyId,
       personId: t.personId,
+      leadId: t.leadId,
       companyName: t.company?.name,
       personName,
     });

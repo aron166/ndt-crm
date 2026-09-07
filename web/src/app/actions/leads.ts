@@ -11,6 +11,7 @@ import {
 import type { LeadOutcome } from "@/lib/leads/outcomes";
 import { userLeadCtx } from "@/lib/actor";
 import { parseQuestionLines } from "@/lib/leads/qualification";
+import { getLeadStatuses } from "@/lib/leads/queries";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 
@@ -400,4 +401,41 @@ export async function saveQualificationQuestions(text: string) {
   revalidatePath("/leads/setup");
   revalidatePath("/leads");
   return { success: true };
+}
+
+// ── Task → kanban: ticking a call task must never advance the stage silently ──
+
+/**
+ * What the "melyik fázisba kerüljön?" prompt needs, fetched lazily when the
+ * modal opens (not on every task render). Returns null when the task is not a
+ * lead call task — the caller then shows no prompt at all.
+ */
+export async function getLeadStagePrompt(taskId: number) {
+  const task = await db.task.findFirst({
+    where: { id: taskId, tenantId: TENANT_ID },
+    select: { leadId: true, type: true },
+  });
+  if (!task?.leadId || task.type !== "call") return null;
+
+  const lead = await db.lead.findFirst({
+    where: { id: task.leadId, tenantId: TENANT_ID },
+    select: {
+      id: true, status: true, outcome: true, convertedDealId: true,
+      company: { select: { name: true } },
+      contact: { select: { person: { select: { firstName: true, lastName: true } } } },
+    },
+  });
+  if (!lead) return null;
+  // A closed lead has left the board; there is no stage to pick.
+  if (lead.outcome !== "open" || lead.convertedDealId) return null;
+
+  const p = lead.contact?.person;
+  const who = p ? `${p.lastName ?? ""} ${p.firstName ?? ""}`.trim() : null;
+  const statuses = await getLeadStatuses(TENANT_ID);
+  return {
+    leadId: lead.id,
+    currentStatus: lead.status,
+    title: [who, lead.company?.name].filter(Boolean).join(" · ") || `Lead #${lead.id}`,
+    statuses: statuses.map((st) => ({ key: st.key, label: st.label, description: st.description })),
+  };
 }

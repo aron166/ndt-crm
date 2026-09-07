@@ -22,6 +22,7 @@ interface Task {
   description: string | null;
   companyId: number | null;
   personId: number | null;
+  leadId: number | null;
   parentTaskId: number | null;
   company: { id: number; name: string } | null;
   person: { id: number; firstName: string | null; lastName: string | null } | null;
@@ -67,6 +68,7 @@ export function TasksClient({ tasks }: TasksClientProps) {
       type: task.type,
       companyId: task.companyId,
       personId: task.personId,
+      leadId: task.leadId,
       companyName: task.company?.name,
       personName,
     });
