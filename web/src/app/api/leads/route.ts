@@ -90,7 +90,6 @@ export async function POST(request: Request) {
           to: parsed.data.contact_email,
           companyId: result.companyId,
           personId: result.personId,
-          companyName: parsed.data.company_name,
         })
       : null;
 

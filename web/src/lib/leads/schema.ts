@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ANSWER_MAX } from "./qualification";
+import { answersRecordSchema } from "./qualification";
 
 // Public lead-intake payload (POST /api/leads).
 // Landing pages (BetonScan/BirdsView) and automations (n8n) post this shape.
@@ -50,7 +50,7 @@ export const leadIntakeSchema = z
     // `intent_path` (task|curious) is accepted as the wire alias of `gate`.
     // Deliberately open (z.record) — adding a question must never need a deploy,
     // and an answer must never be dropped because a slug was renamed.
-    qualification: z.record(z.string().max(50), z.string().max(ANSWER_MAX)).optional(),
+    qualification: answersRecordSchema.optional(),
     // Send the intro material (termékismertető) now: emails it when Resend is
     // connected, otherwise creates the "Küldd el a termékismertetőt" task.
     send_intro: z.boolean().optional(),

@@ -14,14 +14,22 @@ import { reportError } from "@/lib/report-error";
 // Never throws: intake must not fail because an email did.
 
 export const INTRO_TASK_TITLE = "Küldd el a termékismertetőt";
-/** Shown in the email when Áron hasn't put the real URL in the settings yet. */
-export const INTRO_URL_PLACEHOLDER = "[TERMÉKISMERTETŐ LINK — Beállítások]";
 
-/** tenants.settings.introMaterialUrl — where the PDF lives. */
+/**
+ * tenants.settings.introMaterialUrl — where the PDF lives, or null.
+ *
+ * The https check is repeated HERE and not only in the settings writer: this
+ * value goes into a customer-facing email, and `tenants.settings` is a JSON blob
+ * that any other settings writer (or a manual DB edit) can put anything into.
+ * Validating at the single read every caller shares is the only place it holds.
+ * (Vanda, #81.)
+ */
 export async function getIntroMaterialUrl(tenantId: number): Promise<string | null> {
   const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
   const url = (tenant?.settings as { introMaterialUrl?: unknown } | null)?.introMaterialUrl;
-  return typeof url === "string" && url.trim() ? url.trim() : null;
+  if (typeof url !== "string") return null;
+  const trimmed = url.trim();
+  return /^https:\/\//i.test(trimmed) ? trimmed : null;
 }
 
 function introEmail(url: string) {
@@ -53,23 +61,25 @@ export async function sendIntroMaterial(args: {
   to: string | null | undefined;
   companyId: number | null;
   personId: number | null;
-  companyName?: string | null;
 }): Promise<IntroResult> {
   const { tenantId, leadId, to, companyId, personId } = args;
   try {
-    const url = (await getIntroMaterialUrl(tenantId)) ?? INTRO_URL_PLACEHOLDER;
+    const url = await getIntroMaterialUrl(tenantId);
 
-    if (to) {
+    // No link configured → the task branch. Emailing a customer a literal
+    // "[TERMÉKISMERTETŐ LINK — Beállítások]" is worse than telling a human to
+    // send it. (Vanda, #81.)
+    if (to && url) {
       const { isConnected, sendEmail } = await import("@/lib/integrations/resend");
-      if (await isConnected()) {
+      if (await isConnected(tenantId)) {
         const { subject, text } = introEmail(url);
-        const res = await sendEmail({ to, subject, text, companyId, personId });
+        const res = await sendEmail({ tenantId, to, subject, text, companyId, personId });
         if (res.ok) return "email";
         reportError("leads.intro.send", new Error(res.error), { leadId });
       }
     }
 
-    // No Resend, no address, or the send failed → a human owes them the PDF.
+    // No link, no Resend, no address, or the send failed → a human owes them the PDF.
     const due = new Date();
     due.setDate(due.getDate() + 1);
     const task = await db.task.create({
@@ -79,9 +89,12 @@ export async function sendIntroMaterial(args: {
         companyId,
         personId,
         title: INTRO_TASK_TITLE,
-        description: to
-          ? `A lead kérte a termékismertetőt. Küldd el ide: ${to}\nLink: ${url}`
-          : `A lead kérte a termékismertetőt, de nincs email címe. Hívd fel.\nLink: ${url}`,
+        description: [
+          to
+            ? `A lead kérte a termékismertetőt. Küldd el ide: ${to}`
+            : "A lead kérte a termékismertetőt, de nincs email címe. Hívd fel.",
+          url ? `Link: ${url}` : "Nincs termékismertető link beállítva (Leadek → Beállítások).",
+        ].join("\n"),
         type: "email",
         category: "revenue_generating",
         dueDate: due,
@@ -89,7 +102,7 @@ export async function sendIntroMaterial(args: {
       select: { id: true },
     });
     audit("task", task.id, "create", null,
-      { title: INTRO_TASK_TITLE, leadId, reason: to ? "resend_unavailable" : "no_email" },
+      { title: INTRO_TASK_TITLE, leadId, reason: !url ? "no_intro_url" : to ? "resend_unavailable" : "no_email" },
       { tenantId, actor: "system" });
     return "task";
   } catch (err) {

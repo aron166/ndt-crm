@@ -4,7 +4,11 @@ import { decrypt, isEncrypted } from "@/lib/crypto";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
 
-const TENANT_ID = 1;
+// ponytail: no ctx system yet (tenant-decoupling is queued item #1), so callers
+// that genuinely have no tenant in hand still pass DEFAULT_TENANT_ID. The point
+// of threading it is that the ONE caller with a real tenant — the app-key'd
+// public /api/leads intake — stops silently sending through tenant 1's account.
+export const DEFAULT_TENANT_ID = 1;
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 export interface ResendConfig {
@@ -19,9 +23,9 @@ function dec(raw: string | undefined): string | null {
 }
 
 /** Read + decrypt the tenant's Resend credentials (Settings → Integrations). */
-export async function getResendConfig(): Promise<ResendConfig | null> {
+export async function getResendConfig(tenantId: number): Promise<ResendConfig | null> {
   const cred = await db.integrationCredential.findUnique({
-    where: { tenantId_integrationSlug: { tenantId: TENANT_ID, integrationSlug: "resend" } },
+    where: { tenantId_integrationSlug: { tenantId, integrationSlug: "resend" } },
   });
   if (!cred?.isActive) return null;
   const c = cred.credentials as Record<string, string>;
@@ -31,11 +35,13 @@ export async function getResendConfig(): Promise<ResendConfig | null> {
   return { apiKey, fromEmail, fromName: dec(c.fromName) };
 }
 
-export async function isConnected(): Promise<boolean> {
-  return (await getResendConfig()) !== null;
+export async function isConnected(tenantId: number): Promise<boolean> {
+  return (await getResendConfig(tenantId)) !== null;
 }
 
 export interface SendEmailInput {
+  /** Whose Resend account sends it, and whose interaction log records it. */
+  tenantId: number;
   to: string;
   subject: string;
   text: string;
@@ -48,10 +54,11 @@ export interface SendEmailInput {
 }
 
 /** Send a test email to the configured From address to verify the credentials. */
-export async function sendTestEmail(): Promise<SendEmailResult> {
-  const config = await getResendConfig();
+export async function sendTestEmail(tenantId: number): Promise<SendEmailResult> {
+  const config = await getResendConfig(tenantId);
   if (!config) return { ok: false, error: "A Resend integráció nincs beállítva." };
   return sendEmail({
+    tenantId,
     to: config.fromEmail,
     subject: "Helm CRM — teszt email",
     text: "Ez egy teszt üzenet a Helm CRM-ből. Ha megkaptad, a Resend integráció működik. 🎉",
@@ -70,7 +77,8 @@ export type SendEmailResult =
  * CRM keeps a full, immutable communication trail (decisions.md #2).
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const config = await getResendConfig();
+  const { tenantId } = input;
+  const config = await getResendConfig(tenantId);
   if (!config) return { ok: false, error: "A Resend integráció nincs beállítva (Beállítások → Integrációk)." };
 
   const to = input.to.trim();
@@ -114,7 +122,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   try {
     const interaction = await db.interaction.create({
       data: {
-        tenantId: TENANT_ID,
+        tenantId,
         type: "email",
         direction: "outbound",
         notes: `Tárgy: ${subject}\n\n${input.text}`,
@@ -125,10 +133,10 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       },
     });
     audit("interaction", interaction.id, "create", null,
-      { type: "email", direction: "outbound", companyId, personId, source: "resend" }, { tenantId: TENANT_ID });
+      { type: "email", direction: "outbound", companyId, personId, source: "resend" }, { tenantId });
     if (companyId) {
       await db.company.updateMany({
-        where: { id: companyId, tenantId: TENANT_ID },
+        where: { id: companyId, tenantId },
         data: { lastInteractionDate: new Date(), updatedAt: new Date() },
       });
     }

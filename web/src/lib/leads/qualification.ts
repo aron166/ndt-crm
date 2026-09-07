@@ -20,6 +20,26 @@ export interface QualificationQuestion {
 export const QUESTION_MAX = 15;
 export const ANSWER_MAX = 2000;
 export const LABEL_MAX = 200;
+/**
+ * Cap on how many answers one payload may carry. The locked model asks 11 and a
+ * tenant may add its own, so this is generous — it exists only so that
+ * `POST /api/leads`, which is public and takes an unbounded JSON body, cannot
+ * persist megabytes into `leads.qualification` AND again into `app_events.payload`.
+ * (Vanda, #81.)
+ */
+export const ANSWER_KEYS_MAX = 40;
+
+/**
+ * The wire shape of a qualification answer map. Deliberately open on the slug —
+ * adding a question must never need a deploy — but bounded on every axis: key
+ * length, value length, and now the number of keys. One definition, used by the
+ * setter panel, the PATCH route and the public intake schema alike.
+ */
+export const answersRecordSchema = z
+  .record(z.string().max(50), z.string().max(ANSWER_MAX))
+  .refine((o) => Object.keys(o).length <= ANSWER_KEYS_MAX, {
+    message: `Legfeljebb ${ANSWER_KEYS_MAX} válasz küldhető`,
+  });
 
 /**
  * The locked qualification model (machines/birdsview/27_qualification_model.md,
@@ -121,8 +141,7 @@ export function parseAnswers(
   raw: unknown,
   questions: QualificationQuestion[],
 ): Record<string, string> | { error: string } {
-  const shape = z.record(z.string().max(50), z.string().max(ANSWER_MAX));
-  const parsed = shape.safeParse(raw);
+  const parsed = answersRecordSchema.safeParse(raw);
   if (!parsed.success) return { error: `A válasz szöveges és legfeljebb ${ANSWER_MAX} karakter lehet` };
   const known = new Set(questions.map((q) => q.slug));
   const out: Record<string, string> = {};

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import type { LeadCtx } from "./service";
 import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
-import { ANSWER_MAX } from "./qualification";
+import { answersRecordSchema } from "./qualification";
 
 // Shared bits of the lead write API (/api/leads/:id*). Same per-app-key auth
 // as POST /api/leads: the key carries the tenant; the service-role key is NOT
@@ -58,7 +58,7 @@ export const leadPatchSchema = z
      * tenant currently asks about (validated server-side against the question
      * list); an empty string clears an answer.
      */
-    qualification: z.record(z.string().max(50), z.string().max(ANSWER_MAX)).optional(),
+    qualification: answersRecordSchema.optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: "Empty patch" })
   // lost_reason is only read by setLeadOutcome; alone it would 200 with an unchanged lead.

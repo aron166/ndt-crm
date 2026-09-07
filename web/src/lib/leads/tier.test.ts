@@ -64,4 +64,64 @@ describe("computeTier", () => {
       gate: "feladat", situation: "cég", concrete: "fal", timing: "ezen a héten", own_device: "nem",
     })).toBe("B");
   });
+
+  // ── Vanda's #81 findings: free text is not a substring search ──────────
+  // Every case below returned the WRONG tier before the word-boundary +
+  // negation matcher landed. They are the reason that fix exists.
+
+  it("a negated keyword does not count as the signal (finding 1)", () => {
+    // "not the technology — what's in the wall" was goal=technology → tier A,
+    // i.e. 'call within 1 hour' for a lead who said the opposite.
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "fal", timing: "jövő héten",
+      goal: "nem a technológia érdekel, hanem mi van a falban", own_device: "nem",
+    })).toBe("B");
+    // ...and the same shape must still tier A when it is NOT negated.
+    expect(computeTier({
+      gate: "feladat", situation: "cég", goal: "a technológia érdekel", own_device: "nem",
+    })).toBe("A");
+  });
+
+  it("a bare 'nem' inside a positive answer no longer kills it (finding 1)", () => {
+    // "wall, but we don't know exactly where" hit CONCRETE.no on "nem" → null,
+    // and the B lead vanished from the board.
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "fal, de nem tudjuk pontosan hol",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+    // "hanem" is one word — it is not a negator.
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "nem tégla, hanem beton",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+  });
+
+  it("'projekt' does not make a private lead a company (finding 2)", () => {
+    expect(computeTier({
+      gate: "feladat", situation: "családi ház projekt", concrete: "fal", timing: "ezen a héten",
+    })).toBe("D");
+    expect(computeTier({
+      gate: "feladat", situation: "magánszemély vagyok, de projekt jelleggel", concrete: "fal",
+    })).toBe("D");
+    // A real company answer still reads as one.
+    expect(computeTier({
+      gate: "feladat", situation: "céges projekt", concrete: "fal", timing: "ezen a héten",
+      own_device: "nem",
+    })).toBe("B");
+  });
+
+  it("'érdeklődöm' is the curious gate, not a fall-through to A (finding 3)", () => {
+    expect(computeTier({
+      gate: "most csak érdeklődöm", situation: "cég", own_device: "igen",
+    })).toBe("E");
+    expect(computeTier({ gate: "csak nézelődöm" })).toBe("E");
+  });
+
+  it("short keywords match whole words only", () => {
+    // "más" (other) must not fire on "masszív" (massive).
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "masszív beton fal",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+  });
 });

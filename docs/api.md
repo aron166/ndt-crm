@@ -110,7 +110,26 @@ panel, `PATCH`). It is a column, so the board filters and counts on it.
 A **missing** answer never promotes: the spec's literal "own_device ≠ no" would
 make every partial payload a tier A, so A requires an explicit positive signal.
 
+Free-typed answers (what a setter puts in the panel, as opposed to the landing
+form's tokens) are matched on **word boundaries**, not substrings, and a keyword
+sitting inside a negation is ignored — "nem a technológia érdekel" is not
+`goal=technology`. `hanem` / `de` end the negation, so "nem tégla, hanem beton"
+still reads as concrete.
+
+> ⚠️ **`tier` only reaches an automation at intake.** `POST /api/leads` puts the
+> derived tier into the `lead_created` event, so a "tier A → call within 1 h"
+> rule fires for leads the landing form already tiered A. A setter who promotes a
+> lead to A **on the phone** updates the column and the badge but fires **no**
+> automation — `setLeadQualification` emits no event. Adding a
+> `lead_tier_changed` trigger is a product decision, not a bug fix; it is Áron's
+> call. (Vanda, #81.)
+
 #### `send_intro`
+
+> ⚠️ **Not idempotent.** A retried or double-submitted `POST /api/leads` creates a
+> second lead *and* a second intro email or task; the company/person dedupe does
+> not cover it. The landing form must not retry blind. (Vanda, #81 — deferred,
+> needs a dedupe-window decision.)
 
 `true` → if the Resend integration is connected **and** a `contact_email` was
 given, the intro email goes out immediately with the link from
