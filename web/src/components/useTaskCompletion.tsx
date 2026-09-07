@@ -76,8 +76,12 @@ export function useTaskCompletion() {
     }
   }, []);
 
+  // Stable identity: LeadStagePromptModal has this in an effect dependency list,
+  // and a fresh closure each render would re-fire the server action forever.
+  const closeStage = useCallback(() => setStageTaskId(null), []);
+
   const stageModal = stageTaskId !== null ? (
-    <LeadStagePromptModal key={stageTaskId} taskId={stageTaskId} onClose={() => setStageTaskId(null)} />
+    <LeadStagePromptModal key={stageTaskId} taskId={stageTaskId} onClose={closeStage} />
   ) : null;
 
   const logModal = logTask ? (

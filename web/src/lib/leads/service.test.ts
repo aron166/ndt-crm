@@ -25,7 +25,12 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-const mockDb = db as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>;
+type M = ReturnType<typeof vi.fn>;
+const mockDb = db as unknown as {
+  lead: { findFirst: M; updateMany: M };
+  task: { updateMany: M; create: M };
+  $transaction: M;
+};
 const ctx: LeadCtx = { tenantId: 1, userId: 2, actor: "user" };
 
 const LEAD = {
