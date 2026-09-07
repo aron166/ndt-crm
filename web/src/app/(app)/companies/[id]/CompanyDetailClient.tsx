@@ -370,6 +370,7 @@ export function CompanyDetailClient({
           the user believes they left. (Vanda, PR #83.) */}
       <div
         aria-busy={switching}
+        inert={switching}
         style={{ opacity: switching ? 0.55 : 1, pointerEvents: switching ? "none" : undefined, transition: "opacity 120ms" }}
       >
 

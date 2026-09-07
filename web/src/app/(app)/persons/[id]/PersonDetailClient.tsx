@@ -344,6 +344,7 @@ export function PersonDetailClient({
               events so a click can't land on a tab the user left. (Vanda, PR #83.) */}
           <div
             aria-busy={switching}
+            inert={switching}
             style={{ opacity: switching ? 0.55 : 1, pointerEvents: switching ? "none" : undefined, transition: "opacity 120ms" }}
           >
             {/* Activity */}
