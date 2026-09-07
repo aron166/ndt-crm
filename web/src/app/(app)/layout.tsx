@@ -13,7 +13,7 @@ export default async function AppLayout({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [overdueCount, defaultPipeline] = await Promise.all([
+  const [overdueCount, defaultPipeline, marketingReviewCount] = await Promise.all([
     db.task.count({
       where: {
         tenantId: 1,
@@ -27,12 +27,14 @@ export default async function AppLayout({
       include: { stages: { orderBy: { position: "asc" } }, customFields: { orderBy: { position: "asc" } } },
       orderBy: { position: "asc" },
     }),
+    db.contentItem.count({ where: { tenantId: 1, status: "in_review" } }),
   ]);
 
   return (
     <AppShell
       email={user.email ?? ""}
       overdueCount={overdueCount}
+      marketingReviewCount={marketingReviewCount}
       defaultPipeline={defaultPipeline ? serializeDates(defaultPipeline) : null}
     >
       {children}

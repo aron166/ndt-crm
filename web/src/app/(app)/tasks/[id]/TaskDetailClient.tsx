@@ -6,7 +6,8 @@ import { Plus, CheckCircle2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskModal } from "../TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
-import { completeTask, reopenTask } from "@/app/actions/tasks";
+import { reopenTask } from "@/app/actions/tasks";
+import { useTaskCompletion } from "@/components/useTaskCompletion";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -22,9 +23,15 @@ interface SubTask {
   description: string | null;
   companyId: number | null;
   personId: number | null;
+  leadId: number | null;
   parentTaskId: number | null;
   company: { id: number; name: string } | null;
   person: { id: number; firstName: string | null; lastName: string | null } | null;
+  costCode: string | null;
+  costQuantity: number | null;
+  costUnit: string | null;
+  costUnitRate: number | null;
+  costAmount: number | null;
   _count: { subTasks: number };
 }
 
@@ -39,7 +46,13 @@ interface Task {
   description: string | null;
   companyId: number | null;
   personId: number | null;
+  leadId: number | null;
   parentTaskId: number | null;
+  costCode: string | null;
+  costQuantity: number | null;
+  costUnit: string | null;
+  costUnitRate: number | null;
+  costAmount: number | null;
   subTasks: SubTask[];
 }
 
@@ -47,10 +60,29 @@ export function TaskDetailClient({ task }: { task: Task }) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [subTaskOpen, setSubTaskOpen] = useState(false);
+  const { complete, logModal } = useTaskCompletion();
 
-  async function handleComplete(id: number) {
-    await completeTask(id);
-    router.refresh();
+  function handleComplete(t: {
+    id: number;
+    type: string | null;
+    companyId: number | null;
+    personId: number | null;
+    leadId: number | null;
+    company?: { name: string } | null;
+    person?: { firstName: string | null; lastName: string | null } | null;
+  }) {
+    const personName = t.person
+      ? `${t.person.lastName ?? ""} ${t.person.firstName ?? ""}`.trim()
+      : undefined;
+    return complete({
+      id: t.id,
+      type: t.type,
+      companyId: t.companyId,
+      personId: t.personId,
+      leadId: t.leadId,
+      companyName: t.company?.name,
+      personName,
+    });
   }
 
   async function handleReopen(id: number) {
@@ -74,6 +106,10 @@ export function TaskDetailClient({ task }: { task: Task }) {
           description: task.description,
           companyId: task.companyId ?? undefined,
           personId: task.personId ?? undefined,
+          costCode: task.costCode,
+          costQuantity: task.costQuantity,
+          costUnit: task.costUnit,
+          costUnitRate: task.costUnitRate,
         }}
       />
       <TaskModal
@@ -81,6 +117,7 @@ export function TaskDetailClient({ task }: { task: Task }) {
         onClose={() => { setSubTaskOpen(false); router.refresh(); }}
         initial={{ parentTaskId: task.id, companyId: task.companyId, personId: task.personId }}
       />
+      {logModal}
 
       <div className="flex items-center gap-2 mb-3">
         <Button
@@ -96,7 +133,7 @@ export function TaskDetailClient({ task }: { task: Task }) {
           <Button
             size="sm"
             className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
-            onClick={() => handleComplete(task.id)}
+            onClick={() => handleComplete(task)}
           >
             <CheckCircle2 className="size-3.5" />
             Kész
@@ -136,7 +173,7 @@ export function TaskDetailClient({ task }: { task: Task }) {
                 <li key={s.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
                   {s.status !== "done" ? (
                     <button
-                      onClick={() => handleComplete(s.id)}
+                      onClick={() => handleComplete(s)}
                       className="w-4 h-4 rounded-full border-2 border-slate-300 hover:border-green-500 shrink-0"
                     />
                   ) : (

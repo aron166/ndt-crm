@@ -21,6 +21,38 @@ export function interactionDirectionLabel(direction: string | null): string {
   return INTERACTION_DIRECTION_LABEL[direction] ?? direction;
 }
 
+// Task types (call/email/meeting/field_visit/document/internal) that, on
+// completion, correspond to a loggable interaction. Maps the task type to the
+// interaction type used by LogInteractionModal. Non-communication task types
+// (document, internal) intentionally have no mapping → no prompt.
+export const TASK_TYPE_TO_INTERACTION_TYPE: Record<string, string> = {
+  call: "call",
+  email: "email",
+  meeting: "meeting",
+  field_visit: "site_visit",
+};
+
+export function taskTypeToInteractionType(taskType: string | null): string | null {
+  if (!taskType) return null;
+  return TASK_TYPE_TO_INTERACTION_TYPE[taskType] ?? null;
+}
+
+/**
+ * After completing a task, should we offer to log an interaction?
+ * Only for communication-type tasks that are tied to a company or person
+ * (an interaction needs a subject to attach to).
+ */
+export function shouldLogInteractionOnComplete(task: {
+  type: string | null;
+  companyId: number | null;
+  personId: number | null;
+}): boolean {
+  return (
+    taskTypeToInteractionType(task.type) !== null &&
+    (task.companyId != null || task.personId != null)
+  );
+}
+
 export interface LogInteractionInput {
   type?: string;
   notes?: string;

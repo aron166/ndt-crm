@@ -38,10 +38,24 @@ function IconTasks() {
     </svg>
   );
 }
+function IconPhone() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
+    </svg>
+  );
+}
 function IconPipe() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 6h18l-4 6 4 6H3"/>
+    </svg>
+  );
+}
+function IconLeads() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 11l19-9-9 19-2-8-8-2z"/>
     </svg>
   );
 }
@@ -78,11 +92,54 @@ function IconSparkle() {
   );
 }
 
+function IconZap() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+    </svg>
+  );
+}
+
+function IconTariff() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>
+    </svg>
+  );
+}
+
+function IconQuote() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+      <path d="M9 13h6M9 17h4"/>
+    </svg>
+  );
+}
+
+function IconUpload() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>
+    </svg>
+  );
+}
+
+function IconMegaphone() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m3 11 18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+    </svg>
+  );
+}
+
+
 const NAV = [
   {
     group: "WORKSPACE",
     items: [
       { href: "/",          label: "Dashboard",  icon: IconDashboard },
+      { href: "/calls",     label: "Hívás mód",  icon: IconPhone },
       { href: "/tasks",     label: "Feladatok",  icon: IconTasks },
     ],
   },
@@ -91,15 +148,21 @@ const NAV = [
     items: [
       { href: "/persons",   label: "Személyek", icon: IconPersons },
       { href: "/companies", label: "Cégek",     icon: IconBuilding },
+      { href: "/leads",     label: "Leadek",    icon: IconLeads },
       { href: "/deals",     label: "Pipeline",  icon: IconPipe },
     ],
   },
   {
     group: "ÜZEMELTETÉS",
     items: [
+      { href: "/quotes",      label: "Árajánlatok", icon: IconQuote },
       { href: "/invoices",    label: "Számlák",     icon: IconInvoice },
       { href: "/analytics",   label: "Analytics",   icon: IconAnalytics },
       { href: "/enrichment",  label: "Enrichment",  icon: IconSparkle },
+      { href: "/automations", label: "Automatizálás", icon: IconZap },
+      { href: "/marketing",   label: "Marketing",   icon: IconMegaphone },
+      { href: "/rate-card",   label: "Díjszabás",   icon: IconTariff },
+      { href: "/import",      label: "Importálás",  icon: IconUpload },
       { href: "/settings",    label: "Beállítások", icon: IconSettings },
     ],
   },
@@ -108,9 +171,11 @@ const NAV = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: (collapsed: boolean) => void;
+  /** Count badges keyed by nav href (e.g. { "/marketing": 3 }). */
+  badges?: Record<string, number>;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
   const pathname = usePathname();
 
   function toggle() {
@@ -161,8 +226,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>Helm CRM</div>
-              <div style={{ fontSize: 10, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Controllabor</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>Helm CRM</div>
+              <div style={{ fontSize: 12, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Controllabor</div>
             </div>
           </>
         )}
@@ -189,7 +254,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             {!collapsed && (
               <div
                 style={{
-                  fontSize: 10, fontWeight: 600, color: "var(--fg-faint)",
+                  fontSize: 12, fontWeight: 600, color: "var(--fg-faint)",
                   letterSpacing: "0.12em", textTransform: "uppercase",
                   padding: "10px 8px 5px",
                 }}
@@ -200,6 +265,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <ul className="space-y-0.5">
               {items.map(({ href, label, icon: Icon }) => {
                 const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+                const badge = badges?.[href] ?? 0;
                 return (
                   <li key={href}>
                     <Link
@@ -208,7 +274,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                       className="relative flex items-center gap-2.5 rounded transition-colors duration-150"
                       style={{
                         height: 32, padding: "0 8px",
-                        fontSize: 13, fontWeight: 500,
+                        fontSize: 14, fontWeight: 500,
                         color: active ? "var(--fg)" : "var(--fg-soft)",
                         background: active
                           ? "linear-gradient(90deg, oklch(0.66 0.19 278 / 0.18), oklch(0.66 0.19 278 / 0.04))"
@@ -239,6 +305,25 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                         <Icon />
                       </span>
                       {!collapsed && <span>{label}</span>}
+                      {badge > 0 && (
+                        <span
+                          className="font-mono-ndt"
+                          style={{
+                            marginLeft: collapsed ? 0 : "auto",
+                            position: collapsed ? "absolute" : "static",
+                            top: collapsed ? 3 : undefined,
+                            right: collapsed ? 3 : undefined,
+                            minWidth: 16, height: 16, padding: "0 4px",
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 12, fontWeight: 700, lineHeight: 1,
+                            color: "white", background: "var(--indigo)",
+                            borderRadius: 8,
+                            boxShadow: "0 0 8px oklch(0.66 0.19 278 / 0.5)",
+                          }}
+                        >
+                          {badge}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );

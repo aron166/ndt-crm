@@ -3,6 +3,9 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
+import { runAutomations } from "@/lib/automations/engine";
+import { deleteCompany } from "@/app/actions/companies";
+import { deletePerson } from "@/app/actions/persons";
 
 const TENANT_ID = 1;
 
@@ -42,11 +45,12 @@ export async function createDeal(formData: FormData) {
       currency: "HUF",
       expectedCloseDate: closeDate ? new Date(closeDate) : null,
       position: (maxPos._max.position ?? -1) + 1,
+      stageEnteredAt: new Date(),
       ...(Object.keys(customFields).length > 0 ? { customFields } : {}),
     },
   });
 
-  audit("task", deal.id, "create", null, { title, stageId: deal.stageId });
+  audit("deal", deal.id, "create", null, { title, stageId: deal.stageId });
   revalidatePath("/deals");
   return { success: true, dealId: deal.id };
 }
@@ -83,7 +87,7 @@ export async function updateDeal(id: number, formData: FormData) {
     },
   });
 
-  if (before) audit("task", id, "update", { title: before.title }, { title });
+  if (before) audit("deal", id, "update", { title: before.title }, { title });
   revalidatePath("/deals");
   return { success: true };
 }
@@ -95,7 +99,11 @@ export async function moveDeal(
 ) {
   const deal = await db.deal.findFirst({
     where: { id: dealId, tenantId: TENANT_ID },
-    select: { stageId: true, stage: { select: { name: true } } },
+    select: {
+      stageId: true, companyId: true, personId: true, value: true,
+      stage: { select: { name: true } },
+      company: { select: { name: true } },
+    },
   });
 
   const newStage = await db.pipelineStage.findUnique({
@@ -103,20 +111,61 @@ export async function moveDeal(
     select: { name: true },
   });
 
+  // Only a real stage change resets the idle clock (drags within the same
+  // column reorder but keep the deal in its stage).
+  const stageChanged = !!deal && deal.stageId !== newStageId;
+
   await db.deal.updateMany({
     where: { id: dealId, tenantId: TENANT_ID },
-    data: { stageId: newStageId, position: newPosition, updatedAt: new Date() },
+    data: {
+      stageId: newStageId, position: newPosition, updatedAt: new Date(),
+      ...(stageChanged ? { stageEnteredAt: new Date() } : {}),
+    },
   });
 
-  audit("task", dealId, "update",
+  audit("deal", dealId, "update",
     { stageId: deal?.stageId, stageName: deal?.stage?.name },
     { stageId: newStageId, stageName: newStage?.name }
   );
+
+  if (stageChanged && deal) {
+    await runAutomations({
+      type: "deal_stage_changed",
+      tenantId: TENANT_ID,
+      companyId: deal.companyId,
+      personId: deal.personId,
+      dealId,
+      companyName: deal.company?.name ?? null,
+      toStageId: newStageId,
+      fields: {
+        company: deal.company?.name ?? null,
+        stageId: newStageId,
+        value: deal.value != null ? Number(deal.value) : null,
+      },
+    });
+  }
+
   revalidatePath("/deals");
 }
 
-export async function deleteDeal(id: number) {
+export async function deleteDeal(
+  id: number,
+  // Optional cascade: also soft-delete the linked company / person. Both are
+  // recoverable (deletedAt + restore), so this stays non-destructive.
+  cascade?: { company?: boolean; person?: boolean },
+) {
+  const before = await db.deal.findFirst({
+    where: { id, tenantId: TENANT_ID },
+    select: { title: true, stageId: true, value: true, companyId: true, personId: true },
+  });
+
   await db.deal.deleteMany({ where: { id, tenantId: TENANT_ID } });
+
+  if (before) audit("deal", id, "delete", before, null);
+
+  if (cascade?.company && before?.companyId) await deleteCompany(before.companyId);
+  if (cascade?.person && before?.personId) await deletePerson(before.personId);
+
   revalidatePath("/deals");
 }
 
@@ -157,6 +206,30 @@ export async function upsertStage(formData: FormData) {
   }
 
   revalidatePath("/deals/setup");
+  return { success: true };
+}
+
+export async function reorderStages(pipelineId: number, orderedIds: number[]) {
+  // Verify the pipeline belongs to this tenant before touching its stages —
+  // app-level scoping is the only multi-tenant guard (ADR/002).
+  const pipeline = await db.pipeline.findFirst({
+    where: { id: pipelineId, tenantId: TENANT_ID },
+    select: { id: true },
+  });
+  if (!pipeline) return { error: "Pipeline nem található" };
+
+  // Persist the new column order. Scope each update to the pipeline so a stray
+  // id from another pipeline can't be repositioned.
+  await db.$transaction(
+    orderedIds.map((id, index) =>
+      db.pipelineStage.updateMany({
+        where: { id, pipelineId },
+        data: { position: index },
+      }),
+    ),
+  );
+  revalidatePath("/deals/setup");
+  revalidatePath("/deals");
   return { success: true };
 }
 

@@ -63,7 +63,7 @@ export default async function InvoicesDrillPage({
       <div className="page-head">
         <div>
           <div className="flex items-center gap-3">
-            <Link href="/analytics" style={{ fontSize: 12, color: "var(--fg-faint)", textDecoration: "none" }}>
+            <Link href="/analytics" style={{ fontSize: 14, color: "var(--fg-faint)", textDecoration: "none" }}>
               ← Analytics
             </Link>
             <span style={{ color: "var(--line-soft)" }}>/</span>
@@ -87,7 +87,7 @@ export default async function InvoicesDrillPage({
             placeholder="Cég neve..."
             style={{
               background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6,
-              padding: "6px 12px", fontSize: 12, color: "var(--fg)", outline: "none", width: 200,
+              padding: "6px 12px", fontSize: 14, color: "var(--fg)", outline: "none", width: 200,
             }}
           />
         </form>
@@ -99,7 +99,7 @@ export default async function InvoicesDrillPage({
           href={search ? `/analytics/invoices?search=${search}` : "/analytics/invoices"}
           className="font-mono-ndt rounded"
           style={{
-            fontSize: 11, padding: "3px 10px",
+            fontSize: 12, padding: "3px 10px",
             background: !yearFilter ? "var(--bg-hover)" : "transparent",
             color: !yearFilter ? "var(--fg)" : "var(--fg-mute)",
           }}
@@ -112,7 +112,7 @@ export default async function InvoicesDrillPage({
             href={search ? `/analytics/invoices?year=${y}&search=${search}` : `/analytics/invoices?year=${y}`}
             className="font-mono-ndt rounded"
             style={{
-              fontSize: 11, padding: "3px 10px",
+              fontSize: 12, padding: "3px 10px",
               background: yearFilter === y ? "var(--bg-hover)" : "transparent",
               color: yearFilter === y ? "var(--fg)" : "var(--fg-mute)",
             }}
@@ -153,17 +153,17 @@ export default async function InvoicesDrillPage({
                   )}
                 </td>
                 <td>
-                  <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
                     {inv.invoiceNumber ?? "—"}
                   </span>
                 </td>
                 <td style={{ textAlign: "right" }}>
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)", fontWeight: 500 }}>
+                  <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--mint)", fontWeight: 500 }}>
                     {inv.netAmount ? formatHUF(Number(inv.netAmount)) : "—"}
                   </span>
                 </td>
                 <td style={{ textAlign: "right" }}>
-                  <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-mute)" }}>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
                     {formatDate(inv.issuedDate)}
                   </span>
                 </td>
@@ -172,7 +172,7 @@ export default async function InvoicesDrillPage({
           </tbody>
         </table>
         {invoiceCount > 200 && (
-          <div style={{ padding: "12px 16px", fontSize: 11, color: "var(--fg-faint)", borderTop: "1px solid var(--line-soft)", textAlign: "center" }}>
+          <div style={{ padding: "12px 16px", fontSize: 12, color: "var(--fg-faint)", borderTop: "1px solid var(--line-soft)", textAlign: "center" }}>
             Első 200 találat megjelenítve · {invoiceCount.toLocaleString("hu-HU")} összesen
           </div>
         )}

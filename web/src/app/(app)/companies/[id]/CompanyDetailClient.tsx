@@ -5,6 +5,8 @@ import Link from "next/link";
 import { AreaChart } from "@/components/viz/AreaChart";
 import { StackBar } from "@/components/viz/StackBar";
 import { LogInteractionModal } from "@/components/LogInteractionModal";
+import { SendEmailButton } from "@/components/SendEmailButton";
+import { NewQuoteDialog } from "@/app/(app)/quotes/NewQuoteDialog";
 import { AddContactModal } from "./AddContactModal";
 import { personLeftCompany } from "@/app/actions/contacts";
 import { TagInput } from "@/components/tags/TagInput";
@@ -13,10 +15,12 @@ import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Phone, X, MapPin, Loader2, Pencil, Trash2 } from "lucide-react";
-import { geocodeCompany, deleteCompany, updateCompany } from "@/app/actions/companies";
+import { geocodeCompany, deleteCompany, updateCompany, restoreCompany } from "@/app/actions/companies";
 import { LeaveCompanyModal } from "@/components/LeaveCompanyModal";
 import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
 import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
+import { CompanyMetadataTab } from "./CompanyMetadataTab";
+import type { AttrRow } from "@/lib/companies/attributes";
 import { useState, useTransition } from "react";
 
 interface Contact {
@@ -33,7 +37,10 @@ interface Task {
   id: number; title: string; type: string | null; category: string | null;
   status: string; dueDate: string | Date | null; estimatedMinutes: number | null;
   description: string | null; companyId: number | null; personId: number | null;
-  parentTaskId: number | null; _count: { subTasks: number };
+  leadId: number | null;
+  parentTaskId: number | null;
+  costCode: string | null; costQuantity: number | null; costUnit: string | null; costUnitRate: number | null;
+  _count: { subTasks: number };
 }
 
 interface AppEvent {
@@ -57,6 +64,7 @@ interface CompanyData {
   revenue2022: bigint | null; revenue2023: bigint | null; revenue2024: bigint | null;
   customerValue: bigint | null;
   lastInteractionDate: string | Date | null; createdAt: Date; lat?: number | null; lng?: number | null;
+  deletedAt?: string | Date | null;
 }
 
 interface Props {
@@ -73,6 +81,7 @@ interface Props {
   initials: string;
   initialTags: { id: number; name: string; color: string }[];
   auditEntries: Parameters<typeof AuditLogEntries>[0]["entries"];
+  attributes: AttrRow[];
 }
 
 const WARMTH_STYLE: Record<string, { bg: string; color: string; label: string }> = {
@@ -112,7 +121,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export function CompanyDetailClient({
   company, contacts, interactions, tasks, appEvents, mapsConnected,
-  revenueSeries, engagementBreakdown, kpis, avatarColor, initials, initialTags, auditEntries,
+  revenueSeries, engagementBreakdown, kpis, avatarColor, initials, initialTags, auditEntries, attributes,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("overview");
@@ -124,6 +133,7 @@ export function CompanyDetailClient({
   const [geocodeMsg, setGeocodeMsg] = useState<string | null>(null);
   const [deleting, startDelete] = useTransition();
   const [editing, setEditing] = useState(false);
+  const activeContact = contacts.find((c) => !c.endedAt) ?? null;
   const [form, setForm] = useState({
     name:           company.name,
     vatNumber:      company.vatNumber ?? "",
@@ -138,6 +148,9 @@ export function CompanyDetailClient({
     website:        company.website ?? "",
   });
   const [saving, startSave] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [restoring, startRestore] = useTransition();
+  const isDeleted = !!company.deletedAt;
   const [enriching, startEnrich] = useTransition();
   const [enrichmentProposals, setEnrichmentProposals] = useState<Awaited<ReturnType<typeof getProposalsByRun>> | null>(null);
 
@@ -176,6 +189,7 @@ export function CompanyDetailClient({
     { key: "activity",   label: `Aktivitás · ${interactions.length}` },
     { key: "tasks",      label: `Feladatok · ${tasks.filter(t => t.status !== "done").length}` },
     ...(hasNdtProfile ? [{ key: "ndt", label: "NDT Profil" }] : []),
+    { key: "metadata",   label: "Metaadatok" },
     ...(appEvents.length > 0 ? [{ key: "events", label: `Események · ${appEvents.length}` }] : []),
     { key: "history",    label: "Előzmények" },
   ];
@@ -209,6 +223,29 @@ export function CompanyDetailClient({
         />
       )}
 
+      {isDeleted && (
+        <div
+          className="mount"
+          style={{
+            display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
+            padding: "10px 16px", borderRadius: 8,
+            background: "var(--coral-soft)", border: "1px solid var(--coral)",
+          }}
+        >
+          <span style={{ fontSize: 14, color: "var(--fg)", flex: 1 }}>
+            Ez a cég törölve van — nem jelenik meg a keresésben, és az adatai nem
+            menthetők, amíg vissza nem állítod.
+          </span>
+          <button
+            className="btn primary"
+            disabled={restoring}
+            onClick={() => startRestore(async () => { await restoreCompany(company.id); router.refresh(); })}
+          >
+            {restoring ? "Visszaállítás..." : "Visszaállítás"}
+          </button>
+        </div>
+      )}
+
       {/* Detail header */}
       <div className="detail-header mount">
         <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
@@ -230,7 +267,7 @@ export function CompanyDetailClient({
                 {company.name}
               </h1>
             </div>
-            <div style={{ marginTop: 6, color: "var(--fg-soft)", fontSize: 13, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div style={{ marginTop: 6, color: "var(--fg-soft)", fontSize: 14, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
               <span>{[company.city, company.county].filter(Boolean).join(" · ")}</span>
               {company.vatNumber && (
                 <span style={{ fontFamily: "var(--font-mono)", color: "var(--fg-faint)" }}>
@@ -238,24 +275,24 @@ export function CompanyDetailClient({
                 </span>
               )}
               {company.warmth && WARMTH_STYLE[company.warmth] && (
-                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, fontWeight: 600,
+                <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, fontWeight: 600,
                   background: WARMTH_STYLE[company.warmth].bg, color: WARMTH_STYLE[company.warmth].color }}>
                   {WARMTH_STYLE[company.warmth].label}
                 </span>
               )}
               {company.accountType && (
-                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "var(--bg-3)", color: "var(--fg-mute)" }}>
+                <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, background: "var(--bg-3)", color: "var(--fg-mute)" }}>
                   {company.accountType}
                 </span>
               )}
               {company.teaorCode && (
-                <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--fg-faint)" }}>
+                <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--fg-faint)" }}>
                   TEÁOR {company.teaorCode}
                 </span>
               )}
             </div>
             {company.scopeOfActivity && (
-              <div style={{ marginTop: 6, fontSize: 12, color: "var(--fg-mute)", fontStyle: "italic", maxWidth: 600 }}>
+              <div style={{ marginTop: 6, fontSize: 14, color: "var(--fg-mute)", fontStyle: "italic", maxWidth: 600 }}>
                 {company.scopeOfActivity}
               </div>
             )}
@@ -270,7 +307,14 @@ export function CompanyDetailClient({
             <button className="btn primary" onClick={() => { setLogPerson(contacts.find(c => !c.endedAt) ?? null); setLogOpen(true); }}>
               <Phone style={{ width: 13, height: 13 }} /> Naplózás
             </button>
+            <SendEmailButton
+              companyId={company.id}
+              personId={activeContact?.personId}
+              defaultTo={activeContact?.email || activeContact?.person.email || undefined}
+              contextLabel={company.name}
+            />
             <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
+            <NewQuoteDialog presetCompany={{ id: company.id, name: company.name }} triggerLabel="+ Árajánlat" triggerClassName="btn" />
             <button
               className="btn"
               onClick={handleEnrich}
@@ -280,7 +324,7 @@ export function CompanyDetailClient({
               <span style={{
                 display: "inline-block",
                 animation: enriching ? "spin 1.2s linear infinite" : "none",
-                fontSize: 13,
+                fontSize: 14,
               }}>✦</span>
               {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
             </button>
@@ -327,7 +371,7 @@ export function CompanyDetailClient({
               {revenueSeries.length >= 2 ? (
                 <AreaChart data={revenueSeries} height={180} color="var(--indigo)" />
               ) : (
-                <div style={{ height: 180, display: "grid", placeItems: "center", color: "var(--fg-faint)", fontSize: 13 }}>
+                <div style={{ height: 180, display: "grid", placeItems: "center", color: "var(--fg-faint)", fontSize: 14 }}>
                   Nincs elegendő számladat a grafikonhoz.
                 </div>
               )}
@@ -398,7 +442,7 @@ export function CompanyDetailClient({
                       value={form[key]}
                       onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                       style={{
-                        width: "100%", fontSize: 12, padding: "5px 8px",
+                        width: "100%", fontSize: 14, padding: "5px 8px",
                         background: "var(--bg-0)", border: "1px solid var(--line-soft)",
                         borderRadius: 5, color: "var(--fg)", outline: "none",
                       }}
@@ -410,7 +454,7 @@ export function CompanyDetailClient({
                   <select
                     value={form.status}
                     onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                    style={{ width: "100%", fontSize: 12, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
+                    style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
                   >
                     <option value="">—</option>
                     <option value="active">Aktív</option>
@@ -423,7 +467,7 @@ export function CompanyDetailClient({
                   <select
                     value={form.accountType}
                     onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value }))}
-                    style={{ width: "100%", fontSize: 12, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
+                    style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
                   >
                     <option value="">—</option>
                     <option value="Prospect">Prospect</option>
@@ -436,7 +480,7 @@ export function CompanyDetailClient({
                   <select
                     value={form.pipelineStatus}
                     onChange={(e) => setForm((f) => ({ ...f, pipelineStatus: e.target.value }))}
-                    style={{ width: "100%", fontSize: 12, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
+                    style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
                   >
                     <option value="">—</option>
                     <option value="0">0 · KUKA</option>
@@ -455,7 +499,8 @@ export function CompanyDetailClient({
                   disabled={saving}
                   onClick={() => {
                     startSave(async () => {
-                      await updateCompany(company.id, {
+                      setSaveError(null);
+                      const res = await updateCompany(company.id, {
                         name:           form.name || undefined,
                         vatNumber:      form.vatNumber || undefined,
                         status:         form.status || undefined,
@@ -468,6 +513,7 @@ export function CompanyDetailClient({
                         country:        form.country || undefined,
                         website:        form.website || undefined,
                       });
+                      if (res?.error) { setSaveError(res.error); return; }
                       setEditing(false);
                       router.refresh();
                     });
@@ -476,6 +522,9 @@ export function CompanyDetailClient({
                 >
                   {saving ? "Mentés..." : "Mentés"}
                 </button>
+                {saveError && (
+                  <p style={{ fontSize: 14, color: "var(--coral)", marginTop: 6 }}>{saveError}</p>
+                )}
               </div>
             ) : (
             <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -484,7 +533,7 @@ export function CompanyDetailClient({
                   <div className="field-label">Website</div>
                   <a href={company.website.startsWith("http") ? company.website : `https://${company.website}`}
                     target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 12, color: "var(--indigo)", wordBreak: "break-all" }}>
+                    style={{ fontSize: 14, color: "var(--indigo)", wordBreak: "break-all" }}>
                     {company.website.replace(/^https?:\/\//, "")}
                   </a>
                 </div>
@@ -493,7 +542,7 @@ export function CompanyDetailClient({
                 <div>
                   <div className="field-label">LinkedIn</div>
                   <a href={company.linkedinUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 12, color: "var(--indigo)" }}>Profil →</a>
+                    style={{ fontSize: 14, color: "var(--indigo)" }}>Profil →</a>
                 </div>
               )}
               {company.teaorDescription && (
@@ -525,8 +574,8 @@ export function CompanyDetailClient({
                       { year: "2024", val: company.revenue2024 },
                     ].map(({ year, val }) => (
                       <div key={year} style={{ textAlign: "center", padding: "6px 4px", background: "var(--bg-3)", borderRadius: 6 }}>
-                        <div style={{ fontSize: 10, color: "var(--fg-faint)" }}>{year}</div>
-                        <div style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--fg-soft)" }}>{formatRevenue(val)}</div>
+                        <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{year}</div>
+                        <div style={{ fontSize: 14, fontFamily: "var(--font-mono)", color: "var(--fg-soft)" }}>{formatRevenue(val)}</div>
                       </div>
                     ))}
                   </div>
@@ -538,7 +587,7 @@ export function CompanyDetailClient({
                   <div className="field-label">NDT módszerek</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                     {company.ndtMethods.map((m) => (
-                      <span key={m} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
+                      <span key={m} style={{ fontSize: 12, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
                         background: "var(--bg-3)", color: NDT_METHOD_COLOR[m] ?? "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>
                         {m}
                       </span>
@@ -554,7 +603,7 @@ export function CompanyDetailClient({
               <StackBar segments={engagementBreakdown} />
               <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
                 {engagementBreakdown.map((x, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
                     <span style={{ width: 6, height: 6, borderRadius: 999, background: x.color, boxShadow: `0 0 6px ${x.color}`, flexShrink: 0 }} />
                     <span style={{ flex: 1, color: "var(--fg-soft)" }}>{x.label}</span>
                     <span style={{ fontFamily: "var(--font-mono)", color: "var(--fg-mute)" }}>{x.value}</span>
@@ -581,7 +630,7 @@ export function CompanyDetailClient({
                       });
                     }}
                     disabled={geocoding}
-                    style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: geocoding ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                    style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: geocoding ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 4 }}
                   >
                     {geocoding && <Loader2 style={{ width: 11, height: 11, animation: "spin 1s linear infinite" }} />}
                     {geocoding ? "Geocodálás..." : company.lat ? "Újra" : "Geocodálás"}
@@ -597,7 +646,7 @@ export function CompanyDetailClient({
                     title={`${company.name} térképen`}
                   />
                 ) : (
-                  <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "var(--fg-faint)" }}>
+                  <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
                     {mapsConnected
                       ? "Kattints a Geocodálás gombra a cím meghatározásához."
                       : <span>Google Maps nincs csatlakoztatva. <a href="/settings" style={{ color: "var(--indigo)" }}>Beállítások →</a></span>
@@ -605,7 +654,7 @@ export function CompanyDetailClient({
                   </div>
                 )}
                 {geocodeMsg && (
-                  <div style={{ padding: "6px 16px", fontSize: 11, color: geocodeMsg.includes("siker") ? "var(--mint)" : "var(--coral)", borderTop: "1px solid var(--line-soft)" }}>
+                  <div style={{ padding: "6px 16px", fontSize: 12, color: geocodeMsg.includes("siker") ? "var(--mint)" : "var(--coral)", borderTop: "1px solid var(--line-soft)" }}>
                     {geocodeMsg}
                   </div>
                 )}
@@ -644,7 +693,7 @@ export function CompanyDetailClient({
                   <td className="num">{c.phone ?? c.person.phone ?? "—"}</td>
                   <td>
                     {c.endedAt
-                      ? <span style={{ fontSize: 11, color: "var(--fg-faint)" }}>Volt ({formatDate(c.endedAt)})</span>
+                      ? <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Volt ({formatDate(c.endedAt)})</span>
                       : <span className="badge-ds dot mint">Aktív</span>
                     }
                   </td>
@@ -673,7 +722,7 @@ export function CompanyDetailClient({
       {tab === "activity" && (
         <div className="panel mount" style={{ marginTop: 16, padding: "18px 22px" }}>
           {interactions.length === 0 ? (
-            <div style={{ textAlign: "center", color: "var(--fg-mute)", padding: "32px 0", fontSize: 13 }}>
+            <div style={{ textAlign: "center", color: "var(--fg-mute)", padding: "32px 0", fontSize: 14 }}>
               Nincs interakció. Naplózáshoz kattints a Contacts fülön.
             </div>
           ) : (
@@ -702,7 +751,7 @@ export function CompanyDetailClient({
                       <span className="when">{formatDateTime(r.occurredAt)}</span>
                     </div>
                     {r.notes && <div className="tl-body">{r.notes}</div>}
-                    {r.outcome && <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>Eredmény: {r.outcome}</div>}
+                    {r.outcome && <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Eredmény: {r.outcome}</div>}
                   </div>
                 );
               })}
@@ -730,7 +779,7 @@ export function CompanyDetailClient({
                   {["VT","PT","MT","UT","RT","DRT","LT","HT","SPECTRO","consultation"].map((m) => {
                     const active = company.ndtMethods.includes(m);
                     return (
-                      <div key={m} style={{ padding: "6px 12px", borderRadius: 6, fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600,
+                      <div key={m} style={{ padding: "6px 12px", borderRadius: 6, fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 600,
                         background: active ? "var(--bg-3)" : "transparent",
                         color: active ? (NDT_METHOD_COLOR[m] ?? "var(--fg)") : "var(--fg-faint)",
                         border: `1px solid ${active ? "var(--line-soft)" : "transparent"}`,
@@ -749,7 +798,7 @@ export function CompanyDetailClient({
                 <div className="panel-head"><div className="panel-title">Termékterület</div></div>
                 <div className="panel-pad" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {company.productAreas.map((pa) => (
-                    <span key={pa} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 12,
+                    <span key={pa} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 14,
                       background: "var(--bg-3)", color: "var(--fg-soft)", border: "1px solid var(--line-soft)" }}>
                       {PRODUCT_AREA_LABEL[pa] ?? pa}
                     </span>
@@ -763,7 +812,7 @@ export function CompanyDetailClient({
                 <div className="panel-head"><div className="panel-title">Vizsgált anyagok</div></div>
                 <div className="panel-pad" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {company.materials.map((m) => (
-                    <span key={m} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 12,
+                    <span key={m} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 14,
                       background: "var(--bg-3)", color: "var(--amber)", fontFamily: "var(--font-mono)" }}>
                       {MATERIAL_LABEL[m] ?? m}
                     </span>
@@ -777,7 +826,7 @@ export function CompanyDetailClient({
                 <div className="panel-head"><div className="panel-title">Gyártmányok</div></div>
                 <div className="panel-pad" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {company.products.map((p, i) => (
-                    <span key={i} style={{ padding: "3px 8px", borderRadius: 4, fontSize: 11,
+                    <span key={i} style={{ padding: "3px 8px", borderRadius: 4, fontSize: 12,
                       background: "var(--bg-3)", color: "var(--fg-mute)" }}>
                       {p}
                     </span>
@@ -820,7 +869,7 @@ export function CompanyDetailClient({
                 <div className="panel-head"><div className="panel-title">Versenytársak</div></div>
                 <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {[company.competitor1, company.competitor2, company.competitor3].filter(Boolean).map((c, i) => (
-                    <div key={i} style={{ fontSize: 12, padding: "5px 8px", background: "var(--bg-3)", borderRadius: 5, color: "var(--coral)" }}>
+                    <div key={i} style={{ fontSize: 14, padding: "5px 8px", background: "var(--bg-3)", borderRadius: 5, color: "var(--coral)" }}>
                       {c}
                     </div>
                   ))}
@@ -833,17 +882,17 @@ export function CompanyDetailClient({
                 <div className="panel-head"><div className="panel-title">Telephely</div></div>
                 <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <div className="field-label">Székhely</div>
-                  <div style={{ fontSize: 12, color: "var(--fg-soft)" }}>
+                  <div style={{ fontSize: 14, color: "var(--fg-soft)" }}>
                     {[company.zipCode, company.city, company.address].filter(Boolean).join(", ") || "—"}
                   </div>
                   {company.siteCity && (
                     <>
                       <div className="field-label" style={{ marginTop: 8 }}>Telephely</div>
-                      <div style={{ fontSize: 12, color: "var(--fg-soft)" }}>
+                      <div style={{ fontSize: 14, color: "var(--fg-soft)" }}>
                         {[company.siteZip, company.siteCity, company.siteStreet].filter(Boolean).join(", ")}
                       </div>
                       {company.siteCounty && (
-                        <div style={{ fontSize: 11, color: "var(--fg-faint)" }}>{company.siteCounty}</div>
+                        <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{company.siteCounty}</div>
                       )}
                     </>
                   )}
@@ -875,13 +924,20 @@ export function CompanyDetailClient({
                   </span>
                   <span className="when">{formatDateTime(ev.createdAt)}</span>
                 </div>
-                <div className="tl-body" style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-faint)" }}>
+                <div className="tl-body" style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-faint)" }}>
                   {JSON.stringify(ev.payload, null, 0).slice(0, 120)}
                   {JSON.stringify(ev.payload).length > 120 ? "…" : ""}
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Metadata (effective-dated attributes) */}
+      {tab === "metadata" && (
+        <div style={{ marginTop: 16 }}>
+          <CompanyMetadataTab companyId={company.id} attributes={attributes} />
         </div>
       )}
 

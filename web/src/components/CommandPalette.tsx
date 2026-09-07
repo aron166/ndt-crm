@@ -155,7 +155,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               <X style={{ width: 14, height: 14 }} />
             </button>
           )}
-          <kbd style={{ fontFamily: "var(--font-geist-mono)", fontSize: 10, padding: "2px 6px", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 4, color: "var(--fg-faint)" }}>
+          <kbd style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12, padding: "2px 6px", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 4, color: "var(--fg-faint)" }}>
             ESC
           </kbd>
         </div>
@@ -163,13 +163,13 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         {/* Results */}
         <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
           {!query.trim() && (
-            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 13, color: "var(--fg-faint)" }}>
+            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
               Kezdj el gépelni a kereséshez...
             </div>
           )}
 
           {query.trim() && !hasResults && (
-            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 13, color: "var(--fg-faint)" }}>
+            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
               Nincs találat: <strong style={{ color: "var(--fg-mute)" }}>{query}</strong>
             </div>
           )}
@@ -178,7 +178,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             <div key={kind}>
               <div style={{
                 padding: "8px 16px 4px",
-                fontSize: 10, fontWeight: 600,
+                fontSize: 12, fontWeight: 600,
                 textTransform: "uppercase", letterSpacing: "0.1em",
                 color: "var(--fg-faint)",
               }}>
@@ -200,11 +200,11 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                   >
                     {iconFor(item.kind)}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 14, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {item.label}
                       </div>
                       {"sub" in item && item.sub && (
-                        <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 1 }}>{item.sub}</div>
+                        <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>{item.sub}</div>
                       )}
                     </div>
                     {item.kind === "company" && item.status && (
@@ -216,11 +216,11 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     {item.kind === "tag" && (
                       <div className="flex items-center gap-2">
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, boxShadow: `0 0 6px ${item.color}` }} />
-                        <span className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)" }}>{item.count}</span>
+                        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{item.count}</span>
                       </div>
                     )}
                     {item.kind === "deal" && item.value && (
-                      <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--mint)" }}>
+                      <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)" }}>
                         {Math.round(item.value).toLocaleString("hu-HU")} HUF
                       </span>
                     )}
@@ -233,7 +233,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
         {/* Footer hint */}
         {hasResults && (
-          <div className="flex items-center gap-4 px-4" style={{ height: 36, borderTop: "1px solid var(--line-soft)", fontSize: 11, color: "var(--fg-faint)", fontFamily: "var(--font-geist-mono)" }}>
+          <div className="flex items-center gap-4 px-4" style={{ height: 36, borderTop: "1px solid var(--line-soft)", fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-geist-mono)" }}>
             <span>↑↓ navigáció</span>
             <span>↵ megnyitás</span>
             <span>ESC bezárás</span>

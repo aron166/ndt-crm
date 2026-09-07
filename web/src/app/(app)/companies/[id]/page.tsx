@@ -6,7 +6,9 @@ import { CompanyDetailClient } from "./CompanyDetailClient";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { getTagsForEntity } from "@/app/actions/tags";
 import { getEntityHistory } from "@/app/actions/audit";
+import { getCompanyAttributes } from "@/app/actions/company-attributes";
 import { serializeDates } from "@/lib/serialize";
+import { serializeTaskCost } from "@/lib/tasks/costing";
 import { isConnected } from "@/lib/integrations/google_maps";
 
 const TENANT_ID = 1;
@@ -25,7 +27,7 @@ export default async function CompanyDetailPage({
   const companyId = parseInt(id, 10);
   if (isNaN(companyId)) notFound();
 
-  const [company, contacts, interactions, tasks, invoices, appEvents, initialTags, auditEntries] = await Promise.all([
+  const [company, contacts, interactions, tasks, invoices, appEvents, initialTags, auditEntries, attributes] = await Promise.all([
     db.company.findFirst({ where: { id: companyId, tenantId: TENANT_ID } }),
     db.contact.findMany({
       where: { companyId, tenantId: TENANT_ID },
@@ -57,6 +59,7 @@ export default async function CompanyDetailPage({
     }),
     getTagsForEntity("company", companyId),
     getEntityHistory("company", companyId),
+    getCompanyAttributes(companyId),
   ]);
 
   if (!company) notFound();
@@ -101,7 +104,7 @@ export default async function CompanyDetailPage({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <Link
           href="/companies"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--fg-mute)" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
           className="row-link"
         >
           <ArrowLeft style={{ width: 14, height: 14 }} />
@@ -114,7 +117,7 @@ export default async function CompanyDetailPage({
         company={serializeDates(company)}
         contacts={serializeDates(contacts)}
         interactions={serializeDates(interactions)}
-        tasks={serializeDates(tasks)}
+        tasks={serializeDates(tasks).map(serializeTaskCost)}
         appEvents={serializeDates(appEvents)}
         mapsConnected={mapsConnected}
         revenueSeries={revenueSeries}
@@ -124,6 +127,7 @@ export default async function CompanyDetailPage({
         initials={initials}
         initialTags={initialTags}
         auditEntries={serializeDates(auditEntries)}
+        attributes={serializeDates(attributes)}
       />
     </div>
   );

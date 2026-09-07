@@ -115,6 +115,22 @@ export async function deleteCompany(id: number) {
   return { success: true };
 }
 
+export async function restoreCompany(id: number) {
+  const company = await db.company.findFirst({
+    where: { id, tenantId: TENANT_ID },
+    select: { name: true, deletedAt: true },
+  });
+  if (!company) return { error: "Cég nem található" };
+  if (!company.deletedAt) return { success: true };
+
+  await db.company.update({ where: { id }, data: { deletedAt: null } });
+  await audit("company", id, "update", { deletedAt: company.deletedAt }, { deletedAt: null });
+
+  revalidatePath("/companies");
+  revalidatePath(`/companies/${id}`);
+  return { success: true };
+}
+
 export async function geocodeCompany(companyId: number) {
   const company = await db.company.findFirst({
     where: { id: companyId, tenantId: TENANT_ID },

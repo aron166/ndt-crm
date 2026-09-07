@@ -46,7 +46,7 @@ export function StatusBar({ collapsed, overdueCount = 0 }: StatusBarProps) {
         background: "oklch(0.135 0.014 258 / 0.95)",
         backdropFilter: "blur(8px)",
         borderTop: "1px solid var(--line-soft)",
-        fontSize: 10,
+        fontSize: 12,
         color: "var(--fg-faint)",
         letterSpacing: "0.04em",
       }}

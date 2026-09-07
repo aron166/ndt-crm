@@ -4,6 +4,7 @@ import { TasksClient } from "./TasksClient";
 import { TasksKanban } from "./TasksKanban";
 import { NewTaskButton } from "./NewTaskButton";
 import { ViewToggle } from "./ViewToggle";
+import { serializeTaskCost } from "@/lib/tasks/costing";
 
 const TENANT_ID = 1;
 
@@ -61,6 +62,7 @@ export default async function TasksPage({
     orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
     take: view === "kanban" ? 500 : 200,
   });
+  const tasksForClient = tasks.map(serializeTaskCost);
 
   const openCount = await db.task.count({
     where: {
@@ -84,7 +86,7 @@ export default async function TasksPage({
       <div className="flex items-center justify-between mb-5">
         <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
           Feladatok
-          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", fontWeight: 400 }}>
+          <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-faint)", fontWeight: 400 }}>
             {openCount} nyitott
             {overdueCount > 0 && (
               <span style={{ color: "var(--coral)", marginLeft: 6 }}>· {overdueCount} lejárt</span>
@@ -111,7 +113,7 @@ export default async function TasksPage({
                   href={`/tasks?status=${key}&due=${dueFilter}&view=list`}
                   className="font-mono-ndt rounded"
                   style={{
-                    fontSize: 11, padding: "3px 10px",
+                    fontSize: 12, padding: "3px 10px",
                     background: statusFilter === key ? "var(--bg-hover)" : "transparent",
                     color: statusFilter === key ? "var(--fg)" : "var(--fg-mute)",
                   }}
@@ -133,7 +135,7 @@ export default async function TasksPage({
                   href={`/tasks?status=${statusFilter}&due=${key}&view=list`}
                   className="font-mono-ndt rounded"
                   style={{
-                    fontSize: 11, padding: "3px 10px",
+                    fontSize: 12, padding: "3px 10px",
                     background: dueFilter === key ? "var(--bg-hover)" : "transparent",
                     color: dueFilter === key ? "var(--fg)" : "var(--fg-mute)",
                   }}
@@ -144,11 +146,11 @@ export default async function TasksPage({
             </div>
           </div>
 
-          <TasksClient tasks={tasks} />
+          <TasksClient tasks={tasksForClient} />
         </>
       )}
 
-      {view === "kanban" && <TasksKanban tasks={tasks} />}
+      {view === "kanban" && <TasksKanban tasks={tasksForClient} />}
     </div>
   );
 }

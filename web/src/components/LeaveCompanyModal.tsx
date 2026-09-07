@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormField } from "@/components/ui/FormField";
 
 interface Props {
   open: boolean;
@@ -16,22 +17,18 @@ export function LeaveCompanyModal({ open, personName, companyName, onConfirm, on
   const [date, setDate] = useState(today);
   const [pending, start] = useTransition();
 
-  if (!open) return null;
-
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <span className="modal-title">Kilépés rögzítése</span>
-          <button className="modal-close" onClick={onClose}><X style={{ width: 16, height: 16 }} /></button>
-        </div>
-        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--fg-soft)" }}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Kilépés rögzítése</DialogTitle>
+        </DialogHeader>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--fg-soft)" }}>
             <strong style={{ color: "var(--fg)" }}>{personName}</strong> mikor hagyta el a(z){" "}
             <strong style={{ color: "var(--fg)" }}>{companyName}</strong> céget?
           </p>
-          <div className="field-group">
-            <label className="field-label">Kilépés dátuma</label>
+          <FormField label="Kilépés dátuma">
             <input
               type="date"
               className="input-ds"
@@ -39,8 +36,8 @@ export function LeaveCompanyModal({ open, personName, companyName, onConfirm, on
               max={today}
               onChange={(e) => setDate(e.target.value)}
             />
-          </div>
-          <p style={{ margin: 0, fontSize: 11, color: "var(--fg-faint)" }}>
+          </FormField>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--fg-faint)" }}>
             Egy „Utánkövetés" feladat automatikusan létrejön 2 hetes határidővel.
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -54,7 +51,7 @@ export function LeaveCompanyModal({ open, personName, companyName, onConfirm, on
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { logInteraction } from "@/app/actions/interactions";
+import { FormField } from "@/components/ui/FormField";
 
 const TYPES = [
   { value: "call",       label: "Telefonhívás" },
@@ -40,6 +41,8 @@ interface LogInteractionModalProps {
   personId?: number | null;
   companyName?: string;
   personName?: string;
+  /** Pre-select the interaction type (e.g. derived from a completed task's type). */
+  defaultType?: string;
 }
 
 function nowLocalIso() {
@@ -55,16 +58,17 @@ export function LogInteractionModal({
   personId,
   companyName,
   personName,
+  defaultType,
 }: LogInteractionModalProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [type, setType] = useState("call");
+  const [type, setType] = useState(defaultType ?? "call");
   const [direction, setDirection] = useState("outbound");
 
   function handleClose() {
     setError(null);
-    setType("call");
+    setType(defaultType ?? "call");
     setDirection("outbound");
     onClose();
   }
@@ -106,10 +110,7 @@ export function LogInteractionModal({
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Típus *
-              </label>
+            <FormField label="Típus" required>
               <Select value={type} onValueChange={(v) => v && setType(v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -122,12 +123,9 @@ export function LogInteractionModal({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FormField>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Irány
-              </label>
+            <FormField label="Irány">
               <Select
                 value={direction}
                 onValueChange={(v) => v && setDirection(v)}
@@ -143,13 +141,10 @@ export function LogInteractionModal({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FormField>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Megjegyzés *
-            </label>
+          <FormField label="Megjegyzés" required>
             <Textarea
               name="notes"
               placeholder="Mi hangzott el? Mi a következő lépés?"
@@ -157,30 +152,24 @@ export function LogInteractionModal({
               required
               autoFocus
             />
-          </div>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Eredmény / státusz
-              </label>
+            <FormField label="Eredmény / státusz">
               <Input
                 name="outcome"
                 placeholder="pl. visszahív, érdeklődő..."
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Időpont *
-              </label>
+            <FormField label="Időpont" required>
               <Input
                 type="datetime-local"
                 name="occurredAt"
                 defaultValue={nowLocalIso()}
                 required
               />
-            </div>
+            </FormField>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

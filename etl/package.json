@@ -12,6 +12,7 @@
     "enrich": "ts-node src/enrich.ts",
     "enrich:dry": "ts-node src/enrich.ts --dry-run",
     "validate": "ts-node src/validate.ts",
+    "seed:birdsview-targets": "ts-node src/seed-birdsview-targets.ts",
     "lint": "eslint src --ext ts"
   },
   "prisma": {

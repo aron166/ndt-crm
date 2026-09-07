@@ -55,11 +55,11 @@ export default async function InvoicesPage({
       <div className="flex items-center justify-between gap-4">
         <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
           Számlák
-          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", fontWeight: 400 }}>
+          <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-faint)", fontWeight: 400 }}>
             {total.toLocaleString("hu-HU")}
           </span>
           {totalAmount > 0 && (
-            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)", fontWeight: 400 }}>
+            <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--mint)", fontWeight: 400 }}>
               · {(totalAmount / 1_000_000).toFixed(1)}M HUF
             </span>
           )}
@@ -72,7 +72,7 @@ export default async function InvoicesPage({
             placeholder="Cég neve…"
             style={{
               background: "var(--bg-panel)", border: "1px solid var(--line-soft)",
-              borderRadius: 6, padding: "5px 12px", fontSize: 12, color: "var(--fg)", outline: "none", width: 200,
+              borderRadius: 6, padding: "5px 12px", fontSize: 14, color: "var(--fg)", outline: "none", width: 200,
             }}
           />
         </form>
@@ -83,7 +83,7 @@ export default async function InvoicesPage({
         <Link
           href={search ? `/invoices?search=${search}` : "/invoices"}
           className="font-mono-ndt rounded"
-          style={{ fontSize: 11, padding: "3px 10px", background: !yearFilter ? "var(--bg-hover)" : "transparent", color: !yearFilter ? "var(--fg)" : "var(--fg-mute)" }}
+          style={{ fontSize: 12, padding: "3px 10px", background: !yearFilter ? "var(--bg-hover)" : "transparent", color: !yearFilter ? "var(--fg)" : "var(--fg-mute)" }}
         >
           Mind
         </Link>
@@ -92,7 +92,7 @@ export default async function InvoicesPage({
             key={y}
             href={search ? `/invoices?year=${y}&search=${search}` : `/invoices?year=${y}`}
             className="font-mono-ndt rounded"
-            style={{ fontSize: 11, padding: "3px 10px", background: yearFilter === y ? "var(--bg-hover)" : "transparent", color: yearFilter === y ? "var(--fg)" : "var(--fg-mute)" }}
+            style={{ fontSize: 12, padding: "3px 10px", background: yearFilter === y ? "var(--bg-hover)" : "transparent", color: yearFilter === y ? "var(--fg)" : "var(--fg-mute)" }}
           >
             {y}
           </Link>
@@ -100,14 +100,14 @@ export default async function InvoicesPage({
       </div>
 
       {/* Table */}
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
         <thead>
           <tr>
             {["Cég", "Számlaszám", "Kiállítás", "Összeg"].map((h, i) => (
               <th key={i} style={{
                 textAlign: i === 3 ? "right" : "left",
                 padding: "0 14px 8px",
-                fontSize: 10, fontWeight: 600,
+                fontSize: 12, fontWeight: 600,
                 textTransform: "uppercase", letterSpacing: "0.12em",
                 color: "var(--fg-faint)",
                 borderBottom: "1px solid var(--line-soft)",
@@ -118,7 +118,7 @@ export default async function InvoicesPage({
         <tbody>
           {invoices.length === 0 && (
             <tr>
-              <td colSpan={4} style={{ padding: "48px 14px", textAlign: "center", color: "var(--fg-faint)", fontSize: 13 }}>
+              <td colSpan={4} style={{ padding: "48px 14px", textAlign: "center", color: "var(--fg-faint)", fontSize: 14 }}>
                 Nincs találat
               </td>
             </tr>
@@ -127,7 +127,7 @@ export default async function InvoicesPage({
             <tr key={inv.id} className="tbl-row">
               <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)" }}>
                 {inv.company ? (
-                  <Link href={`/companies/${inv.company.id}`} className="tbl-link" style={{ fontSize: 13 }}>
+                  <Link href={`/companies/${inv.company.id}`} className="tbl-link" style={{ fontSize: 14 }}>
                     {inv.company.name}
                   </Link>
                 ) : (
@@ -135,18 +135,18 @@ export default async function InvoicesPage({
                 )}
               </td>
               <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)" }}>
-                <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+                <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
                   {inv.invoiceNumber ?? "—"}
                 </span>
               </td>
               <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)" }}>
-                <span className="font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-mute)" }}>
+                <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
                   {formatDate(inv.issuedDate)}
                 </span>
               </td>
               <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)", textAlign: "right" }}>
                 {inv.netAmount ? (
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)", fontWeight: 500 }}>
+                  <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--mint)", fontWeight: 500 }}>
                     {formatHUF(Number(inv.netAmount))}
                   </span>
                 ) : "—"}
@@ -157,7 +157,7 @@ export default async function InvoicesPage({
       </table>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between font-mono-ndt" style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+        <div className="flex items-center justify-between font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
           <span>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString("hu-HU")}</span>
           <div className="flex gap-2">
             {page > 1 && (

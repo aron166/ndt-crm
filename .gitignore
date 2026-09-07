@@ -46,16 +46,29 @@ etl/source/
 *.xlsx
 *.csv
 
-# Internal docs & agent tooling — kept local, NEVER published to the public repo
-/CLAUDE.md
-etl/CLAUDE.md
-/STATUS.md
-/memory/
-/.claude/
-/FOUNDATION.md
-/ProjectOverview.md
-/QuoteFeatureContext/
-/BRIEFING_2026-05-12.md
-web/.agents/
-/redesign/
+# ───────────────────────────────────────────────────────────────
+# Internal planning, agent & design docs — LOCAL ONLY, never commit.
+# This repo is public; these contain business strategy, partner names,
+# agent instructions, and design references that must not be published.
+# History audited 2026-06-06: none were ever committed (clean) — see
+# chore/gitignore-and-account-seed. Previously only untracked, not ignored;
+# a `git add .` would have leaked them. Now properly ignored.
+# ───────────────────────────────────────────────────────────────
+CLAUDE.md
+AGENTS.md
+STATUS.md
+FOUNDATION.md
+ProjectOverview.md
+BRIEFING_*
+memory/
+QuoteFeatureContext/
 _enrichment_wip/
+graphify-out/
+redesign/
+.agents/
+.claude/
+ADR/002-domain-layer-and-platform-foundations.md
+
+# session temp files for commit/PR bodies (see memory/workflows.md)
+.git-msg-tmp
+.pr-body-tmp

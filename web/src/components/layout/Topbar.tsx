@@ -136,7 +136,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
             height: 34,
             background: "var(--bg-panel)",
             border: "1px solid var(--line-soft)",
-            fontSize: 13,
+            fontSize: 14,
             color: "var(--fg-mute)",
             cursor: "text",
           }}
@@ -148,7 +148,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
           <span
             className="ml-auto font-mono-ndt rounded"
             style={{
-              fontSize: 10, padding: "1px 5px",
+              fontSize: 12, padding: "1px 5px",
               background: "var(--bg-raised)",
               border: "1px solid var(--line-soft)",
               color: "var(--fg-mute)",
@@ -187,7 +187,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
               onClick={() => setTaskOpen(true)}
               className="flex items-center gap-1.5 font-medium transition-all"
               style={{
-                height: 32, padding: "0 12px", fontSize: 13,
+                height: 32, padding: "0 12px", fontSize: 14,
                 background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
                 color: "white", border: "1px solid var(--indigo-dim)",
                 borderRight: "none", borderRadius: "6px 0 0 6px",
@@ -204,7 +204,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
               onClick={() => defaultPipeline ? setDealOpen(true) : router.push("/deals/setup")}
               className="flex items-center gap-1 font-medium transition-all"
               style={{
-                height: 32, padding: "0 8px", fontSize: 13,
+                height: 32, padding: "0 8px", fontSize: 14,
                 background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
                 color: "white", border: "1px solid var(--indigo-dim)",
                 borderLeft: "none", borderRadius: "0 6px 6px 0",

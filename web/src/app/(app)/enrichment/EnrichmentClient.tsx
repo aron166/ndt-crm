@@ -50,7 +50,7 @@ function ConfidenceBar({ value }: { value: number }) {
       <div style={{ width: 60, height: 4, background: "var(--line-soft)", borderRadius: 2, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 2, transition: "width 0.3s" }} />
       </div>
-      <span style={{ fontSize: 10, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)" }}>{pct}%</span>
+      <span style={{ fontSize: 12, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)" }}>{pct}%</span>
     </div>
   );
 }
@@ -64,7 +64,7 @@ function SourceBadge({ source }: { source: string }) {
     "var(--fg-faint)";
   return (
     <span style={{
-      fontSize: 10, padding: "1px 6px", borderRadius: 3,
+      fontSize: 12, padding: "1px 6px", borderRadius: 3,
       border: `1px solid ${color}`, color, fontFamily: "var(--font-mono-ndt)",
       textTransform: "uppercase", letterSpacing: "0.05em",
     }}>
@@ -87,7 +87,7 @@ function StatusBadge({ status }: { status: string }) {
   };
   const { label, color } = map[status] ?? { label: status, color: "var(--fg-faint)" };
   return (
-    <span style={{ fontSize: 11, color, fontWeight: 600, fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+    <span style={{ fontSize: 12, color, fontWeight: 600, fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
       {label}
     </span>
   );
@@ -147,7 +147,7 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
   if (applied) {
     return (
       <div style={{ padding: "14px 16px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, opacity: 0.5 }}>
-        <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>✓ Alkalmazva — {proposal.entityName}</span>
+        <span style={{ fontSize: 14, color: "var(--fg-mute)" }}>✓ Alkalmazva — {proposal.entityName}</span>
       </div>
     );
   }
@@ -161,25 +161,25 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
       <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, overflow: "hidden" }}>
         <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Link href={entityHref} style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>{proposal.entityName}</Link>
-            <span style={{ fontSize: 11, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase" }}>
+            <Link href={entityHref} style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{proposal.entityName}</Link>
+            <span style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase" }}>
               {proposal.entityType === "company" ? "cég" : "személy"}
             </span>
           </div>
-          <span style={{ fontSize: 11, color: "var(--fg-faint)" }}>Nem találtunk változtatnivalót</span>
+          <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Nem találtunk változtatnivalót</span>
         </div>
         {debug?.facts && (
           <div style={{ padding: "0 16px 12px", borderTop: "1px solid var(--line-soft)" }}>
-            <div style={{ fontSize: 10, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "10px 0 6px" }}>Debug — források</div>
+            <div style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "10px 0 6px" }}>Debug — források</div>
             {(debug.facts as string[]).map((f: string, i: number) => (
-              <div key={i} style={{ fontSize: 11, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", padding: "2px 0", borderBottom: "1px solid var(--line-soft)" }}>
+              <div key={i} style={{ fontSize: 12, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", padding: "2px 0", borderBottom: "1px solid var(--line-soft)" }}>
                 {f}
               </div>
             ))}
           </div>
         )}
         {proposal.rawResponse?.startsWith("ERROR:") && (
-          <div style={{ padding: "8px 16px", fontSize: 11, color: "var(--coral)", fontFamily: "var(--font-mono-ndt)" }}>
+          <div style={{ padding: "8px 16px", fontSize: 12, color: "var(--coral)", fontFamily: "var(--font-mono-ndt)" }}>
             {proposal.rawResponse}
           </div>
         )}
@@ -195,20 +195,20 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
           <Link href={entityHref} style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>
             {proposal.entityName}
           </Link>
-          <span style={{ fontSize: 11, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase" }}>
             {proposal.entityType === "company" ? "cég" : "személy"}
           </span>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button
             onClick={handleApproveAll}
-            style={{ fontSize: 12, padding: "3px 8px", border: "1px solid var(--mint)", color: "var(--mint)", background: "transparent", borderRadius: 4, cursor: "pointer" }}
+            style={{ fontSize: 14, padding: "3px 8px", border: "1px solid var(--mint)", color: "var(--mint)", background: "transparent", borderRadius: 4, cursor: "pointer" }}
           >
             Mind jóváhagy
           </button>
           <button
             onClick={handleRejectAll}
-            style={{ fontSize: 12, padding: "3px 8px", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", background: "transparent", borderRadius: 4, cursor: "pointer" }}
+            style={{ fontSize: 14, padding: "3px 8px", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", background: "transparent", borderRadius: 4, cursor: "pointer" }}
           >
             Mind elutasít
           </button>
@@ -235,18 +235,18 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
             />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-soft)", textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "var(--font-mono-ndt)" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg-soft)", textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "var(--font-mono-ndt)" }}>
                   {fieldLabel(key)}
                 </span>
                 <SourceBadge source={change.source} />
                 <ConfidenceBar value={change.confidence} />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, color: "var(--fg-mute)", textDecoration: "line-through", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 14, color: "var(--fg-mute)", textDecoration: "line-through", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {change.current ?? "(üres)"}
                 </span>
-                <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>→</span>
-                <span style={{ fontSize: 13, color: "var(--mint)", fontWeight: 500, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 14, color: "var(--fg-faint)" }}>→</span>
+                <span style={{ fontSize: 14, color: "var(--mint)", fontWeight: 500, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {change.proposed}
                 </span>
               </div>
@@ -257,14 +257,14 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
 
       {/* Footer */}
       <div style={{ padding: "10px 16px", borderTop: "1px solid var(--line-soft)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 11, color: "var(--fg-faint)" }}>
+        <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>
           {selected.size}/{fields.length} mező kiválasztva
         </span>
         <button
           onClick={handleApply}
           disabled={isPending}
           style={{
-            fontSize: 13, fontWeight: 600, padding: "6px 16px",
+            fontSize: 14, fontWeight: 600, padding: "6px 16px",
             background: selected.size > 0 ? "var(--indigo)" : "var(--bg-inset)",
             color: selected.size > 0 ? "white" : "var(--fg-faint)",
             border: "none", borderRadius: 5, cursor: selected.size > 0 ? "pointer" : "not-allowed",
@@ -284,27 +284,27 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
 function RunRow({ run }: { run: RunWithCount }) {
   return (
     <tr style={{ borderBottom: "1px solid var(--line-soft)" }}>
-      <td style={{ padding: "10px 12px", fontSize: 13, color: "var(--fg)" }}>
+      <td style={{ padding: "10px 12px", fontSize: 14, color: "var(--fg)" }}>
         #{run.id}
       </td>
-      <td style={{ padding: "10px 12px", fontSize: 13 }}>
-        <span style={{ fontFamily: "var(--font-mono-ndt)", color: "var(--fg-soft)", textTransform: "uppercase", fontSize: 11 }}>
+      <td style={{ padding: "10px 12px", fontSize: 14 }}>
+        <span style={{ fontFamily: "var(--font-mono-ndt)", color: "var(--fg-soft)", textTransform: "uppercase", fontSize: 12 }}>
           {run.entityType === "company" ? "cég" : "személy"}
         </span>
       </td>
-      <td style={{ padding: "10px 12px", fontSize: 13, color: "var(--fg-soft)" }}>
+      <td style={{ padding: "10px 12px", fontSize: 14, color: "var(--fg-soft)" }}>
         {run.entityIds.length} entitás
       </td>
       <td style={{ padding: "10px 12px" }}>
         <StatusBadge status={run.status} />
       </td>
-      <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--fg-mute)" }}>
+      <td style={{ padding: "10px 12px", fontSize: 14, color: "var(--fg-mute)" }}>
         {run._count.proposals} javaslat
       </td>
-      <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--fg-mute)" }}>
+      <td style={{ padding: "10px 12px", fontSize: 14, color: "var(--fg-mute)" }}>
         {run.triggeredBy ?? "—"}
       </td>
-      <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--fg-faint)" }}>
+      <td style={{ padding: "10px 12px", fontSize: 14, color: "var(--fg-faint)" }}>
         {formatRelativeTime(run.createdAt)}
       </td>
     </tr>
@@ -317,7 +317,7 @@ export function EnrichmentClient({ runs, proposals }: Props) {
   const [tab, setTab] = useState<"queue" | "runs">("queue");
 
   const tabStyle = (active: boolean) => ({
-    fontSize: 13, fontWeight: 600, padding: "8px 16px",
+    fontSize: 14, fontWeight: 600, padding: "8px 16px",
     cursor: "pointer", border: "none", background: "transparent",
     color: active ? "var(--fg)" : "var(--fg-faint)",
     borderBottom: active ? "2px solid var(--indigo)" : "2px solid transparent",
@@ -332,12 +332,12 @@ export function EnrichmentClient({ runs, proposals }: Props) {
           <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--fg)", margin: 0, letterSpacing: "-0.02em" }}>
             Enrichment Engine
           </h1>
-          <p style={{ fontSize: 13, color: "var(--fg-mute)", margin: "4px 0 0" }}>
+          <p style={{ fontSize: 14, color: "var(--fg-mute)", margin: "4px 0 0" }}>
             AI-alapú cég és személy adatfeltöltés — emberi jóváhagyással
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ fontSize: 12, color: "var(--fg-faint)", padding: "4px 10px", border: "1px solid var(--line-soft)", borderRadius: 4, fontFamily: "var(--font-mono-ndt)" }}>
+          <div style={{ fontSize: 14, color: "var(--fg-faint)", padding: "4px 10px", border: "1px solid var(--line-soft)", borderRadius: 4, fontFamily: "var(--font-mono-ndt)" }}>
             {proposals.length} várakozó
           </div>
         </div>
@@ -362,7 +362,7 @@ export function EnrichmentClient({ runs, proposals }: Props) {
                 <SparkleIcon />
               </div>
               <p style={{ fontSize: 14 }}>Nincs várakozó javaslat.</p>
-              <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
+              <p style={{ fontSize: 14, color: "var(--fg-faint)", marginTop: 4 }}>
                 Indíts enrichmentet a cégek listájából a "Enrichment futtatása" gombbal.
               </p>
             </div>
@@ -380,7 +380,7 @@ export function EnrichmentClient({ runs, proposals }: Props) {
       {tab === "runs" && (
         <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, overflow: "hidden" }}>
           {runs.length === 0 ? (
-            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--fg-mute)", fontSize: 13 }}>
+            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }}>
               Még nem futott enrichment.
             </div>
           ) : (
@@ -388,7 +388,7 @@ export function EnrichmentClient({ runs, proposals }: Props) {
               <thead>
                 <tr style={{ background: "var(--bg-inset)", borderBottom: "1px solid var(--line-soft)" }}>
                   {["#", "Típus", "Entitások", "Státusz", "Javaslatok", "Indította", "Létrehozva"].map((h) => (
-                    <th key={h} style={{ padding: "8px 12px", fontSize: 11, fontWeight: 600, color: "var(--fg-faint)", textAlign: "left", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    <th key={h} style={{ padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "var(--fg-faint)", textAlign: "left", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                       {h}
                     </th>
                   ))}

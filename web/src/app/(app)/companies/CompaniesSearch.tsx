@@ -1,32 +1,38 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
-import { useCallback, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 
 interface CompaniesSearchProps {
   search: string;
   includeFA: boolean;
-  neverContacted?: boolean;
-  pipelineStatus?: string;
 }
 
-export function CompaniesSearch({ search, includeFA, neverContacted, pipelineStatus }: CompaniesSearchProps) {
+function CompaniesSearchInner({ search, includeFA }: CompaniesSearchProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [value, setValue] = useState(search);
 
+  // Keep the textbox in sync when the applied search changes via chip removal,
+  // a loaded saved view, or back/forward navigation.
+  useEffect(() => {
+    setValue(search);
+  }, [search]);
+
+  // Preserve every other active filter param; only touch search / fa / page.
   const push = useCallback(
     (newSearch: string, newFA: boolean) => {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams(searchParams.toString());
       if (newSearch) params.set("search", newSearch);
+      else params.delete("search");
       if (newFA) params.set("fa", "1");
+      else params.delete("fa");
       params.set("page", "1");
-      if (neverContacted) params.set("never_contacted", "1");
-      if (pipelineStatus) params.set("pipeline_status", pipelineStatus);
       router.push(`${pathname}?${params.toString()}`);
     },
-    [router, pathname, neverContacted, pipelineStatus]
+    [router, pathname, searchParams]
   );
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -56,5 +62,13 @@ export function CompaniesSearch({ search, includeFA, neverContacted, pipelineSta
         F.A. cégek
       </label>
     </div>
+  );
+}
+
+export function CompaniesSearch(props: CompaniesSearchProps) {
+  return (
+    <Suspense fallback={null}>
+      <CompaniesSearchInner {...props} />
+    </Suspense>
   );
 }

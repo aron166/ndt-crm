@@ -3,9 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, AlertTriangle, Building2, User, Calendar } from "lucide-react";
-import { moveDeal } from "@/app/actions/deals";
+import { Plus, AlertTriangle, Building2, User, Calendar, Trash2 } from "lucide-react";
+import { moveDeal, deleteDeal } from "@/app/actions/deals";
 import { DealModal } from "./DealModal";
+import { DeleteCardDialog, type DeleteCascade } from "@/components/DeleteCardDialog";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -59,12 +60,14 @@ function DealCard({
   onDragEnd,
   dragging,
   onEdit,
+  onDelete,
 }: {
   deal: Deal;
   onDragStart: (id: number) => void;
   onDragEnd: () => void;
   dragging: boolean;
   onEdit: (deal: Deal) => void;
+  onDelete: (id: number) => void;
 }) {
   const isStale = !deal.stage?.isTerminalWon && !deal.stage?.isTerminalLost && deal.tasks.length === 0;
   const formattedValue = formatValue(deal.value);
@@ -77,7 +80,15 @@ function DealCard({
       draggable
       onDragStart={() => onDragStart(deal.id)}
       onDragEnd={onDragEnd}
-      className={cn("rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
+      onClick={() => onEdit(deal)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        // Only the card itself opens — let child controls (e.g. delete) handle their own keys.
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(deal); }
+      }}
+      className={cn("relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
         border: `1px solid ${isStale ? "oklch(0.72 0.18 25 / 0.5)" : "var(--line-soft)"}`,
@@ -97,21 +108,35 @@ function DealCard({
         e.currentTarget.style.transform = "none";
       }}
     >
+      <button
+        type="button"
+        title="Deal törlése a pipeline-ból"
+        aria-label="Deal törlése"
+        draggable={false}
+        onClick={(e) => { e.stopPropagation(); onDelete(deal.id); }}
+        className="absolute"
+        style={{
+          top: 6, right: 6, width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+          borderRadius: 5, color: "var(--fg-faint)", background: "var(--bg-hover)",
+          border: "1px solid var(--line-soft)",
+        }}
+        onMouseOver={(e) => { e.currentTarget.style.color = "var(--coral)"; }}
+        onMouseOut={(e) => { e.currentTarget.style.color = "var(--fg-faint)"; }}
+      >
+        <Trash2 style={{ width: 12, height: 12 }} />
+      </button>
+
       {/* Stale warning */}
       {isStale && (
-        <div className="flex items-center gap-1.5 mb-2" style={{ fontSize: 10, color: "var(--coral)" }}>
+        <div className="flex items-center gap-1.5 mb-2" style={{ fontSize: 12, color: "var(--coral)" }}>
           <AlertTriangle style={{ width: 11, height: 11 }} />
           <span className="font-mono-ndt">Nincs következő lépés</span>
         </div>
       )}
 
-      {/* Title */}
+      {/* Title — presentational only; the parent card handles click + hover */}
       <p
-        style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", marginBottom: 6 }}
-        onClick={() => onEdit(deal)}
-        className="cursor-pointer"
-        onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-        onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
+        style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35, color: "var(--fg)", marginBottom: 6, paddingRight: 20 }}
       >
         {deal.title}
       </p>
@@ -128,7 +153,7 @@ function DealCard({
         <Link
           href={`/companies/${deal.company.id}`}
           className="flex items-center gap-1.5"
-          style={{ fontSize: 11, color: "var(--fg-mute)" }}
+          style={{ fontSize: 12, color: "var(--fg-mute)" }}
           onClick={(e) => e.stopPropagation()}
           onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
           onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}
@@ -140,7 +165,7 @@ function DealCard({
           <Link
             href={`/persons/${deal.person!.id}`}
             className="flex items-center gap-1.5"
-            style={{ fontSize: 11, color: "var(--fg-faint)" }}
+            style={{ fontSize: 12, color: "var(--fg-faint)" }}
             onClick={(e) => e.stopPropagation()}
             onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
             onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}
@@ -150,7 +175,7 @@ function DealCard({
           </Link>
         )}
         {deal.expectedCloseDate && (
-          <div className="flex items-center gap-1.5 font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)" }}>
+          <div className="flex items-center gap-1.5 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
             <Calendar style={{ width: 10, height: 10 }} />
             {formatDate(deal.expectedCloseDate)}
           </div>
@@ -168,6 +193,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
   const [modalOpen, setModalOpen] = useState(false);
   const [editDeal, setEditDeal] = useState<Deal | null>(null);
   const [newStageId, setNewStageId] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Deal | null>(null);
   const [, startTransition] = useTransition();
 
   function handleDrop(stageId: number) {
@@ -184,6 +210,20 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
     startTransition(async () => { await moveDeal(id, stageId, newPosition); router.refresh(); });
   }
 
+  function handleDelete(id: number) {
+    const deal = deals.find((d) => d.id === id);
+    if (deal) setPendingDelete(deal);
+  }
+
+  function confirmDelete(cascade: DeleteCascade) {
+    const deal = pendingDelete;
+    if (!deal) return;
+    setPendingDelete(null);
+    // Optimistic remove; refresh re-syncs from the server (same shape as moveDeal).
+    setDeals((prev) => prev.filter((d) => d.id !== deal.id));
+    startTransition(async () => { await deleteDeal(deal.id, cascade); router.refresh(); });
+  }
+
   const stageDeals = (stageId: number) =>
     deals.filter((d) => d.stageId === stageId).sort((a, b) => a.position - b.position);
 
@@ -191,8 +231,22 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
     deals.filter((d) => d.stageId === stageId)
       .reduce((s, d) => s + (d.value ? parseFloat(String(d.value)) : 0), 0);
 
+  const pendingDealPerson = pendingDelete?.person;
+  const pendingPersonName = pendingDealPerson
+    ? `${pendingDealPerson.lastName ?? ""} ${pendingDealPerson.firstName ?? ""}`.trim()
+    : "";
+
   return (
     <>
+      <DeleteCardDialog
+        open={pendingDelete !== null}
+        kind="deal"
+        label={pendingDelete?.title ?? ""}
+        company={pendingDelete?.company ?? null}
+        person={pendingPersonName ? { name: pendingPersonName } : null}
+        onConfirm={confirmDelete}
+        onClose={() => setPendingDelete(null)}
+      />
       <DealModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditDeal(null); setNewStageId(null); router.refresh(); }}
@@ -209,7 +263,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
       />
 
       {/* Kanban */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${pipeline.stages.length}, minmax(240px, 1fr))`, gap: 12, alignItems: "start" }}>
+      <div className="kboard">
         {pipeline.stages.map((stage) => {
           const cards = stageDeals(stage.id);
           const colValue = stageValue(stage.id);
@@ -233,7 +287,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
                 <span className="kcol-title">{stage.name}</span>
                 <span className="kcol-count font-mono-ndt">{cards.length}</span>
                 {colValue > 0 && (
-                  <span className="font-mono-ndt" style={{ fontSize: 10, color: "var(--fg-faint)", marginLeft: 4 }}>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: 4 }}>
                     {Math.round(colValue).toLocaleString("hu-HU")}
                   </span>
                 )}
@@ -248,6 +302,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
                     onDragEnd={() => { setDraggingId(null); setHoverStage(null); }}
                     dragging={draggingId === deal.id}
                     onEdit={(d) => { setEditDeal(d); setModalOpen(true); }}
+                    onDelete={handleDelete}
                   />
                 ))}
 
@@ -255,7 +310,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
                   <button
                     onClick={() => { setNewStageId(stage.id); setEditDeal(null); setModalOpen(true); }}
                     className="btn ghost"
-                    style={{ justifyContent: "flex-start", width: "100%", height: 30, fontSize: 12, color: "var(--fg-mute)" }}
+                    style={{ justifyContent: "flex-start", width: "100%", height: 30, fontSize: 14, color: "var(--fg-mute)" }}
                   >
                     <Plus style={{ width: 11, height: 11 }} />
                     Deal hozzáadása

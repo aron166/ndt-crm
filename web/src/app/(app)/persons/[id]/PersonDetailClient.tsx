@@ -8,14 +8,16 @@ import Link from "next/link";
 import { Sparkline } from "@/components/viz/Sparkline";
 import { SignalMeter } from "@/components/viz/SignalMeter";
 import { LogInteractionButton } from "@/components/LogInteractionButton";
+import { SendEmailButton } from "@/components/SendEmailButton";
 import { TagInput } from "@/components/tags/TagInput";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { AuditLogEntries } from "@/components/AuditLogTab";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
+import { SetEmployerModal } from "./SetEmployerModal";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Mail, Phone, MapPin, Trash2 } from "lucide-react";
-import { updatePerson, deletePerson } from "@/app/actions/persons";
+import { updatePerson, deletePerson, restorePerson } from "@/app/actions/persons";
 
 interface Contact {
   id: number; companyId: number; role: string | null;
@@ -30,7 +32,10 @@ interface Task {
   id: number; title: string; type: string | null; category: string | null;
   status: string; dueDate: string | Date | null; estimatedMinutes: number | null;
   description: string | null; companyId: number | null; personId: number | null;
-  parentTaskId: number | null; _count: { subTasks: number };
+  leadId: number | null;
+  parentTaskId: number | null;
+  costCode: string | null; costQuantity: number | null; costUnit: string | null; costUnitRate: number | null;
+  _count: { subTasks: number };
 }
 interface ConversationMessage {
   id: number; role: string; content: string; createdAt: string | Date;
@@ -44,6 +49,7 @@ interface Conversation {
 interface Person {
   id: number; firstName: string | null; lastName: string | null;
   email: string | null; phone: string | null; notes: string | null;
+  deletedAt?: string | Date | null;
 }
 
 const TYPE_COLOR: Record<string, string> = {
@@ -76,6 +82,7 @@ export function PersonDetailClient({
   const router = useRouter();
   const [tab, setTab] = useState("activity");
   const [taskOpen, setTaskOpen] = useState(false);
+  const [employerOpen, setEmployerOpen] = useState(false);
   const [deleting, startDelete] = useTransition();
   const [form, setForm] = useState({
     firstName:   person.firstName   ?? "",
@@ -86,6 +93,9 @@ export function PersonDetailClient({
     notes:       person.notes       ?? "",
   });
   const [saving, startSave] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [restoring, startRestore] = useTransition();
+  const isDeleted = !!person.deletedAt;
   const [enriching, startEnrich] = useTransition();
   const [enrichmentProposals, setEnrichmentProposals] = useState<Awaited<ReturnType<typeof getProposalsByRun>> | null>(null);
 
@@ -128,11 +138,40 @@ export function PersonDetailClient({
         onClose={() => { setTaskOpen(false); router.refresh(); }}
         initial={{ personId: person.id, companyId: currentContact?.companyId, personName: `${person.lastName ?? ""} ${person.firstName ?? ""}`.trim() }}
       />
+      <SetEmployerModal
+        open={employerOpen}
+        onClose={() => setEmployerOpen(false)}
+        personId={person.id}
+        currentCompanyName={currentContact?.company.name}
+      />
       {enrichmentProposals && (
         <EnrichmentDrawer
           proposals={enrichmentProposals as unknown as Parameters<typeof EnrichmentDrawer>[0]["proposals"]}
           onClose={() => { setEnrichmentProposals(null); router.refresh(); }}
         />
+      )}
+
+      {isDeleted && (
+        <div
+          className="mount"
+          style={{
+            display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
+            padding: "10px 16px", borderRadius: 8,
+            background: "var(--coral-soft)", border: "1px solid var(--coral)",
+          }}
+        >
+          <span style={{ fontSize: 14, color: "var(--fg)", flex: 1 }}>
+            Ez a személy törölve van — nem jelenik meg a keresésben, és az adatai nem
+            menthetők, amíg vissza nem állítod.
+          </span>
+          <button
+            className="btn primary"
+            disabled={restoring}
+            onClick={() => startRestore(async () => { await restorePerson(person.id); router.refresh(); })}
+          >
+            {restoring ? "Visszaállítás..." : "Visszaállítás"}
+          </button>
+        </div>
       )}
 
       {/* Detail header */}
@@ -171,19 +210,19 @@ export function PersonDetailClient({
             )}
             <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
               {person.email && (
-                <a href={`mailto:${person.email}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--fg-soft)" }} className="row-link">
+                <a href={`mailto:${person.email}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-soft)" }} className="row-link">
                   <Mail style={{ width: 13, height: 13 }} />
                   <span style={{ fontFamily: "var(--font-mono)" }}>{person.email}</span>
                 </a>
               )}
               {person.phone && (
-                <a href={`tel:${person.phone}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--fg-soft)" }} className="row-link">
+                <a href={`tel:${person.phone}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-soft)" }} className="row-link">
                   <Phone style={{ width: 13, height: 13 }} />
                   <span style={{ fontFamily: "var(--font-mono)" }}>{person.phone}</span>
                 </a>
               )}
               {currentContact?.company.city && (
-                <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--fg-soft)" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-soft)" }}>
                   <MapPin style={{ width: 13, height: 13 }} /> {currentContact.company.city}
                 </span>
               )}
@@ -198,10 +237,10 @@ export function PersonDetailClient({
             <div className="field-label">Relationship signal</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4 }}>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 500 }}>{signalLevel}.0</span>
-              <span style={{ fontSize: 11, color: "var(--fg-mute)" }}>/ 6.0</span>
+              <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>/ 6.0</span>
             </div>
             <SignalMeter level={signalLevel} />
-            <div style={{ fontSize: 11, color: "var(--fg-mute)", marginTop: 8, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 12, color: "var(--fg-mute)", marginTop: 8, lineHeight: 1.4 }}>
               {signalLabel}
             </div>
           </div>
@@ -214,6 +253,12 @@ export function PersonDetailClient({
               personName={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
               companyName={currentContact?.company.name}
             />
+            <SendEmailButton
+              personId={person.id}
+              companyId={currentContact?.companyId}
+              defaultTo={person.email || undefined}
+              contextLabel={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
+            />
             <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
             <button
               className="btn"
@@ -221,7 +266,7 @@ export function PersonDetailClient({
               disabled={enriching}
               style={{ display: "flex", alignItems: "center", gap: 6 }}
             >
-              <span style={{ display: "inline-block", animation: enriching ? "spin 1.2s linear infinite" : "none", fontSize: 13 }}>✦</span>
+              <span style={{ display: "inline-block", animation: enriching ? "spin 1.2s linear infinite" : "none", fontSize: 14 }}>✦</span>
               {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
             </button>
             <button
@@ -247,15 +292,15 @@ export function PersonDetailClient({
             <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
               <div>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 20, color: "var(--fg)" }}>{interactions.length}</div>
-                <div style={{ fontSize: 10, color: "var(--fg-mute)" }}>interakció</div>
+                <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>interakció</div>
               </div>
               <div>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 20, color: "var(--fg)" }}>{tasks.filter(t => t.status !== "done").length}</div>
-                <div style={{ fontSize: 10, color: "var(--fg-mute)" }}>nyitott feladat</div>
+                <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>nyitott feladat</div>
               </div>
               <div>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 20, color: "var(--fg)" }}>{contacts.length}</div>
-                <div style={{ fontSize: 10, color: "var(--fg-mute)" }}>munkahely</div>
+                <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>munkahely</div>
               </div>
             </div>
           </div>
@@ -298,7 +343,7 @@ export function PersonDetailClient({
               <div className="panel mount">
                 <div style={{ padding: "18px 22px" }}>
                   {interactions.length === 0 ? (
-                    <div style={{ textAlign: "center", color: "var(--fg-mute)", padding: "32px 0", fontSize: 13 }}>
+                    <div style={{ textAlign: "center", color: "var(--fg-mute)", padding: "32px 0", fontSize: 14 }}>
                       Nincs interakció rögzítve.
                     </div>
                   ) : (
@@ -323,7 +368,7 @@ export function PersonDetailClient({
                               <span className="when">{formatDateTime(r.occurredAt)}</span>
                             </div>
                             {r.notes && <div className="tl-body">{r.notes}</div>}
-                            {r.outcome && <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 4 }}>Eredmény: {r.outcome}</div>}
+                            {r.outcome && <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Eredmény: {r.outcome}</div>}
                           </div>
                         );
                       })}
@@ -339,9 +384,12 @@ export function PersonDetailClient({
                 <div style={{ padding: "22px 24px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
                     <span className="h-section" style={{ margin: 0 }}>Karrierút</span>
-                    <span style={{ fontSize: 11, color: "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>
+                    <span style={{ fontSize: 12, color: "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>
                       {contacts.length} munkahely
                     </span>
+                    <button className="btn" style={{ marginLeft: "auto" }} onClick={() => setEmployerOpen(true)}>
+                      + Munkahelyváltás
+                    </button>
                   </div>
                   <div className="tl">
                     {contacts.map((c, i) => (
@@ -364,7 +412,7 @@ export function PersonDetailClient({
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginTop: 18, padding: 14, border: "1px dashed var(--line-soft)", borderRadius: 8, fontSize: 12, color: "var(--fg-mute)", lineHeight: 1.5 }}>
+                  <div style={{ marginTop: 18, padding: 14, border: "1px dashed var(--line-soft)", borderRadius: 8, fontSize: 14, color: "var(--fg-mute)", lineHeight: 1.5 }}>
                     <div style={{ color: "var(--fg)", fontWeight: 500, marginBottom: 4 }}>Miért tároljuk a karriertörténetet</div>
                     Ha a személy céget vált, a teljes kapcsolati történet követi. A kapcsolat az érték — nem az adott munkáltatónál lévő rekord.
                   </div>
@@ -392,15 +440,15 @@ export function PersonDetailClient({
                   <div key={conv.id} style={{ borderBottom: "1px solid var(--line-soft)", paddingBottom: 16 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                       <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--violet)", boxShadow: "0 0 6px var(--violet)", flexShrink: 0 }} />
-                      <span style={{ fontWeight: 500, color: "var(--fg)", fontSize: 13 }}>
+                      <span style={{ fontWeight: 500, color: "var(--fg)", fontSize: 14 }}>
                         {conv.summary ?? conv.channel}
                       </span>
                       {conv.agent && (
-                        <span className="badge-ds" style={{ background: "var(--violet-soft, oklch(0.26 0.05 290))", color: "var(--violet)", border: "1px solid oklch(0.45 0.12 290)", fontSize: 10 }}>
+                        <span className="badge-ds" style={{ background: "var(--violet-soft, oklch(0.26 0.05 290))", color: "var(--violet)", border: "1px solid oklch(0.45 0.12 290)", fontSize: 12 }}>
                           {conv.agent.name} · {conv.agent.owner ?? conv.agent.role}
                         </span>
                       )}
-                      <span className="font-mono-ndt" style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-faint)" }}>
+                      <span className="font-mono-ndt" style={{ marginLeft: "auto", fontSize: 12, color: "var(--fg-faint)" }}>
                         {formatDateTime(conv.startedAt)}
                       </span>
                     </div>
@@ -411,7 +459,7 @@ export function PersonDetailClient({
                           style={{
                             padding: "8px 12px",
                             borderRadius: 6,
-                            fontSize: 12,
+                            fontSize: 14,
                             lineHeight: 1.5,
                             background: msg.role === "user" ? "var(--bg-0)" : "oklch(0.24 0.04 290 / 0.5)",
                             color: msg.role === "user" ? "var(--fg-soft)" : "var(--fg)",
@@ -419,7 +467,7 @@ export function PersonDetailClient({
                             border: "1px solid var(--line-soft)",
                           }}
                         >
-                          <span className="font-mono-ndt" style={{ fontSize: 9, color: "var(--fg-faint)", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.1em" }}>
                             {msg.role}
                           </span>
                           {msg.content}
@@ -451,7 +499,7 @@ export function PersonDetailClient({
                         value={form[key]}
                         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                         style={{
-                          width: "100%", fontSize: 12, padding: "5px 8px",
+                          width: "100%", fontSize: 14, padding: "5px 8px",
                           background: "var(--bg-0)", border: "1px solid var(--line-soft)",
                           borderRadius: 5, color: "var(--fg)", outline: "none",
                         }}
@@ -465,7 +513,7 @@ export function PersonDetailClient({
                       onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                       rows={4}
                       style={{
-                        width: "100%", fontSize: 12, padding: "5px 8px",
+                        width: "100%", fontSize: 14, padding: "5px 8px",
                         background: "var(--bg-0)", border: "1px solid var(--line-soft)",
                         borderRadius: 5, color: "var(--fg)", outline: "none", resize: "vertical",
                       }}
@@ -477,7 +525,8 @@ export function PersonDetailClient({
                       disabled={saving}
                       onClick={() => {
                         startSave(async () => {
-                          await updatePerson(person.id, {
+                          setSaveError(null);
+                          const res = await updatePerson(person.id, {
                             firstName:   form.firstName   || undefined,
                             lastName:    form.lastName    || undefined,
                             email:       form.email       || undefined,
@@ -485,6 +534,7 @@ export function PersonDetailClient({
                             linkedinUrl: form.linkedinUrl || undefined,
                             notes:       form.notes       || undefined,
                           });
+                          if (res?.error) { setSaveError(res.error); return; }
                           router.refresh();
                         });
                       }}
@@ -505,6 +555,9 @@ export function PersonDetailClient({
                       Mégse
                     </button>
                   </div>
+                  {saveError && (
+                    <p style={{ fontSize: 14, color: "var(--coral)", marginTop: 4 }}>{saveError}</p>
+                  )}
                 </div>
               </div>
             )}
@@ -513,15 +566,33 @@ export function PersonDetailClient({
           {/* Right: sidebar panels */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Current employer */}
-            {currentContact && (
+            {!currentContact && (
               <div className="panel mount">
                 <div className="panel-head"><div className="panel-title">Jelenlegi munkahely</div></div>
+                <div className="panel-pad" style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 14, color: "var(--fg-mute)", marginBottom: 10 }}>
+                    Nincs rögzített munkahely.
+                  </div>
+                  <button className="btn primary" onClick={() => setEmployerOpen(true)}>
+                    + Munkahely beállítása
+                  </button>
+                </div>
+              </div>
+            )}
+            {currentContact && (
+              <div className="panel mount">
+                <div className="panel-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div className="panel-title">Jelenlegi munkahely</div>
+                  <button className="btn" style={{ padding: "2px 10px", fontSize: 12 }} onClick={() => setEmployerOpen(true)}>
+                    Módosítás
+                  </button>
+                </div>
                 <div className="panel-pad">
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{
                       width: 42, height: 42, borderRadius: 8,
                       background: "var(--indigo-soft)", display: "grid", placeItems: "center",
-                      fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 13, color: "var(--indigo)",
+                      fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 14, color: "var(--indigo)",
                     }}>
                       {currentContact.company.name.slice(0, 2).toUpperCase()}
                     </div>
@@ -530,7 +601,7 @@ export function PersonDetailClient({
                         {currentContact.company.name}
                       </Link>
                       {currentContact.company.city && (
-                        <div style={{ fontSize: 11, color: "var(--fg-mute)", marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: "var(--fg-mute)", marginTop: 2 }}>
                           {currentContact.company.city}
                         </div>
                       )}

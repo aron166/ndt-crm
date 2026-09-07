@@ -31,8 +31,24 @@ export async function proxy(request: NextRequest) {
 
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth/");
+  // Service-to-service ingestion endpoints authenticate with a service-role
+  // Bearer key (validated in-route), not a session cookie. Without this bypass
+  // the session gate redirects their callers to /login, so external apps
+  // (VeloQuote, agents, BirdsView webhooks) can never reach them. The cron
+  // endpoint likewise self-authenticates with CRON_SECRET, not a session.
+  // /api/health is intentionally public: uptime monitors can't hold a session,
+  // and the route reveals nothing beyond up/down.
+  const isServiceApi =
+    request.nextUrl.pathname === "/api/events" ||
+    request.nextUrl.pathname === "/api/conversations" ||
+    request.nextUrl.pathname === "/api/leads" ||
+    request.nextUrl.pathname.startsWith("/api/leads/") ||
+    request.nextUrl.pathname === "/api/content" ||
+    request.nextUrl.pathname === "/api/calls/result" ||
+    request.nextUrl.pathname === "/api/cron/automations" ||
+    request.nextUrl.pathname === "/api/health";
 
-  if (!user && !isLoginPage && !isAuthRoute) {
+  if (!user && !isLoginPage && !isAuthRoute && !isServiceApi) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

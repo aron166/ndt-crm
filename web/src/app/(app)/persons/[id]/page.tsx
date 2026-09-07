@@ -6,6 +6,7 @@ import { PersonDetailClient } from "./PersonDetailClient";
 import { getTagsForEntity } from "@/app/actions/tags";
 import { getEntityHistory } from "@/app/actions/audit";
 import { serializeDates } from "@/lib/serialize";
+import { serializeTaskCost } from "@/lib/tasks/costing";
 
 const TENANT_ID = 1;
 
@@ -81,7 +82,7 @@ export default async function PersonDetailPage({
       <div style={{ marginBottom: 16 }}>
         <Link
           href="/persons"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--fg-mute)" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
           className="row-link"
         >
           <ArrowLeft style={{ width: 14, height: 14 }} />
@@ -93,7 +94,7 @@ export default async function PersonDetailPage({
         person={serializeDates(person)}
         contacts={serializeDates(contacts)}
         interactions={serializeDates(interactions)}
-        tasks={serializeDates(tasks)}
+        tasks={serializeDates(tasks).map(serializeTaskCost)}
         conversations={serializeDates(conversations)}
         engagementSeries={engagementSeries}
         signalLevel={signalLevel}

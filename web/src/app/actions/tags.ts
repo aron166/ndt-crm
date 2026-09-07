@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { audit } from "@/lib/audit";
 
 const TENANT_ID = 1;
 
@@ -28,10 +29,14 @@ export async function addTag(
     create: { tenantId: TENANT_ID, name: trimmed, color: color ?? "#6366f1" },
   });
 
-  await db.tagging.upsert({
+  const tagging = await db.tagging.upsert({
     where: { tagId_taggableType_taggableId: { tagId: tag.id, taggableType, taggableId } },
     update: {},
     create: { tagId: tag.id, taggableType, taggableId },
+  });
+
+  audit("tagging", tagging.id, "create", null, {
+    tagId: tag.id, tagName: trimmed, taggableType, taggableId,
   });
 
   revalidateEntity(taggableType, taggableId);
@@ -43,9 +48,18 @@ export async function removeTag(
   taggableId: number,
   tagId: number
 ) {
+  const existing = await db.tagging.findUnique({
+    where: { tagId_taggableType_taggableId: { tagId, taggableType, taggableId } },
+    select: { id: true },
+  });
+
   await db.tagging.deleteMany({
     where: { tagId, taggableType, taggableId },
   });
+
+  if (existing) {
+    audit("tagging", existing.id, "delete", { tagId, taggableType, taggableId }, null);
+  }
   revalidateEntity(taggableType, taggableId);
 }
 

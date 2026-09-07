@@ -1,0 +1,8 @@
+# CodeRabbit reviews PRs targeting the default branch only, and ours target `dev`
+# (Vercel deploys from `dev` — see VERSION_CONTROL.md). Without this, every PR
+# needs a manual `@coderabbitai review` comment.
+reviews:
+  auto_review:
+    enabled: true
+    base_branches:
+      - dev

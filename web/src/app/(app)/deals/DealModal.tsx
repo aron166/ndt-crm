@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { EntitySearch } from "@/components/EntitySearch";
 import { createDeal, updateDeal } from "@/app/actions/deals";
+import { FormField } from "@/components/ui/FormField";
 
 interface CustomField {
   id: number; key: string; label: string; type: string;
@@ -92,14 +93,12 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="field-label">Cím *</label>
+          <FormField label="Cím" required>
             <Input name="title" defaultValue={initial?.title} placeholder="Deal megnevezése" required autoFocus />
-          </div>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="field-label">Fázis</label>
+            <FormField label="Fázis">
               <Select value={stageId} onValueChange={(v) => v && setStageId(v)}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -121,32 +120,28 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <label className="field-label">Érték (HUF)</label>
+            </FormField>
+            <FormField label="Érték (HUF)">
               <Input type="number" name="value" defaultValue={initial?.value} placeholder="pl. 850000" min={0} />
-            </div>
+            </FormField>
           </div>
 
-          <div>
-            <label className="field-label">Cég *</label>
+          <FormField label="Cég" required>
             <EntitySearch endpoint="/api/search/companies" placeholder="Keresés..." value={company} onChange={setCompany} />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="field-label">Kapcsolattartó</label>
+          <FormField label="Kapcsolattartó">
             <EntitySearch endpoint="/api/search/persons" placeholder="Keresés..." value={person} onChange={setPerson} />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="field-label">Várható zárás</label>
+          <FormField label="Várható zárás">
             <Input type="date" name="expectedCloseDate" defaultValue={initial?.expectedCloseDate} />
-          </div>
+          </FormField>
 
           {/* Dynamic custom fields */}
           {pipeline.customFields.length > 0 && (
             <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>
                 Egyéni mezők
               </div>
               <div className="space-y-3">
@@ -154,11 +149,7 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
                   const savedVal = initial?.customFieldValues?.[f.key] ?? "";
                   const opts = Array.isArray(f.options) ? (f.options as string[]) : [];
                   return (
-                    <div key={f.key}>
-                      <label className="field-label">
-                        {f.label}
-                        {f.required && <span style={{ color: "var(--coral)", marginLeft: 3 }}>*</span>}
-                      </label>
+                    <FormField key={f.key} label={f.label} required={f.required}>
                       {f.type === "text" && (
                         <Input name={`cf_${f.key}`} defaultValue={savedVal} required={f.required} />
                       )}
@@ -173,7 +164,7 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
                           name={`cf_${f.key}`}
                           defaultValue={savedVal}
                           required={f.required}
-                          style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 13, outline: "none" }}
+                          style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none" }}
                         >
                           <option value="">—</option>
                           {opts.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -184,7 +175,7 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
                           {opts.map((o) => {
                             const checked = savedVal.split(",").includes(o);
                             return (
-                              <label key={o} className="flex items-center gap-1.5 cursor-pointer" style={{ fontSize: 12, color: "var(--fg-soft)" }}>
+                              <label key={o} className="flex items-center gap-1.5 cursor-pointer" style={{ fontSize: 14, color: "var(--fg-soft)" }}>
                                 <input type="checkbox" name={`cf_${f.key}[]`} value={o} defaultChecked={checked} />
                                 {o}
                               </label>
@@ -192,7 +183,7 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
                           })}
                         </div>
                       )}
-                    </div>
+                    </FormField>
                   );
                 })}
               </div>
