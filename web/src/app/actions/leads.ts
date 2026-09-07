@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { DEFAULT_LEAD_STATUSES } from "@/lib/leads/statuses";
+import { DEFAULT_LEAD_STATUSES, STAGE_DESCRIPTION_PLACEHOLDER, STAGE_DESCRIPTION_MAX } from "@/lib/leads/statuses";
 import {
   changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome,
 } from "@/lib/leads/service";
@@ -255,6 +255,7 @@ export async function createLeadStatus(formData: FormData) {
       tenantId: TENANT_ID, key, label, color,
       position: (max._max.position ?? -1) + 1,
       isInitial: false, isTerminal: false, isCommitment: false,
+      description: STAGE_DESCRIPTION_PLACEHOLDER,
     },
   });
   revalidatePath("/leads/setup");
@@ -269,6 +270,9 @@ export async function upsertLeadStatus(formData: FormData) {
   const isInitial = formData.get("isInitial") === "true";
   const isTerminal = formData.get("isTerminal") === "true";
   const isCommitment = formData.get("isCommitment") === "true";
+  // Absent key → not submitted, leave unchanged. Empty string → clear to null.
+  const descRaw = formData.get("description");
+  const description = descRaw === null ? undefined : (String(descRaw).trim().slice(0, STAGE_DESCRIPTION_MAX) || null);
   if (!id) return { error: "Hiányzó azonosító" };
   if (!label) return { error: "Név kötelező" };
 
@@ -300,6 +304,7 @@ export async function upsertLeadStatus(formData: FormData) {
         isInitial,
         isTerminal: isInitial || isCommitment ? false : isTerminal,
         isCommitment: isInitial ? false : isCommitment,
+        ...(description !== undefined ? { description } : {}),
       },
     }),
   ]);

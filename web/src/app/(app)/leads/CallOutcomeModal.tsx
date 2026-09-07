@@ -19,12 +19,13 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function CallOutcomeModal({
-  open, onClose, leadId, title, onLogged,
+  open, onClose, leadId, title, stageDescription, onLogged,
 }: {
   open: boolean;
   onClose: () => void;
   leadId: number;
   title?: string | null;
+  stageDescription?: string | null;
   onLogged?: () => void;
 }) {
   const [outcome, setOutcome] = useState<string>("no_answer");
@@ -63,6 +64,11 @@ export function CallOutcomeModal({
           <DialogTitle>Hívás eredménye</DialogTitle>
           {title && <p className="text-sm" style={{ color: "var(--fg-mute)" }}>{title}</p>}
         </DialogHeader>
+        {stageDescription && (
+          <div style={{ fontSize: 12, color: "var(--fg-soft)", whiteSpace: "pre-wrap", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 180, overflowY: "auto" }}>
+            {stageDescription}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField label="Eredmény" required>
             <select style={inputStyle} value={outcome} onChange={(e) => setOutcome(e.target.value)} autoFocus>

@@ -320,6 +320,10 @@ model LeadStatus {
   isInitial    Boolean  @default(false) @map("is_initial") // where inbound API leads land
   isTerminal   Boolean  @default(false) @map("is_terminal") // terminal-lost style (greyed)
   isCommitment Boolean  @default(false) @map("is_commitment") // booking = the order (megrendelés); the commitment point
+  // Per-stage self-documentation: what we do in this phase, where the script is.
+  // Markdown-ish free text, rendered on the kanban column header + inside the
+  // call-outcome modal. Péter's "a stranger makes a real call 2 min after walking in".
+  description  String?  @db.Text
   createdAt    DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])

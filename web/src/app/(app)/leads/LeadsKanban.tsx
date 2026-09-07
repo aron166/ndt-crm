@@ -297,6 +297,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
       onClose={() => setCallingId(null)}
       leadId={callingId ?? 0}
       title={calling ? [personNameOf(calling), calling.company?.name].filter(Boolean).join(" · ") : null}
+      stageDescription={statuses.find((s) => s.key === calling?.status)?.description ?? null}
       onLogged={() => router.refresh()}
     />
     {error && (
@@ -349,6 +350,17 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
                 {total > cards.length ? `${cards.length} / ${total}` : total}
               </span>
             </div>
+
+            {status.description && (
+              <details>
+                <summary style={{ fontSize: 12, color: "var(--fg-mute)", cursor: "pointer", padding: "0 10px 6px", listStyle: "none" }}>
+                  Mit csinálunk itt?
+                </summary>
+                <div style={{ fontSize: 12, color: "var(--fg-soft)", whiteSpace: "pre-wrap", padding: "0 10px 8px", lineHeight: 1.5 }}>
+                  {status.description}
+                </div>
+              </details>
+            )}
 
             <div className="kcol-body">
               {cards.map((lead) => (
