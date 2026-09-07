@@ -21,7 +21,7 @@ import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichme
 import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
 import { CompanyMetadataTab } from "./CompanyMetadataTab";
 import type { AttrRow } from "@/lib/companies/attributes";
-import { useState, useTransition } from "react";
+import { useDeferredValue, useState, useTransition } from "react";
 
 interface Contact {
   id: number; personId: number; role: string | null;
@@ -125,6 +125,11 @@ export function CompanyDetailClient({
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("overview");
+  // The tab pills read `tab` (instant highlight); every tab BODY reads
+  // `shownTab`, so React renders the new body in a non-blocking pass instead of
+  // blocking the click. This component is ~950 lines and the overview tab mounts
+  // two charts — that render was the interaction, not the state update.
+  const shownTab = useDeferredValue(tab);
   const [logOpen, setLogOpen] = useState(false);
   const [logPerson, setLogPerson] = useState<Contact | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -361,7 +366,7 @@ export function CompanyDetailClient({
       </div>
 
       {/* Overview */}
-      {tab === "overview" && (
+      {shownTab === "overview" && (
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>
           <div className="panel mount">
             <div className="panel-head">
@@ -665,7 +670,7 @@ export function CompanyDetailClient({
       )}
 
       {/* Contacts */}
-      {tab === "contacts" && (
+      {shownTab === "contacts" && (
         <div className="panel mount" style={{ marginTop: 16, overflow: "hidden" }}>
           <div className="panel-head">
             <div className="panel-title">Kapcsolatok</div>
@@ -719,7 +724,7 @@ export function CompanyDetailClient({
       )}
 
       {/* Activity */}
-      {tab === "activity" && (
+      {shownTab === "activity" && (
         <div className="panel mount" style={{ marginTop: 16, padding: "18px 22px" }}>
           {interactions.length === 0 ? (
             <div style={{ textAlign: "center", color: "var(--fg-mute)", padding: "32px 0", fontSize: 14 }}>
@@ -761,14 +766,14 @@ export function CompanyDetailClient({
       )}
 
       {/* Tasks */}
-      {tab === "tasks" && (
+      {shownTab === "tasks" && (
         <div style={{ marginTop: 16 }}>
           <ContextTasksTab tasks={tasks} companyId={company.id} companyName={company.name} />
         </div>
       )}
 
       {/* NDT Profil */}
-      {tab === "ndt" && (
+      {shownTab === "ndt" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>
           {/* Left column: capabilities */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -904,7 +909,7 @@ export function CompanyDetailClient({
       )}
 
       {/* App Events */}
-      {tab === "events" && (
+      {shownTab === "events" && (
         <div className="panel mount" style={{ marginTop: 16, padding: "18px 22px" }}>
           <div className="tl">
             {appEvents.map((ev) => (
@@ -935,14 +940,14 @@ export function CompanyDetailClient({
       )}
 
       {/* Metadata (effective-dated attributes) */}
-      {tab === "metadata" && (
+      {shownTab === "metadata" && (
         <div style={{ marginTop: 16 }}>
           <CompanyMetadataTab companyId={company.id} attributes={attributes} />
         </div>
       )}
 
       {/* History */}
-      {tab === "history" && (
+      {shownTab === "history" && (
         <div className="panel mount" style={{ marginTop: 16, padding: "18px 22px" }}>
           <AuditLogEntries entries={auditEntries} />
         </div>

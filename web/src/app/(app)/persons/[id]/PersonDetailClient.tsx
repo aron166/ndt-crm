@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useDeferredValue, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
 import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
@@ -81,6 +81,10 @@ export function PersonDetailClient({
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("activity");
+  // Pills read `tab` (instant highlight), bodies read `shownTab` — the tab body
+  // renders in a non-blocking pass instead of blocking the click. Same reason as
+  // CompanyDetailClient.
+  const shownTab = useDeferredValue(tab);
   const [taskOpen, setTaskOpen] = useState(false);
   const [employerOpen, setEmployerOpen] = useState(false);
   const [deleting, startDelete] = useTransition();
@@ -339,7 +343,7 @@ export function PersonDetailClient({
           {/* Left: tab content */}
           <div>
             {/* Activity */}
-            {tab === "activity" && (
+            {shownTab === "activity" && (
               <div className="panel mount">
                 <div style={{ padding: "18px 22px" }}>
                   {interactions.length === 0 ? (
@@ -379,7 +383,7 @@ export function PersonDetailClient({
             )}
 
             {/* Career */}
-            {tab === "career" && (
+            {shownTab === "career" && (
               <div className="panel mount">
                 <div style={{ padding: "22px 24px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
@@ -421,7 +425,7 @@ export function PersonDetailClient({
             )}
 
             {/* Tasks */}
-            {tab === "tasks" && (
+            {shownTab === "tasks" && (
               <div>
                 <ContextTasksTab
                   tasks={tasks}
@@ -434,7 +438,7 @@ export function PersonDetailClient({
             )}
 
             {/* Conversations */}
-            {tab === "conversations" && (
+            {shownTab === "conversations" && (
               <div className="panel mount space-y-4" style={{ padding: "18px 22px" }}>
                 {conversations.map((conv) => (
                   <div key={conv.id} style={{ borderBottom: "1px solid var(--line-soft)", paddingBottom: 16 }}>
@@ -480,7 +484,7 @@ export function PersonDetailClient({
             )}
 
             {/* Adatok — inline edit */}
-            {tab === "adatok" && (
+            {shownTab === "adatok" && (
               <div className="panel mount" style={{ padding: "18px 22px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {(
