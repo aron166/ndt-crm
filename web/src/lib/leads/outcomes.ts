@@ -22,6 +22,19 @@ export const CALL_OUTCOMES = [
   { key: "meeting_booked",     label: "Foglalt meeting" },
 ] as const;
 export type CallOutcomeKey = (typeof CALL_OUTCOMES)[number]["key"];
+/**
+ * The call outcomes that CLOSE the lead as lost. Péter's rule (BRIEFING addendum
+ * 2026-09-07): "mandatory note on every outcome, INCLUDING a reason for
+ * lost/disqualified" — the outcome key on its own is not a reason, so these two
+ * additionally require a short free-text `lostReason`.
+ */
+export const LOST_CALL_OUTCOMES: readonly CallOutcomeKey[] = ["not_interested", "disqualified"];
+export function isLostCallOutcome(key: string): boolean {
+  return (LOST_CALL_OUTCOMES as readonly string[]).includes(key);
+}
+/** Shortest reason we accept anywhere. "x" is not a reason. */
+export const LOST_REASON_MIN = 3;
+export const LOST_REASON_MAX = 500;
 const CALL_OUTCOME_KEYS = CALL_OUTCOMES.map((o) => o.key) as [CallOutcomeKey, ...CallOutcomeKey[]];
 
 export function callOutcomeLabel(key: string | null): string {
@@ -50,6 +63,8 @@ export const callOutcomeSchema = z
     callbackAt: z.coerce.date().optional(),
     /** Required when outcome = meeting_booked. */
     demoWith: z.enum(["aron", "peter"]).optional(),
+    /** Required when the outcome is lost/disqualified — a short free text WHY. */
+    lostReason: z.string().trim().max(LOST_REASON_MAX).optional(),
     /** Optional: who the callback task is assigned to (defaults to the actor). */
     assignedToId: z.number().int().positive().optional(),
   })
@@ -61,6 +76,9 @@ export const callOutcomeSchema = z
     }
     if (d.outcome === "meeting_booked" && !d.demoWith) {
       ctx.addIssue({ code: "custom", path: ["demoWith"], message: "Add meg, kivel lesz a demó (Áron / Péter)" });
+    }
+    if (isLostCallOutcome(d.outcome) && (d.lostReason ?? "").length < LOST_REASON_MIN) {
+      ctx.addIssue({ code: "custom", path: ["lostReason"], message: "Az elvesztés oka kötelező (min. 3 karakter)" });
     }
   });
 export type CallOutcomeInput = z.infer<typeof callOutcomeSchema>;
@@ -105,7 +123,8 @@ export function planCallOutcome(
     }
     case "not_interested":
     case "disqualified":
-      plan.lost = { lostReason: input.outcome };
+      // The schema guarantees lostReason here; the `??` is a type narrowing, not a default.
+      plan.lost = { lostReason: input.lostReason ?? input.outcome };
       break;
     case "wrong_number":
       break;
@@ -127,4 +146,24 @@ export function callbackTone(due: Date | string | null | undefined, now: Date = 
 export function daysSince(date: Date | string | null | undefined, now: Date = new Date()): number | null {
   if (!date) return null;
   return Math.max(0, Math.floor((now.getTime() - new Date(date).getTime()) / 86_400_000));
+}
+
+/**
+ * Ask for the mandatory lost reason from the two manual outcome dropdowns (lead
+ * card + lead detail). Returns null when the user cancels or types nothing usable
+ * — the caller aborts, so a lead is never closed as lost without a why.
+ *
+ * ponytail: `window.prompt`, matching the `confirm()`/`alert()` already used on
+ * both surfaces. The high-frequency path (setter logging a call) gets a real
+ * required field in CallOutcomeModal; upgrade this to a dialog if the manual
+ * dropdown turns out to be used often.
+ */
+export function promptLostReason(): string | null {
+  const raw = window.prompt("Miért veszett el a lead? (kötelező)");
+  const reason = raw?.trim() ?? "";
+  if (reason.length < LOST_REASON_MIN) {
+    if (raw !== null) window.alert("Az elvesztés oka kötelező (min. 3 karakter).");
+    return null;
+  }
+  return reason.slice(0, LOST_REASON_MAX);
 }

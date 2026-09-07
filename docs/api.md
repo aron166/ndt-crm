@@ -88,7 +88,8 @@ curl -X PATCH $CRM/api/leads/12 \
 | field | effect |
 |---|---|
 | `status` | move to a column (must exist for the tenant) — fires `lead_status_changed` |
-| `outcome` | `won` → converts to a deal (returns `converted_deal_id`) · `lost` (+ optional `lost_reason`) · `open` re-opens a lost lead |
+| `outcome` | `won` → converts to a deal (returns `converted_deal_id`) · `lost` — **`lost_reason` required** (3–500 chars free text) · `open` re-opens a lost lead |
+| `lost_reason` | only valid together with `outcome: "lost"`, and mandatory with it |
 | `assigned_to_id` | user id or `null` |
 | `custom_fields` | shallow-merged; a `null` value deletes the key (≤16 KB) |
 
@@ -99,7 +100,9 @@ Order applied: assign → custom_fields → status → outcome. First failure re
 
 Same payload and **same rules as the "Hívás eredménye" modal** (one shared server
 function): a note is always required; `callback_requested` needs `callback_at`
-(date **and** hour); `meeting_booked` needs `demo_with`.
+(date **and** hour); `meeting_booked` needs `demo_with`; `not_interested` and
+`disqualified` need a **`lost_reason`** (3–500 chars) — the outcome key alone is
+not a reason (Péter, 2026-09-07).
 
 ```bash
 curl -X POST $CRM/api/leads/12/interactions \
@@ -112,7 +115,7 @@ curl -X POST $CRM/api/leads/12/interactions \
 |---|---|
 | `no_answer` | stage advances `new → call_1 → call_2 → call_3 → call_3_plus` |
 | `wrong_number` | logged only |
-| `not_interested`, `disqualified` | lead `outcome = lost`, `lost_reason` = the key; leaves the board |
+| `not_interested`, `disqualified` | **requires `lost_reason`**; lead `outcome = lost`, `lost_reason` = that free text (the outcome key stays on the interaction row); leaves the board |
 | `callback_requested` | creates a `call` task due at `callback_at` (assigned to `assigned_to_id`), moves to `recall` |
 | `meeting_booked` | moves to `demo_aron` / `demo_peter` per `demo_with` (`aron|peter`) |
 

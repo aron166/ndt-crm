@@ -18,7 +18,15 @@ describe("lead API schemas", () => {
     expect(leadPatchSchema.safeParse({ lost_reason: "No budget" }).success).toBe(false);
     expect(leadPatchSchema.safeParse({ outcome: "won", lost_reason: "No budget" }).success).toBe(false);
     expect(leadPatchSchema.safeParse({ outcome: "lost", lost_reason: "No budget" }).success).toBe(true);
-    expect(leadPatchSchema.safeParse({ outcome: "lost" }).success).toBe(true);
+    // …and the mirror rule: lost without a why is the gap Péter flagged.
+    expect(leadPatchSchema.safeParse({ outcome: "lost" }).success).toBe(false);
+    expect(leadPatchSchema.safeParse({ outcome: "lost", lost_reason: "xy" }).success).toBe(false);
+  });
+  it("wire lost_reason reaches the shared schema, and its absence is rejected there", () => {
+    const ok = leadInteractionWireSchema.parse({ outcome: "disqualified", note: "n", lost_reason: "Nincs betonszerkezetük" });
+    expect(callOutcomeSchema.safeParse(toCallOutcomeInput(ok)).success).toBe(true);
+    const bad = leadInteractionWireSchema.parse({ outcome: "disqualified", note: "n" });
+    expect(callOutcomeSchema.safeParse(toCallOutcomeInput(bad)).success).toBe(false);
   });
   it("wire interaction payload maps to the shared modal schema (same rules)", () => {
     const wire = leadInteractionWireSchema.parse({ outcome: "callback_requested", note: "x", callback_at: "2026-09-10T10:00:00Z", assigned_to_id: "2" });

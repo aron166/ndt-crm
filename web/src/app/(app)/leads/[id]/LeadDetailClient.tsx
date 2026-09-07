@@ -9,7 +9,7 @@ import { LeadEditModal } from "./LeadEditModal";
 import { CallOutcomeModal } from "../CallOutcomeModal";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, type LeadOutcome } from "@/lib/leads/outcomes";
+import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
 
 interface Interaction {
@@ -130,11 +130,18 @@ export function LeadDetailClient({
   }
 
   function handleOutcome(next: LeadOutcome) {
+    // A lost lead must say WHY (Péter, 2026-09-07); an already-lost lead keeps
+    // the stored reason, so only ask when there is none yet.
+    let reason: string | null = null;
+    if (next === "lost" && !lead.lostReason) {
+      reason = promptLostReason();
+      if (reason === null) return;
+    }
     const prev = outcome;
     setOutcome(next);
     setActionError(null);
     startOutcome(async () => {
-      const res = await setLeadOutcomeAction(lead.id, next);
+      const res = await setLeadOutcomeAction(lead.id, next, reason);
       if ("error" in res) { setOutcome(prev); setActionError(res.error); router.refresh(); return; }
       if (res.dealId) setConverted(res.dealId);
       router.refresh();

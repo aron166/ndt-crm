@@ -19,6 +19,15 @@ describe("callOutcomeSchema — the shared rules", () => {
     expect(parse({ outcome: "meeting_booked", note: "ok" }).success).toBe(false);
     expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter" }).success).toBe(true);
   });
+  it("not_interested / disqualified need a real lost reason, not just the key", () => {
+    expect(parse({ outcome: "not_interested", note: "n" }).success).toBe(false);
+    expect(parse({ outcome: "disqualified", note: "n", lostReason: "  " }).success).toBe(false);
+    expect(parse({ outcome: "not_interested", note: "n", lostReason: "xy" }).success).toBe(false);
+    expect(parse({ outcome: "not_interested", note: "n", lostReason: "Van saját szkennerük" }).success).toBe(true);
+  });
+  it("a lost reason on a non-lost outcome is simply ignored, not an error", () => {
+    expect(parse({ outcome: "no_answer", note: "n", lostReason: "akármi" }).success).toBe(true);
+  });
   it("rejects unknown outcomes", () => {
     expect(parse({ outcome: "interested", note: "x" }).success).toBe(false);
   });
@@ -44,9 +53,11 @@ describe("planCallOutcome", () => {
     expect(p("meeting_booked", "call_2", { demoWith: "peter" }).status).toBe("demo_peter");
     expect(p("meeting_booked", "demo_aron", { demoWith: "aron" }).status).toBeNull();
   });
-  it("not_interested / disqualified close as lost with the key as reason", () => {
-    expect(p("not_interested", "call_1").lost).toEqual({ lostReason: "not_interested" });
-    expect(p("disqualified", "new").lost).toEqual({ lostReason: "disqualified" });
+  it("not_interested / disqualified close as lost carrying the typed reason", () => {
+    expect(p("not_interested", "call_1", { lostReason: "Van saját szkennerük" }).lost)
+      .toEqual({ lostReason: "Van saját szkennerük" });
+    expect(p("disqualified", "new", { lostReason: "Nincs betonszerkezetük" }).lost)
+      .toEqual({ lostReason: "Nincs betonszerkezetük" });
     expect(p("wrong_number", "new")).toEqual({ status: null, lost: null, callbackAt: null });
   });
   it("never moves into a column the tenant removed", () => {
