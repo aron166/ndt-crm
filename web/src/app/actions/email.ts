@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { sendEmail, sendTestEmail } from "@/lib/integrations/resend";
+import { DEFAULT_TENANT_ID, sendEmail, sendTestEmail } from "@/lib/integrations/resend";
 
 export async function sendResendTest() {
   try {
-    const result = await sendTestEmail();
+    const result = await sendTestEmail(DEFAULT_TENANT_ID);
     if (!result.ok) return { error: result.error };
     return { success: true };
   } catch {
@@ -27,6 +27,7 @@ export async function sendCrmEmail(input: {
   let result;
   try {
     result = await sendEmail({
+      tenantId: DEFAULT_TENANT_ID,
       to: input.to,
       subject: input.subject,
       text: input.text,

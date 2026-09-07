@@ -64,4 +64,152 @@ describe("computeTier", () => {
       gate: "feladat", situation: "cég", concrete: "fal", timing: "ezen a héten", own_device: "nem",
     })).toBe("B");
   });
+
+  // ── Vanda's #81 findings: free text is not a substring search ──────────
+  // Every case below returned the WRONG tier before the word-boundary +
+  // negation matcher landed. They are the reason that fix exists.
+
+  it("a negated keyword does not count as the signal (finding 1)", () => {
+    // "not the technology — what's in the wall" was goal=technology → tier A,
+    // i.e. 'call within 1 hour' for a lead who said the opposite.
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "fal", timing: "jövő héten",
+      goal: "nem a technológia érdekel, hanem mi van a falban", own_device: "nem",
+    })).toBe("B");
+    // ...and the same shape must still tier A when it is NOT negated.
+    expect(computeTier({
+      gate: "feladat", situation: "cég", goal: "a technológia érdekel", own_device: "nem",
+    })).toBe("A");
+  });
+
+  it("a bare 'nem' inside a positive answer no longer kills it (finding 1)", () => {
+    // "wall, but we don't know exactly where" hit CONCRETE.no on "nem" → null,
+    // and the B lead vanished from the board.
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "fal, de nem tudjuk pontosan hol",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+    // "hanem" is one word — it is not a negator.
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "nem tégla, hanem beton",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+  });
+
+  it("'projekt' does not make a private lead a company (finding 2)", () => {
+    expect(computeTier({
+      gate: "feladat", situation: "családi ház projekt", concrete: "fal", timing: "ezen a héten",
+    })).toBe("D");
+    expect(computeTier({
+      gate: "feladat", situation: "magánszemély vagyok, de projekt jelleggel", concrete: "fal",
+    })).toBe("D");
+    // A real company answer still reads as one.
+    expect(computeTier({
+      gate: "feladat", situation: "céges projekt", concrete: "fal", timing: "ezen a héten",
+      own_device: "nem",
+    })).toBe("B");
+  });
+
+  it("'érdeklődöm' is the curious gate, not a fall-through to A (finding 3)", () => {
+    expect(computeTier({
+      gate: "most csak érdeklődöm", situation: "cég", own_device: "igen",
+    })).toBe("E");
+    expect(computeTier({ gate: "csak nézelődöm" })).toBe("E");
+  });
+
+  it("short keywords match whole words only", () => {
+    // "más" (other) must not fire on "masszív" (massive).
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "masszív beton fal",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+  });
+
+  // ── Vanda's #84 findings: the fix's OWN regressions ───────────────────
+  // An earlier revision inferred prefix-vs-exact from keyword length, which
+  // disabled every 3-letter stem. These are the answers it broke.
+
+  it("matches inflected Hungarian stems (finding 1)", () => {
+    const base = { gate: "feladat", concrete: "fal", timing: "ezen a héten", own_device: "nem" };
+    expect(computeTier({ ...base, situation: "a cégem nevében" })).toBe("B");
+    expect(computeTier({ ...base, situation: "cégnél dolgozom" })).toBe("B");
+    expect(computeTier({ ...base, situation: "cégnek kell" })).toBe("B");
+    expect(computeTier({ ...base, situation: "profi vagyok" })).toBe("C");
+    const co = { gate: "feladat", situation: "cég", timing: "ezen a héten", own_device: "nem" };
+    expect(computeTier({ ...co, concrete: "a falban vannak vasak?" })).toBe("B");
+    expect(computeTier({ ...co, concrete: "falat kell átfúrni" })).toBe("B");
+    expect(computeTier({ ...co, concrete: "hidat vizsgálnánk" })).toBe("B");
+  });
+
+  it("an evaluation of the STRUCTURE is not an interest in the machine (finding 2)", () => {
+    // goal=technology is a tier-A signal — "call within 1 h". A condition
+    // survey must not trip it just by containing "értékel".
+    const co = { gate: "feladat", situation: "cég", concrete: "fal", timing: "ezen a héten", own_device: "nem" };
+    expect(computeTier({ ...co, goal: "állapot értékelés" })).toBe("B");
+    expect(computeTier({ ...co, goal: "az állapotát szeretnénk értékelni" })).toBe("B");
+    // ...but a real technology answer still is one.
+    expect(computeTier({ ...co, goal: "a technológia érdekel" })).toBe("A");
+  });
+
+  it("'csak nézek körül' is the curious gate, not a company lead (finding 3)", () => {
+    expect(computeTier({
+      gate: "csak nézek körül", situation: "cég", own_device: "igen",
+    })).toBe("E");
+  });
+
+  it("a comma ends the negation (finding 4)", () => {
+    expect(computeTier({
+      gate: "feladat", situation: "nem cég, magánszemély", concrete: "fal", timing: "ezen a héten",
+    })).toBe("D");
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "nem tudom, beton vagy tégla",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+  });
+
+  it("'igény' is not 'igen' (Vanda #84 re-review)", () => {
+    // "igény" ("need/demand") is everywhere in Hungarian sales prose, and the
+    // prefix form made it a machine signal — tier A, "call within 1 hour".
+    const co = { gate: "feladat", situation: "cég", concrete: "fal", timing: "ezen a héten" };
+    expect(computeTier({ ...co, own_device: "igény szerint bérelnénk" })).toBe("B");
+    expect(computeTier({ ...co, own_device: "igényelnénk egyet" })).toBe("B");
+    // A real yes still is one.
+    expect(computeTier({ ...co, own_device: "igen" })).toBe("A");
+    expect(computeTier({ ...co, own_device: "igen, van egy gépünk" })).toBe("A");
+  });
+
+  it("'körülnézek' is one word, and it is the curious gate", () => {
+    expect(computeTier({ gate: "körülnézek", situation: "cég", own_device: "igen" })).toBe("E");
+  });
+
+  it("'nem csak X' adds to X, it does not deny it", () => {
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "nem csak fal",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+  });
+
+  // The table-driven grid Vanda asked for: this is what would have caught the
+  // MIN_PREFIX breakage immediately, because it pins every canonical token.
+  it("every canonical landing token still tiers per the spec", () => {
+    const base = { gate: "task", situation: "company", concrete: "wall", timing: "this_week" };
+    const cases: [Record<string, string>, string | null][] = [
+      [{ ...base, own_device: "yes" }, "A"],
+      [{ ...base, own_device: "maybe" }, "A"],
+      [{ ...base, own_device: "no", goal: "technology" }, "A"],
+      [{ ...base, own_device: "no" }, "B"],
+      [{ ...base, own_device: "no", goal: "condition" }, "B"],
+      [{ ...base, situation: "pro" }, "C"],
+      [{ ...base, situation: "private" }, "D"],
+      [{ gate: "curious" }, "E"],
+      [{ intent_path: "curious" }, "E"],
+      [{ ...base, own_device: "no", timing: "no_date" }, null],
+      [{ ...base, own_device: "no", concrete: "none" }, null],
+      [{ gate: "task", situation: "company" }, null],
+      [{}, null],
+    ];
+    for (const [answers, want] of cases) {
+      expect(computeTier(answers), JSON.stringify(answers)).toBe(want);
+    }
+  });
 });

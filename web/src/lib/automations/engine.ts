@@ -285,6 +285,7 @@ export async function runAutomationAction(
     // import graph for this otherwise-pure engine module.
     const { sendEmail } = await import("@/lib/integrations/resend");
     const result = await sendEmail({
+      tenantId: ev.tenantId,
       to,
       subject: renderTemplate(cfg.subjectTemplate, ev),
       text: renderTemplate(cfg.bodyTemplate, ev, false),
