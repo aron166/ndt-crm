@@ -47,10 +47,12 @@ export const leadIntakeSchema = z
     // either the Branch A seven (situation, concrete, goal, size, postcode,
     // timing, own_device) or the Branch B three (hook, use_case, work).
     // Same shape as the setter tab writes, so both land on leads.qualification.
-    // Deliberately open (z.record) — adding a question must never need a deploy.
+    // `intent_path` (task|curious) is accepted as the wire alias of `gate`.
+    // Deliberately open (z.record) — adding a question must never need a deploy,
+    // and an answer must never be dropped because a slug was renamed.
     qualification: z.record(z.string().max(50), z.string().max(ANSWER_MAX)).optional(),
-    // Caller asks for the intro material (termékismertető). Recorded only —
-    // the CRM cannot attach a PDF yet (send_email automations are text-only).
+    // Send the intro material (termékismertető) now: emails it when Resend is
+    // connected, otherwise creates the "Küldd el a termékismertetőt" task.
     send_intro: z.boolean().optional(),
   })
   .refine((d) => Boolean(d.contact_email || d.contact_phone), {

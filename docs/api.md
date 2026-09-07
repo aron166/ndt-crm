@@ -39,9 +39,20 @@ curl -X POST $CRM/api/leads \
     "service_interest": "GPR",
     "channel": "cold_email",
     "campaign": "gp8800-launch-1",
-    "utm_source": "gmail"
+    "utm_source": "gmail",
+    "qualification": {
+      "intent_path": "task",
+      "situation": "company",
+      "concrete": "wall",
+      "goal": "drill",
+      "size": "kb. 40 m2",
+      "postcode": "9024",
+      "timing": "this_week",
+      "own_device": "maybe"
+    },
+    "send_intro": true
   }'
-# → 201 { "ok": true, "leadId": 12, "companyId": 3, "personId": 7 }
+# → 201 { "ok": true, "leadId": 12, "tier": "A", "intro": "email", "companyId": 3, "personId": 7 }
 ```
 
 | field | notes |
@@ -52,9 +63,61 @@ curl -X POST $CRM/api/leads \
 | `channel` | `cold_email · landing · linkedin · meta_ads · referral · import · manual` (default `landing`) |
 | `campaign` | free text tag |
 | `utm_*`, `referrer`, `landing_variant`, `lead_score`, `priority` | stored on `custom_fields` |
+| `qualification` | optional `{ slug: answer }` — the locked qualification model, see below |
+| `send_intro` | optional bool — send the termékismertető now (see below) |
 
 Company is deduped by name (case-insensitive), person by email. The lead lands in
-the tenant's initial column (`new`) and fires `lead_created` automations.
+the tenant's initial column (`new`) and fires `lead_created` automations (whose
+condition fields now include `tier`).
+
+Response: `leadId`, `companyId`, `personId`, plus `tier` (`A|B|C|D|E|null`) and,
+when `send_intro` was true, `intro` (`email` — sent and logged · `task` — a
+"Küldd el a termékismertetőt" task was created instead · `skipped` — it failed and
+was reported; the lead itself is still created).
+
+#### `qualification` — the locked model (2026-09-07)
+
+**The slugs are permanent.** One intake for every channel; the `gate` question
+branches. Send only the answers you have — a partial object is fine, it just may
+not place the lead in a tier.
+
+| branch | slugs |
+|---|---|
+| gate (everyone) | `gate` — `task` \| `curious`. **`intent_path` is accepted as an alias** and is stored as `gate`. |
+| A — `task` | `situation` (`company` \| `pro` \| `private`) · `concrete` (`wall` \| `slab` \| `bridge` \| `other`) · `goal` (`drill` \| `condition` \| `technology`) · `size` · `postcode` · `timing` (`this_week` \| `this_month` \| `no_date`) · `own_device` (`yes` \| `maybe` \| `no`) |
+| B — `curious` | `hook` · `use_case` · `work` (+ email). No postcode, no date → nurture pool. |
+
+Values are free text (≤2000 chars each): the tokens above are what the landing
+form posts, but the CRM also reads a setter's Hungarian ("cég", "födém", "talán",
+"ezen a héten"). Unknown slugs are **stored, not rejected**, on intake — losing a
+real answer to a renamed question is worse than an orphan key. (`PATCH` is
+stricter: see below.)
+
+#### `tier` — derived, never submitted
+
+`leads.tier` is recomputed from the answers on **every** write (intake, setter
+panel, `PATCH`). It is a column, so the board filters and counts on it.
+
+| tier | rule | response Péter expects |
+|---|---|---|
+| **A** machine prospect | `situation=company` **and** (`own_device` ∈ {`yes`,`maybe`} **or** `goal=technology`) | call within 1 h |
+| **B** company job | `situation=company`, concrete structure, `timing` set | call same day |
+| **C** professional | `situation=pro` | call within 2 days |
+| **D** private | `situation=private` | auto-email, booked only when we're in the area |
+| **E** nurture | `gate=curious` | intro PDF, no human effort |
+| `null` | not placeable yet (no `situation`, or a company with neither a machine signal nor a datable concrete job) | — |
+
+A **missing** answer never promotes: the spec's literal "own_device ≠ no" would
+make every partial payload a tier A, so A requires an explicit positive signal.
+
+#### `send_intro`
+
+`true` → if the Resend integration is connected **and** a `contact_email` was
+given, the intro email goes out immediately with the link from
+`tenants.settings.introMaterialUrl` (set at `/leads/setup`; until Áron fills it in
+the mail carries a visible placeholder) and is logged as an outbound interaction.
+Otherwise a task **"Küldd el a termékismertetőt"** is created on the lead, due
+tomorrow. Intake never fails because the email did.
 
 ### `GET /api/leads` — list (paginated, never unbounded)
 
@@ -138,9 +201,13 @@ curl -X PATCH $CRM/api/leads/12 \
 # → sets area_m2, clears deadline, leaves every other answer alone
 ```
 
-`GET /api/leads/:id` returns the current slugs; an unknown slug is rejected rather
-than stored, because a typo'd key would sit in the JSON forever with no question
-to render it. Answers are ≤2000 chars each.
+`GET /api/leads/:id` returns the current slugs plus `tier`; on **PATCH** an unknown
+slug is rejected rather than stored, because a typo'd key would sit in the JSON
+forever with no question to render it (intake is deliberately more forgiving —
+see above). Answers are ≤2000 chars each. Every write recomputes `tier`.
+
+The default list is the locked model's `gate` + Branch A seven + Branch B three,
+with the spec's draft Hungarian marked ⚠️ until Áron signs off on the wording.
 
 ## Ecosystem hub
 

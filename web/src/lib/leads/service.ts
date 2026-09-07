@@ -9,6 +9,7 @@ import {
   RECALL_STATUS, type LeadOutcome,
 } from "./outcomes";
 import { parseAnswers, answersFrom } from "./qualification";
+import { computeTier } from "./tier";
 
 // The ONE write path for lead process changes — used by the server actions (UI)
 // and the public /api/leads routes alike, so the rules can't drift between the
@@ -263,7 +264,7 @@ export async function setLeadQualification(
 ): Promise<Result> {
   const lead = await db.lead.findFirst({
     where: { id: leadId, tenantId: ctx.tenantId },
-    select: { qualification: true },
+    select: { qualification: true, tier: true },
   });
   if (!lead) return { error: "Lead nem található" };
 
@@ -278,11 +279,19 @@ export async function setLeadQualification(
 
   if (JSON.stringify(before) === JSON.stringify(merged)) return { success: true };
 
+  // The tier is derived, so it is recomputed HERE — the one write path for
+  // setter answers (panel + PATCH /api/leads/:id both land here). Never stored
+  // stale, never entered by hand.
+  const tier = computeTier(merged);
+
   await db.lead.updateMany({
     where: { id: leadId, tenantId: ctx.tenantId },
-    data: { qualification: merged },
+    data: { qualification: merged, tier },
   });
-  audit("lead", leadId, "update", { qualification: before }, { qualification: merged }, auditOpts(ctx));
+  audit("lead", leadId, "update",
+    { qualification: before, tier: lead.tier },
+    { qualification: merged, tier },
+    auditOpts(ctx));
   return { success: true };
 }
 

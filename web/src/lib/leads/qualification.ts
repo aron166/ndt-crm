@@ -17,22 +17,36 @@ export interface QualificationQuestion {
   label: string;
 }
 
-export const QUESTION_MAX = 10;
+export const QUESTION_MAX = 15;
 export const ANSWER_MAX = 2000;
 export const LABEL_MAX = 200;
 
 /**
- * ⚠️ PLACEHOLDERS. Áron + Péter deliver the real setter script Monday
- * (2026-09-08); these exist so the tab is usable and the shape is real, not so
- * anyone calls from them. Editable at /leads/setup — replacing them writes
- * `tenants.settings.qualificationQuestions` and this array stops being used.
+ * The locked qualification model (machines/birdsview/27_qualification_model.md,
+ * 2026-09-07, Ãron Ã Kai). The `gate` question branches: A (`task`) asks the
+ * seven, B (`curious`) asks the soft three and lands in the nurture pool.
+ *
+ * The SLUGS ARE PERMANENT â leads.qualification and computeTier() key off them.
+ * The HU labels are the spec's draft wording, prefixed â ï¸ so it is obvious on
+ * /leads/setup that Ãron still owes the final Hungarian. Editing the list there
+ * writes tenants.settings.qualificationQuestions and this array stops being used
+ * (answers survive, they are keyed by slug).
  */
 export const DEFAULT_QUALIFICATION_QUESTIONS: QualificationQuestion[] = [
-  { slug: "project_type",   label: "TODO — Milyen szerkezetet kell vizsgálni? (födém, fal, híd, ipari padló)" },
-  { slug: "area_m2",        label: "TODO — Mekkora a vizsgálandó felület (m²)?" },
-  { slug: "deadline",       label: "TODO — Mikorra kell az eredmény?" },
-  { slug: "decision_maker", label: "TODO — Ki dönt a megrendelésről, ő van most a vonalban?" },
-  { slug: "prior_scanning", label: "TODO — Volt már náluk betonszkennelés? Mi volt az ára?" },
+  // Gate â everyone.
+  { slug: "gate", label: "⚠️ Van most egy konkrét feladat, amihez ez kellene, vagy egyelőre csak érdekel a technológia? (task / curious)" },
+  // Branch A â `task`, the seven.
+  { slug: "situation",  label: "⚠️ Milyen helyzetben kérdezel: cég/projekt · szakember (villanyszerelő, statikus, kivitelező) · saját ingatlan" },
+  { slug: "concrete",   label: "⚠️ Mibe kellene belenézni: fal · födém/aljzat · híd/műtárgy · más / nem beton" },
+  { slug: "goal",       label: "⚠️ Mit szeretnél tudni: mi van benne fúrás előtt · az állapotát · magát a technológiát értékelem" },
+  { slug: "size",       label: "⚠️ Kb. mekkora felület vagy hány pont?" },
+  { slug: "postcode",   label: "⚠️ Irányítószám (kötelező)" },
+  { slug: "timing",     label: "⚠️ Mikor: ezen a héten · ebben a hónapban · nincs még dátum" },
+  { slug: "own_device", label: "⚠️ Gondolkodtatok már saját műszeren? (igen / talán / nem)" },
+  // Branch B â `curious`, the soft three.
+  { slug: "hook",     label: "⚠️ Mi keltette fel az érdeklődésed?" },
+  { slug: "use_case", label: "⚠️ Mire használnád, ha lenne ilyen a kezedben?" },
+  { slug: "work",     label: "⚠️ Milyen munkát végzel / milyen cégnél?" },
 ];
 
 /** Slug for a freshly typed question. Same rules as slugifyStatusKey. */
@@ -130,25 +144,20 @@ export function answersFrom(qualification: unknown): Record<string, string> {
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Tier — derived, never submitted. Rules are verbatim from the locked model
-// (machines/birdsview/27_qualification_model.md, 2026-09-07). Branch B and
-// anything unrecognised is E (nurture pool). Recomputed on every write, so a
-// setter correcting an answer in the CRM re-tiers the lead.
-export type LeadTier = "A" | "B" | "C" | "D" | "E";
-
-export function computeTier(answers: Record<string, string>): LeadTier {
-  const { gate, situation, concrete, goal, own_device, timing } = answers;
-  if (gate !== "task") return "E";
-  if (situation === "company") {
-    // A outranks B: machine prospect.
-    if (own_device !== "no" || goal === "technology") return "A";
-    // "concrete=yes" in the spec means a concrete structure — `other` is the
-    // "más / nem beton" kill answer.
-    if (concrete && concrete !== "other" && timing) return "B";
-    return "E";
+/**
+ * Intake answers → stored answers. The landing form posts the gate as
+ * `intent_path` (task|curious) because that is what the form's own branching
+ * calls it; the CRM keys it `gate`. One name in the DB, both accepted on the
+ * wire. Blank answers are dropped, unknown slugs are KEPT — losing a real answer
+ * because a question was renamed is worse than an orphan key (the setter panel
+ * only renders the current questions anyway).
+ */
+export function normalizeIntakeAnswers(raw: Record<string, string> | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw ?? {})) {
+    const value = typeof v === "string" ? v.trim() : "";
+    if (!value) continue;
+    out[k === "intent_path" ? "gate" : k] = value;
   }
-  if (situation === "pro") return "C";
-  if (situation === "private") return "D";
-  return "E";
+  return out;
 }

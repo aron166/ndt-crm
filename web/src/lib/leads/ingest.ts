@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import type { LeadIntake } from "./schema";
-import { computeTier, type LeadTier } from "./qualification";
+import { normalizeIntakeAnswers } from "./qualification";
+import { computeTier, type LeadTier } from "./tier";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
 //
@@ -167,12 +168,11 @@ export async function ingestLead(
   if (input.contact_name) customFields.contact_name = input.contact_name;
   if (input.contact_email) customFields.contact_email = input.contact_email;
   if (input.contact_phone) customFields.contact_phone = input.contact_phone;
-  // Derived tier (A–E) from the locked qualification model. Stored alongside
-  // the answers so the board can filter on it without re-deriving.
-  const tier = input.qualification ? computeTier(input.qualification) : null;
-  if (tier) customFields.tier = tier;
-  // Recorded, not acted on: the CRM has no PDF-attachment path yet.
-  if (input.send_intro !== undefined) customFields.send_intro = input.send_intro;
+  // Qualification answers (locked model) + the tier they derive. `tier` is a
+  // real column so the board can filter and count on it; the answers stay JSON.
+  const answers = normalizeIntakeAnswers(input.qualification);
+  const hasAnswers = Object.keys(answers).length > 0;
+  const tier = hasAnswers ? computeTier(answers) : null;
 
   const lead = await tx.lead.create({
     data: {
@@ -188,9 +188,7 @@ export async function ingestLead(
       message: input.message ?? null,
       serviceInterest: input.service_interest ?? null,
       receivedDate: new Date(),
-      ...(input.qualification
-        ? { qualification: input.qualification as Prisma.InputJsonValue }
-        : {}),
+      ...(hasAnswers ? { qualification: answers as Prisma.InputJsonValue, tier } : {}),
       ...(Object.keys(customFields).length > 0
         ? { customFields: customFields as Prisma.InputJsonValue }
         : {}),

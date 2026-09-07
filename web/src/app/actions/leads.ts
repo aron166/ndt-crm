@@ -384,22 +384,38 @@ export async function saveLeadQualification(leadId: number, answers: Record<stri
   return { success: true };
 }
 
-/** Replace the tenant's setter question list (one `slug|label` per line). */
-export async function saveQualificationQuestions(text: string) {
+/**
+ * Replace the tenant's setter question list (one `slug|label` per line) and the
+ * intro-material link. Both live in tenants.settings, so they save together.
+ */
+export async function saveQualificationQuestions(text: string, introUrl?: string) {
   const parsed = parseQuestionLines(text);
   if ("error" in parsed) return parsed;
 
+  const url = (introUrl ?? "").trim();
+  // https-only, same rule as webhook_out: this link goes out in customer email.
+  if (url && !/^https:\/\//i.test(url)) return { error: "A termékismertető linkje https:// címmel kezdődjön" };
+  if (url.length > 500) return { error: "A link túl hosszú" };
+
   const before = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  const settings = { ...((before?.settings ?? {}) as Record<string, unknown>), qualificationQuestions: parsed };
+  const settings = {
+    ...((before?.settings ?? {}) as Record<string, unknown>),
+    qualificationQuestions: parsed,
+    introMaterialUrl: url || null,
+  };
   await db.tenant.update({
     where: { id: TENANT_ID },
     // Prisma's InputJsonValue rejects an interface without an index signature;
     // the value IS plain JSON, so the double cast is the whole story.
     data: { settings: settings as unknown as Prisma.InputJsonValue },
   });
+  const beforeSettings = (before?.settings as Record<string, unknown> | null) ?? {};
   await audit("tenant", TENANT_ID, "update",
-    { qualificationQuestions: (before?.settings as Record<string, unknown> | null)?.qualificationQuestions ?? null },
-    { qualificationQuestions: parsed });
+    {
+      qualificationQuestions: beforeSettings.qualificationQuestions ?? null,
+      introMaterialUrl: beforeSettings.introMaterialUrl ?? null,
+    },
+    { qualificationQuestions: parsed, introMaterialUrl: url || null });
 
   revalidatePath("/leads/setup");
   revalidatePath("/leads");

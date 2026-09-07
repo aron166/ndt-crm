@@ -294,6 +294,9 @@ model Lead {
   // question LIST is tenant config (tenants.settings.qualificationQuestions),
   // so changing the questions never needs a migration.
   qualification   Json?
+  // Derived tier (A|B|C|D|E) from those answers — lib/leads/tier.ts. Nullable:
+  // "not placeable yet". Recomputed on every qualification write, never typed in.
+  tier            String?
   // Inbound channel (cold_email | landing | linkedin | meta_ads | referral | import | manual) + campaign tag.
   channel         String?
   campaign        String?

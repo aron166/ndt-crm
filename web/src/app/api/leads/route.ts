@@ -4,6 +4,7 @@ import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { leadIntakeSchema } from "@/lib/leads/schema";
 import { ingestLead } from "@/lib/leads/ingest";
+import { sendIntroMaterial, type IntroResult } from "@/lib/leads/intro";
 import { runAutomations } from "@/lib/automations/engine";
 import { serializeDates } from "@/lib/serialize";
 import { leadListQuerySchema, LEAD_API_SELECT } from "@/lib/leads/api";
@@ -80,6 +81,19 @@ export async function POST(request: Request) {
       ingestLead(parsed.data, { tenantId: key.tenantId, appSlug: key.appSlug }, tx),
     );
 
+    // The intro material (termékismertető) is the thing the qualification
+    // answers were traded for — send it (or task it) before anything else.
+    const intro: IntroResult | null = parsed.data.send_intro
+      ? await sendIntroMaterial({
+          tenantId: key.tenantId,
+          leadId: result.leadId,
+          to: parsed.data.contact_email,
+          companyId: result.companyId,
+          personId: result.personId,
+          companyName: parsed.data.company_name,
+        })
+      : null;
+
     // Fire task-automation rules for the new lead (e.g. the seeded follow-up
     // task). Runs post-commit and is itself fail-safe, so it never blocks or
     // fails the intake response.
@@ -108,6 +122,7 @@ export async function POST(request: Request) {
         ok: true,
         leadId: result.leadId,
         tier: result.tier,
+        ...(intro ? { intro } : {}),
         companyId: result.companyId,
         personId: result.personId,
       },
