@@ -11,7 +11,9 @@ import {
   seedDefaultLeadStatuses,
 } from "@/app/actions/leads";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { STAGE_DESCRIPTION_PLACEHOLDER, STAGE_DESCRIPTION_MAX } from "@/lib/leads/statuses";
 
 const STATUS_COLORS = [
   "#64748b", "#6366f1", "#8b5cf6", "#3b82f6",
@@ -28,6 +30,7 @@ interface LeadStatus {
   isInitial: boolean;
   isTerminal: boolean;
   isCommitment: boolean;
+  description: string | null;
 }
 
 function StatusRow({
@@ -41,6 +44,7 @@ function StatusRow({
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(status.label);
   const [color, setColor] = useState(status.color);
+  const [description, setDescription] = useState(status.description ?? "");
   const [isInitial, setIsInitial] = useState(status.isInitial);
   const [isTerminal, setIsTerminal] = useState(status.isTerminal);
   const [isCommitment, setIsCommitment] = useState(status.isCommitment);
@@ -51,6 +55,7 @@ function StatusRow({
     data.set("id", String(status.id));
     data.set("label", label);
     data.set("color", color);
+    data.set("description", description);
     data.set("isInitial", String(isInitial));
     data.set("isTerminal", String(isTerminal));
     data.set("isCommitment", String(isCommitment));
@@ -90,6 +95,9 @@ function StatusRow({
           </span>
         )}
         {status.isTerminal && <span className="badge-ds coral" style={{ fontSize: 12 }}>Lezárt</span>}
+        {(!status.description || status.description === STAGE_DESCRIPTION_PLACEHOLDER) && (
+          <span className="badge-ds coral" style={{ fontSize: 12 }}>Nincs script</span>
+        )}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
           onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
@@ -120,6 +128,19 @@ function StatusRow({
             />
           ))}
         </div>
+      </div>
+      <div>
+        <label className="field-label">Mit csinálunk ebben a fázisban? (script)</label>
+        <Textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={6}
+          maxLength={STAGE_DESCRIPTION_MAX}
+          placeholder={STAGE_DESCRIPTION_PLACEHOLDER}
+        />
+        <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
+          Ez jelenik meg a kanban oszlop fejlécében és a hívás-modalban. Sortörések megmaradnak.
+        </p>
       </div>
       <div className="flex gap-4 text-sm flex-wrap" style={{ color: "var(--fg-soft)" }}>
         <label className="flex items-center gap-2 cursor-pointer">

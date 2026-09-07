@@ -22,6 +22,7 @@ export async function getLeadStatuses(tenantId: number): Promise<LeadStatusDef[]
     isInitial: r.isInitial,
     isTerminal: r.isTerminal,
     isCommitment: r.isCommitment,
+    description: r.description,
   }));
 }
 

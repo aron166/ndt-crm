@@ -439,6 +439,7 @@ export function LeadDetailClient({
         onClose={() => setLogging(false)}
         leadId={lead.id}
         title={[personName, lead.company?.name].filter(Boolean).join(" · ") || null}
+        stageDescription={statuses.find((s) => s.key === status)?.description ?? null}
         onLogged={() => router.refresh()}
       />
 
