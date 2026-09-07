@@ -124,4 +124,46 @@ describe("computeTier", () => {
       timing: "ezen a héten", own_device: "nem",
     })).toBe("B");
   });
+
+  // ── Vanda's #84 findings: the fix's OWN regressions ───────────────────
+  // An earlier revision inferred prefix-vs-exact from keyword length, which
+  // disabled every 3-letter stem. These are the answers it broke.
+
+  it("matches inflected Hungarian stems (finding 1)", () => {
+    const base = { gate: "feladat", concrete: "fal", timing: "ezen a héten", own_device: "nem" };
+    expect(computeTier({ ...base, situation: "a cégem nevében" })).toBe("B");
+    expect(computeTier({ ...base, situation: "cégnél dolgozom" })).toBe("B");
+    expect(computeTier({ ...base, situation: "cégnek kell" })).toBe("B");
+    expect(computeTier({ ...base, situation: "profi vagyok" })).toBe("C");
+    const co = { gate: "feladat", situation: "cég", timing: "ezen a héten", own_device: "nem" };
+    expect(computeTier({ ...co, concrete: "a falban vannak vasak?" })).toBe("B");
+    expect(computeTier({ ...co, concrete: "falat kell átfúrni" })).toBe("B");
+    expect(computeTier({ ...co, concrete: "hidat vizsgálnánk" })).toBe("B");
+  });
+
+  it("an evaluation of the STRUCTURE is not an interest in the machine (finding 2)", () => {
+    // goal=technology is a tier-A signal — "call within 1 h". A condition
+    // survey must not trip it just by containing "értékel".
+    const co = { gate: "feladat", situation: "cég", concrete: "fal", timing: "ezen a héten", own_device: "nem" };
+    expect(computeTier({ ...co, goal: "állapot értékelés" })).toBe("B");
+    expect(computeTier({ ...co, goal: "az állapotát szeretnénk értékelni" })).toBe("B");
+    // ...but a real technology answer still is one.
+    expect(computeTier({ ...co, goal: "a technológia érdekel" })).toBe("A");
+  });
+
+  it("'csak nézek körül' is the curious gate, not a company lead (finding 3)", () => {
+    expect(computeTier({
+      gate: "csak nézek körül", situation: "cég", own_device: "igen",
+    })).toBe("E");
+  });
+
+  it("a comma ends the negation (finding 4)", () => {
+    expect(computeTier({
+      gate: "feladat", situation: "nem cég, magánszemély", concrete: "fal", timing: "ezen a héten",
+    })).toBe("D");
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "nem tudom, beton vagy tégla",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+  });
 });

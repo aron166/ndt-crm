@@ -131,12 +131,17 @@ still reads as concrete.
 > not cover it. The landing form must not retry blind. (Vanda, #81 — deferred,
 > needs a dedupe-window decision.)
 
-`true` → if the Resend integration is connected **and** a `contact_email` was
-given, the intro email goes out immediately with the link from
-`tenants.settings.introMaterialUrl` (set at `/leads/setup`; until Áron fills it in
-the mail carries a visible placeholder) and is logged as an outbound interaction.
+`true` → the intro email goes out immediately, and is logged as an outbound
+interaction, when **all three** hold: the Resend integration is connected, a
+`contact_email` was given, and `tenants.settings.introMaterialUrl` holds an
+`https://` link (set at `/leads/setup`).
+
 Otherwise a task **"Küldd el a termékismertetőt"** is created on the lead, due
-tomorrow. Intake never fails because the email did.
+tomorrow, with the audit `reason` naming which one was missing —
+`no_intro_url`, `no_email` or `resend_unavailable`. In particular, with **no
+link configured the mail is never sent**: a task is created instead, because
+emailing a customer a placeholder where the link should be is worse than
+telling a human to send it. Intake never fails because the email did.
 
 ### `GET /api/leads` — list (paginated, never unbounded)
 

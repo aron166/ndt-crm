@@ -36,7 +36,10 @@ export const ANSWER_KEYS_MAX = 40;
  * setter panel, the PATCH route and the public intake schema alike.
  */
 export const answersRecordSchema = z
-  .record(z.string().max(50), z.string().max(ANSWER_MAX))
+  .record(
+    z.string().max(50, { message: "A kérdés azonosítója legfeljebb 50 karakter lehet" }),
+    z.string().max(ANSWER_MAX, { message: `A válasz szöveges és legfeljebb ${ANSWER_MAX} karakter lehet` }),
+  )
   .refine((o) => Object.keys(o).length <= ANSWER_KEYS_MAX, {
     message: `Legfeljebb ${ANSWER_KEYS_MAX} válasz küldhető`,
   });
@@ -142,7 +145,11 @@ export function parseAnswers(
   questions: QualificationQuestion[],
 ): Record<string, string> | { error: string } {
   const parsed = answersRecordSchema.safeParse(raw);
-  if (!parsed.success) return { error: `A válasz szöveges és legfeljebb ${ANSWER_MAX} karakter lehet` };
+  // Report what actually failed: mapping every schema error to the length
+  // message told a 41-key payload it had a too-long answer. (Vanda, #84.)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? `A válasz szöveges és legfeljebb ${ANSWER_MAX} karakter lehet` };
+  }
   const known = new Set(questions.map((q) => q.slug));
   const out: Record<string, string> = {};
   for (const [slug, value] of Object.entries(parsed.data)) {
