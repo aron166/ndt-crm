@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useDeferredValue, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
 import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
@@ -81,6 +81,9 @@ export function PersonDetailClient({
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("activity");
+  // Same split as CompanyDetailClient: pills read `tab`, bodies read `shownTab`.
+  const shownTab = useDeferredValue(tab);
+  const switching = tab !== shownTab;
   const [taskOpen, setTaskOpen] = useState(false);
   const [employerOpen, setEmployerOpen] = useState(false);
   const [deleting, startDelete] = useTransition();
@@ -315,7 +318,7 @@ export function PersonDetailClient({
 
       {/* Tabs + content */}
       <div style={{ marginTop: 18 }}>
-        <div className="tabs-ds">
+        <div className="tabs-ds" aria-busy={switching}>
           {TABS.map(({ key, label, count }) => (
             <button key={key} className={`tab-ds ${tab === key ? "active" : ""}`} onClick={() => setTab(key)}>
               {label}
@@ -336,10 +339,13 @@ export function PersonDetailClient({
         </div>
 
         <div className="split-grid" style={{ marginTop: 16 }}>
-          {/* Left: tab content */}
-          <div>
+          {/* Left: tab content. While the deferred body is still rendering the new
+              pill is lit but the OLD body is on screen — `inert` stops a click or
+              a Tab key landing on the tab the user left. No dimming: the urgent
+              pass fires on every switch, so it would flash. (Vanda, PR #83.) */}
+          <div inert={switching}>
             {/* Activity */}
-            {tab === "activity" && (
+            {shownTab === "activity" && (
               <div className="panel mount">
                 <div style={{ padding: "18px 22px" }}>
                   {interactions.length === 0 ? (
@@ -379,7 +385,7 @@ export function PersonDetailClient({
             )}
 
             {/* Career */}
-            {tab === "career" && (
+            {shownTab === "career" && (
               <div className="panel mount">
                 <div style={{ padding: "22px 24px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
@@ -421,7 +427,7 @@ export function PersonDetailClient({
             )}
 
             {/* Tasks */}
-            {tab === "tasks" && (
+            {shownTab === "tasks" && (
               <div>
                 <ContextTasksTab
                   tasks={tasks}
@@ -434,7 +440,7 @@ export function PersonDetailClient({
             )}
 
             {/* Conversations */}
-            {tab === "conversations" && (
+            {shownTab === "conversations" && (
               <div className="panel mount space-y-4" style={{ padding: "18px 22px" }}>
                 {conversations.map((conv) => (
                   <div key={conv.id} style={{ borderBottom: "1px solid var(--line-soft)", paddingBottom: 16 }}>
@@ -480,7 +486,7 @@ export function PersonDetailClient({
             )}
 
             {/* Adatok — inline edit */}
-            {tab === "adatok" && (
+            {shownTab === "adatok" && (
               <div className="panel mount" style={{ padding: "18px 22px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {(

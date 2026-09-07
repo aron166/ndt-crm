@@ -177,27 +177,28 @@ export default async function LeadsPage({
       ? { ...ACTIVE, OR: [{ status: key }, { status: null }, { status: { notIn: knownKeys } }] }
       : { ...ACTIVE, status: key };
 
-  // One bounded query per column (newest first) + a count per column for the
-  // "shown / total" badge. Never an unbounded findMany.
+  // One bounded query per column (newest first). Never an unbounded findMany.
+  // ponytail: under the cap, rows.length IS the total — the COUNT only fires for a
+  // capped column, and pays a serial round trip when it does. Fine at ~2ms (fra1);
+  // if several columns ever sit at the cap, pair it back into the findMany's Promise.all.
   const perColumn = await Promise.all(
     statuses.map(async (st) => {
-      const [rows, total] = await Promise.all([
-        db.lead.findMany({
-          where: colWhere(st.key),
-          include: {
-            company: { select: { id: true, name: true } },
-            contact: {
-              select: {
-                id: true, phone: true, email: true,
-                person: { select: { id: true, firstName: true, lastName: true, phone: true } },
-              },
+      const rows = await db.lead.findMany({
+        where: colWhere(st.key),
+        include: {
+          company: { select: { id: true, name: true } },
+          contact: {
+            select: {
+              id: true, phone: true, email: true,
+              person: { select: { id: true, firstName: true, lastName: true, phone: true } },
             },
           },
-          orderBy: { createdAt: "desc" },
-          take: COLUMN_LIMIT,
-        }),
-        db.lead.count({ where: colWhere(st.key) }),
-      ]);
+        },
+        orderBy: { createdAt: "desc" },
+        take: COLUMN_LIMIT,
+      });
+      const total =
+        rows.length < COLUMN_LIMIT ? rows.length : await db.lead.count({ where: colWhere(st.key) });
       return { key: st.key, rows, total };
     }),
   );

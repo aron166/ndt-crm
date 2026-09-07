@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { Insights } from "@/components/Insights";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -29,7 +30,12 @@ export default function RootLayout({
       lang="hu"
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="h-full">{children}</body>
+      <body className="h-full">
+        {children}
+        {/* Field RUM — see components/Insights.tsx. Needs Speed Insights enabled
+            on the Vercel project (Áron) before it reports anything. */}
+        <Insights />
+      </body>
     </html>
   );
 }
