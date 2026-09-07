@@ -129,3 +129,26 @@ export function answersFrom(qualification: unknown): Record<string, string> {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Tier — derived, never submitted. Rules are verbatim from the locked model
+// (machines/birdsview/27_qualification_model.md, 2026-09-07). Branch B and
+// anything unrecognised is E (nurture pool). Recomputed on every write, so a
+// setter correcting an answer in the CRM re-tiers the lead.
+export type LeadTier = "A" | "B" | "C" | "D" | "E";
+
+export function computeTier(answers: Record<string, string>): LeadTier {
+  const { gate, situation, concrete, goal, own_device, timing } = answers;
+  if (gate !== "task") return "E";
+  if (situation === "company") {
+    // A outranks B: machine prospect.
+    if (own_device !== "no" || goal === "technology") return "A";
+    // "concrete=yes" in the spec means a concrete structure — `other` is the
+    // "más / nem beton" kill answer.
+    if (concrete && concrete !== "other" && timing) return "B";
+    return "E";
+  }
+  if (situation === "pro") return "C";
+  if (situation === "private") return "D";
+  return "E";
+}

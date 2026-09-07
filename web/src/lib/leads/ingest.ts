@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { LeadIntake } from "./schema";
+import { computeTier, type LeadTier } from "./qualification";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
 //
@@ -46,6 +47,8 @@ export interface IngestCtx {
 
 export interface IngestResult {
   leadId: number;
+  /** Derived qualification tier, null when no answers were submitted. */
+  tier: LeadTier | null;
   companyId: number;
   personId: number;
   /** True when an existing company was reused (deduped). */
@@ -164,6 +167,12 @@ export async function ingestLead(
   if (input.contact_name) customFields.contact_name = input.contact_name;
   if (input.contact_email) customFields.contact_email = input.contact_email;
   if (input.contact_phone) customFields.contact_phone = input.contact_phone;
+  // Derived tier (A–E) from the locked qualification model. Stored alongside
+  // the answers so the board can filter on it without re-deriving.
+  const tier = input.qualification ? computeTier(input.qualification) : null;
+  if (tier) customFields.tier = tier;
+  // Recorded, not acted on: the CRM has no PDF-attachment path yet.
+  if (input.send_intro !== undefined) customFields.send_intro = input.send_intro;
 
   const lead = await tx.lead.create({
     data: {
@@ -179,6 +188,9 @@ export async function ingestLead(
       message: input.message ?? null,
       serviceInterest: input.service_interest ?? null,
       receivedDate: new Date(),
+      ...(input.qualification
+        ? { qualification: input.qualification as Prisma.InputJsonValue }
+        : {}),
       ...(Object.keys(customFields).length > 0
         ? { customFields: customFields as Prisma.InputJsonValue }
         : {}),
@@ -228,6 +240,7 @@ export async function ingestLead(
 
   return {
     leadId: lead.id,
+    tier,
     companyId: company.id,
     personId: person.id,
     companyReused,

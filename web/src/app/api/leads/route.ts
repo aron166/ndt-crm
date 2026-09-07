@@ -98,6 +98,8 @@ export async function POST(request: Request) {
         serviceInterest: parsed.data.service_interest ?? null,
         message: parsed.data.message ?? null,
         sourceApp: key.appSlug,
+        // Derived qualification tier (A–E) — lets a rule target e.g. tier D.
+        tier: result.tier,
       },
     });
 
@@ -105,6 +107,7 @@ export async function POST(request: Request) {
       {
         ok: true,
         leadId: result.leadId,
+        tier: result.tier,
         companyId: result.companyId,
         personId: result.personId,
       },
