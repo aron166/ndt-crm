@@ -267,6 +267,12 @@ export async function upsertLeadStatus(formData: FormData) {
 
   const existing = await db.leadStatus.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!existing) return { error: "Státusz nem található" };
+  // Same guard as deleteLeadStatus: the tenant must never end up with zero initial
+  // statuses. Without this, un-checking the flag here silently leaves the board with
+  // no entry column, so leads with a null/deleted status stop rendering anywhere.
+  if (existing.isInitial && !isInitial) {
+    return { error: "A kezdő státusz jelölése nem vehető le — előbb jelölj ki másikat." };
+  }
 
   // Exactly one initial status and one commitment status (the megrendelés
   // column): clear the flag on the others when setting it here. A status can't
