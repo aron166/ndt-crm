@@ -81,10 +81,9 @@ export function PersonDetailClient({
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("activity");
-  // Pills read `tab` (instant highlight), bodies read `shownTab` — the tab body
-  // renders in a non-blocking pass instead of blocking the click. Same reason as
-  // CompanyDetailClient.
+  // Same split as CompanyDetailClient: pills read `tab`, bodies read `shownTab`.
   const shownTab = useDeferredValue(tab);
+  const switching = tab !== shownTab;
   const [taskOpen, setTaskOpen] = useState(false);
   const [employerOpen, setEmployerOpen] = useState(false);
   const [deleting, startDelete] = useTransition();
@@ -340,8 +339,13 @@ export function PersonDetailClient({
         </div>
 
         <div className="split-grid" style={{ marginTop: 16 }}>
-          {/* Left: tab content */}
-          <div>
+          {/* Left: tab content. While the deferred body is still rendering the new
+              pill is lit but the OLD body is on screen — dim it and kill pointer
+              events so a click can't land on a tab the user left. (Vanda, PR #83.) */}
+          <div
+            aria-busy={switching}
+            style={{ opacity: switching ? 0.55 : 1, pointerEvents: switching ? "none" : undefined, transition: "opacity 120ms" }}
+          >
             {/* Activity */}
             {shownTab === "activity" && (
               <div className="panel mount">

@@ -178,9 +178,9 @@ export default async function LeadsPage({
       : { ...ACTIVE, status: key };
 
   // One bounded query per column (newest first). Never an unbounded findMany.
-  // The "shown / total" badge needs a count ONLY when the column is capped —
-  // under the cap the row count IS the total, so the extra COUNT was one wasted
-  // round trip per column (8 on the live board) for a number we already had.
+  // ponytail: under the cap, rows.length IS the total — the COUNT only fires for a
+  // capped column, and pays a serial round trip when it does. Fine at ~2ms (fra1);
+  // if several columns ever sit at the cap, pair it back into the findMany's Promise.all.
   const perColumn = await Promise.all(
     statuses.map(async (st) => {
       const rows = await db.lead.findMany({

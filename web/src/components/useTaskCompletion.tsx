@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import { completeTask } from "@/app/actions/tasks";
 import {
@@ -53,7 +53,10 @@ export function useTaskCompletion() {
   const complete = useCallback(
     async (task: CompletableTask) => {
       await completeTask(task.id);
-      router.refresh();
+      // The refresh is a full RSC round trip. Outside a transition it blocked the
+      // click that ticked the task off, and delayed the follow-up modal behind it.
+      // The task IS done before the modal opens either way — only the re-render moves.
+      startTransition(() => router.refresh());
       if (shouldPromptStage(task)) {
         setStageTaskId(task.id);
       } else if (shouldLogInteractionOnComplete(task)) {

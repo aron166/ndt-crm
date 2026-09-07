@@ -125,11 +125,10 @@ export function CompanyDetailClient({
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("overview");
-  // The tab pills read `tab` (instant highlight); every tab BODY reads
-  // `shownTab`, so React renders the new body in a non-blocking pass instead of
-  // blocking the click. This component is ~950 lines and the overview tab mounts
-  // two charts — that render was the interaction, not the state update.
+  // Pills read `tab` (instant highlight); tab BODIES read `shownTab`, so the
+  // ~950-line body renders in a non-blocking pass instead of inside the click.
   const shownTab = useDeferredValue(tab);
+  const switching = tab !== shownTab;
   const [logOpen, setLogOpen] = useState(false);
   const [logPerson, setLogPerson] = useState<Contact | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -364,6 +363,15 @@ export function CompanyDetailClient({
           </button>
         ))}
       </div>
+
+      {/* While a tab body is still rendering (useDeferredValue), the new pill is
+          already lit but the OLD body is on screen — and was still clickable.
+          Dim it and turn off pointer events so a click can't fire against a tab
+          the user believes they left. (Vanda, PR #83.) */}
+      <div
+        aria-busy={switching}
+        style={{ opacity: switching ? 0.55 : 1, pointerEvents: switching ? "none" : undefined, transition: "opacity 120ms" }}
+      >
 
       {/* Overview */}
       {shownTab === "overview" && (
@@ -952,6 +960,7 @@ export function CompanyDetailClient({
           <AuditLogEntries entries={auditEntries} />
         </div>
       )}
+      </div>
     </>
   );
 }

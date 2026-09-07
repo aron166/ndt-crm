@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, CheckCircle2 } from "lucide-react";
@@ -68,9 +68,11 @@ export function ContextTasksTab({
     });
   }
 
-  async function handleReopen(id: number) {
-    await reopenTask(id);
-    router.refresh();
+  function handleReopen(id: number) {
+    startTransition(async () => {
+      await reopenTask(id);
+      router.refresh();
+    });
   }
 
   const open = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled");

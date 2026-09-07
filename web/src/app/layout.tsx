@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Insights } from "@/components/Insights";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -32,11 +32,9 @@ export default function RootLayout({
     >
       <body className="h-full">
         {children}
-        {/* Field RUM (INP/LCP/CLS + element attribution). The dashboard was being
-            read for INP numbers this app was never reporting — nothing was
-            instrumented before this. Needs Speed Insights enabled on the Vercel
-            project (Áron-only). */}
-        <SpeedInsights />
+        {/* Field RUM — see components/Insights.tsx. Needs Speed Insights enabled
+            on the Vercel project (Áron) before it reports anything. */}
+        <Insights />
       </body>
     </html>
   );

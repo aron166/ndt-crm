@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { TaskModal } from "./TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
@@ -74,15 +74,24 @@ export function TasksClient({ tasks }: TasksClientProps) {
     });
   }
 
-  async function handleReopen(id: number) {
-    await reopenTask(id);
-    router.refresh();
+  // Both were bare `await action(); router.refresh()` inside the click — the
+  // await and the refresh's re-render ran as blocking work attributed to the
+  // interaction. Same `startTransition` shape the kanbans already use.
+  const [, startTransition] = useTransition();
+
+  function handleReopen(id: number) {
+    startTransition(async () => {
+      await reopenTask(id);
+      router.refresh();
+    });
   }
 
-  async function handleDelete(id: number) {
+  function handleDelete(id: number) {
     if (!confirm("Biztosan törlöd ezt a feladatot?")) return;
-    await deleteTask(id);
-    router.refresh();
+    startTransition(async () => {
+      await deleteTask(id);
+      router.refresh();
+    });
   }
 
   return (
