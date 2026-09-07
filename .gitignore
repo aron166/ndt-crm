@@ -68,3 +68,7 @@ redesign/
 .agents/
 .claude/
 ADR/002-domain-layer-and-platform-foundations.md
+
+# session temp files for commit/PR bodies (see memory/workflows.md)
+.git-msg-tmp
+.pr-body-tmp
