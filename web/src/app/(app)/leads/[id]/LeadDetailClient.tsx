@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Building2, User, Mail, Phone, Globe, CheckCircle2, Pencil, Trash2, PhoneCall, CalendarClock } from "lucide-react";
@@ -93,6 +93,9 @@ export function LeadDetailClient({
   const [logging, setLogging] = useState(false);
   const [deleting, startDelete] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [assignedTo, setAssignedTo] = useState(String(lead.assignedToId ?? ""));
+  // Resync when a successful assign (or any other refresh) brings new props in.
+  useEffect(() => { setAssignedTo(String(lead.assignedToId ?? "")); }, [lead.assignedToId]);
   const closed = outcome !== "open" || converted !== null;
 
   function handleDelete() {
@@ -138,10 +141,18 @@ export function LeadDetailClient({
     });
   }
 
+  // Controlled so a failed assign visibly reverts — an uncontrolled select keeps
+  // the DOM value the user picked even though the server never took it (same
+  // silent-revert class as the kanban drag fix).
   function handleAssign(v: string) {
+    const prev = assignedTo;
+    setAssignedTo(v);
     startStatus(async () => {
       const res = await assignLeadAction(lead.id, v === "" ? null : Number(v));
-      if ("error" in res) setActionError(res.error);
+      if ("error" in res) {
+        setActionError(res.error);
+        setAssignedTo(prev);
+      }
       router.refresh();
     });
   }
@@ -311,7 +322,7 @@ export function LeadDetailClient({
               <div className="flex justify-between items-center" style={{ fontSize: 12 }}>
                 <span style={{ color: "var(--fg-mute)" }}>Felelős</span>
                 <select
-                  defaultValue={lead.assignedToId ?? ""}
+                  value={assignedTo}
                   onChange={(e) => handleAssign(e.target.value)}
                   disabled={statusPending}
                   className="font-mono-ndt"

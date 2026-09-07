@@ -6,7 +6,7 @@ company, one tenant in production today, but the schema is multi-tenant and the
 software is meant to be sold later. The next 4 weeks are about a sales pipeline
 (lead kanban, call-outcome logging, automations, HTTP API for external agents).
 
-Read `CLAUDE.md`, `ADR/`, `prisma/schema.prisma`, `src/lib/`, `src/actions/`,
+Read `CLAUDE.md`, `ADR/`, `prisma/schema.prisma`, `src/lib/`, `src/app/actions/`,
 `src/app/api/`, and the tests before writing anything.
 
 ## What I want from you

@@ -54,6 +54,10 @@ export const leadPatchSchema = z
     custom_fields: z.record(z.string().max(100), z.unknown()).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: "Empty patch" })
+  // lost_reason is only read by setLeadOutcome; alone it would 200 with an unchanged lead.
+  .refine((d) => d.lost_reason === undefined || d.outcome === "lost", {
+    message: "lost_reason requires outcome=lost", path: ["lost_reason"],
+  })
   .refine((d) => new TextEncoder().encode(JSON.stringify(d.custom_fields ?? {})).length <= 16 * 1024, {
     message: "custom_fields exceeds 16KB", path: ["custom_fields"],
   });
