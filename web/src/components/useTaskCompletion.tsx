@@ -8,14 +8,28 @@ import {
   taskTypeToInteractionType,
 } from "@/lib/interactions";
 import { LogInteractionModal } from "./LogInteractionModal";
+import { LeadStagePromptModal } from "./LeadStagePromptModal";
 
 export interface CompletableTask {
   id: number;
   type: string | null;
   companyId: number | null;
   personId: number | null;
+  /** Set when the task serves a lead (e.g. a callback) — drives the stage prompt. */
+  leadId?: number | null;
   companyName?: string;
   personName?: string;
+}
+
+/**
+ * A completed CALL task that serves a lead asks which stage the lead is in now
+ * (Péter, 2026-09-07): ticking it off is ambiguous, so it must never advance the
+ * card by itself. This takes precedence over the log-interaction prompt — the
+ * lead's own "Hívás eredménye" modal is the richer way to log that call, and two
+ * stacked dialogs on one click is worse than either.
+ */
+function shouldPromptStage(task: CompletableTask): boolean {
+  return task.leadId != null && task.type === "call";
 }
 
 /**
@@ -34,12 +48,15 @@ export interface CompletableTask {
 export function useTaskCompletion() {
   const router = useRouter();
   const [logTask, setLogTask] = useState<CompletableTask | null>(null);
+  const [stageTaskId, setStageTaskId] = useState<number | null>(null);
 
   const complete = useCallback(
     async (task: CompletableTask) => {
       await completeTask(task.id);
       router.refresh();
-      if (shouldLogInteractionOnComplete(task)) {
+      if (shouldPromptStage(task)) {
+        setStageTaskId(task.id);
+      } else if (shouldLogInteractionOnComplete(task)) {
         setLogTask(task);
       }
     },
@@ -52,10 +69,20 @@ export function useTaskCompletion() {
    * drag-to-done via `moveTask`). No-op for non-interaction tasks.
    */
   const promptLog = useCallback((task: CompletableTask) => {
-    if (shouldLogInteractionOnComplete(task)) {
+    if (shouldPromptStage(task)) {
+      setStageTaskId(task.id);
+    } else if (shouldLogInteractionOnComplete(task)) {
       setLogTask(task);
     }
   }, []);
+
+  // Stable identity: LeadStagePromptModal has this in an effect dependency list,
+  // and a fresh closure each render would re-fire the server action forever.
+  const closeStage = useCallback(() => setStageTaskId(null), []);
+
+  const stageModal = stageTaskId !== null ? (
+    <LeadStagePromptModal key={stageTaskId} taskId={stageTaskId} onClose={closeStage} />
+  ) : null;
 
   const logModal = logTask ? (
     <LogInteractionModal
@@ -70,5 +97,7 @@ export function useTaskCompletion() {
     />
   ) : null;
 
-  return { complete, promptLog, logModal };
+  // One `logModal` node keeps every existing call site unchanged — it now carries
+  // whichever prompt applies.
+  return { complete, promptLog, logModal: <>{logModal}{stageModal}</> };
 }
