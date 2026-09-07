@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ANSWER_MAX } from "./qualification";
 
 // Public lead-intake payload (POST /api/leads).
 // Landing pages (BetonScan/BirdsView) and automations (n8n) post this shape.
@@ -40,6 +41,19 @@ export const leadIntakeSchema = z
     landing_variant: optStr,
     lead_score: z.preprocess(emptyToUndef, z.coerce.number().optional()),
     priority: optStr,
+
+    // Qualification answers keyed by the permanent slugs in the locked
+    // qualification model (birdsview/27_qualification_model.md): `gate` plus
+    // either the Branch A seven (situation, concrete, goal, size, postcode,
+    // timing, own_device) or the Branch B three (hook, use_case, work).
+    // Same shape as the setter tab writes, so both land on leads.qualification.
+    // `intent_path` (task|curious) is accepted as the wire alias of `gate`.
+    // Deliberately open (z.record) — adding a question must never need a deploy,
+    // and an answer must never be dropped because a slug was renamed.
+    qualification: z.record(z.string().max(50), z.string().max(ANSWER_MAX)).optional(),
+    // Send the intro material (termékismertető) now: emails it when Resend is
+    // connected, otherwise creates the "Küldd el a termékismertetőt" task.
+    send_intro: z.boolean().optional(),
   })
   .refine((d) => Boolean(d.contact_email || d.contact_phone), {
     message: "At least one of contact_email or contact_phone is required",

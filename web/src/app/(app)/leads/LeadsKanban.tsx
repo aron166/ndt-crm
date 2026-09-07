@@ -12,6 +12,7 @@ import type { LeadStatusDef } from "@/lib/leads/statuses";
 import {
   LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, promptLostReason, type LeadOutcome,
 } from "@/lib/leads/outcomes";
+import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 
 interface Lead {
   id: number;
@@ -23,6 +24,7 @@ interface Lead {
   serviceInterest: string | null;
   message: string | null;
   estimatedValue: number | null;
+  tier: string | null;
   createdAt: string | Date;
   lastContactAt: string | null;
   callbackDueAt: string | null;
@@ -117,6 +119,21 @@ function LeadCard({
       >
         <Trash2 style={{ width: 12, height: 12 }} />
       </button>
+
+      {/* Tier badge */}
+      {isTier(lead.tier) && (
+        <span
+          className="font-mono-ndt"
+          title={TIER_LABEL[lead.tier]}
+          style={{
+            display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 3,
+            fontWeight: 700, color: TIER_COLOR[lead.tier], border: `1px solid ${TIER_COLOR[lead.tier]}`,
+            background: "var(--bg-hover)",
+          }}
+        >
+          {lead.tier}
+        </span>
+      )}
 
       {/* Person (headline) */}
       <Link

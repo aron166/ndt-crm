@@ -12,6 +12,7 @@ import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import type { QualificationQuestion } from "@/lib/leads/qualification";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
+import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
 
 interface Interaction {
@@ -57,6 +58,7 @@ interface Lead {
   convertedDealId: number | null;
   createdAt: string | Date;
   customFields: Record<string, unknown> | null;
+  tier: string | null;
   companyId: number | null;
   company: { id: number; name: string; city: string | null; website: string | null } | null;
   contact: {
@@ -175,7 +177,20 @@ export function LeadDetailClient({
       {/* Header */}
       <div className="page-head">
         <div>
-          <h1 className="page-title">
+          <h1 className="page-title flex items-center gap-2">
+            {isTier(lead.tier) && (
+              <span
+                className="font-mono-ndt"
+                title={TIER_LABEL[lead.tier]}
+                style={{
+                  fontSize: 12, padding: "2px 7px", borderRadius: 4, fontWeight: 700,
+                  color: TIER_COLOR[lead.tier], border: `1px solid ${TIER_COLOR[lead.tier]}`,
+                  background: "var(--bg-hover)",
+                }}
+              >
+                {lead.tier}
+              </span>
+            )}
             {lead.serviceInterest || lead.subject || "Lead"}
           </h1>
           <p className="page-sub">

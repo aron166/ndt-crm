@@ -50,6 +50,7 @@ const LEAD_FIELDS = [
   { key: "status", label: "Státusz" },
   { key: "outcome", label: "Kimenetel (open/won/lost)" },
   { key: "channel", label: "Csatorna (channel)" },
+  { key: "tier", label: "Minősítés (A–E)" },
   { key: "callOutcome", label: "Hívás eredménye (kulcs)" },
   { key: "idleDays", label: "Tétlen napok (lead_idle)" },
   // Company attributes (auto-merged by the engine for richer targeting):

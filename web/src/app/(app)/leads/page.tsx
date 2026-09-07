@@ -7,6 +7,7 @@ import { Settings2 } from "lucide-react";
 import { fullName, formatRelativeTime } from "@/lib/utils";
 import { getLeadExtras } from "@/lib/leads/board";
 import { LEAD_OUTCOME_LABEL, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/outcomes";
+import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 
 const TENANT_ID = 1;
 const PAGE_SIZE = 30;
@@ -17,12 +18,14 @@ const COLUMN_LIMIT = 50;
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string }>;
+  searchParams: Promise<{ view?: string; page?: string; tier?: string }>;
 }) {
-  const { view, page: rawPage } = await searchParams;
+  const { view, page: rawPage, tier: rawTier } = await searchParams;
   const showConverted = view === "closed" || view === "converted";
   const parsedPage = Number.parseInt(rawPage ?? "1", 10);
   const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+  // Tier filter applies only to the active (kanban) view — closed list ignores it.
+  const tier = isTier(rawTier) ? rawTier : null;
 
   // Counts power the toggle. Won (= converted to a deal) and lost leads leave
   // the active board — the "Lezárt" list keeps them for history.
@@ -164,7 +167,7 @@ export default async function LeadsPage({
   // a tenant can end up with zero isInitial statuses (unchecking it at /leads/setup
   // clears the flag without electing a replacement), and orphaned leads must still land.
   const initialKey = statuses.find((s) => s.isInitial)?.key ?? statuses[0]?.key ?? "new";
-  const ACTIVE = { tenantId: TENANT_ID, convertedDealId: null, outcome: "open" } as const;
+  const ACTIVE = { tenantId: TENANT_ID, convertedDealId: null, outcome: "open", ...(tier ? { tier } : {}) };
   const knownKeys = statuses.map((s) => s.key);
   // A lead whose status was deleted at /leads/setup has no column — it lands in
   // the entry column instead of vanishing from the board (which would make the
@@ -217,6 +220,29 @@ export default async function LeadsPage({
   }));
   const fresh = columnTotals[initialKey] ?? 0;
 
+  const tierPill = (href: string, active: boolean, label: string, color?: string) => (
+    <Link
+      key={href}
+      href={href}
+      className="rounded-full font-mono-ndt"
+      style={{
+        height: 26, padding: "0 12px", fontSize: 12, lineHeight: "26px",
+        background: active ? (color ? "var(--bg-hover)" : "var(--indigo-soft)") : "var(--bg-panel)",
+        color: active ? (color ?? "var(--indigo)") : "var(--fg-mute)",
+        border: `1px solid ${active ? (color ?? "var(--indigo-line)") : "var(--line-soft)"}`,
+      }}
+    >
+      {label}
+    </Link>
+  );
+
+  const TierFilter = (
+    <div className="flex items-center gap-2">
+      {tierPill("/leads", tier === null, "Mind")}
+      {TIERS.map((t) => tierPill(`/leads?tier=${t}`, tier === t, `${t} · ${TIER_LABEL[t]}`, TIER_COLOR[t]))}
+    </div>
+  );
+
   return (
     <div className="mount">
       <div className="page-head">
@@ -234,6 +260,7 @@ export default async function LeadsPage({
           </p>
         </div>
         <div className="page-actions" style={{ gap: 8 }}>
+          {TierFilter}
           {Toggle}
           <Link href="/leads/setup" className="btn sm" style={{ gap: 6 }}>
             <Settings2 style={{ width: 13, height: 13 }} />

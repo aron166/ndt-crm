@@ -100,7 +100,7 @@ export const LEAD_API_SELECT = {
   id: true, status: true, outcome: true, closedAt: true, lostReason: true,
   assignedToId: true, source: true, sourceApp: true, channel: true, campaign: true,
   subject: true, serviceInterest: true, message: true, estimatedValue: true,
-  customFields: true, qualification: true, convertedDealId: true, receivedDate: true, createdAt: true,
+  customFields: true, qualification: true, tier: true, convertedDealId: true, receivedDate: true, createdAt: true,
   company: { select: { id: true, name: true, city: true, vatNumber: true } },
   contact: {
     select: {
