@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-07
 **Status:** Accepted
-**Author:** Kai (CTO) — with Áron
+**Author:** Nate (lead dev, ndt-crm) — recording Kai's call
 
 ## Context
 
