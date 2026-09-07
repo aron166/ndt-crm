@@ -166,4 +166,50 @@ describe("computeTier", () => {
       timing: "ezen a héten", own_device: "nem",
     })).toBe("B");
   });
+
+  it("'igény' is not 'igen' (Vanda #84 re-review)", () => {
+    // "igény" ("need/demand") is everywhere in Hungarian sales prose, and the
+    // prefix form made it a machine signal — tier A, "call within 1 hour".
+    const co = { gate: "feladat", situation: "cég", concrete: "fal", timing: "ezen a héten" };
+    expect(computeTier({ ...co, own_device: "igény szerint bérelnénk" })).toBe("B");
+    expect(computeTier({ ...co, own_device: "igényelnénk egyet" })).toBe("B");
+    // A real yes still is one.
+    expect(computeTier({ ...co, own_device: "igen" })).toBe("A");
+    expect(computeTier({ ...co, own_device: "igen, van egy gépünk" })).toBe("A");
+  });
+
+  it("'körülnézek' is one word, and it is the curious gate", () => {
+    expect(computeTier({ gate: "körülnézek", situation: "cég", own_device: "igen" })).toBe("E");
+  });
+
+  it("'nem csak X' adds to X, it does not deny it", () => {
+    expect(computeTier({
+      gate: "feladat", situation: "cég", concrete: "nem csak fal",
+      timing: "ezen a héten", own_device: "nem",
+    })).toBe("B");
+  });
+
+  // The table-driven grid Vanda asked for: this is what would have caught the
+  // MIN_PREFIX breakage immediately, because it pins every canonical token.
+  it("every canonical landing token still tiers per the spec", () => {
+    const base = { gate: "task", situation: "company", concrete: "wall", timing: "this_week" };
+    const cases: [Record<string, string>, string | null][] = [
+      [{ ...base, own_device: "yes" }, "A"],
+      [{ ...base, own_device: "maybe" }, "A"],
+      [{ ...base, own_device: "no", goal: "technology" }, "A"],
+      [{ ...base, own_device: "no" }, "B"],
+      [{ ...base, own_device: "no", goal: "condition" }, "B"],
+      [{ ...base, situation: "pro" }, "C"],
+      [{ ...base, situation: "private" }, "D"],
+      [{ gate: "curious" }, "E"],
+      [{ intent_path: "curious" }, "E"],
+      [{ ...base, own_device: "no", timing: "no_date" }, null],
+      [{ ...base, own_device: "no", concrete: "none" }, null],
+      [{ gate: "task", situation: "company" }, null],
+      [{}, null],
+    ];
+    for (const [answers, want] of cases) {
+      expect(computeTier(answers), JSON.stringify(answers)).toBe(want);
+    }
+  });
 });

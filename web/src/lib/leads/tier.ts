@@ -98,7 +98,8 @@ const NEG_BARRIERS = new Set(["|", "hanem", "de", "viszont", "azonban", "but"]);
 function negatedAt(ws: string[], i: number): boolean {
   for (let j = i - 1; j >= Math.max(0, i - NEG_WINDOW); j--) {
     if (NEG_BARRIERS.has(ws[j])) return false;
-    if (NEGATORS.has(ws[j])) return true;
+    // "nem csak fal" is "not ONLY a wall" — an addition, not a denial.
+    if (NEGATORS.has(ws[j])) return ws[j + 1] !== "csak";
   }
   return false;
 }
@@ -129,7 +130,7 @@ const SITUATION = {
   // "projekt" was here and matched "családi ház projekt" — a private lead typing
   // the commonest Hungarian word for a job. It is also why `pro` below is exact
   // and the stem is "profi*": "pro*" would match "projekt" all over again.
-  company: ["company", "ceg*", "kft", "zrt", "bt", "vallalkoz*", "munkahely*"],
+  company: ["company", "ceg*", "kft", "zrt", "bt", "vallalkoz*"],
   pro: ["pro", "profi*", "szakember*", "villanyszerel*", "statikus*", "kivitelez*", "epitesz*", "muszaki ellenor*"],
   private: ["private", "magan*", "sajat ingatlan*", "csaladi haz*", "lakas*"],
 } as const;
@@ -139,7 +140,7 @@ const SITUATION = {
 // pontosan hol" a NON-concrete answer. Negation is negatedAt()'s job now.
 const CONCRETE = {
   no: ["nem beton*", "mas", "other", "none"],
-  yes: ["yes", "igen*", "fal*", "wall*", "fodem*", "aljzat*", "slab*", "hid*", "bridge*", "mutargy*", "beton*", "concrete*", "padlo*"],
+  yes: ["yes", "igen", "fal*", "wall*", "fodem*", "aljzat*", "slab*", "hid*", "bridge*", "mutargy*", "beton*", "concrete*", "padlo*"],
 } as const;
 
 // `condition` is FIRST on purpose: "állapot értékelés" contains an evaluation
@@ -154,7 +155,7 @@ const GOAL = {
 const OWN_DEVICE = {
   no: ["nem", "no", "nincs*"],
   maybe: ["maybe", "talan*", "lehet*"],
-  yes: ["yes", "igen*"],
+  yes: ["yes", "igen"],
 } as const;
 
 const GATE = {
@@ -163,7 +164,7 @@ const GATE = {
   // so a curious lead used to fall through to the company branch and could come
   // out tier A. "nez*" is deliberately NOT a bare keyword: "nézzük meg a falat"
   // is a job, not a browse.
-  curious: ["curious", "erdekel*", "erdeklod*", "nezelod*", "tajekozod*", "csak nez*", "korul nez*"],
+  curious: ["curious", "erdekel*", "erdeklod*", "nezelod*", "tajekozod*", "csak nez*", "korulnez*"],
 } as const;
 
 /** Timing answers that mean "no date named". */

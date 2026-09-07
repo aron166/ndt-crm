@@ -35,14 +35,19 @@ export const ANSWER_KEYS_MAX = 40;
  * length, value length, and now the number of keys. One definition, used by the
  * setter panel, the PATCH route and the public intake schema alike.
  */
+export const ANSWER_LENGTH_MSG = `A válasz szöveges és legfeljebb ${ANSWER_MAX} karakter lehet`;
+export const ANSWER_KEYS_MSG = `Legfeljebb ${ANSWER_KEYS_MAX} válasz küldhető`;
+/** Only these reach a user; anything else is zod's English and gets the fallback. */
+const OUR_MESSAGES = new Set([ANSWER_LENGTH_MSG, ANSWER_KEYS_MSG]);
+
 export const answersRecordSchema = z
-  .record(
-    z.string().max(50, { message: "A kérdés azonosítója legfeljebb 50 karakter lehet" }),
-    z.string().max(ANSWER_MAX, { message: `A válasz szöveges és legfeljebb ${ANSWER_MAX} karakter lehet` }),
-  )
-  .refine((o) => Object.keys(o).length <= ANSWER_KEYS_MAX, {
-    message: `Legfeljebb ${ANSWER_KEYS_MAX} válasz küldhető`,
-  });
+  .record(z.string().max(50), z.string().max(ANSWER_MAX, { message: ANSWER_LENGTH_MSG }))
+  .refine((o) => Object.keys(o).length <= ANSWER_KEYS_MAX, { message: ANSWER_KEYS_MSG });
+
+/** The first issue we actually wrote, or the generic Hungarian fallback. */
+export function answersErrorMessage(error: z.ZodError): string {
+  return error.issues.map((i) => i.message).find((m) => OUR_MESSAGES.has(m)) ?? ANSWER_LENGTH_MSG;
+}
 
 /**
  * The locked qualification model (machines/birdsview/27_qualification_model.md,
@@ -147,9 +152,7 @@ export function parseAnswers(
   const parsed = answersRecordSchema.safeParse(raw);
   // Report what actually failed: mapping every schema error to the length
   // message told a 41-key payload it had a too-long answer. (Vanda, #84.)
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? `A válasz szöveges és legfeljebb ${ANSWER_MAX} karakter lehet` };
-  }
+  if (!parsed.success) return { error: answersErrorMessage(parsed.error) };
   const known = new Set(questions.map((q) => q.slug));
   const out: Record<string, string> = {};
   for (const [slug, value] of Object.entries(parsed.data)) {
