@@ -210,9 +210,12 @@ export async function runLeadAction(
 ): Promise<boolean> {
   if (actionType === "webhook_out") {
     const cfg = actionConfig as WebhookOutActionConfig;
-    if (!cfg?.url || !/^https?:\/\//i.test(cfg.url)) return false;
+    // HTTPS only — mirrors parseRuleForm. Trim too: rules persisted before that
+    // normalisation landed may still carry surrounding whitespace.
+    const url = cfg?.url?.trim() ?? "";
+    if (!/^https:\/\//i.test(url)) return false;
     const { companyName, ...rest } = ev;
-    const res = await fetch(cfg.url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event: ev.type, ...rest, company: companyName ?? null, firedAt: new Date().toISOString() }),

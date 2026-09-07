@@ -139,7 +139,12 @@ async function runLeadIdleRule(rule: Rule, now: Date): Promise<number> {
     },
     take: 500, // ponytail: cron batch cap; the rest is picked up next run
   });
-  if (leads.length === 0) return 0;
+  if (leads.length === 0) {
+    // Stamp anyway — the rule DID run, it just matched nothing. Matches what the
+    // deal_idle_in_stage path does after an empty query.
+    await db.automationRule.update({ where: { id: rule.id }, data: { lastRunAt: now } });
+    return 0;
+  }
 
   const extras = await getLeadExtras(
     rule.tenantId,
