@@ -160,7 +160,10 @@ export default async function LeadsPage({
   }
 
   const statuses = await getLeadStatuses(TENANT_ID);
-  const initialKey = statuses.find((s) => s.isInitial)?.key ?? "new";
+  // Fall back to the first configured column, never to a key with no column:
+  // a tenant can end up with zero isInitial statuses (unchecking it at /leads/setup
+  // clears the flag without electing a replacement), and orphaned leads must still land.
+  const initialKey = statuses.find((s) => s.isInitial)?.key ?? statuses[0]?.key ?? "new";
   const ACTIVE = { tenantId: TENANT_ID, convertedDealId: null, outcome: "open" } as const;
   const knownKeys = statuses.map((s) => s.key);
   // A lead whose status was deleted at /leads/setup has no column — it lands in

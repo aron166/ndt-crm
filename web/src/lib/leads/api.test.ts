@@ -14,6 +14,12 @@ describe("lead API schemas", () => {
     expect(leadPatchSchema.safeParse({ outcome: "maybe" }).success).toBe(false);
     expect(leadPatchSchema.safeParse({ assigned_to_id: null, custom_fields: { a: 1, b: null } }).success).toBe(true);
   });
+  it("patch rejects lost_reason without outcome=lost (would 200 with an unchanged lead)", () => {
+    expect(leadPatchSchema.safeParse({ lost_reason: "No budget" }).success).toBe(false);
+    expect(leadPatchSchema.safeParse({ outcome: "won", lost_reason: "No budget" }).success).toBe(false);
+    expect(leadPatchSchema.safeParse({ outcome: "lost", lost_reason: "No budget" }).success).toBe(true);
+    expect(leadPatchSchema.safeParse({ outcome: "lost" }).success).toBe(true);
+  });
   it("wire interaction payload maps to the shared modal schema (same rules)", () => {
     const wire = leadInteractionWireSchema.parse({ outcome: "callback_requested", note: "x", callback_at: "2026-09-10T10:00:00Z", assigned_to_id: "2" });
     const r = callOutcomeSchema.safeParse(toCallOutcomeInput(wire));

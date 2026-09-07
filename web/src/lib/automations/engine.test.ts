@@ -259,6 +259,11 @@ describe("runLeadAction / runAutomationAction (v2 actions)", () => {
     const body = JSON.parse(String((init as RequestInit).body));
     expect(body).toMatchObject({ event: "lead_created", leadId: 5, company: "Acme Kft." });
     expect(await runLeadAction("webhook_out", { url: "ftp://x" }, ev)).toBe(false);
+    // HTTPS only — the payload carries CRM ids and the secret lives in the URL.
+    expect(await runLeadAction("webhook_out", { url: "http://n8n.local/hook" }, ev)).toBe(false);
+    // …and a rule persisted before the trim landed still delivers.
+    expect(await runLeadAction("webhook_out", { url: "  https://n8n.local/hook  " }, ev)).toBe(true);
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe("https://n8n.local/hook");
     fetchMock.mockRestore();
   });
 

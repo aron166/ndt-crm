@@ -585,7 +585,7 @@ function RuleForm({
               <div>
                 <label className="field-label">Webhook URL</label>
                 <input style={inputStyle} value={form.webhookUrl} onChange={(e) => set("webhookUrl", e.target.value)} placeholder="https://n8n.example.com/webhook/…" />
-                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát.</p>
+                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát. Csak <strong>https://</strong> — nincs auth fejléc, a titkot az URL-be tedd.</p>
               </div>
             )}
 

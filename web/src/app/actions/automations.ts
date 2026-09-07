@@ -8,6 +8,7 @@ import {
   TRIGGER_TYPES, ACTION_TYPES,
   type TriggerType, type ActionType,
 } from "@/lib/automations/types";
+import { getLeadStatuses } from "@/lib/leads/queries";
 
 const TENANT_ID = 1;
 
@@ -33,7 +34,7 @@ interface RuleInput {
 }
 
 // Validate + normalise the shared rule payload used by create and update.
-function parseRuleForm(formData: FormData): RuleInput | { error: string } {
+async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: string }> {
   const name = (formData.get("name") as string)?.trim();
   const triggerType = formData.get("triggerType") as string;
   const actionType = (formData.get("actionType") as string) || "create_task";
@@ -59,14 +60,33 @@ function parseRuleForm(formData: FormData): RuleInput | { error: string } {
     if (typeof actionConfig.toStatus !== "string" || !actionConfig.toStatus.trim()) {
       return { error: "A célstátusz kötelező" };
     }
+    // Resolve the reference in THIS tenant before persisting. A dangling key is
+    // saved happily but then fails inside changeLeadStatus on every single run —
+    // the engine swallows that error, so the rule retries forever, silently.
+    const statuses = await getLeadStatuses(TENANT_ID);
+    const toStatus = actionConfig.toStatus.trim();
+    if (!statuses.some((st) => st.key === toStatus)) {
+      return { error: "Ismeretlen célstátusz" };
+    }
+    actionConfig.toStatus = toStatus;
   } else if (actionType === "assign_lead") {
     if (!Number.isInteger(Number(actionConfig.assignedToId)) || Number(actionConfig.assignedToId) <= 0) {
       return { error: "A felelős kötelező" };
     }
+    const assignedToId = Number(actionConfig.assignedToId);
+    const user = await db.user.findFirst({ where: { id: assignedToId, tenantId: TENANT_ID }, select: { id: true } });
+    if (!user) return { error: "Ismeretlen felelős" };
+    actionConfig.assignedToId = assignedToId;
   } else if (actionType === "webhook_out") {
-    if (typeof actionConfig.url !== "string" || !/^https?:\/\//i.test(actionConfig.url.trim())) {
-      return { error: "Érvényes http(s) webhook URL kötelező" };
+    // HTTPS only: the payload carries CRM identifiers, and webhook_out sends no
+    // auth header by design — the secret lives IN the URL, so cleartext leaks it.
+    // Trim and store the normalised value; an untrimmed URL passed here but then
+    // failed the engine's regex, and the rule silently never fired.
+    const url = typeof actionConfig.url === "string" ? actionConfig.url.trim() : "";
+    if (!/^https:\/\//i.test(url)) {
+      return { error: "Érvényes https webhook URL kötelező" };
     }
+    actionConfig.url = url;
   } else {
     if (typeof actionConfig.titleTemplate !== "string" || !actionConfig.titleTemplate.trim()) {
       return { error: "A létrehozandó feladat címe kötelező" };
@@ -103,7 +123,7 @@ function parseRuleForm(formData: FormData): RuleInput | { error: string } {
 }
 
 export async function createAutomation(formData: FormData) {
-  const parsed = parseRuleForm(formData);
+  const parsed = await parseRuleForm(formData);
   if ("error" in parsed) return parsed;
 
   const rule = await db.automationRule.create({
@@ -128,7 +148,7 @@ export async function createAutomation(formData: FormData) {
 }
 
 export async function updateAutomation(id: number, formData: FormData) {
-  const parsed = parseRuleForm(formData);
+  const parsed = await parseRuleForm(formData);
   if ("error" in parsed) return parsed;
 
   const before = await db.automationRule.findFirst({
