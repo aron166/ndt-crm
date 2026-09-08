@@ -19,10 +19,17 @@ const INP_ELIGIBLE = new Set(["pointerdown", "pointerup", "click", "keydown", "k
 const args = process.argv.slice(2);
 const jsonFlagIdx = args.indexOf("--json");
 const jsonOutPath = jsonFlagIdx !== -1 ? args[jsonFlagIdx + 1] : null;
+const COLD = args.includes("--cold");
+
+// Fast-3G-ish profile for the cold pass only — the warm pass stays on the
+// default (unthrottled) network so the two runs remain comparable to the
+// numbers already reported.
+const COLD_NETWORK = { offline: false, latency: 150, downloadThroughput: (1.6 * 1024 * 1024) / 8, uploadThroughput: (750 * 1024) / 8 };
 
 let chromeProc = null;
 let userDataDir = null;
 let ws = null;
+const mutations = []; // one line per row that wrote to the dev DB, printed at the end
 
 function log(...a) { console.error(...a); }
 
@@ -150,12 +157,125 @@ async function main() {
     clickAndMeasure(cdp, sessionId, 'button[title="Kész"]')));
   }
 
-  printTable(results);
+  printTable("WARM (idle, hydrated, unthrottled network)", results);
+
+  let coldResults = null;
+  if (COLD) {
+    coldResults = await runColdPass(cdp, sessionId);
+    printTable("COLD (click as soon as hit-testable after load, fast-3G-ish network, no settle)", coldResults, true);
+  }
+
+  if (mutations.length) log(`\nMUTATED: ${mutations.join("; ")}`);
 
   if (jsonOutPath) {
-    writeFileSync(jsonOutPath, JSON.stringify(results, null, 2));
+    writeFileSync(jsonOutPath, JSON.stringify({ warm: results, cold: coldResults }, null, 2));
     log(`\nRaw results written to ${jsonOutPath}`);
   }
+}
+
+// ---------- cold pass: click during hydration, not after it ----------
+// Each row gets its own fresh target (no module-cache carryover between
+// pages) with browser cache cleared and CPU+network throttled, then clicks
+// the instant the element is hit-testable — no settle() wait at all.
+async function runColdPass(cdp, warmSessionId) {
+  const rows = [];
+
+  rows.push(await coldInteraction(cdp, "dashboard: panel-head nav link click (cold)", `${BASE}/`, async (sid) => {
+    await evalExpr(sid.cdp, sid.sessionId, `
+      (() => {
+        const links = Array.from(document.querySelectorAll('.panel-head a'));
+        const el = links.find(a => a.textContent && a.textContent.includes('Kanban'))
+                || links.find(a => a.textContent && a.textContent.includes('Hívás mód'))
+                || links[0];
+        if (el) el.setAttribute('data-inp-target', '1');
+        return !!el;
+      })()
+    `);
+    return coldClick(sid.cdp, sid.sessionId, '[data-inp-target="1"]');
+  }));
+
+  rows.push(await coldInteraction(cdp, "leads: kanban card open (cold)", `${BASE}/leads`, (sid) =>
+    coldClick(sid.cdp, sid.sessionId, '.kcol-body > div[role="button"]', getCardOwnPoint)));
+
+  rows.push(await coldInteraction(cdp, "companies: filter typing (cold)", `${BASE}/companies`, (sid) =>
+    coldType(sid.cdp, sid.sessionId, 'input[placeholder^="Keresés cég"]', "k")));
+
+  await ensureOpenTaskExists(cdp, warmSessionId); // the warm pass's own "g" row likely just completed the last one
+  rows.push(await coldInteraction(cdp, "tasks: completion click (cold)", `${BASE}/tasks`, (sid) =>
+    coldClick(sid.cdp, sid.sessionId, 'button[title="Kész"]')));
+
+  return rows;
+}
+
+// Fresh target + throttled CPU/network + cleared cache + observer re-armed,
+// navigates, then hands off to `actionFn` right after loadEventFired (no
+// settle). Closes the target when done.
+async function coldInteraction(cdp, label, url, actionFn) {
+  const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" });
+  const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
+  await cdp.send("Page.enable", {}, sessionId);
+  await cdp.send("Runtime.enable", {}, sessionId);
+  await cdp.send("Network.enable", {}, sessionId);
+  await cdp.send("Page.bringToFront", {}, sessionId);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 }, sessionId);
+  await cdp.send("Network.emulateNetworkConditions", COLD_NETWORK, sessionId);
+  await cdp.send("Network.clearBrowserCache", {}, sessionId);
+  await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: OBSERVER_SOURCE }, sessionId);
+
+  const loadPromise = new Promise((resolve) => {
+    const off = cdp.on("Page.loadEventFired", () => { off(); resolve(); });
+  });
+  await cdp.send("Page.navigate", { url }, sessionId);
+  await loadPromise;
+
+  let r;
+  try {
+    r = await actionFn({ cdp, sessionId });
+  } finally {
+    await cdp.send("Target.closeTarget", { targetId }).catch(() => {});
+  }
+  return finalize(label, r);
+}
+
+// Polls elementFromPoint (via getCenter/pointFn) every 50ms starting the
+// instant loadEventFired has already resolved — this is the whole point of
+// the cold pass: click the moment the element is hit-testable, which can be
+// well before React has hydrated and wired its listeners, not after an
+// artificial settle().
+async function pollUntilHitTestable(cdp, sessionId, selector, pointFn = getCenter, capMs = 3000) {
+  const start = Date.now();
+  while (Date.now() - start < capMs) {
+    const rect = await pointFn(cdp, sessionId, selector);
+    if (rect && rect.w > 0 && rect.h > 0) return { rect, elapsedMs: Date.now() - start };
+    await sleep(50);
+  }
+  return null;
+}
+
+async function coldClick(cdp, sessionId, selector, pointFn = getCenter) {
+  const found = await pollUntilHitTestable(cdp, sessionId, selector, pointFn);
+  if (!found) return { skip: `${selector} (never hit-testable within 3s of load)` };
+  await trustedMouseMove(cdp, sessionId, found.rect.x, found.rect.y);
+  await trustedPressRelease(cdp, sessionId, found.rect.x, found.rect.y);
+  // ponytail: fixed 2.2s buffer; poll for the route commit instead if this run gets slow
+  await sleep(2200);
+  const { inp, loaf } = await readPerf(cdp, sessionId);
+  return { ...summarize(inp, loaf), clickAtMs: found.elapsedMs };
+}
+
+async function coldType(cdp, sessionId, selector, char) {
+  const found = await pollUntilHitTestable(cdp, sessionId, selector);
+  if (!found) return { skip: `${selector} (never hit-testable within 3s of load)` };
+  await trustedMouseMove(cdp, sessionId, found.rect.x, found.rect.y);
+  await trustedPressRelease(cdp, sessionId, found.rect.x, found.rect.y);
+  await sleep(50);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", text: char, unmodifiedText: char, key: char }, sessionId);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", text: char, unmodifiedText: char, key: char }, sessionId);
+  // ponytail: fixed 2.2s buffer; poll for the route commit instead if this run gets slow
+  await sleep(2200);
+  const { inp, loaf } = await readPerf(cdp, sessionId);
+  const keyEntries = inp.filter((e) => e.name === "keydown" || e.name === "keypress" || e.name === "keyup");
+  return { ...summarize(keyEntries.length ? keyEntries : inp, loaf), clickAtMs: found.elapsedMs };
 }
 
 // ---------- injected page-side observer ----------
@@ -367,11 +487,11 @@ async function clickAndMeasure(cdp, sessionId, selector, pointFn = getCenter) {
   await sleep(150);
   await resetPerf(cdp, sessionId);
   await trustedPressRelease(cdp, sessionId, rect2.x, rect2.y);
-  // ponytail: extra buffer — a click that triggers client-side SPA navigation
-  // races the next Page.navigate otherwise (empirically: <2s left the next
-  // click on the next page dead — no events at all, even though hit-test and
-  // dispatch both reported success). If this ever needs to go lower, verify
-  // against the exact repro in git history first.
+  // ponytail: fixed 2.2s buffer; poll for the route commit instead if this run gets slow
+  // (a click that triggers client-side SPA navigation races the next
+  // Page.navigate otherwise — empirically, <2s left the next click on the
+  // next page dead: zero events, even though hit-test and dispatch both
+  // reported success. Verify against the repro in git history before lowering.)
   await sleep(2200);
   const { inp, loaf } = await readPerf(cdp, sessionId);
   return summarize(inp, loaf);
@@ -402,7 +522,7 @@ async function typeAndMeasure(cdp, sessionId, selector, text) {
     }
     prevLen = val.length;
   }
-  await sleep(2200); // ponytail: same safety buffer as clickAndMeasure
+  await sleep(2200); // ponytail: fixed 2.2s buffer; poll for the route commit instead if this run gets slow
   const { inp, loaf } = await readPerf(cdp, sessionId);
   const keyEntries = inp.filter((e) => e.name === "keydown" || e.name === "keypress" || e.name === "keyup");
   return summarize(keyEntries.length ? keyEntries : inp, loaf, keyEntries.length ? null : "no keydown/keypress/keyup entries; falling back to full entry set");
@@ -504,7 +624,7 @@ async function measureDrag(cdp, sessionId, label, url) {
     return { label, skipped: true, note: "SKIPPED (drag source/target elements not found in live DOM)" };
   }
 
-  await sleep(2200); // ponytail: same safety buffer as clickAndMeasure
+  await sleep(2200); // ponytail: fixed 2.2s buffer; poll for the route commit instead if this run gets slow
 
   const postCheck = await evalExpr(cdp, sessionId, `
     (() => {
@@ -569,7 +689,8 @@ async function ensureOpenTaskExists(cdp, sessionId) {
   await trustedMouseMove(cdp, sessionId, titleRect.x, titleRect.y);
   await trustedPressRelease(cdp, sessionId, titleRect.x, titleRect.y);
   await sleep(100);
-  for (const ch of "INP probe test task") {
+  const taskTitle = `INP probe test task ${new Date().toISOString()}`;
+  for (const ch of taskTitle) {
     await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", text: ch, unmodifiedText: ch, key: ch }, sessionId);
     await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", text: ch, unmodifiedText: ch, key: ch }, sessionId);
   }
@@ -579,6 +700,7 @@ async function ensureOpenTaskExists(cdp, sessionId) {
   await trustedMouseMove(cdp, sessionId, submitRect.x, submitRect.y);
   await trustedPressRelease(cdp, sessionId, submitRect.x, submitRect.y);
   await sleep(1500);
+  mutations.push(`created task "${taskTitle}" (no open task existed)`);
 }
 
 // ---------- outcome modal (interaction d) ----------
@@ -623,28 +745,35 @@ async function measureOutcomeModal(cdp, sessionId, url) {
   const submitFinal = finalize("leads: outcome modal submit", submitR);
   if (leadId && !submitFinal.skipped) {
     submitFinal.note = (submitFinal.note ? submitFinal.note + " " : "") + `(lead id=${leadId} mutated — default outcome no_answer, needs no extra field)`;
+    // idempotent by construction: every run resubmits the same default
+    // outcome (no_answer) for whichever lead's Hívás button it hits first,
+    // so repeated runs just keep resetting it to the same state.
+    mutations.push(`set outcome=no_answer on lead id=${leadId}`);
   }
 
   return { openResult: openFinal, submitResult: submitFinal };
 }
 
 // ---------- output ----------
-function printTable(results) {
-  console.log("\nAll numbers captured under 4x CPU throttling (Emulation.setCPUThrottlingRate rate:4). durationThreshold:0.\n");
-  console.log("| interaction | INP (ms) | input delay | processing | presentation | worst LoAF blockingDuration | ineligibleMax (hover etc) | attribution |");
-  console.log("|---|---|---|---|---|---|---|---|");
+function printTable(title, results, cold = false) {
+  console.log(`\n## ${title}\n`);
+  console.log(`4x CPU throttling.${cold ? " Network: fast-3G-ish (150ms latency, 1.6Mbps down, 750Kbps up). No settle — clicked the instant the target was hit-testable." : " Unthrottled network. Settled ~800ms after load before interacting."} durationThreshold:0.\n`);
+  const coldCol = cold ? " click-at (ms after load) |" : "";
+  console.log(`| interaction | INP (ms) | input delay | processing | presentation | worst LoAF blockingDuration | ineligibleMax (hover etc) |${coldCol} attribution |`);
+  console.log(`|---|---|---|---|---|---|---|${cold ? "---|" : ""}---|`);
   for (const r of results) {
+    const clickAt = cold ? ` ${r.clickAtMs ?? "-"} |` : "";
     if (r.skipped) {
-      console.log(`| ${r.label} | ${r.note} | - | - | - | - | ${r.ineligibleMax ?? "-"} | - |`);
+      console.log(`| ${r.label} | ${r.note} | - | - | - | - | ${r.ineligibleMax ?? "-"} |${clickAt} - |`);
     } else if (r.synthetic) {
-      console.log(`| ${r.label} | ${r.note} | - | - | - | ${r.worstLoafBlockingMs ?? "-"} | - | ${r.attribution} |`);
+      console.log(`| ${r.label} | ${r.note} | - | - | - | ${r.worstLoafBlockingMs ?? "-"} | - |${clickAt} ${r.attribution} |`);
     } else {
-      console.log(`| ${r.label} | ${r.inpMs} | ${r.inputDelayMs} | ${r.processingMs} | ${r.presentationMs} | ${r.worstLoafBlockingMs ?? "-"} | ${r.ineligibleMax ?? "-"} | ${r.attribution} |`);
+      console.log(`| ${r.label} | ${r.inpMs} | ${r.inputDelayMs} | ${r.processingMs} | ${r.presentationMs} | ${r.worstLoafBlockingMs ?? "-"} | ${r.ineligibleMax ?? "-"} |${clickAt} ${r.attribution} |`);
     }
   }
   console.log("\nWorst-3 raw entries per interaction:\n");
   console.log("```json");
-  console.log(JSON.stringify(results.map((r) => ({ label: r.label, worst3: r.worst3 ?? null, skipped: !!r.skipped, note: r.note ?? null })), null, 2));
+  console.log(JSON.stringify(results.map((r) => ({ label: r.label, worst3: r.worst3 ?? null, skipped: !!r.skipped, note: r.note ?? null, clickAtMs: r.clickAtMs ?? null })), null, 2));
   console.log("```");
 }
 
