@@ -10,9 +10,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { TaskModal } from "@/app/(app)/tasks/TaskModal";
-import { DealModal } from "@/app/(app)/deals/DealModal";
+import dynamic from "next/dynamic";
 import { LogOut, User, Plus, Bell, Search, ChevronDown } from "lucide-react";
+
+// The Topbar is in the app shell on EVERY route, and these two modals pull in
+// EntitySearch, Select, Textarea, FormField, the costing lib and two server
+// actions (~520 lines + deps). Statically imported, all of it had to download
+// and parse before hydration could finish on every page — which is what made a
+// click during the hydration window cost 192-312ms (docs/PERF_2026-09-08_INP.md).
+// They are only ever opened from the "+" menu, so they load on first open.
+const TaskModal = dynamic(
+  () => import("@/app/(app)/tasks/TaskModal").then((m) => m.TaskModal),
+  { ssr: false },
+);
+const DealModal = dynamic(
+  () => import("@/app/(app)/deals/DealModal").then((m) => m.DealModal),
+  { ssr: false },
+);
 
 // ── Breadcrumb labels ─────────────────────────────────────────
 const CRUMB: Record<string, string> = {
@@ -78,6 +92,15 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
   const crumbs = useCrumb(pathname);
   const [taskOpen, setTaskOpen] = useState(false);
   const [dealOpen, setDealOpen] = useState(false);
+  // Latch: mount on first open and keep mounted. Gating purely on `*Open` would
+  // defer the chunk too, but would also reset a half-filled form every close —
+  // this keeps today's "reopen and your input is still there" behaviour exactly.
+  const [taskMounted, setTaskMounted] = useState(false);
+  const [dealMounted, setDealMounted] = useState(false);
+  // Single door in for each modal, so a future call site cannot open one without
+  // also mounting it.
+  function openTask() { setTaskMounted(true); setTaskOpen(true); }
+  function openDeal() { setDealMounted(true); setDealOpen(true); }
   const [newMenuOpen, setNewMenuOpen] = useState(false);
 
   async function handleSignOut() {
@@ -91,8 +114,10 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
 
   return (
     <>
-      <TaskModal open={taskOpen} onClose={() => { setTaskOpen(false); router.refresh(); }} />
-      {defaultPipeline && (
+      {taskMounted && (
+        <TaskModal open={taskOpen} onClose={() => { setTaskOpen(false); router.refresh(); }} />
+      )}
+      {defaultPipeline && dealMounted && (
         <DealModal
           open={dealOpen}
           onClose={() => { setDealOpen(false); router.refresh(); }}
@@ -184,7 +209,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
           {/* + New split button */}
           <div className="flex items-stretch" style={{ borderRadius: 6, overflow: "hidden" }}>
             <button
-              onClick={() => setTaskOpen(true)}
+              onClick={openTask}
               className="flex items-center gap-1.5 font-medium transition-all"
               style={{
                 height: 32, padding: "0 12px", fontSize: 14,
@@ -201,7 +226,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
             </button>
             <div style={{ width: 1, background: "oklch(0.56 0.18 278)" }} />
             <button
-              onClick={() => defaultPipeline ? setDealOpen(true) : router.push("/deals/setup")}
+              onClick={() => defaultPipeline ? openDeal() : router.push("/deals/setup")}
               className="flex items-center gap-1 font-medium transition-all"
               style={{
                 height: 32, padding: "0 8px", fontSize: 14,
