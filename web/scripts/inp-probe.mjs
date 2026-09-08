@@ -20,6 +20,8 @@ const args = process.argv.slice(2);
 const jsonFlagIdx = args.indexOf("--json");
 const jsonOutPath = jsonFlagIdx !== -1 ? args[jsonFlagIdx + 1] : null;
 const COLD = args.includes("--cold");
+const repeatFlagIdx = args.indexOf("--repeat");
+const REPEAT = repeatFlagIdx !== -1 ? parseInt(args[repeatFlagIdx + 1], 10) : 7;
 
 // Fast-3G-ish profile for the cold pass only — the warm pass stays on the
 // default (unthrottled) network so the two runs remain comparable to the
@@ -100,111 +102,156 @@ async function main() {
 
   const ONLY = process.env.INP_ONLY; // debug helper, unset in normal use
   const SKIP = new Set((process.env.INP_SKIP || "").split(",").filter(Boolean));
+  const wantKey = (k) => (!ONLY || ONLY === k) && !SKIP.has(k);
 
-  if ((!ONLY || ONLY === "a") && !SKIP.has("a")) {
-  // ---------- (a) dashboard: panel-head nav link click ----------
-  results.push(await runOnPage(cdp, sessionId, "dashboard: panel-head nav link click", `${BASE}/`, async () => {
-    const found = await evalExpr(cdp, sessionId, `
-      (() => {
-        const links = Array.from(document.querySelectorAll('.panel-head a'));
-        const el = links.find(a => a.textContent && a.textContent.includes('Kanban'))
-                || links.find(a => a.textContent && a.textContent.includes('Hívás mód'))
-                || links[0];
-        if (!el) return false;
-        el.setAttribute('data-inp-target', '1');
-        return true;
-      })()
-    `);
-    if (!found.value) return { skip: ".panel-head a" };
-    return clickAndMeasure(cdp, sessionId, '[data-inp-target="1"]');
-  }));
+  log(`Running ${REPEAT} repetition(s) per interaction, rotating order each rep...`);
+
+  const WARM_KEYS = ["a", "b", "c", "d", "e", "f", "g"].filter(wantKey);
+  const warmSamples = new Map(); // label -> [{ r, result }]
+  for (let r = 0; r < REPEAT; r++) {
+    for (const key of rotate(WARM_KEYS, r)) {
+      for (const res of await warmOnce(key, cdp, sessionId)) pushSample(warmSamples, res.label, r, res);
+    }
   }
+  const warmStats = WARM_ROW_LABELS.filter((l) => warmSamples.has(l)).map((l) => ({ label: l, ...computeStats(warmSamples.get(l)) }));
+  printStatsTable("WARM (idle, hydrated, unthrottled network)", warmStats);
 
-  if ((!ONLY || ONLY === "b") && !SKIP.has("b")) {
-  // ---------- (b) leads: kanban card open ----------
-  results.push(await runOnPage(cdp, sessionId, "leads: kanban card open", `${BASE}/leads`, () =>
-    clickAndMeasure(cdp, sessionId, '.kcol-body > div[role="button"]', getCardOwnPoint)));
-  }
-
-  if ((!ONLY || ONLY === "c") && !SKIP.has("c")) {
-  // ---------- (c) leads: card drag between columns ----------
-  results.push(await measureDrag(cdp, sessionId, "leads: card drag between columns", `${BASE}/leads`));
-  }
-
-  if ((!ONLY || ONLY === "d") && !SKIP.has("d")) {
-  // ---------- (d) leads: outcome modal open + submit ----------
-  const { openResult, submitResult } = await measureOutcomeModal(cdp, sessionId, `${BASE}/leads`);
-  results.push(openResult);
-  results.push(submitResult);
-  }
-
-  if ((!ONLY || ONLY === "e") && !SKIP.has("e")) {
-  // ---------- (e) companies: filter typing ----------
-  results.push(await runOnPage(cdp, sessionId, "companies: filter typing", `${BASE}/companies`, () =>
-    typeAndMeasure(cdp, sessionId, 'input[placeholder^="Keresés cég"]', "kft")));
-  }
-
-  if ((!ONLY || ONLY === "f") && !SKIP.has("f")) {
-  // ---------- (f) persons: search typing ----------
-  results.push(await runOnPage(cdp, sessionId, "persons: search typing", `${BASE}/persons`, () =>
-    typeAndMeasure(cdp, sessionId, 'input[placeholder^="Keresés név"]', "nagy")));
-  }
-
-  if ((!ONLY || ONLY === "g") && !SKIP.has("g")) {
-  // ---------- (g) tasks: completion click ----------
-  await ensureOpenTaskExists(cdp, sessionId);
-  results.push(await runOnPage(cdp, sessionId, "tasks: completion click", `${BASE}/tasks`, () =>
-    clickAndMeasure(cdp, sessionId, 'button[title="Kész"]')));
-  }
-
-  printTable("WARM (idle, hydrated, unthrottled network)", results);
-
-  let coldResults = null;
+  let coldStats = null;
+  let coldSamples = null;
   if (COLD) {
-    coldResults = await runColdPass(cdp, sessionId);
-    printTable("COLD (click as soon as hit-testable after load, fast-3G-ish network, no settle)", coldResults, true);
+    const COLD_KEYS = ["a", "b", "e", "g"].filter(wantKey);
+    coldSamples = new Map();
+    for (let r = 0; r < REPEAT; r++) {
+      for (const key of rotate(COLD_KEYS, r)) {
+        for (const res of await coldOnce(key, cdp, sessionId)) pushSample(coldSamples, res.label, r, res);
+      }
+    }
+    coldStats = COLD_ROW_LABELS.filter((l) => coldSamples.has(l)).map((l) => ({ label: l, ...computeStats(coldSamples.get(l)) }));
+    printStatsTable("COLD (click as soon as hit-testable after load, fast-3G-ish network, no settle — fresh target + cleared cache EVERY repetition)", coldStats, true);
   }
 
   if (mutations.length) log(`\nMUTATED: ${mutations.join("; ")}`);
 
   if (jsonOutPath) {
-    writeFileSync(jsonOutPath, JSON.stringify({ warm: results, cold: coldResults }, null, 2));
+    const toRaw = (samples) => Object.fromEntries([...samples.entries()].map(([label, arr]) => [label, arr]));
+    writeFileSync(jsonOutPath, JSON.stringify({
+      repeat: REPEAT,
+      warm: { stats: warmStats, samples: toRaw(warmSamples) },
+      cold: coldStats ? { stats: coldStats, samples: toRaw(coldSamples) } : null,
+    }, null, 2));
     log(`\nRaw results written to ${jsonOutPath}`);
   }
 }
 
+// Cyclic rotation so interaction order changes between repetitions — a
+// systematic warm-up effect (early reps slower) then shows up as the SAME
+// interaction reading differently depending on its position, not as a fake
+// per-interaction difference.
+function rotate(arr, n) {
+  const k = arr.length ? n % arr.length : 0;
+  return arr.slice(k).concat(arr.slice(0, k));
+}
+
+function pushSample(map, label, r, result) {
+  if (!map.has(label)) map.set(label, []);
+  map.get(label).push({ r, result });
+}
+
+const WARM_ROW_LABELS = [
+  "dashboard: panel-head nav link click",
+  "leads: kanban card open",
+  "leads: card drag between columns",
+  "leads: outcome modal open",
+  "leads: outcome modal submit",
+  "companies: filter typing",
+  "persons: search typing",
+  "tasks: completion click",
+];
+const COLD_ROW_LABELS = [
+  "dashboard: panel-head nav link click (cold)",
+  "leads: kanban card open (cold)",
+  "companies: filter typing (cold)",
+  "tasks: completion click (cold)",
+];
+
+// One repetition of one warm interaction. Returns an array of finalize()
+// results (usually 1; the outcome-modal interaction produces 2: open + submit).
+async function warmOnce(key, cdp, sessionId) {
+  switch (key) {
+    case "a":
+      return [await runOnPage(cdp, sessionId, "dashboard: panel-head nav link click", `${BASE}/`, async () => {
+        const found = await evalExpr(cdp, sessionId, `
+          (() => {
+            const links = Array.from(document.querySelectorAll('.panel-head a'));
+            const el = links.find(a => a.textContent && a.textContent.includes('Kanban'))
+                    || links.find(a => a.textContent && a.textContent.includes('Hívás mód'))
+                    || links[0];
+            if (!el) return false;
+            el.setAttribute('data-inp-target', '1');
+            return true;
+          })()
+        `);
+        if (!found.value) return { skip: ".panel-head a" };
+        return clickAndMeasure(cdp, sessionId, '[data-inp-target="1"]');
+      })];
+    case "b":
+      return [await runOnPage(cdp, sessionId, "leads: kanban card open", `${BASE}/leads`, () =>
+        clickAndMeasure(cdp, sessionId, '.kcol-body > div[role="button"]', getCardOwnPoint))];
+    case "c":
+      return [await measureDrag(cdp, sessionId, "leads: card drag between columns", `${BASE}/leads`)];
+    case "d": {
+      const { openResult, submitResult } = await measureOutcomeModal(cdp, sessionId, `${BASE}/leads`);
+      return [openResult, submitResult];
+    }
+    case "e":
+      return [await runOnPage(cdp, sessionId, "companies: filter typing", `${BASE}/companies`, () =>
+        typeAndMeasure(cdp, sessionId, 'input[placeholder^="Keresés cég"]', "kft"))];
+    case "f":
+      return [await runOnPage(cdp, sessionId, "persons: search typing", `${BASE}/persons`, () =>
+        typeAndMeasure(cdp, sessionId, 'input[placeholder^="Keresés név"]', "nagy"))];
+    case "g":
+      await ensureOpenTaskExists(cdp, sessionId);
+      return [await runOnPage(cdp, sessionId, "tasks: completion click", `${BASE}/tasks`, () =>
+        clickAndMeasure(cdp, sessionId, 'button[title="Kész"]'))];
+    default:
+      return [];
+  }
+}
+
 // ---------- cold pass: click during hydration, not after it ----------
-// Each row gets its own fresh target (no module-cache carryover between
-// pages) with browser cache cleared and CPU+network throttled, then clicks
-// the instant the element is hit-testable — no settle() wait at all.
-async function runColdPass(cdp, warmSessionId) {
-  const rows = [];
-
-  rows.push(await coldInteraction(cdp, "dashboard: panel-head nav link click (cold)", `${BASE}/`, async (sid) => {
-    await evalExpr(sid.cdp, sid.sessionId, `
-      (() => {
-        const links = Array.from(document.querySelectorAll('.panel-head a'));
-        const el = links.find(a => a.textContent && a.textContent.includes('Kanban'))
-                || links.find(a => a.textContent && a.textContent.includes('Hívás mód'))
-                || links[0];
-        if (el) el.setAttribute('data-inp-target', '1');
-        return !!el;
-      })()
-    `);
-    return coldClick(sid.cdp, sid.sessionId, '[data-inp-target="1"]');
-  }));
-
-  rows.push(await coldInteraction(cdp, "leads: kanban card open (cold)", `${BASE}/leads`, (sid) =>
-    coldClick(sid.cdp, sid.sessionId, '.kcol-body > div[role="button"]', getCardOwnPoint)));
-
-  rows.push(await coldInteraction(cdp, "companies: filter typing (cold)", `${BASE}/companies`, (sid) =>
-    coldType(sid.cdp, sid.sessionId, 'input[placeholder^="Keresés cég"]', "k")));
-
-  await ensureOpenTaskExists(cdp, warmSessionId); // the warm pass's own "g" row likely just completed the last one
-  rows.push(await coldInteraction(cdp, "tasks: completion click (cold)", `${BASE}/tasks`, (sid) =>
-    coldClick(sid.cdp, sid.sessionId, 'button[title="Kész"]')));
-
-  return rows;
+// Every repetition of every interaction gets its own fresh target (no
+// module-cache carryover) with browser cache cleared and CPU+network
+// throttled — coldInteraction() does that per call, and this is called once
+// per (interaction, repetition) pair, so each cold sample really is cold.
+async function coldOnce(key, cdp, warmSessionId) {
+  switch (key) {
+    case "a":
+      return [await coldInteraction(cdp, "dashboard: panel-head nav link click (cold)", `${BASE}/`, async (sid) => {
+        await evalExpr(sid.cdp, sid.sessionId, `
+          (() => {
+            const links = Array.from(document.querySelectorAll('.panel-head a'));
+            const el = links.find(a => a.textContent && a.textContent.includes('Kanban'))
+                    || links.find(a => a.textContent && a.textContent.includes('Hívás mód'))
+                    || links[0];
+            if (el) el.setAttribute('data-inp-target', '1');
+            return !!el;
+          })()
+        `);
+        return coldClick(sid.cdp, sid.sessionId, '[data-inp-target="1"]');
+      })];
+    case "b":
+      return [await coldInteraction(cdp, "leads: kanban card open (cold)", `${BASE}/leads`, (sid) =>
+        coldClick(sid.cdp, sid.sessionId, '.kcol-body > div[role="button"]', getCardOwnPoint))];
+    case "e":
+      return [await coldInteraction(cdp, "companies: filter typing (cold)", `${BASE}/companies`, (sid) =>
+        coldType(sid.cdp, sid.sessionId, 'input[placeholder^="Keresés cég"]', "k"))];
+    case "g":
+      await ensureOpenTaskExists(cdp, warmSessionId); // a prior "g" repetition likely just completed the last open task
+      return [await coldInteraction(cdp, "tasks: completion click (cold)", `${BASE}/tasks`, (sid) =>
+        coldClick(sid.cdp, sid.sessionId, 'button[title="Kész"]'))];
+    default:
+      return [];
+  }
 }
 
 // Fresh target + throttled CPU/network + cleared cache + observer re-armed,
@@ -755,26 +802,72 @@ async function measureOutcomeModal(cdp, sessionId, url) {
 }
 
 // ---------- output ----------
-function printTable(title, results, cold = false) {
-  console.log(`\n## ${title}\n`);
-  console.log(`4x CPU throttling.${cold ? " Network: fast-3G-ish (150ms latency, 1.6Mbps down, 750Kbps up). No settle — clicked the instant the target was hit-testable." : " Unthrottled network. Settled ~800ms after load before interacting."} durationThreshold:0.\n`);
-  const coldCol = cold ? " click-at (ms after load) |" : "";
-  console.log(`| interaction | INP (ms) | input delay | processing | presentation | worst LoAF blockingDuration | ineligibleMax (hover etc) |${coldCol} attribution |`);
-  console.log(`|---|---|---|---|---|---|---|${cold ? "---|" : ""}---|`);
-  for (const r of results) {
-    const clickAt = cold ? ` ${r.clickAtMs ?? "-"} |` : "";
-    if (r.skipped) {
-      console.log(`| ${r.label} | ${r.note} | - | - | - | - | ${r.ineligibleMax ?? "-"} |${clickAt} - |`);
-    } else if (r.synthetic) {
-      console.log(`| ${r.label} | ${r.note} | - | - | - | ${r.worstLoafBlockingMs ?? "-"} | - |${clickAt} ${r.attribution} |`);
-    } else {
-      console.log(`| ${r.label} | ${r.inpMs} | ${r.inputDelayMs} | ${r.processingMs} | ${r.presentationMs} | ${r.worstLoafBlockingMs ?? "-"} | ${r.ineligibleMax ?? "-"} |${clickAt} ${r.attribution} |`);
+// A row's "value" for the distribution is INP duration normally, or the LoAF
+// blockingDuration for the synthetic drag row (it has no Event Timing at all).
+function valueOf(result) {
+  if (!result || result.skipped) return null;
+  if (typeof result.inpMs === "number") return result.inpMs;
+  if (typeof result.worstLoafBlockingMs === "number") return result.worstLoafBlockingMs;
+  return null;
+}
+
+function avg(nums) { return nums.reduce((a, b) => a + b, 0) / nums.length; }
+
+// median/p75/min/max/n over N repetitions of one interaction, plus:
+// - overMax180: max ever crossed 180ms (INP is a high-percentile metric —
+//   max is the number that matters, never dropped as "noise")
+// - unstable: spread (max-min) exceeds the median itself — too unstable to
+//   draw a conclusion from; flagged rather than averaged away
+// - driftNote: first-half-of-reps vs second-half-of-reps average differs by
+//   more than ~20ms/25% — a warm-up effect in the HARNESS, not the app
+function computeStats(samples) {
+  const withValue = samples.map((s) => ({ ...s, v: valueOf(s.result) }));
+  const ok = withValue.filter((s) => s.v !== null);
+  const attempted = samples.length;
+  if (!ok.length) {
+    const reasons = [...new Set(samples.map((s) => s.result.note).filter(Boolean))];
+    return { skipped: true, n: 0, attempted, note: reasons.join(" | ") || "all attempts skipped" };
+  }
+  const sorted = [...ok].sort((a, b) => a.v - b.v).map((s) => s.v);
+  // ponytail: nearest-rank percentile (no interpolation) — fine at n<=~20, add interpolation if N grows a lot
+  const pick = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))];
+  const median = pick(0.5), p75 = pick(0.75), min = sorted[0], max = sorted[sorted.length - 1];
+  const attribution = [...ok].reverse()[0]?.result.attribution ?? "-";
+
+  let driftNote = null;
+  const byRep = [...ok].sort((a, b) => a.r - b.r);
+  if (byRep.length >= 4) {
+    const half = Math.floor(byRep.length / 2);
+    const firstAvg = avg(byRep.slice(0, half).map((s) => s.v));
+    const secondAvg = avg(byRep.slice(-half).map((s) => s.v));
+    const delta = secondAvg - firstAvg;
+    if (Math.abs(delta) > Math.max(20, median * 0.25)) {
+      driftNote = `${delta > 0 ? "SLOWER" : "FASTER"} by ${Math.round(Math.abs(delta))}ms, 1st→2nd half of reps (warm-up drift)`;
     }
   }
-  console.log("\nWorst-3 raw entries per interaction:\n");
-  console.log("```json");
-  console.log(JSON.stringify(results.map((r) => ({ label: r.label, worst3: r.worst3 ?? null, skipped: !!r.skipped, note: r.note ?? null, clickAtMs: r.clickAtMs ?? null })), null, 2));
-  console.log("```");
+
+  return {
+    skipped: false, median, p75, min, max, n: ok.length, attempted,
+    overMax180: max > 180, unstable: (max - min) > median, driftNote, attribution,
+  };
+}
+
+function printStatsTable(title, rows, cold = false) {
+  console.log(`\n## ${title}\n`);
+  console.log(`4x CPU throttling.${cold ? " Network: fast-3G-ish (150ms latency, 1.6Mbps down, 750Kbps up). No settle — clicked the instant the target was hit-testable, fresh cold target+cache every repetition." : " Unthrottled network. Settled ~800ms after load before interacting."} durationThreshold:0. N=${REPEAT} repetitions, rotated order.\n`);
+  console.log("| interaction | median | p75 | min | max | n/attempted | flags | attribution |");
+  console.log("|---|---|---|---|---|---|---|---|");
+  for (const r of rows) {
+    if (r.skipped) {
+      console.log(`| ${r.label} | - | - | - | - | 0/${r.attempted} | SKIPPED | ${r.note} |`);
+      continue;
+    }
+    const flags = [];
+    if (r.overMax180) flags.push("max>180ms");
+    if (r.unstable) flags.push("UNSTABLE (max-min>median)");
+    if (r.driftNote) flags.push(r.driftNote);
+    console.log(`| ${r.label} | ${r.median} | ${r.p75} | ${r.min} | ${r.max} | ${r.n}/${r.attempted} | ${flags.join("; ") || "-"} | ${r.attribution} |`);
+  }
 }
 
 main()
