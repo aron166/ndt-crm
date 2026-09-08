@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -97,8 +97,28 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
   // this keeps today's "reopen and your input is still there" behaviour exactly.
   const [taskMounted, setTaskMounted] = useState(false);
   const [dealMounted, setDealMounted] = useState(false);
-  // Single door in for each modal, so a future call site cannot open one without
-  // also mounting it.
+  // Mount on *intent*, not on click. A closed base-ui Dialog portals nothing, so
+  // mounting early costs nothing — but it gets the lazy chunk fetched during the
+  // hover/tab before the click, so the first open still paints in one frame
+  // instead of waiting on the network. (Vanda, PR #86.) Pointer users get this
+  // via hover, keyboard users via focus; touch users have no hover, which is why
+  // the click path below still latches on its own rather than relying on prep.
+  // Mount both modals in a post-hydration effect. This is the half of the fix
+  // that matters. `next/dynamic` alone keeps them off the critical hydration
+  // path (the whole INP win: 312 -> 96ms on the worst cold row), but it also
+  // made the FIRST open wait on the network — measured at 546-624ms on fast-3G,
+  // i.e. a button that looks dead. Effects run after the hydration commit, so
+  // mounting here costs the hydration window nothing while starting the chunk
+  // fetch immediately; a closed base-ui Dialog portals nothing, so a mounted
+  // closed modal renders no DOM. requestIdleCallback was tried here first and
+  // measured WORSE (683ms) — it defers past the point the user clicks.
+  useEffect(() => {
+    setTaskMounted(true);
+    setDealMounted(true);
+  }, []);
+
+  function prepTask() { setTaskMounted(true); }
+  function prepDeal() { if (defaultPipeline) setDealMounted(true); }
   function openTask() { setTaskMounted(true); setTaskOpen(true); }
   function openDeal() { setDealMounted(true); setDealOpen(true); }
   const [newMenuOpen, setNewMenuOpen] = useState(false);
@@ -210,6 +230,8 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
           <div className="flex items-stretch" style={{ borderRadius: 6, overflow: "hidden" }}>
             <button
               onClick={openTask}
+              onMouseEnter={prepTask}
+              onFocus={prepTask}
               className="flex items-center gap-1.5 font-medium transition-all"
               style={{
                 height: 32, padding: "0 12px", fontSize: 14,
@@ -227,6 +249,8 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
             <div style={{ width: 1, background: "oklch(0.56 0.18 278)" }} />
             <button
               onClick={() => defaultPipeline ? openDeal() : router.push("/deals/setup")}
+              onMouseEnter={prepDeal}
+              onFocus={prepDeal}
               className="flex items-center gap-1 font-medium transition-all"
               style={{
                 height: 32, padding: "0 8px", fontSize: 14,

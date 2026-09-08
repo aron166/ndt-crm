@@ -33,10 +33,10 @@ function DialogOverlay({
       className={cn(
         // ponytail: no blur, no fade. `backdrop-filter` forces a full-viewport
         // composite on every dialog open and the 100ms enter animation held the
-        // interaction open for its whole duration — together they were ~119ms of
-        // the 120ms INP on "outcome modal open" (docs/PERF_2026-09-08_INP.md).
-        // Áron's Phase 1.5 constraint already says "no glass, no animations".
-        // Re-add a transform-only transition if the instant open ever feels abrupt.
+        // interaction open for its own duration — together ~32ms of the 104ms
+        // warm median on "outcome modal open" (104 -> 72, N=7). Áron's Phase 1.5
+        // constraint already says "no glass, no animations". A test pins these
+        // classes out; see docs/PERF_2026-09-08_INP.md before re-adding a fade.
         "fixed inset-0 isolate z-50 bg-black/10",
         className
       )}
