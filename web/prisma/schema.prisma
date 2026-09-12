@@ -90,7 +90,7 @@ model Person {
   phone       String?
   linkedinUrl String?   @map("linkedin_url")
   notes       String?
-  deletedAt   DateTime? @map("deleted_at")
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
@@ -141,10 +141,10 @@ model Company {
   industryEn           String?   @map("industry_en")
   scopeOfActivity      String?   @map("scope_of_activity")
   // ── NDT capability matrix ────────────────────────────────────────────────
-  ndtMethods           String[]  @map("ndt_methods") // ["VT","PT","MT","UT","RT","DRT","LT","HT","SPECTRO"]
-  productAreas         String[]  @map("product_areas") // ["w","wp","f","c","t","p"]
-  materials            String[] // ["Fe","Al","Cu","AM"]
-  products             String[] // GYÁRTMÁNY_01-07
+  ndtMethods           String[]  @default([]) @map("ndt_methods") // ["VT","PT","MT","UT","RT","DRT","LT","HT","SPECTRO"]
+  productAreas         String[]  @default([]) @map("product_areas") // ["w","wp","f","c","t","p"]
+  materials            String[]  @default([]) // ["Fe","Al","Cu","AM"]
+  products             String[]  @default([]) // GYÁRTMÁNY_01-07
   isPedCompliant       Boolean?  @map("is_ped_compliant")
   inspectionFrequency  String?   @map("inspection_frequency")
   hasInternalLab       Boolean?  @map("has_internal_lab")
@@ -166,7 +166,7 @@ model Company {
   revenue2024          BigInt?   @map("revenue_2024")
   customerValue        BigInt?   @map("customer_value")
   customFields         Json?     @map("custom_fields")
-  deletedAt            DateTime? @map("deleted_at")
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 

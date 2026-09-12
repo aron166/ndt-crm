@@ -4,10 +4,15 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
+  // Tenant 1 is created by migration 20260422001115_seed_default_tenant — the
+  // lead_status seeds reference it by id. Match on the ID, not the slug: keying
+  // on the slug meant a renamed tenant silently produced a SECOND tenant here,
+  // with the admin user on it and every seeded lead status on the first one.
   const tenant = await prisma.tenant.upsert({
-    where: { slug: 'controllabor' },
+    where: { id: 1 },
     update: {},
     create: {
+      id: 1,
       name: 'Controllabor Kft.',
       slug: 'controllabor',
     },
