@@ -10,6 +10,7 @@ import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import type { QualificationQuestion } from "@/lib/leads/qualification";
+import type { ScriptVariant } from "@/lib/leads/scripts";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
@@ -81,6 +82,7 @@ export function LeadDetailClient({
   openTasks,
   questions,
   qualification,
+  scriptVariants,
 }: {
   lead: Lead;
   interactions: Interaction[];
@@ -90,6 +92,7 @@ export function LeadDetailClient({
   openTasks: OpenTask[];
   questions: QualificationQuestion[];
   qualification: Record<string, string>;
+  scriptVariants: ScriptVariant[];
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(lead.status ?? "new");
@@ -464,6 +467,7 @@ export function LeadDetailClient({
         title={[personName, lead.company?.name].filter(Boolean).join(" · ") || null}
         stageDescription={statuses.find((s) => s.key === status)?.description ?? null}
         onLogged={() => router.refresh()}
+        scriptVariants={scriptVariants}
       />
 
       <LeadEditModal

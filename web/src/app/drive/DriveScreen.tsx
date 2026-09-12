@@ -6,6 +6,7 @@ import { logLeadCall } from "@/app/actions/leads";
 import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
+import type { ScriptVariant } from "@/lib/leads/scripts";
 
 // /drive — one column, thumb-reachable, phone-at-arm's-length in a car.
 // Outcome rules (which extra field, min lengths) live server-side in
@@ -36,7 +37,7 @@ function outcomeBtnStyle(tone: "red" | "green" | undefined): React.CSSProperties
   };
 }
 
-export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
+export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueue: DriveLead[]; scriptVariants?: ScriptVariant[] }) {
   const router = useRouter();
   const [queue, setQueue] = useState(initialQueue);
   // Which lead ids are done (skipped or saved) this session — an index would
@@ -52,6 +53,8 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const submitting = useRef(false);
+  const [scriptKey, setScriptKey] = useState("");
+  const [scriptOpen, setScriptOpen] = useState(false);
 
   // A fresh queue arrives (router.refresh() re-runs the server component and
   // hands us a new array) — keep it, but never reset `done`: that's what was
@@ -64,10 +67,28 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
   // Count what is actually left in THIS queue — `done` can hold ids a refresh
   // has already dropped from it.
   const remaining = queue.filter((l) => !done.has(l.id)).length;
+  // Same A/B default rule as the kanban's CallOutcomeModal: deterministic on
+  // the lead id, not random — a re-render must not switch the script mid-call.
+  const defaultScriptKey = lead ? scriptVariants[lead.id % scriptVariants.length]?.key ?? "" : "";
+  // Recompute for the NEW lead once the queue advances — resetFields() runs
+  // before this re-render sees the new `lead`, so it can't pick the right
+  // default itself. Adjusting state during render (React's documented pattern
+  // for this) instead of an effect: correct on the SAME render as the new
+  // lead, no extra commit.
+  const [trackedLeadId, setTrackedLeadId] = useState(lead?.id);
+  if (lead?.id !== trackedLeadId) {
+    setTrackedLeadId(lead?.id);
+    setScriptKey(defaultScriptKey);
+  }
+  const script = scriptVariants.find((v) => v.key === scriptKey) ?? null;
 
   function resetFields() {
     setNote(""); setSelectedOutcome(null); setCallbackAt("");
     setDemoWith("aron"); setLostReason(""); setExpanded(false); setError(null);
+    // scriptKey is NOT reset here: `lead` still points at the OLD lead in this
+    // closure, so defaultScriptKey would be the old lead's default. The
+    // useEffect above recomputes it once the new `lead` is rendered.
+    setScriptOpen(false);
   }
 
   function skip() {
@@ -88,6 +109,7 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
           callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
           demoWith: outcome === "meeting_booked" ? demoWith : null,
           lostReason: isLostCallOutcome(outcome) ? lostReason : null,
+          scriptVariant: scriptKey || undefined,
         });
         if ("error" in res) { setError(res.error); return; }
         resetFields();
@@ -191,6 +213,27 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
             <button onClick={() => setExpanded((e) => !e)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 12, padding: "6px 0 0", cursor: "pointer" }}>
               {expanded ? "kevesebb" : "több"}
             </button>
+          )}
+        </div>
+      )}
+
+      {scriptVariants.length > 0 && (
+        <div style={{ background: "var(--bg-1)", border: "1px solid var(--line-soft)", borderRadius: 10, padding: "10px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <select style={{ ...inputStyle, width: "auto", flex: 1 }} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
+              <option value="">Nincs szkript</option>
+              {scriptVariants.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
+            </select>
+            {script?.body && (
+              <button onClick={() => setScriptOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 13, padding: 4, cursor: "pointer" }}>
+                Szkript {scriptOpen ? "▲" : "▼"}
+              </button>
+            )}
+          </div>
+          {scriptOpen && script?.body && (
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+              {script.body}
+            </p>
           )}
         </div>
       )}

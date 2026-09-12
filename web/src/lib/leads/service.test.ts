@@ -18,6 +18,7 @@ vi.mock("./queries", () => ({
       "own_device", "hook", "use_case", "work",
     ].map((slug) => ({ slug, label: slug })),
   ),
+  getScriptVariants: vi.fn().mockResolvedValue([{ key: "a", label: "A", body: "" }]),
 }));
 vi.mock("@/lib/db", () => ({
   db: {
@@ -112,6 +113,14 @@ describe("task → card: logging a call cannot leave two open callback tasks", (
     expect(res).toMatchObject({ success: true, status: "call_2" });
     expect(txTaskUpdateMany).toHaveBeenCalledTimes(1);
     expect(txTaskCreate).not.toHaveBeenCalled();
+  });
+
+  it("an unknown scriptVariant is rejected and no interaction row is created", async () => {
+    const res = await logLeadCallOutcome(10, {
+      outcome: "no_answer", note: "nem vette fel", scriptVariant: "does_not_exist",
+    }, ctx);
+    expect(res).toEqual({ error: "Ismeretlen szkriptváltozat: does_not_exist" });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
   });
 });
 

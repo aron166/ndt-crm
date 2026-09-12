@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { logLeadCall } from "@/app/actions/leads";
 import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX } from "@/lib/leads/outcomes";
 import { FormField } from "@/components/ui/FormField";
+import type { ScriptVariant } from "@/lib/leads/scripts";
 
 // "Hívás eredménye" — the core lead interaction. Validation (note required,
 // callback needs date+hour, meeting needs who) is enforced SERVER-side in
@@ -19,7 +20,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function CallOutcomeModal({
-  open, onClose, leadId, title, stageDescription, onLogged,
+  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [],
 }: {
   open: boolean;
   onClose: () => void;
@@ -27,6 +28,7 @@ export function CallOutcomeModal({
   title?: string | null;
   stageDescription?: string | null;
   onLogged?: () => void;
+  scriptVariants?: ScriptVariant[];
 }) {
   const [outcome, setOutcome] = useState<string>("no_answer");
   const [note, setNote] = useState("");
@@ -35,9 +37,16 @@ export function CallOutcomeModal({
   const [lostReason, setLostReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // A/B: deterministic per-lead assignment (leadId % length), not random or
+  // "always A" — every variant needs data, and a re-render must not switch
+  // the script mid-call. Empty ("Nincs szkript") when the tenant has none.
+  const defaultScriptKey = scriptVariants[leadId % scriptVariants.length]?.key ?? "";
+  const [scriptKey, setScriptKey] = useState(defaultScriptKey);
+  const script = scriptVariants.find((v) => v.key === scriptKey) ?? null;
 
   function reset() {
     setOutcome("no_answer"); setNote(""); setCallbackAt(""); setDemoWith("aron"); setLostReason(""); setError(null);
+    setScriptKey(defaultScriptKey);
   }
   function handleClose() { reset(); onClose(); }
 
@@ -51,6 +60,7 @@ export function CallOutcomeModal({
         callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
         demoWith: outcome === "meeting_booked" ? demoWith : null,
         lostReason: isLostCallOutcome(outcome) ? lostReason : null,
+        scriptVariant: scriptKey || undefined,
       });
       if ("error" in res) { setError(res.error); return; }
       reset(); onClose(); onLogged?.();
@@ -68,6 +78,19 @@ export function CallOutcomeModal({
           <div style={{ fontSize: 12, color: "var(--fg-soft)", whiteSpace: "pre-wrap", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 180, overflowY: "auto" }}>
             {stageDescription}
           </div>
+        )}
+        {scriptVariants.length > 0 && (
+          <FormField label="Szkript">
+            <select style={inputStyle} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
+              <option value="">Nincs szkript</option>
+              {scriptVariants.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
+            </select>
+            {script && script.body && (
+              <div style={{ marginTop: 8, fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 220, overflowY: "auto" }}>
+                {script.body}
+              </div>
+            )}
+          </FormField>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField label="Eredmény" required>

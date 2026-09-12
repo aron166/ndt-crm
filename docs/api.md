@@ -287,6 +287,12 @@ curl -X POST $CRM/api/leads/12/interactions \
 # → 201 { "ok": true, "interactionId": 91, "status": "recall", "outcome": "open", "taskId": 40 }
 ```
 
+`script_variant` (optional) records which call-script A/B variant was used. It
+must be one of the tenant's keys (`tenants.settings.scriptVariants`, edited at
+`/leads/setup`) — an unknown key is a `400`, never a silent write, because the
+point of the variant is that its outcomes can be counted. It lands on the
+interaction row, so re-wording or deleting a script never rewrites history.
+
 | `outcome` | what happens |
 |---|---|
 | `no_answer` | stage advances `new → call_1 → call_2 → call_3 → call_3_plus` |

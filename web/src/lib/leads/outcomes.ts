@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SCRIPT_KEY_MAX } from "./scripts";
 
 // Lead call-outcome logging — PURE module (no DB), shared by the UI modal, the
 // server action and the public API. The note-required / callback rules live in
@@ -78,6 +79,13 @@ export const callOutcomeSchema = z
     lostReason: z.string().trim().max(LOST_REASON_MAX).optional(),
     /** Optional: who the callback task is assigned to (defaults to the actor). */
     assignedToId: z.number().int().positive().optional(),
+    /**
+     * Which call-script variant was used (A/B). The KEY only — the definitions
+     * are tenant config. Validated against the tenant's list in the service, the
+     * same way a qualification slug is: an unknown key is a 400, never a silent
+     * write into a statistics bucket nobody is looking at.
+     */
+    scriptVariant: z.string().trim().min(1).max(SCRIPT_KEY_MAX).optional(),
   })
   .superRefine((d, ctx) => {
     if (d.outcome === "callback_requested") {

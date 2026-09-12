@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { DEFAULT_LEAD_STATUSES, type LeadStatusDef } from "./statuses";
 import { questionsFromSettings, type QualificationQuestion } from "./qualification";
+import { scriptVariantsFromSettings, type ScriptVariant } from "./scripts";
 
 /**
  * The tenant's lead-pipeline columns, ordered. Falls back to the default set if
@@ -43,4 +44,13 @@ export async function getInitialLeadStatusKey(tenantId: number): Promise<string>
 export async function getQualificationQuestions(tenantId: number): Promise<QualificationQuestion[]> {
   const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
   return questionsFromSettings(tenant?.settings);
+}
+
+/**
+ * The tenant's call-script A/B variants. Falls back to the in-code placeholders
+ * when the tenant has never set one (or set a malformed one).
+ */
+export async function getScriptVariants(tenantId: number): Promise<ScriptVariant[]> {
+  const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  return scriptVariantsFromSettings(tenant?.settings);
 }

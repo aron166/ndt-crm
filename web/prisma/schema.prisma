@@ -653,6 +653,9 @@ model Interaction {
   direction  String? // inbound, outbound
   notes      String?
   outcome    String? // maps to 0-8 status codes
+  // Which call-script variant this call used — the key only; the definitions
+  // live in tenants.settings.scriptVariants (lib/leads/scripts.ts).
+  scriptVariant String?  @map("script_variant")
   occurredAt DateTime @default(now()) @map("occurred_at")
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -663,6 +666,7 @@ model Interaction {
   user    User?    @relation(fields: [userId], references: [id])
 
   @@index([tenantId, leadId])
+  @@index([tenantId, scriptVariant])
   @@map("interactions")
 }
 
