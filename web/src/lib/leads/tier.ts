@@ -115,28 +115,27 @@ function hitAt(ws: string[], keywords: readonly string[]): number {
 }
 
 /**
- * The token whose keyword appears EARLIEST in the answer, table order breaking a
- * tie. Position matters because Hungarian answers routinely carry two tokens in
- * two clauses — "Igen, de még nem döntöttünk" holds both `igen` and `nem`, and
- * the old first-table-entry-wins scan returned `no`, inverting a machine
- * prospect into a nobody. What the lead said FIRST is the answer; the rest is
- * qualification. (Lars, 2026-09-08.)
+ * The first token in TABLE ORDER whose keyword hits un-negated anywhere in the
+ * answer. Key order is therefore a PRIORITY, and every table below says out loud
+ * why its order is what it is: kill answers first where a wrong yes is
+ * expensive, the strongest positive signal first where a wrong no loses a lead.
+ *
+ * A short-lived revision ranked by keyword POSITION instead ("what the lead said
+ * first wins"). It fixed one answer and broke three classes: "Érdeklődnék, de
+ * konkrét feladatunk van" fell to the curious gate, "Falban, de nem beton"
+ * became a concrete job, and "Saját ingatlan, de a cégem nevén" became private.
+ * Position is not priority. The one table that genuinely needed a different
+ * answer got a different ORDER instead. (Vanda, #87.)
  */
 function match<T extends string>(value: string | undefined, table: Record<T, readonly string[]>): T | null {
   const v = fold(value);
   if (!v) return null;
   const ws = words(v);
-  let best: T | null = null;
-  let bestAt = Infinity;
   for (const [token, keywords] of Object.entries(table) as [T, readonly string[]][]) {
     if (v === token) return token;
-    const at = hitAt(ws, keywords);
-    if (at >= 0 && at < bestAt) {
-      best = token;
-      bestAt = at;
-    }
+    if (hitAt(ws, keywords) >= 0) return token;
   }
-  return best;
+  return null;
 }
 
 // ponytail: keyword lists, not an NLP pass — the landing form sends the token
@@ -163,25 +162,52 @@ const CONCRETE = {
 // verb, and if `technology` were checked first that answer would tier A —
 // "call within 1 hour" — for a routine condition survey. (Vanda, #84.)
 // `technology` is a tier-A signal ("call within 1 hour"), so it takes a POSITIVE
-// statement about the technology itself. A bare "muszer*" used to live here and
-// tiered "Milyen műszerrel csinálják?" — a question about HOW WE work, the most
-// ordinary thing an inbound lead asks — as a machine prospect. (Lars, 2026-09-08.)
+// statement. A bare "muszer*" used to live here and tiered "Milyen műszerrel
+// csinálják?" — a question about HOW WE work, the most ordinary thing an inbound
+// lead asks — as a machine prospect. The cure for that is the enquiry guard in
+// isEnquiry(), NOT throwing the keyword away: "Saját műszert szeretnénk venni"
+// typed into this slot is a machine prospect and must still reach A.
+// (Lars, 2026-09-08; Vanda, #87.)
+//
 // `condition` is FIRST on purpose: "állapot értékelés" is a routine condition
 // survey, not a technology enquiry. (Vanda, #84.)
 const GOAL = {
   condition: ["allapot*", "condition*"],
-  technology: ["technolog*", "maga a technolog*"],
+  technology: ["technolog*", "sajat muszer*", "muszert venn*", "muszervasarl*", "muszert szeretn*"],
   drill: ["furas*", "drill*", "mi van benne"],
 } as const;
 
-// The machine-prospect signal. Ownership and purchase intent are stated
-// POSITIVELY here — "sajat muszer", "vasarol", "beszerez" — rather than inferred
-// from a `goal` keyword, so asking about our instruments never tiers as owning
-// one. `berel*` is deliberately absent: renting is a job, not a machine sale.
+/**
+ * True for an answer that ASKS something rather than states it — "Milyen
+ * műszerrel csinálják?", "Milyen technológiával dolgoznak?". An enquiry carries
+ * no signal about the lead, so it must not tier them; without this guard every
+ * sibling of the reported question would have to be blacklisted one by one.
+ * Both halves are required: an interrogative opener AND a question mark, so
+ * "Mikor tudnak jönni? Sürgős." stays a question but "milyen jó lenne" does not.
+ */
+const INTERROGATIVES = ["milyen", "milyet", "hogyan", "mivel", "mennyi*", "miert", "hol", "mikor", "mit", "mi"];
+
+function isEnquiry(raw: string | undefined | null): boolean {
+  if (!raw || !raw.includes("?")) return false;
+  const ws = words(fold(raw));
+  return ws.length > 0 && INTERROGATIVES.some((q) => wordMatches(ws[0], q));
+}
+
+// The machine-prospect signal, and the one table whose order is POSITIVE-FIRST.
+// The answer to "van saját műszered?" nearly always opens with nem/nincs and
+// then says the interesting part — "Nincs, de vásárolnánk egyet", "Nem, de
+// gondolkodunk rajta". Both are machine prospects; ranking the kill answer first
+// threw them away. A bare "nem" with nothing positive anywhere still lands on
+// `no`, because `no` is simply last.
+//
+// Ownership and purchase intent are stated POSITIVELY here — never inferred from
+// a `goal` keyword — so asking about our instruments cannot read as owning one.
+// `berel*` is deliberately absent: renting is a job, not a machine sale. So is
+// "van sajat*", which fired on "van saját szakemberünk, műszer nincs". (Vanda, #87.)
 const OWN_DEVICE = {
-  no: ["nem", "no", "nincs*"],
+  yes: ["yes", "igen", "sajat muszer*", "sajat gep*", "van muszer*", "van gep*"],
   maybe: ["maybe", "talan*", "lehet*", "vasarol*", "beszerz*", "beszerez*", "vennenk", "venni szeretn*", "gondolkod*"],
-  yes: ["yes", "igen", "sajat muszer*", "sajat gep*", "van muszer*", "van gep*", "van sajat*"],
+  no: ["nem", "no", "nincs*"],
 } as const;
 
 const GATE = {
@@ -194,9 +220,14 @@ const GATE = {
 } as const;
 
 /**
- * Timing answers that mean "no date named". Undecided phrasings belong here:
- * "Még nem dőlt el, valamikor ősszel" named no date, and counting it as one
- * promoted a company lead to tier B — bookable — on a shrug. (Lars, 2026-09-08.)
+ * Timing answers that mean "no date named" — undecided phrasings only. They are
+ * checked ONLY when the answer names no date at all (see timingSet), because
+ * they are routinely bolted onto a real one: "Október 5-én, majd egyeztetünk"
+ * and "Nem biztos, de október 5-én kezdünk" both name a date.
+ *
+ * Bare "majd" and "valamikor" were here for one revision and demoted every
+ * company lead whose date happened to carry a filler adverb — the exact inverse
+ * of the bug they were added for. (Vanda, #87.)
  */
 const NO_DATE = [
   "no date",
@@ -211,21 +242,38 @@ const NO_DATE = [
   "nem biztos",
   "nem hatarozt*",
   "valamikor",
-  "majd",
 ];
 
-/** True when the lead named ANY timeframe ("nincs még dátum" is not one). */
+/**
+ * Tokens that name an actual point in time. Seasons are deliberately absent:
+ * "valamikor ősszel" is a shrug with a season attached, not a date.
+ */
+const DATE_SIGNAL = [
+  "januar*", "februar*", "marcius*", "aprilis*", "majus*", "junius*",
+  "julius*", "augusztus*", "szeptember*", "oktober*", "november*", "december*",
+  "hetfo*", "kedd*", "szerda*", "szerdan*", "csutortok*", "pentek*", "szombat*", "vasarnap*",
+  "holnap*", "jovo", "jovore", "kovetkezo", "ma", "azonnal*", "surgos*",
+];
+
+const HAS_NUMBER = /\d/;
+
+/**
+ * True when the lead named ANY timeframe.
+ *
+ * A named date always wins: the undecided list is consulted only when nothing in
+ * the answer points at a point in time. An answer with neither — "jövő héten",
+ * "két hét múlva" — still counts, which is the permissive default this has
+ * always had; only an explicit shrug turns it off.
+ */
 function timingSet(answer: string | undefined): boolean {
-  const ws = words(fold(answer));
+  const folded = fold(answer);
+  const ws = words(folded);
   if (!ws.length) return false;
+  if (HAS_NUMBER.test(folded)) return true;
+  if (DATE_SIGNAL.some((k) => keywordAt(ws, k) >= 0)) return true;
   return !NO_DATE.some((k) => keywordAt(ws, k) >= 0);
 }
 
-/**
- * The lead's tier, or null when the answers don't place it yet (no `situation`,
- * or a company lead that is neither a machine prospect nor a booked-able job).
- * null means "no badge" — never a silent A/B.
- */
 export function computeTier(answers: Record<string, string>): LeadTier | null {
   const gate = match(answers.gate ?? answers.intent_path, GATE);
   if (gate === "curious") return "E";
@@ -238,7 +286,8 @@ export function computeTier(answers: Record<string, string>): LeadTier | null {
 
   // situation === "company"
   const ownDevice = match(answers.own_device, OWN_DEVICE);
-  const goal = match(answers.goal, GOAL);
+  // An enquiry states nothing about the lead, so it tiers nothing.
+  const goal = isEnquiry(answers.goal) ? null : match(answers.goal, GOAL);
   if (ownDevice === "yes" || ownDevice === "maybe" || goal === "technology") return "A";
 
   const concrete = match(answers.concrete, CONCRETE);
