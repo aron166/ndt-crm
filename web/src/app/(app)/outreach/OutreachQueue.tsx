@@ -1,5 +1,10 @@
 "use client";
 
+// ⚠️ Every Hungarian string on this page is a PROPOSAL, not final copy. It was
+// reviewed for idiom (translating-english-to-hungarian) but not signed off by
+// Áron or Péter — the consent/unsubscribe footer above all, which is the one
+// line a recipient can hold us to. Replace before the first real campaign.
+
 import { useState } from "react";
 import { FormField } from "@/components/ui/FormField";
 import {
@@ -13,6 +18,12 @@ import {
   type OutreachSettings,
 } from "@/app/actions/email-drafts";
 import { DRAFT_STATUSES, MAX_STEP, canEdit, canApprove, canSend, type DraftStatus } from "@/lib/outreach/drafts";
+
+// ⚠️ PLACEHOLDER consent line. Áron owes the real wording — this one is a
+// starting point, not legal text, and it goes out on every send once saved.
+const FOOTER_PLACEHOLDER =
+  "⚠️ Ezt a levelet üzleti ajánlatként küldtük a nyilvánosan elérhető céges elérhetőségre. " +
+  "Ha nem szeretne több levelet kapni tőlünk, válaszoljon annyit: „leiratkozás”, és töröljük a listánkról.";
 
 const STATUS_LABEL: Record<DraftStatus, string> = {
   draft: "Piszkozat",
@@ -163,8 +174,8 @@ export default function OutreachQueue({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="page-head">
         <div>
-          <h1 className="page-title">Outreach átnézés</h1>
-          <p className="page-sub">Kampányonként generált emailek jóváhagyása és küldése</p>
+          <h1 className="page-title">Outreach piszkozatok</h1>
+          <p className="page-sub">Kampányonként megírt emailek jóváhagyása és küldése</p>
         </div>
         <button
           onClick={() => setSettingsOpen((v) => !v)}
@@ -179,7 +190,7 @@ export default function OutreachQueue({
 
       {settingsOpen && (
         <div className="panel panel-pad" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <FormField label="Válaszcím (reply-to)" hint="Ide érkeznek a válaszok — hagyd üresen a törléshez">
+          <FormField label="Válaszcím (reply-to)" hint="Ide érkeznek a válaszok. Hagyd üresen, ha nem kell.">
             <input
               className="input-ds"
               type="email"
@@ -189,13 +200,13 @@ export default function OutreachQueue({
               style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px" }}
             />
           </FormField>
-          <FormField label="Lezáró szöveg (jogi/leiratkozási közlemény)" full>
+          <FormField label="Lábléc (leiratkozási és jogi közlemény) ⚠️" full>
             <textarea
               className="input-ds"
               value={footer}
               onChange={(e) => setFooter(e.target.value)}
               rows={2}
-              placeholder="pl. Ha nem szeretnél több emailt kapni, jelezd válaszban."
+              placeholder={FOOTER_PLACEHOLDER}
               style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical" }}
             />
           </FormField>
@@ -286,7 +297,7 @@ export default function OutreachQueue({
         </div>
       ) : drafts.length === 0 ? (
         <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center" }}>
-          Nincs a szűrőnek megfelelő piszkozat
+          A szűrőnek egyetlen piszkozat sem felel meg
         </div>
       ) : (
         <div className="panel" style={{ padding: 0, overflow: "hidden" }}>

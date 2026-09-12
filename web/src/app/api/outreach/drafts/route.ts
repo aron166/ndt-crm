@@ -101,7 +101,7 @@ export async function POST(request: Request) {
           },
         });
         audit(
-          "campaign",
+          "email_draft",
           row.id,
           "create",
           null,
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
         },
       });
       audit(
-        "campaign",
+        "email_draft",
         row.id,
         "update",
         { subject: existing.subject, body: existing.body, toEmail: existing.toEmail },

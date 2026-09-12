@@ -21,7 +21,7 @@ export type AuditEntityType =
   | "deal" | "lead" | "proposal" | "invoice" | "quote"
   | "equipment" | "integration_credential" | "custom_field"
   | "automation_rule"
-  | "campaign" | "content_item"
+  | "campaign" | "content_item" | "email_draft"
   | "cost_rate"
   // Tenant-level config (tenants.settings — e.g. the setter question list).
   | "tenant";

@@ -98,17 +98,6 @@ export const MAX_BULK_DRAFTS = 200;
 
 export const draftsUpsertSchema = z.array(draftUpsertSchema).max(MAX_BULK_DRAFTS);
 
-/** Human-readable label for the first failing field, in declaration order. */
-const FIELD_LABELS: Record<string, string> = {
-  companyId: "companyId",
-  personId: "personId",
-  campaign: "campaign",
-  step: "step",
-  subject: "subject",
-  body: "body",
-  toEmail: "toEmail",
-};
-
 export function validateUpsert(
   raw: unknown,
 ): { ok: true; value: DraftUpsert } | { ok: false; error: string } {
@@ -116,6 +105,5 @@ export function validateUpsert(
   if (result.success) return { ok: true, value: result.data };
   const first = result.error.issues[0];
   const field = String(first?.path[0] ?? "value");
-  const label = FIELD_LABELS[field] ?? field;
-  return { ok: false, error: `Invalid ${label}: ${first?.message ?? "validation failed"}` };
+  return { ok: false, error: `Invalid ${field}: ${first?.message ?? "validation failed"}` };
 }

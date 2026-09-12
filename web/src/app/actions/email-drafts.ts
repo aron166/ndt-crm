@@ -18,10 +18,7 @@ import {
 
 const TENANT_ID = 1;
 
-// ponytail: "email_draft" isn't in lib/audit.ts's AuditEntityType union (out of
-// scope for this task — audit.ts is owned by other in-flight work). "campaign"
-// is the closest existing category for these campaign-scoped rows.
-const AUDIT_TYPE = "campaign" as const;
+const AUDIT_TYPE = "email_draft" as const;
 
 export interface DraftRow {
   id: number;
@@ -239,7 +236,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
     });
     to = contact?.email?.trim() || contact?.person.email?.trim() || null;
   }
-  if (!to) return { ok: false, error: "Nincs elérhető email cím a címzetthez" };
+  if (!to) return { ok: false, error: "Ehhez a céghez nincs email cím" };
 
   const settings = await getOutreachSettings();
   const text = withFooter(row.body, settings.footer);
