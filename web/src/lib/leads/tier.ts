@@ -104,23 +104,39 @@ function negatedAt(ws: string[], i: number): boolean {
   return false;
 }
 
-/** True when any keyword matches on a word boundary and is not negated. */
-function hits(ws: string[], keywords: readonly string[]): boolean {
-  return keywords.some((k) => {
+/** Earliest word index at which any keyword matches un-negated, or -1. */
+function hitAt(ws: string[], keywords: readonly string[]): number {
+  let best = -1;
+  for (const k of keywords) {
     const i = keywordAt(ws, k);
-    return i >= 0 && !negatedAt(ws, i);
-  });
+    if (i >= 0 && !negatedAt(ws, i) && (best === -1 || i < best)) best = i;
+  }
+  return best;
 }
 
+/**
+ * The token whose keyword appears EARLIEST in the answer, table order breaking a
+ * tie. Position matters because Hungarian answers routinely carry two tokens in
+ * two clauses — "Igen, de még nem döntöttünk" holds both `igen` and `nem`, and
+ * the old first-table-entry-wins scan returned `no`, inverting a machine
+ * prospect into a nobody. What the lead said FIRST is the answer; the rest is
+ * qualification. (Lars, 2026-09-08.)
+ */
 function match<T extends string>(value: string | undefined, table: Record<T, readonly string[]>): T | null {
   const v = fold(value);
   if (!v) return null;
   const ws = words(v);
+  let best: T | null = null;
+  let bestAt = Infinity;
   for (const [token, keywords] of Object.entries(table) as [T, readonly string[]][]) {
     if (v === token) return token;
-    if (hits(ws, keywords)) return token;
+    const at = hitAt(ws, keywords);
+    if (at >= 0 && at < bestAt) {
+      best = token;
+      bestAt = at;
+    }
   }
-  return null;
+  return best;
 }
 
 // ponytail: keyword lists, not an NLP pass — the landing form sends the token
@@ -146,16 +162,26 @@ const CONCRETE = {
 // `condition` is FIRST on purpose: "állapot értékelés" contains an evaluation
 // verb, and if `technology` were checked first that answer would tier A —
 // "call within 1 hour" — for a routine condition survey. (Vanda, #84.)
+// `technology` is a tier-A signal ("call within 1 hour"), so it takes a POSITIVE
+// statement about the technology itself. A bare "muszer*" used to live here and
+// tiered "Milyen műszerrel csinálják?" — a question about HOW WE work, the most
+// ordinary thing an inbound lead asks — as a machine prospect. (Lars, 2026-09-08.)
+// `condition` is FIRST on purpose: "állapot értékelés" is a routine condition
+// survey, not a technology enquiry. (Vanda, #84.)
 const GOAL = {
   condition: ["allapot*", "condition*"],
-  technology: ["technolog*", "muszer*", "ertekelem*"],
+  technology: ["technolog*", "maga a technolog*"],
   drill: ["furas*", "drill*", "mi van benne"],
 } as const;
 
+// The machine-prospect signal. Ownership and purchase intent are stated
+// POSITIVELY here — "sajat muszer", "vasarol", "beszerez" — rather than inferred
+// from a `goal` keyword, so asking about our instruments never tiers as owning
+// one. `berel*` is deliberately absent: renting is a job, not a machine sale.
 const OWN_DEVICE = {
   no: ["nem", "no", "nincs*"],
-  maybe: ["maybe", "talan*", "lehet*"],
-  yes: ["yes", "igen"],
+  maybe: ["maybe", "talan*", "lehet*", "vasarol*", "beszerz*", "beszerez*", "vennenk", "venni szeretn*", "gondolkod*"],
+  yes: ["yes", "igen", "sajat muszer*", "sajat gep*", "van muszer*", "van gep*", "van sajat*"],
 } as const;
 
 const GATE = {
@@ -167,8 +193,26 @@ const GATE = {
   curious: ["curious", "erdekel*", "erdeklod*", "nezelod*", "tajekozod*", "csak nez*", "korulnez*"],
 } as const;
 
-/** Timing answers that mean "no date named". */
-const NO_DATE = ["no date", "nincs*", "nem tudom", "meg nincs*", "nincs datum*"];
+/**
+ * Timing answers that mean "no date named". Undecided phrasings belong here:
+ * "Még nem dőlt el, valamikor ősszel" named no date, and counting it as one
+ * promoted a company lead to tier B — bookable — on a shrug. (Lars, 2026-09-08.)
+ */
+const NO_DATE = [
+  "no date",
+  "nincs*",
+  "nem tudom",
+  "nem tudjuk",
+  "meg nincs*",
+  "nincs datum*",
+  "meg nem",
+  "nem dolt*",
+  "nem dontott*",
+  "nem biztos",
+  "nem hatarozt*",
+  "valamikor",
+  "majd",
+];
 
 /** True when the lead named ANY timeframe ("nincs még dátum" is not one). */
 function timingSet(answer: string | undefined): boolean {
