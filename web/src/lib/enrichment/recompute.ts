@@ -28,7 +28,9 @@ export async function recomputeCloseness(target: {
           select: { type: true, occurredAt: true },
         }),
         db.invoice.findMany({
-          where: { tenantId, companyId },
+          // Score thresholds are HUF; a non-HUF invoice is skipped rather than
+          // mis-converted — FX conversion is out of scope here.
+          where: { tenantId, companyId, currency: "HUF" },
           select: { netAmount: true },
         }),
       ]);

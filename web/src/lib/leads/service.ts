@@ -283,7 +283,12 @@ export async function setLeadQualification(
   // The tier is derived, so it is recomputed HERE — the one write path for
   // setter answers (panel + PATCH /api/leads/:id both land here). Never stored
   // stale, never entered by hand.
-  const tier = computeTier(merged);
+  //
+  // computeTier can return null ("not yet placeable" — see its final branch).
+  // A setter saving one answer must not null out a tier a PREVIOUS answer
+  // already placed the lead into, so an unplaced result falls back to the
+  // lead's current tier rather than clearing it.
+  const tier = computeTier(merged) ?? lead.tier;
 
   await db.lead.updateMany({
     where: { id: leadId, tenantId: ctx.tenantId },

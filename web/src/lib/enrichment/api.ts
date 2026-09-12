@@ -36,9 +36,11 @@ export async function readJson(request: Request): Promise<unknown | NextResponse
   }
 }
 
-const enrichmentBodySchema = z.object({
-  enrichment: dossierSchema.nullable(),
-});
+const enrichmentBodySchema = z
+  .object({
+    enrichment: dossierSchema.nullable(),
+  })
+  .strict();
 
 /**
  * Parses `{ enrichment: <dossier|null> }`. `closeness_score` is CRM-computed:

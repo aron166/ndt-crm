@@ -1,27 +1,16 @@
 "use client";
 
-import { readDossier, sortDossierItems } from "@/lib/enrichment/dossier";
+import { readDossier, sortDossierItems, safeHttpUrl } from "@/lib/enrichment/dossier";
 import { formatDate } from "@/lib/utils";
 
 interface Props {
   enrichment: unknown;
   closenessScore: number | null;
   enrichmentUpdatedAt: string | Date | null;
+  emptyText: string;
 }
 
-/** Only render a URL as a link when it actually parses as http/https — the
- * dossier is written by an external research agent, treat it as untrusted. */
-function safeHttpUrl(url: string | undefined): string | null {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null;
-  } catch {
-    return null;
-  }
-}
-
-export function CompanyDossierTab({ enrichment, closenessScore, enrichmentUpdatedAt }: Props) {
+export function DossierTab({ enrichment, closenessScore, enrichmentUpdatedAt, emptyText }: Props) {
   const dossier = readDossier(enrichment);
   const hasContent = !!dossier && (
     (dossier.apropo?.length ?? 0) > 0 ||
@@ -45,7 +34,7 @@ export function CompanyDossierTab({ enrichment, closenessScore, enrichmentUpdate
       </div>
 
       {!hasContent ? (
-        <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>Ehhez a céghez még nincs dosszié.</p>
+        <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>{emptyText}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
           {(dossier!.apropo?.length ?? 0) > 0 && (

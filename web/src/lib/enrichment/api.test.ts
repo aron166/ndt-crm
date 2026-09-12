@@ -39,6 +39,10 @@ describe("parseEnrichmentBody", () => {
     expect(parseEnrichmentBody({})).toBeInstanceOf(NextResponse);
   });
 
+  it("rejects an unknown top-level key instead of silently ignoring it", () => {
+    expect(parseEnrichmentBody({ enrichment: null, closenessScore: 99 })).toBeInstanceOf(NextResponse);
+  });
+
   it("rejects a fourth apropó line and unknown top-level keys", () => {
     expect(parseEnrichmentBody({ enrichment: { apropo: ["a", "b", "c", "d"] } })).toBeInstanceOf(NextResponse);
     expect(parseEnrichmentBody({ enrichment: { nem_letezo: 1 } })).toBeInstanceOf(NextResponse);

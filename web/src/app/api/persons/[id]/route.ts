@@ -4,6 +4,7 @@ import { reportError } from "@/lib/report-error";
 import { audit } from "@/lib/audit";
 import { serializeDates } from "@/lib/serialize";
 import { json, enrichmentApiCtx, parseEntityId, readJson, parseEnrichmentBody } from "@/lib/enrichment/api";
+import { dossierDigest } from "@/lib/enrichment/dossier";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -33,14 +34,21 @@ export async function PATCH(request: Request, { params }: Params) {
 
   try {
     await db.person.updateMany({
-      where: { id, tenantId: ctx.tenantId },
+      where: { id, tenantId: ctx.tenantId, deletedAt: null },
       data: {
-        // enrichment REPLACES the stored dossier (no merge); explicit null clears it.
-        enrichment: enrichment === null ? Prisma.JsonNull : (enrichment as Prisma.InputJsonValue),
+        // enrichment REPLACES the stored dossier (no merge); explicit null
+        // clears it. Prisma.JsonNull writes a JSONB `null` literal — that
+        // still matches `WHERE enrichment IS NOT NULL`, so a cleared row must
+        // use DbNull (a true SQL NULL) instead.
+        enrichment: enrichment === null ? Prisma.DbNull : (enrichment as Prisma.InputJsonValue),
         enrichmentUpdatedAt: new Date(),
       },
     });
-    audit("person", id, "update", { enrichment: exists.enrichment as Record<string, unknown> | null }, { enrichment },
+    // Digest, not the document: dossiers run ~600 KB and getEntityHistory loads
+    // 100 audit rows into every detail page's RSC payload.
+    audit("person", id, "update",
+      { enrichment: dossierDigest(exists.enrichment) },
+      { enrichment: dossierDigest(enrichment) },
       { tenantId: ctx.tenantId, actor: "agent", actorAgentId: ctx.actorAgentId });
   } catch (err) {
     reportError("api.persons.patch", err, { personId: id, sourceApp: ctx.actorAgentId });
@@ -48,7 +56,8 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   const person = await db.person.findFirst({ where: { id, tenantId: ctx.tenantId }, select: PERSON_SELECT });
-  const wire = serializeDates(person!);
+  if (!person) return json({ error: "Not found" }, 404);
+  const wire = serializeDates(person);
   return json({
     ok: true,
     person: {

@@ -55,6 +55,34 @@ export function readDossier(value: unknown): Dossier | null {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * A small digest of a dossier for the audit log, instead of the ~600 KB
+ * document itself: `getEntityHistory` loads 100 audit rows into every detail
+ * page's RSC payload, so storing the full before/after there does not scale.
+ * `null` for "no dossier stored" (before a first PATCH, or after a clear).
+ */
+export function dossierDigest(value: unknown): { items: number; has_summary: boolean; apropo: number } | null {
+  const dossier = readDossier(value);
+  if (!dossier) return null;
+  return {
+    items: dossier.items?.length ?? 0,
+    has_summary: !!dossier.summary,
+    apropo: dossier.apropo?.length ?? 0,
+  };
+}
+
+/** Only render a URL as a link when it actually parses as http/https — the
+ * dossier is written by an external research agent, treat it as untrusted. */
+export function safeHttpUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Newest first. Undated items sink to the bottom, keeping their order. */
 export function sortDossierItems(items: DossierItem[]): DossierItem[] {
   return [...items].sort((a, b) => {

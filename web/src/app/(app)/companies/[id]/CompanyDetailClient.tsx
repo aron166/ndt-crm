@@ -20,7 +20,7 @@ import { LeaveCompanyModal } from "@/components/LeaveCompanyModal";
 import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
 import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
 import { CompanyMetadataTab } from "./CompanyMetadataTab";
-import { CompanyDossierTab } from "./CompanyDossierTab";
+import { DossierTab } from "@/components/DossierTab";
 import type { AttrRow } from "@/lib/companies/attributes";
 import { useDeferredValue, useState, useTransition } from "react";
 
@@ -959,10 +959,11 @@ export function CompanyDetailClient({
       {/* Dossier — closeness score + research notes from the enrichment agent */}
       {shownTab === "dossier" && (
         <div style={{ marginTop: 16 }}>
-          <CompanyDossierTab
+          <DossierTab
             enrichment={company.enrichment}
             closenessScore={company.closenessScore ?? null}
             enrichmentUpdatedAt={company.enrichmentUpdatedAt ?? null}
+            emptyText="Ehhez a céghez még nincs dosszié."
           />
         </div>
       )}

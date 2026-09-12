@@ -14,7 +14,7 @@ import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { AuditLogEntries } from "@/components/AuditLogTab";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
 import { SetEmployerModal } from "./SetEmployerModal";
-import { PersonDossierTab } from "./PersonDossierTab";
+import { DossierTab } from "@/components/DossierTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Mail, Phone, MapPin, Trash2 } from "lucide-react";
@@ -573,10 +573,11 @@ export function PersonDetailClient({
 
             {/* Dossier — closeness score + research notes from the enrichment agent */}
             {shownTab === "dossier" && (
-              <PersonDossierTab
+              <DossierTab
                 enrichment={person.enrichment}
                 closenessScore={person.closenessScore ?? null}
                 enrichmentUpdatedAt={person.enrichmentUpdatedAt ?? null}
+                emptyText="Ehhez a személyhez még nincs dosszié."
               />
             )}
           </div>
