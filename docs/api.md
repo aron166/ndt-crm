@@ -153,6 +153,41 @@ turn it off, so a shrug cannot promote a company lead to B.
 > `lead_tier_changed` trigger is a product decision, not a bug fix; it is Áron's
 > call. (Vanda, #81.)
 
+#### `thread_key` — cold-email reply intake
+
+A reply to a cold email we sent. Post it with the thread's key, the campaign, and
+`channel: "cold_email"`:
+
+```bash
+curl -X POST $CRM/api/leads -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "company_name": "Vasmű Zrt.", "contact_email": "kovacs@vasmu.hu",
+        "channel": "cold_email", "campaign": "BirdsView Q4", "thread_key": "birdsview-q4:42" }'
+# → 201 { "ok": true, "leadId": 31, "tier": null, "companyId": 42, "personId": 88, "draftId": 5 }
+```
+
+`thread_key` is the string `threadKeyFor(campaign, companyId)` stamped on the
+draft when it was sent (`lib/outreach/drafts.ts`), so a reply finds its way back
+to the email that caused it. Three things follow from it:
+
+1. **Idempotent.** If a lead already carries this thread key, **nothing is
+   written** and you get **`200 { ok, leadId, deduped: true, companyId }`** with
+   the original lead — no second lead, no second company, no intro email, no
+   `lead_created` automation. The reply-intake skill is schedulable and will
+   re-read the same Gmail thread; this is what makes that safe. Guaranteed by a
+   unique index on `(tenant_id, thread_key)`, so two concurrent posts cannot
+   both win — the loser also returns the 200.
+2. **The company comes from the draft, not from the name.** We know exactly who
+   we mailed, so `company_name` is not used for dedupe on these posts. That
+   sidesteps the known weak spot of this intake (exact-name matching, which
+   collapses every `"(magánérdeklődő)"` onto one row).
+3. **The answered draft flips to `replied`** — only one in `sent` status, so a
+   forged or stale key cannot promote a draft that never went out.
+
+A `thread_key` that matches no draft is still accepted and still stored: the
+lead is created by the ordinary path (name dedupe included) and `draftId` is
+omitted. Nothing else about the intake changes, and a payload without a
+`thread_key` behaves exactly as before.
+
 #### `send_intro`
 
 > ⚠️ **Not idempotent.** A retried or double-submitted `POST /api/leads` creates a

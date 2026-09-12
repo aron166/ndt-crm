@@ -30,6 +30,11 @@ export const leadIntakeSchema = z
       z.enum(["cold_email", "landing", "linkedin", "meta_ads", "referral", "import", "manual"]).default("landing"),
     ),
     campaign: optStr,
+    // Cold-email reply intake (addendum item 3). The thread this reply came
+    // back on — the same string `threadKeyFor()` stamped on the sent draft.
+    // Posting it twice is safe: it is the idempotency key, and the second post
+    // returns the first lead instead of creating another.
+    thread_key: z.preprocess(emptyToUndef, z.string().trim().max(200).optional()),
 
     // Marketing passthrough — stored on lead.customFields.
     utm_source: optStr,

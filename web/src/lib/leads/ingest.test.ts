@@ -9,11 +9,16 @@ function makeTx(seed: {
   company?: { id: number } | null;
   person?: { id: number } | null;
   contact?: { id: number } | null;
+  /** An existing lead on this thread key — the idempotency fixture. */
+  lead?: { id: number; companyId: number | null; contactId: number | null } | null;
+  /** A sent draft this reply answers. */
+  draft?: { id: number; companyId: number; personId: number | null } | null;
 }) {
   let nextId = 100;
   const created = {
     company: 0, person: 0, contact: 0, lead: 0, auditLog: 0, appEvent: 0,
   };
+  const draftUpdates: unknown[] = [];
   const lastLeadData: { value?: unknown } = {};
 
   const tx: LeadTx = {
@@ -31,6 +36,11 @@ function makeTx(seed: {
     },
     lead: {
       create: vi.fn(async (args) => { created.lead++; lastLeadData.value = args.data; return { id: ++nextId }; }),
+      findFirst: vi.fn(async () => seed.lead ?? null),
+    },
+    emailDraft: {
+      findFirst: vi.fn(async () => seed.draft ?? null),
+      updateMany: vi.fn(async (args) => { draftUpdates.push(args); return { count: 1 }; }),
     },
     leadStatus: {
       // No configured initial status in the fake → ingest falls back to "new".
@@ -43,7 +53,7 @@ function makeTx(seed: {
       create: vi.fn(async () => { created.appEvent++; return { id: ++nextId }; }),
     },
   };
-  return { tx, created, lastLeadData };
+  return { tx, created, lastLeadData, draftUpdates };
 }
 
 const ctx = { tenantId: 1, appSlug: "betonscan_landing" };
@@ -170,5 +180,85 @@ describe("leadIntakeSchema", () => {
     const r = leadIntakeSchema.safeParse({ company_name: "Acme", contact_email: "a@b.hu" });
     expect(r.success).toBe(true);
     if (r.success) expect(r.data.source).toBe("web");
+  });
+});
+
+describe("ingestLead — cold-email reply intake (thread_key)", () => {
+  const reply = (extra: Record<string, unknown> = {}) =>
+    parse({
+      company_name: "Vasmű Zrt.",
+      contact_email: "kovacs@vasmu.hu",
+      channel: "cold_email",
+      campaign: "BirdsView Q4",
+      thread_key: "birdsview-q4:42",
+      ...extra,
+    });
+
+  it("is idempotent: a thread key that already has a lead creates nothing", async () => {
+    const { tx, created } = makeTx({ lead: { id: 900, companyId: 42, contactId: 7 } });
+    const res = await ingestLead(reply(), ctx, tx);
+
+    expect(res.leadId).toBe(900);
+    expect(res.deduped).toBe(true);
+    // Nothing at all was written — not a lead, not a company, not an audit row.
+    expect(created).toEqual({ company: 0, person: 0, contact: 0, lead: 0, auditLog: 0, appEvent: 0 });
+  });
+
+  it("attaches the lead to the DRAFT's company, not to a name match", async () => {
+    // The replier's signature says something else entirely; the draft wins,
+    // because we know exactly who we mailed.
+    const { tx, created, lastLeadData } = makeTx({
+      draft: { id: 5, companyId: 42, personId: null },
+      company: { id: 999 }, // a name match that must NOT be used
+    });
+    const res = await ingestLead(reply({ company_name: "valami egészen más" }), ctx, tx);
+
+    expect(res.companyId).toBe(42);
+    expect((lastLeadData.value as { companyId: number }).companyId).toBe(42);
+    expect(created.company).toBe(0);
+    expect(tx.company.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("flips the answered draft to replied, and only a SENT one", async () => {
+    const { tx, draftUpdates } = makeTx({ draft: { id: 5, companyId: 42, personId: null } });
+    const res = await ingestLead(reply(), ctx, tx);
+
+    expect(res.draftId).toBe(5);
+    expect(draftUpdates).toHaveLength(1);
+    expect(draftUpdates[0]).toMatchObject({
+      where: { tenantId: 1, threadKey: "birdsview-q4:42", status: "sent" },
+      data: { status: "replied" },
+    });
+  });
+
+  it("stores the thread key on the lead so the next run can find it", async () => {
+    const { tx, lastLeadData } = makeTx({ draft: { id: 5, companyId: 42, personId: null } });
+    await ingestLead(reply(), ctx, tx);
+    expect((lastLeadData.value as { threadKey: string }).threadKey).toBe("birdsview-q4:42");
+  });
+
+  it("a thread key with no matching draft still works and touches no draft", async () => {
+    const { tx, created, draftUpdates, lastLeadData } = makeTx({});
+    const res = await ingestLead(reply(), ctx, tx);
+
+    expect(res.deduped).toBe(false);
+    expect(res.draftId).toBeNull();
+    expect(draftUpdates).toHaveLength(0);
+    expect(created.lead).toBe(1);
+    // No draft to trust, so the normal name dedupe applies.
+    expect((lastLeadData.value as { threadKey: string }).threadKey).toBe("birdsview-q4:42");
+  });
+
+  it("an ordinary lead with no thread key is unaffected", async () => {
+    const { tx, created, draftUpdates, lastLeadData } = makeTx({});
+    const res = await ingestLead(
+      parse({ company_name: "Acme Kft.", contact_email: "a@acme.hu" }),
+      ctx,
+      tx,
+    );
+    expect(res.deduped).toBe(false);
+    expect(draftUpdates).toHaveLength(0);
+    expect(created.lead).toBe(1);
+    expect((lastLeadData.value as { threadKey: string | null }).threadKey).toBeNull();
   });
 });

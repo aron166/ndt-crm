@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { leadIntakeSchema } from "@/lib/leads/schema";
@@ -81,6 +82,17 @@ export async function POST(request: Request) {
       ingestLead(parsed.data, { tenantId: key.tenantId, appSlug: key.appSlug }, tx),
     );
 
+    // A reply we have already recorded. Nothing was written, so nothing
+    // downstream may fire either: re-sending the intro material or re-running
+    // `lead_created` would mean a second email and a second follow-up task for
+    // one answered thread. 200, not 201 — nothing was created.
+    if (result.deduped) {
+      return json(
+        { ok: true, leadId: result.leadId, deduped: true, companyId: result.companyId },
+        200,
+      );
+    }
+
     // The intro material (termékismertető) is the thing the qualification
     // answers were traded for — send it (or task it) before anything else.
     const intro: IntroResult | null = parsed.data.send_intro
@@ -124,10 +136,31 @@ export async function POST(request: Request) {
         ...(intro ? { intro } : {}),
         companyId: result.companyId,
         personId: result.personId,
+        ...(result.draftId ? { draftId: result.draftId } : {}),
       },
       201,
     );
   } catch (err) {
+    // Two posts for one thread raced past the in-transaction check and the
+    // unique index caught the loser. That is the index doing its job, not a
+    // failure: re-read the winner and answer as if we had deduped, so the
+    // reply-intake skill sees the same idempotent result either way.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002" &&
+      parsed.data.thread_key
+    ) {
+      const winner = await db.lead.findFirst({
+        where: { tenantId: key.tenantId, threadKey: parsed.data.thread_key.trim() },
+        select: { id: true, companyId: true },
+      });
+      if (winner) {
+        return json(
+          { ok: true, leadId: winner.id, deduped: true, companyId: winner.companyId },
+          200,
+        );
+      }
+    }
     reportError("api.leads", err, { sourceApp: key.appSlug });
     return json({ error: "Internal error" }, 500);
   }

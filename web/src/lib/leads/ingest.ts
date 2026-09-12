@@ -28,6 +28,11 @@ export interface LeadTx {
   };
   lead: {
     create(args: Prisma.LeadCreateArgs): Promise<{ id: number }>;
+    findFirst(args: Prisma.LeadFindFirstArgs): Promise<{ id: number; companyId: number | null; contactId: number | null } | null>;
+  };
+  emailDraft: {
+    findFirst(args: Prisma.EmailDraftFindFirstArgs): Promise<{ id: number; companyId: number; personId: number | null } | null>;
+    updateMany(args: Prisma.EmailDraftUpdateManyArgs): Promise<{ count: number }>;
   };
   leadStatus: {
     findFirst(args: Prisma.LeadStatusFindFirstArgs): Promise<{ key: string } | null>;
@@ -48,6 +53,15 @@ export interface IngestCtx {
 
 export interface IngestResult {
   leadId: number;
+  /**
+   * True when `thread_key` matched a lead that already existed, so nothing was
+   * created and `leadId` is the original. The reply-intake skill runs on a
+   * schedule and re-reads the same Gmail thread; this is the signal that it
+   * correctly did nothing the second time.
+   */
+  deduped?: boolean;
+  /** The draft this reply answered, when `thread_key` matched one. */
+  draftId?: number | null;
   /** Derived qualification tier, null when no answers were submitted. */
   tier: LeadTier | null;
   companyId: number;
@@ -87,11 +101,55 @@ export async function ingestLead(
   // inside the app_events payload below for raw-submission traceability.)
   const sourceApp = ctx.appSlug.trim();
 
-  // 1. Dedupe Company by exact name (case-insensitive) within the tenant.
-  const existingCompany = await tx.company.findFirst({
-    where: { tenantId, name: { equals: input.company_name, mode: "insensitive" } },
-    select: { id: true },
-  });
+  // 0. Reply intake (addendum item 3). A `thread_key` means "this is an answer
+  // to a cold email we sent", and it does two things no other intake does:
+  //
+  //   (a) IDEMPOTENCY. The reply-intake skill is schedulable and will see the
+  //       same Gmail thread on its next run. If a lead already carries this
+  //       thread key we return it untouched — no second lead, no second
+  //       company, no second automation firing. (The unique index on
+  //       (tenant_id, thread_key) is the real guarantee; this is the fast path.)
+  //   (b) COMPANY IDENTITY. We already know exactly who we mailed, so the lead
+  //       is attached to the DRAFT's company rather than dedupe-by-name on
+  //       whatever the replier typed in their signature. Name dedupe is the
+  //       weakest link in this intake (STATUS.md: every "(magánérdeklődő)"
+  //       collapses onto one row); a thread key sidesteps it entirely.
+  const threadKey = input.thread_key?.trim() || null;
+
+  if (threadKey) {
+    const existingLead = await tx.lead.findFirst({
+      where: { tenantId, threadKey },
+      select: { id: true, companyId: true, contactId: true },
+    });
+    if (existingLead) {
+      return {
+        leadId: existingLead.id,
+        deduped: true,
+        draftId: null,
+        tier: null,
+        companyId: existingLead.companyId ?? 0,
+        personId: 0,
+        companyReused: true,
+        personReused: true,
+      };
+    }
+  }
+
+  const draft = threadKey
+    ? await tx.emailDraft.findFirst({
+        where: { tenantId, threadKey },
+        select: { id: true, companyId: true, personId: true },
+      })
+    : null;
+
+  // 1. Dedupe Company by exact name (case-insensitive) within the tenant —
+  // unless the thread key already told us the company for certain.
+  const existingCompany = draft
+    ? { id: draft.companyId }
+    : await tx.company.findFirst({
+        where: { tenantId, name: { equals: input.company_name, mode: "insensitive" } },
+        select: { id: true },
+      });
   const companyReused = Boolean(existingCompany);
   const company =
     existingCompany ??
@@ -183,6 +241,7 @@ export async function ingestLead(
       sourceApp,
       channel: input.channel,
       campaign: input.campaign ?? null,
+      threadKey,
       status: statusKey,
       subject: input.service_interest ?? null,
       message: input.message ?? null,
@@ -219,6 +278,18 @@ export async function ingestLead(
     },
   });
 
+  // 5b. The answered draft is now `replied`. Scoped to the tenant AND to the
+  // statuses a reply can legitimately arrive on — only a draft we actually SENT
+  // can be replied to, so a never-sent row cannot be flipped by a forged
+  // thread key, and an already-`replied` row is not rewritten on a later reply
+  // in the same thread.
+  if (threadKey && draft) {
+    await tx.emailDraft.updateMany({
+      where: { tenantId, threadKey, status: "sent" },
+      data: { status: "replied" },
+    });
+  }
+
   // 6. Emit an app_events row so the ecosystem hub sees the submission.
   await tx.appEvent.create({
     data: {
@@ -238,6 +309,8 @@ export async function ingestLead(
 
   return {
     leadId: lead.id,
+    deduped: false,
+    draftId: draft?.id ?? null,
     tier,
     companyId: company.id,
     personId: person.id,
