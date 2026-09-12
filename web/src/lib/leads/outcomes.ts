@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SCRIPT_KEY_MAX } from "./scripts";
+import { BOOKING_KINDS } from "@/lib/booking/priority";
 
 // Lead call-outcome logging — PURE module (no DB), shared by the UI modal, the
 // server action and the public API. The note-required / callback rules live in
@@ -75,6 +76,10 @@ export const callOutcomeSchema = z
     callbackAt: z.coerce.date().optional(),
     /** Required when outcome = meeting_booked. */
     demoWith: z.enum(["aron", "peter"]).optional(),
+    /** Required when outcome = meeting_booked — when the demo/visit starts. */
+    bookingAt: z.coerce.date().optional(),
+    /** Required when outcome = meeting_booked — the priority rung (lib/booking/priority.ts). */
+    bookingKind: z.enum(BOOKING_KINDS).optional(),
     /** Required when the outcome is lost/disqualified — a short free text WHY. */
     lostReason: z.string().trim().max(LOST_REASON_MAX).optional(),
     /** Optional: who the callback task is assigned to (defaults to the actor). */
@@ -96,6 +101,12 @@ export const callOutcomeSchema = z
     if (d.outcome === "meeting_booked" && !d.demoWith) {
       ctx.addIssue({ code: "custom", path: ["demoWith"], message: "Add meg, kivel lesz a demó (Áron / Péter)" });
     }
+    if (d.outcome === "meeting_booked" && (!d.bookingAt || Number.isNaN(d.bookingAt.getTime()))) {
+      ctx.addIssue({ code: "custom", path: ["bookingAt"], message: "Foglaláshoz dátum és óra kötelező" });
+    }
+    if (d.outcome === "meeting_booked" && !d.bookingKind) {
+      ctx.addIssue({ code: "custom", path: ["bookingKind"], message: "Add meg a foglalás típusát" });
+    }
     if (isLostCallOutcome(d.outcome) && (d.lostReason ?? "").length < LOST_REASON_MIN) {
       ctx.addIssue({ code: "custom", path: ["lostReason"], message: "Az elvesztés oka kötelező (min. 3 karakter)" });
     }
@@ -109,6 +120,9 @@ export interface CallOutcomePlan {
   lost: { lostReason: string } | null;
   /** A callback task to create (callback_requested only). */
   callbackAt: Date | null;
+  /** A booking task to create (meeting_booked only). */
+  bookingAt: Date | null;
+  bookingKind: (typeof BOOKING_KINDS)[number] | null;
 }
 
 /**
@@ -121,7 +135,7 @@ export function planCallOutcome(
   knownStatuses: readonly string[],
 ): CallOutcomePlan {
   const known = (s: string) => knownStatuses.includes(s);
-  const plan: CallOutcomePlan = { status: null, lost: null, callbackAt: null };
+  const plan: CallOutcomePlan = { status: null, lost: null, callbackAt: null, bookingAt: null, bookingKind: null };
 
   switch (input.outcome) {
     case "no_answer": {
@@ -138,6 +152,8 @@ export function planCallOutcome(
     case "meeting_booked": {
       const target = DEMO_STATUS[input.demoWith ?? "aron"];
       if (known(target)) plan.status = target;
+      plan.bookingAt = input.bookingAt ?? null;
+      plan.bookingKind = input.bookingKind ?? null;
       break;
     }
     case "not_interested":

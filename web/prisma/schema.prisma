@@ -530,6 +530,11 @@ model Task {
   setMembership    String[]  @map("set_membership") // user-defined set membership
   skillRequiredId  Int?      @map("skill_required_id") // FK added in Step 4.5
   dueDate          DateTime? @map("due_date")
+  // Booking (item 2): when the visit starts. A task that has startsAt IS a
+  // booking; duration reuses estimatedMinutes. bookingKind is the priority rung
+  // (lib/booking/priority.ts) — the money rungs come from the deal/lead value.
+  startsAt         DateTime? @map("starts_at")
+  bookingKind      String?   @map("booking_kind")
   completedAt      DateTime? @map("completed_at")
   estimatedMinutes Int?      @map("estimated_minutes") // normaidő — measured against actual
   actualMinutes    Int?      @map("actual_minutes")
@@ -549,6 +554,7 @@ model Task {
   subTasks   Task[]   @relation("SubTasks")
 
   @@index([tenantId, leadId])
+  @@index([tenantId, startsAt])
   @@map("tasks")
 }
 
