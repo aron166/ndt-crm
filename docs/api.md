@@ -116,6 +116,19 @@ sitting inside a negation is ignored — "nem a technológia érdekel" is not
 `goal=technology`. `hanem` / `de` end the negation, so "nem tégla, hanem beton"
 still reads as concrete.
 
+When an answer carries **two** competing tokens, the one the lead said **first**
+wins: "Igen, de még nem döntöttünk" is `own_device=yes`, not `no`. Keyword-table
+order only breaks a tie at the same position.
+
+Tier A needs a **positive** machine signal — `own_device` answered yes/maybe
+(including purchase intent: "vásárolnánk", "beszerezzük"), or an explicit
+statement about the technology. Asking *about* our instruments ("Milyen
+műszerrel csinálják?") is an ordinary inbound question and tiers nothing.
+
+A `timing` answer counts as "set" only when it names a timeframe. Undecided
+phrasings ("még nem dőlt el", "valamikor ősszel", "majd", "nem tudjuk") do not,
+so they cannot promote a company lead to B.
+
 > ⚠️ **`tier` only reaches an automation at intake.** `POST /api/leads` puts the
 > derived tier into the `lead_created` event, so a "tier A → call within 1 h"
 > rule fires for leads the landing form already tiered A. A setter who promotes a
