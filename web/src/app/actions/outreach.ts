@@ -10,6 +10,7 @@ import {
   isCallOutcome,
 } from "@/lib/outreach/queue";
 import { audienceWhere } from "@/lib/marketing/audience-query";
+import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import type { Prisma } from "@prisma/client";
 
 const TENANT_ID = 1;
@@ -271,6 +272,7 @@ export async function recordCall(
       },
     }),
   ]);
+  await recomputeCloseness({ tenantId: TENANT_ID, companyId: company.id, personId });
 
   // Follow-up task is a convenience on top — created after the call is safely
   // logged so it can never roll back the interaction.

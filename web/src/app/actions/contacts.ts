@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { createCompany } from "@/app/actions/companies";
+import { recomputeCloseness } from "@/lib/enrichment/recompute";
 
 const TENANT_ID = 1;
 
@@ -149,6 +150,7 @@ export async function setCurrentEmployer(formData: FormData) {
     });
     return created;
   });
+  await recomputeCloseness({ tenantId: TENANT_ID, companyId, personId });
 
   if (current) {
     await audit("contact", current.id, "update", { endedAt: null }, { endedAt: startedAt.toISOString() });

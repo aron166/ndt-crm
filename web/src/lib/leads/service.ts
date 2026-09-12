@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { audit, type AuditOptions } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
+import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { getLeadStatuses, getQualificationQuestions } from "./queries";
 import { leadStatusLabel } from "./statuses";
 import {
@@ -282,7 +283,12 @@ export async function setLeadQualification(
   // The tier is derived, so it is recomputed HERE — the one write path for
   // setter answers (panel + PATCH /api/leads/:id both land here). Never stored
   // stale, never entered by hand.
-  const tier = computeTier(merged);
+  //
+  // computeTier can return null ("not yet placeable" — see its final branch).
+  // A setter saving one answer must not null out a tier a PREVIOUS answer
+  // already placed the lead into, so an unplaced result falls back to the
+  // lead's current tier rather than clearing it.
+  const tier = computeTier(merged) ?? lead.tier;
 
   await db.lead.updateMany({
     where: { id: leadId, tenantId: ctx.tenantId },
@@ -374,6 +380,7 @@ export async function logLeadCallOutcome(
     }
     return { interaction, task };
   });
+  await recomputeCloseness({ tenantId: ctx.tenantId, companyId: lead.companyId, personId });
 
   audit("interaction", interaction.id, "create", null,
     { type: "call", outcome: input.outcome, leadId, companyId: lead.companyId, personId }, auditOpts(ctx));

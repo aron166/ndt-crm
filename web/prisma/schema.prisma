@@ -90,6 +90,12 @@ model Person {
   phone       String?
   linkedinUrl String?   @map("linkedin_url")
   notes       String?
+
+  // ── Enrichment dossier (written by the research skill via PATCH /api/persons/:id) ──
+  enrichment          Json?     @map("enrichment") // see lib/enrichment/dossier.ts for the shape
+  closenessScore      Int?      @map("closeness_score") // 0-100, CRM-computed, never written from outside
+  enrichmentUpdatedAt DateTime? @map("enrichment_updated_at")
+
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -166,6 +172,12 @@ model Company {
   revenue2024          BigInt?   @map("revenue_2024")
   customerValue        BigInt?   @map("customer_value")
   customFields         Json?     @map("custom_fields")
+
+  // ── Enrichment dossier (written by the research skill via PATCH /api/companies/:id) ──
+  enrichment           Json?     @map("enrichment") // see lib/enrichment/dossier.ts for the shape
+  closenessScore       Int?      @map("closeness_score") // 0-100, CRM-computed, never written from outside
+  enrichmentUpdatedAt  DateTime? @map("enrichment_updated_at")
+
   deletedAt            DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")

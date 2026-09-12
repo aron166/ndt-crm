@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { db } from "@/lib/db";
-import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, type LeadCtx } from "./service";
+import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, setLeadQualification, type LeadCtx } from "./service";
 
 // The task ↔ kanban sync (Péter, BRIEFING addendum 2026-09-07 P0 #4). Both
 // directions, plus the "duplication structurally impossible" claim.
@@ -12,7 +12,12 @@ vi.mock("./queries", () => ({
     ["new", "call_1", "call_2", "call_3", "call_3_plus", "recall", "demo_aron", "demo_peter"]
       .map((key, position) => ({ key, label: key, color: "#000", position, isInitial: position === 0, isTerminal: false, isCommitment: false, description: null })),
   ),
-  getQualificationQuestions: vi.fn().mockResolvedValue([]),
+  getQualificationQuestions: vi.fn().mockResolvedValue(
+    [
+      "gate", "situation", "concrete", "goal", "size", "postcode", "timing",
+      "own_device", "hook", "use_case", "work",
+    ].map((slug) => ({ slug, label: slug })),
+  ),
 }));
 vi.mock("@/lib/db", () => ({
   db: {
@@ -107,6 +112,28 @@ describe("task → card: logging a call cannot leave two open callback tasks", (
     expect(res).toMatchObject({ success: true, status: "call_2" });
     expect(txTaskUpdateMany).toHaveBeenCalledTimes(1);
     expect(txTaskCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("setLeadQualification keeps a placed tier when the new answer doesn't re-place it", () => {
+  it("keeps tier A when the derived tier is null (not yet placeable)", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ qualification: {}, tier: "A" });
+    const res = await setLeadQualification(10, { hook: "erdekel a technologia" }, ctx);
+    expect(res).toEqual({ success: true });
+    expect(mockDb.lead.updateMany).toHaveBeenCalledWith({
+      where: { id: 10, tenantId: 1 },
+      data: { qualification: { hook: "erdekel a technologia" }, tier: "A" },
+    });
+  });
+
+  it("overwrites tier A with C when the new answer derives a tier", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ qualification: {}, tier: "A" });
+    const res = await setLeadQualification(10, { situation: "szakember" }, ctx);
+    expect(res).toEqual({ success: true });
+    expect(mockDb.lead.updateMany).toHaveBeenCalledWith({
+      where: { id: 10, tenantId: 1 },
+      data: { qualification: { situation: "szakember" }, tier: "C" },
+    });
   });
 });
 

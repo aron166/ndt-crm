@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { validateInteractionInput } from "@/lib/interactions";
 import { audit } from "@/lib/audit";
+import { recomputeCloseness } from "@/lib/enrichment/recompute";
 
 export async function logInteraction(formData: FormData) {
   const type = formData.get("type") as string;
@@ -34,6 +35,7 @@ export async function logInteraction(formData: FormData) {
   });
   await audit("interaction", interaction.id, "create", null,
     { type, direction, companyId, personId, occurredAt });
+  await recomputeCloseness({ tenantId: 1, companyId, personId });
 
   if (companyId) {
     await db.company.updateMany({

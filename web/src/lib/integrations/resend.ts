@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { decrypt, isEncrypted } from "@/lib/crypto";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
+import { recomputeCloseness } from "@/lib/enrichment/recompute";
 
 // ponytail: no ctx system yet (tenant-decoupling is queued item #1), so callers
 // that genuinely have no tenant in hand still pass DEFAULT_TENANT_ID. The point
@@ -134,6 +135,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     });
     audit("interaction", interaction.id, "create", null,
       { type: "email", direction: "outbound", companyId, personId, source: "resend" }, { tenantId });
+    await recomputeCloseness({ tenantId, companyId, personId });
     if (companyId) {
       await db.company.updateMany({
         where: { id: companyId, tenantId },

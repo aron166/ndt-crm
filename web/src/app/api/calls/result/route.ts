@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { callResultSchema, composeCallNotes } from "@/lib/calls/result";
 import { analyzeCallTranscript } from "@/lib/calls/analyze";
+import { recomputeCloseness } from "@/lib/enrichment/recompute";
 
 // Call-result intake. The external transcription/analysis pipeline (Make:
 // recorder → Drive → Whisper → AI) posts the finished transcript + analysis
@@ -103,6 +104,7 @@ export async function POST(request: Request) {
         } as Prisma.InputJsonValue,
       },
     });
+    await recomputeCloseness({ tenantId, companyId: company.id, personId: input.person_id ?? null });
 
     revalidatePath(`/companies/${company.id}`);
     if (input.person_id) revalidatePath(`/persons/${input.person_id}`);
