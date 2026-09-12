@@ -6,6 +6,11 @@ import { db } from "@/lib/db";
 
 export interface LeadRef { id: number; companyId: number | null; personId: number | null; createdAt: Date }
 
+/** The open-call-task predicate: a call task that is still owed (not done/cancelled). Shared so /drive doesn't grow a second copy with a status value that doesn't exist in the schema. */
+export function openCallTaskWhere(tenantId: number) {
+  return { tenantId, type: "call", status: { in: ["created", "in_progress"] as string[] } };
+}
+
 export interface LeadExtras {
   lastContactAt: Date | null;
   callbackDueAt: Date | null;
@@ -27,7 +32,7 @@ export async function getLeadExtras(tenantId: number, leads: LeadRef[]): Promise
       ? db.interaction.groupBy({ by: ["personId"], where: { tenantId, personId: { in: personIds } }, _max: { occurredAt: true } })
       : [],
     db.task.findMany({
-      where: { tenantId, leadId: { in: leadIds }, type: "call", status: { in: ["created", "in_progress"] }, dueDate: { not: null } },
+      where: { ...openCallTaskWhere(tenantId), leadId: { in: leadIds }, dueDate: { not: null } },
       select: { leadId: true, dueDate: true },
       orderBy: { dueDate: "asc" },
     }),

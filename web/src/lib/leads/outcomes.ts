@@ -32,6 +32,17 @@ export const LOST_CALL_OUTCOMES: readonly CallOutcomeKey[] = ["not_interested", 
 export function isLostCallOutcome(key: string): boolean {
   return (LOST_CALL_OUTCOMES as readonly string[]).includes(key);
 }
+/**
+ * Outcomes whose `.superRefine` rule above requires an extra field beyond the
+ * note (callbackAt / demoWith / lostReason) — the client uses this only to
+ * decide which field to reveal; the schema above is what actually enforces it.
+ */
+export const CALL_OUTCOMES_NEEDING_DETAIL: readonly CallOutcomeKey[] = [
+  "callback_requested",
+  "meeting_booked",
+  "not_interested",
+  "disqualified",
+];
 /** Shortest reason we accept anywhere. "x" is not a reason. */
 export const LOST_REASON_MIN = 3;
 export const LOST_REASON_MAX = 500;
