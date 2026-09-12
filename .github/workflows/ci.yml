@@ -1,0 +1,70 @@
+name: CI
+
+# The three gates that were run by hand until now. The third one is the point:
+# `prisma migrate deploy` against an EMPTY database is what nothing checked, and
+# it had been broken for months (PR #91 — hand-run SQL that never became a
+# migration, plus a seed that referenced a tenant no migration created).
+# Vercel builds the app; this workflow does not, to stay fast.
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  check:
+    name: tsc + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npm test
+
+  migrations:
+    name: clean-database migrate deploy
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ndt_crm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      # prisma.config.ts points the CLI at DIRECT_URL; it loads .env with dotenv,
+      # which never overrides a variable already in the environment.
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ndt_crm
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ndt_crm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Build the schema from zero
+        run: npx prisma migrate deploy
+      - name: Nothing left pending
+        run: npx prisma migrate status
