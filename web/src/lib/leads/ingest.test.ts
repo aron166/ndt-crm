@@ -180,6 +180,51 @@ describe("ingestLead", () => {
     expect(created.person).toBe(1);
     expect(tx.person.findFirst).not.toHaveBeenCalled(); // no email → no dedupe lookup
   });
+
+  it("uses the caller's pre-tier when there are no qualification answers", async () => {
+    const input = parse({ company_name: "Acme", contact_phone: "+36301234567", tier: "A" });
+    const { tx, created } = makeTx({});
+    const result = await ingestLead(input, ctx, tx);
+    expect(result.tier).toBe("A");
+    expect(created.lead).toBe(1);
+    const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(data.tier).toBe("A");
+  });
+
+  it("a derived tier wins over the caller's pre-tier when answers are present", async () => {
+    const input = parse({
+      company_name: "Acme",
+      contact_phone: "+36301234567",
+      tier: "D", // caller's pre-tier — must be overridden by the derived one
+      qualification: { situation: "pro" }, // derives to "C"
+    });
+    const { tx } = makeTx({});
+    const result = await ingestLead(input, ctx, tx);
+    expect(result.tier).toBe("C");
+    const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(data.tier).toBe("C");
+  });
+
+  it("keeps the pre-tier when answers are present but place nothing", async () => {
+    const input = parse({
+      company_name: "Acme",
+      contact_phone: "+36301234567",
+      tier: "A",
+      qualification: { size: "kb. 40 m2" }, // no situation/gate → computeTier → null
+    });
+    const { tx } = makeTx({});
+    const result = await ingestLead(input, ctx, tx);
+    expect(result.tier).toBe("A");
+  });
+
+  it("leaves tier unset when neither a pre-tier nor derivable answers are submitted", async () => {
+    const input = parse({ company_name: "Acme", contact_phone: "+36301234567" });
+    const { tx } = makeTx({});
+    const result = await ingestLead(input, ctx, tx);
+    expect(result.tier).toBeNull();
+    const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(data.tier).toBeUndefined();
+  });
 });
 
 describe("leadIntakeSchema", () => {

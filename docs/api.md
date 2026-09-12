@@ -93,10 +93,17 @@ form posts, but the CRM also reads a setter's Hungarian ("cég", "födém", "tal
 real answer to a renamed question is worse than an orphan key. (`PATCH` is
 stricter: see below.)
 
-#### `tier` — derived, never submitted
+#### `tier` — derived by default, pre-settable at intake only
 
 `leads.tier` is recomputed from the answers on **every** write (intake, setter
 panel, `PATCH`). It is a column, so the board filters and counts on it.
+
+`POST /api/leads` also accepts an optional `tier` in the payload, for a caller
+that already knows it — cold-outreach leads arrive pre-tiered by research and
+carry no qualification answers yet. That pre-tier is used **only** when the
+payload carries no qualification answers; the moment there are answers to
+derive from, the derived tier wins and the submitted `tier` is ignored, so a
+setter filling in answers later still takes over correctly.
 
 | tier | rule | response Péter expects |
 |---|---|---|
@@ -311,6 +318,56 @@ see above). Answers are ≤2000 chars each. Every write recomputes `tier`.
 The default list is the locked model's `gate` + Branch A seven + Branch B three,
 with the spec's draft Hungarian marked ⚠️ until Áron signs off on the wording.
 
+## Companies & persons
+
+### `PATCH /api/companies/:id` / `PATCH /api/persons/:id` — write the enrichment dossier
+
+```bash
+curl -X PATCH $CRM/api/companies/42 \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "enrichment": {
+        "summary": "Fémszerkezet gyártó, 40 fő, 2019 óta ISO 9001.",
+        "apropo": ["2024-ben új csarnokot avattak Kecskeméten."],
+        "items": [ { "date": "2024", "title": "Új csarnok", "detail": "Kecskeméti telephely bővítés", "source": "linkedin" } ],
+        "sources": ["https://linkedin.com/company/..."]
+      } }'
+# → 200 { "ok": true, "company": { "id": 42, "name": "...", "enrichment": {...},
+#          "closeness_score": 61, "enrichment_updated_at": "2026-09-12T10:00:00.000Z" } }
+```
+
+Same auth as every other route (`Authorization: Bearer <key>`, tenant from the
+key, `404` if the row is soft-deleted or outside the key's tenant). `PATCH
+/api/persons/:id` is identical except the response key is `person` and it
+carries `first_name`/`last_name` instead of `name`.
+
+`enrichment` is the research skill's dossier — validated against the same
+`dossierSchema` on both routes:
+
+| field | cap |
+|---|---|
+| `summary` | ≤4000 chars |
+| `apropo` | ≤3 items, each ≤600 chars — the "apropó" one-liners a caller opens the phone call with |
+| `items` | ≤200, each `{ date?≤40, title≤300, detail?≤2000, source?≤200, url?≤600 }` |
+| `sources` | ≤50 items, each ≤600 chars |
+| `meta` | free-form object, not rendered |
+
+Invalid shape (a cap exceeded, an unknown top-level key, a bad `url`) is a `400
+{ error, details }` with the usual flattened Zod errors.
+
+**Replace, not merge.** `enrichment` overwrites the stored dossier whole — the
+research skill owns the entire document, so there is no per-field patching.
+Sending `"enrichment": null` explicitly clears it. Every write (including a
+clearing `null`) stamps `enrichment_updated_at = now()`; callers cannot set that
+field themselves.
+
+`closeness_score` is **read-only** — the CRM computes it from interactions and
+invoices, recomputed on every interaction write. Sending it in the body at all
+(any value, including `null`) is rejected:
+
+```json
+{ "error": "closeness_score is computed by the CRM and cannot be set" }
+```
+
 ## Outreach
 
 The outreach queue is a drafting worklist: a drafting agent skill pulls undrafted
@@ -339,12 +396,12 @@ scopeOfActivity, notes, ndtMethods, lat, lng`) plus up to 3 current `contacts`
 undrafted count, not capped by `limit`. `campaign` is required; a missing or
 invalid `campaign`/`limit` (1-200, default 50) is a `400 { error, details }`.
 
-> ⚠️ This does **not** return an enrichment dossier or a lead-scoring tier: the
-> addendum's "dossier + tier" ask needs `companies.enrichment` /
-> `closeness_score` (addendum item 2 — not built yet) and `tier`, which today
-> only exists on `leads`, not `companies`. This endpoint returns only the
-> company facts that exist right now; wire in the dossier/tier once addendum
-> item 2 lands.
+> ⚠️ This does **not** return an enrichment dossier or a lead-scoring tier yet.
+> `companies.enrichment` / `closeness_score` (see **Companies & persons** above)
+> now exist and are writable via `PATCH /api/companies/:id`, but `tier` is still
+> a `leads`-only column. This endpoint still returns only the company facts that
+> exist right now; wiring the dossier/closeness into this endpoint's response is
+> the next step.
 
 ### `POST /api/outreach/drafts` — bulk upsert drafts
 

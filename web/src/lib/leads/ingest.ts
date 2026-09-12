@@ -249,7 +249,12 @@ export async function ingestLead(
   // real column so the board can filter and count on it; the answers stay JSON.
   const answers = normalizeIntakeAnswers(input.qualification);
   const hasAnswers = Object.keys(answers).length > 0;
-  const tier = hasAnswers ? computeTier(answers) : null;
+  // A derived tier wins whenever the answers actually place the lead; the
+  // caller's pre-tier (cold-outreach leads, tiered by research before any
+  // answers exist) is the fallback. A setter filling answers later takes over,
+  // but answers that derive to null — "not placeable yet" — do not erase what
+  // the research already knew.
+  const tier = (hasAnswers ? computeTier(answers) : null) ?? input.tier ?? null;
 
   const lead = await tx.lead.create({
     data: {
@@ -266,7 +271,8 @@ export async function ingestLead(
       message: input.message ?? null,
       serviceInterest: input.service_interest ?? null,
       receivedDate: new Date(),
-      ...(hasAnswers ? { qualification: answers as Prisma.InputJsonValue, tier } : {}),
+      ...(hasAnswers ? { qualification: answers as Prisma.InputJsonValue } : {}),
+      ...(tier ? { tier } : {}),
       ...(Object.keys(customFields).length > 0
         ? { customFields: customFields as Prisma.InputJsonValue }
         : {}),

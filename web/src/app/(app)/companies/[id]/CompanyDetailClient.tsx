@@ -20,6 +20,7 @@ import { LeaveCompanyModal } from "@/components/LeaveCompanyModal";
 import { triggerBulkEnrichment, getProposalsByRun } from "@/app/actions/enrichment";
 import { EnrichmentDrawer } from "@/components/EnrichmentDrawer";
 import { CompanyMetadataTab } from "./CompanyMetadataTab";
+import { CompanyDossierTab } from "./CompanyDossierTab";
 import type { AttrRow } from "@/lib/companies/attributes";
 import { useDeferredValue, useState, useTransition } from "react";
 
@@ -65,6 +66,7 @@ interface CompanyData {
   customerValue: bigint | null;
   lastInteractionDate: string | Date | null; createdAt: Date; lat?: number | null; lng?: number | null;
   deletedAt?: string | Date | null;
+  enrichment?: unknown; closenessScore?: number | null; enrichmentUpdatedAt?: string | Date | null;
 }
 
 interface Props {
@@ -194,6 +196,7 @@ export function CompanyDetailClient({
     { key: "tasks",      label: `Feladatok · ${tasks.filter(t => t.status !== "done").length}` },
     ...(hasNdtProfile ? [{ key: "ndt", label: "NDT Profil" }] : []),
     { key: "metadata",   label: "Metaadatok" },
+    { key: "dossier",    label: "Dosszié" },
     ...(appEvents.length > 0 ? [{ key: "events", label: `Események · ${appEvents.length}` }] : []),
     { key: "history",    label: "Előzmények" },
   ];
@@ -950,6 +953,17 @@ export function CompanyDetailClient({
       {shownTab === "metadata" && (
         <div style={{ marginTop: 16 }}>
           <CompanyMetadataTab companyId={company.id} attributes={attributes} />
+        </div>
+      )}
+
+      {/* Dossier — closeness score + research notes from the enrichment agent */}
+      {shownTab === "dossier" && (
+        <div style={{ marginTop: 16 }}>
+          <CompanyDossierTab
+            enrichment={company.enrichment}
+            closenessScore={company.closenessScore ?? null}
+            enrichmentUpdatedAt={company.enrichmentUpdatedAt ?? null}
+          />
         </div>
       )}
 

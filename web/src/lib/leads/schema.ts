@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { answersRecordSchema } from "./qualification";
+import { TIERS } from "./tier";
 
 // Public lead-intake payload (POST /api/leads).
 // Landing pages (BetonScan/BirdsView) and automations (n8n) post this shape.
@@ -73,6 +74,11 @@ export const leadIntakeSchema = z
     // Deliberately open (z.record) — adding a question must never need a deploy,
     // and an answer must never be dropped because a slug was renamed.
     qualification: answersRecordSchema.optional(),
+    // Optional pre-tier from a caller that already knows it (e.g. cold-outreach
+    // research, which tiers a prospect before any qualification answers exist).
+    // A derived tier always wins when there are answers to derive from — see
+    // ingest.ts. Never submitted by the landing forms.
+    tier: z.enum(TIERS).optional(),
     // Send the intro material (termékismertető) now: emails it when Resend is
     // connected, otherwise creates the "Küldd el a termékismertetőt" task.
     send_intro: z.boolean().optional(),

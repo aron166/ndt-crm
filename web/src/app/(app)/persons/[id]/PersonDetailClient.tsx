@@ -14,6 +14,7 @@ import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { AuditLogEntries } from "@/components/AuditLogTab";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
 import { SetEmployerModal } from "./SetEmployerModal";
+import { PersonDossierTab } from "./PersonDossierTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Mail, Phone, MapPin, Trash2 } from "lucide-react";
@@ -50,6 +51,7 @@ interface Person {
   id: number; firstName: string | null; lastName: string | null;
   email: string | null; phone: string | null; notes: string | null;
   deletedAt?: string | Date | null;
+  enrichment?: unknown; closenessScore?: number | null; enrichmentUpdatedAt?: string | Date | null;
 }
 
 const TYPE_COLOR: Record<string, string> = {
@@ -132,6 +134,7 @@ export function PersonDetailClient({
       ? [{ key: "conversations", label: "AI Beszélgetések", count: conversations.length }]
       : []),
     { key: "adatok",        label: "Adatok",       count: 0 },
+    { key: "dossier",       label: "Dosszié",      count: 0 },
   ];
 
   return (
@@ -566,6 +569,15 @@ export function PersonDetailClient({
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Dossier — closeness score + research notes from the enrichment agent */}
+            {shownTab === "dossier" && (
+              <PersonDossierTab
+                enrichment={person.enrichment}
+                closenessScore={person.closenessScore ?? null}
+                enrichmentUpdatedAt={person.enrichmentUpdatedAt ?? null}
+              />
             )}
           </div>
 
