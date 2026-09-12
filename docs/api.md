@@ -153,40 +153,54 @@ turn it off, so a shrug cannot promote a company lead to B.
 > `lead_tier_changed` trigger is a product decision, not a bug fix; it is Áron's
 > call. (Vanda, #81.)
 
-#### `thread_key` — cold-email reply intake
+#### `thread_key` + `draft_key` — cold-email reply intake
 
-A reply to a cold email we sent. Post it with the thread's key, the campaign, and
-`channel: "cold_email"`:
+A reply to a cold email we sent. It takes **two** keys, because they answer two
+different questions:
+
+| field | what it identifies | grain |
+|---|---|---|
+| `thread_key` | the **email conversation** (the Gmail thread id) | one real conversation |
+| `draft_key` | the **outreach** we sent — `email_drafts.thread_key` | campaign + company (shared by all 4 touches) |
 
 ```bash
 curl -X POST $CRM/api/leads -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{ "company_name": "Vasmű Zrt.", "contact_email": "kovacs@vasmu.hu",
-        "channel": "cold_email", "campaign": "BirdsView Q4", "thread_key": "birdsview-q4:42" }'
-# → 201 { "ok": true, "leadId": 31, "tier": null, "companyId": 42, "personId": 88, "draftId": 5 }
+        "channel": "cold_email", "campaign": "BirdsView Q4",
+        "thread_key": "gmail-thread-aaa111", "draft_key": "birdsview-q4:42" }'
+# new reply   → 201 { "ok": true, "leadId": 31, "tier": null, "companyId": 42, "personId": 88, "draftId": 5 }
+# seen before → 200 { "ok": true, "leadId": 31, "deduped": true, "companyId": 42 }
 ```
 
-`thread_key` is the string `threadKeyFor(campaign, companyId)` stamped on the
-draft when it was sent (`lib/outreach/drafts.ts`), so a reply finds its way back
-to the email that caused it. Three things follow from it:
+**Why two keys.** `draft_key` is `threadKeyFor(campaign, companyId)` and is
+identical for touches 1-4, so using it for idempotency would mean *one lead per
+campaign per company*: a prospect who answers "not now" to touch 1 and "send the
+quote" three weeks later would have the second reply silently swallowed as a
+duplicate. `thread_key` is per conversation, which is what idempotency actually
+needs.
 
-1. **Idempotent.** If a lead already carries this thread key, **nothing is
-   written** and you get **`200 { ok, leadId, deduped: true, companyId }`** with
-   the original lead — no second lead, no second company, no intro email, no
-   `lead_created` automation. The reply-intake skill is schedulable and will
-   re-read the same Gmail thread; this is what makes that safe. Guaranteed by a
-   unique index on `(tenant_id, thread_key)`, so two concurrent posts cannot
-   both win — the loser also returns the 200.
-2. **The company comes from the draft, not from the name.** We know exactly who
-   we mailed, so `company_name` is not used for dedupe on these posts. That
-   sidesteps the known weak spot of this intake (exact-name matching, which
-   collapses every `"(magánérdeklődő)"` onto one row).
-3. **The answered draft flips to `replied`** — only one in `sent` status, so a
-   forged or stale key cannot promote a draft that never went out.
+1. **Idempotent on `thread_key`.** If a lead already carries it, **nothing is
+   written** and you get `200 { deduped: true }` with the original lead — no
+   second lead, no second company, no intro email, no `lead_created` automation.
+   A unique index on `(tenant_id, thread_key)` is the guarantee, so two
+   concurrent posts cannot both win; the loser also returns the 200. Both keys
+   are lowercased on the way in, so a case variant is the same key.
+2. **A thread key must be vouched for.** It is honoured **only** when
+   `channel` is `cold_email` **and** `draft_key` resolves to a real draft of
+   yours. Otherwise it is dropped and the post takes the ordinary intake path.
+   This endpoint is CORS-open and draft keys are enumerable, so an unvouched key
+   would let anyone with a tenant app key claim a thread — burning it, so the
+   genuine reply later returns `deduped: true` and is silently discarded.
+3. **The company comes from the draft**, not from dedupe-by-name on whatever the
+   replier typed — sidestepping the weak spot of this intake (exact-name
+   matching collapses every `"(magánérdeklődő)"` onto one row).
+4. **A reply stops the sequence.** The answered draft goes `sent → replied`
+   (only a *sent* draft can be replied to), and every still-queued touch for that
+   company and campaign goes `draft`/`approved` → **`cancelled`**, so nobody can
+   later send cold touch 3 to someone who already answered.
 
-A `thread_key` that matches no draft is still accepted and still stored: the
-lead is created by the ordinary path (name dedupe included) and `draftId` is
-omitted. Nothing else about the intake changes, and a payload without a
-`thread_key` behaves exactly as before.
+`draftId` in the response names the draft this reply answered (newest sent touch
+first). A payload with no `thread_key` behaves exactly as it always has.
 
 #### `send_intro`
 

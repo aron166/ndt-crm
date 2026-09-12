@@ -30,11 +30,28 @@ export const leadIntakeSchema = z
       z.enum(["cold_email", "landing", "linkedin", "meta_ads", "referral", "import", "manual"]).default("landing"),
     ),
     campaign: optStr,
-    // Cold-email reply intake (addendum item 3). The thread this reply came
-    // back on — the same string `threadKeyFor()` stamped on the sent draft.
-    // Posting it twice is safe: it is the idempotency key, and the second post
-    // returns the first lead instead of creating another.
-    thread_key: z.preprocess(emptyToUndef, z.string().trim().max(200).optional()),
+    // Cold-email reply intake (addendum item 3). TWO different keys, because
+    // they answer two different questions and conflating them loses replies:
+    //
+    //   thread_key — the PROVIDER's id for this email conversation (the Gmail
+    //     thread id). One real conversation, one value. This is the idempotency
+    //     key: re-reading the same thread must not create a second lead.
+    //   draft_key  — `email_drafts.thread_key`, i.e. threadKeyFor(campaign,
+    //     companyId). It identifies the OUTREACH we sent, which is
+    //     campaign+company-grained and therefore shared by all four touches.
+    //     Used only to find the draft, its company, and to mark it replied.
+    //
+    // The first version used the draft key for both. That made the contract
+    // one-lead-per-campaign-per-company while the docs promised
+    // one-lead-per-thread: a prospect who said "not now" to touch 1 and "send
+    // the quote" three weeks later had the second reply silently swallowed as a
+    // duplicate. (Vanda, #89.)
+    // Both are lowercased: the unique index is case-sensitive, and the intake
+    // skill hand-builds these strings — "BirdsView-Q4:42" and "birdsview-q4:42"
+    // would otherwise be two index entries, i.e. two leads and two intro emails
+    // for one answered thread. (Vanda, #89.)
+    thread_key: z.preprocess(emptyToUndef, z.string().trim().toLowerCase().max(200).optional()),
+    draft_key: z.preprocess(emptyToUndef, z.string().trim().toLowerCase().max(200).optional()),
 
     // Marketing passthrough — stored on lead.customFields.
     utm_source: optStr,

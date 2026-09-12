@@ -145,20 +145,33 @@ export async function POST(request: Request) {
     // unique index caught the loser. That is the index doing its job, not a
     // failure: re-read the winner and answer as if we had deduped, so the
     // reply-intake skill sees the same idempotent result either way.
+    const target = (err as { meta?: { target?: unknown } })?.meta?.target;
+    const hitThreadKeyIndex =
+      Array.isArray(target) ? target.includes("thread_key") : String(target ?? "").includes("thread_key");
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&
       err.code === "P2002" &&
+      hitThreadKeyIndex &&
       parsed.data.thread_key
     ) {
-      const winner = await db.lead.findFirst({
-        where: { tenantId: key.tenantId, threadKey: parsed.data.thread_key.trim() },
-        select: { id: true, companyId: true },
-      });
-      if (winner) {
-        return json(
-          { ok: true, leadId: winner.id, deduped: true, companyId: winner.companyId },
-          200,
-        );
+      // The recovery read is itself wrapped: we only got here because a
+      // transaction failed, so the connection may be gone. An throw escaping
+      // here would skip reportError AND return Next's bare 500 without
+      // CORS_HEADERS, which a browser caller sees as an opaque CORS error
+      // rather than a server error. (Vanda, #89.)
+      try {
+        const winner = await db.lead.findFirst({
+          where: { tenantId: key.tenantId, threadKey: parsed.data.thread_key.trim().toLowerCase() },
+          select: { id: true, companyId: true },
+        });
+        if (winner) {
+          return json(
+            { ok: true, leadId: winner.id, deduped: true, companyId: winner.companyId },
+            200,
+          );
+        }
+      } catch (recoveryErr) {
+        reportError("api.leads.p2002_recovery", recoveryErr, { sourceApp: key.appSlug });
       }
     }
     reportError("api.leads", err, { sourceApp: key.appSlug });

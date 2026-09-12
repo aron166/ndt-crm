@@ -55,6 +55,7 @@ describe("state machine predicates", () => {
     sent: { edit: false, approve: false, send: false },
     failed: { edit: true, approve: false, send: true },
     replied: { edit: false, approve: false, send: false },
+    cancelled: { edit: false, approve: false, send: false },
   };
 
   for (const status of DRAFT_STATUSES) {

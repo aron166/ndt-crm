@@ -33,6 +33,7 @@ const STATUS_LABEL: Record<DraftStatus, string> = {
   sent: "Elküldve",
   failed: "Sikertelen",
   replied: "Válaszolt",
+  cancelled: "Visszavonva",
 };
 
 const STATUS_TONE: Record<DraftStatus, string> = {
@@ -42,6 +43,7 @@ const STATUS_TONE: Record<DraftStatus, string> = {
   sent: "var(--mint)",
   failed: "var(--coral)",
   replied: "var(--sky)",
+  cancelled: "var(--fg-faint)",
 };
 
 function StatusBadge({ status }: { status: DraftStatus }) {

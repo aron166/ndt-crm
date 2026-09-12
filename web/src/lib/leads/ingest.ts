@@ -31,7 +31,7 @@ export interface LeadTx {
     findFirst(args: Prisma.LeadFindFirstArgs): Promise<{ id: number; companyId: number | null; contactId: number | null } | null>;
   };
   emailDraft: {
-    findFirst(args: Prisma.EmailDraftFindFirstArgs): Promise<{ id: number; companyId: number; personId: number | null } | null>;
+    findFirst(args: Prisma.EmailDraftFindFirstArgs): Promise<{ id: number; companyId: number; campaign: string } | null>;
     updateMany(args: Prisma.EmailDraftUpdateManyArgs): Promise<{ count: number }>;
   };
   leadStatus: {
@@ -53,19 +53,20 @@ export interface IngestCtx {
 
 export interface IngestResult {
   leadId: number;
+  /** Always set. See `deduped`. */
   /**
    * True when `thread_key` matched a lead that already existed, so nothing was
    * created and `leadId` is the original. The reply-intake skill runs on a
    * schedule and re-reads the same Gmail thread; this is the signal that it
    * correctly did nothing the second time.
    */
-  deduped?: boolean;
+  deduped: boolean;
   /** The draft this reply answered, when `thread_key` matched one. */
-  draftId?: number | null;
+  draftId: number | null;
   /** Derived qualification tier, null when no answers were submitted. */
   tier: LeadTier | null;
-  companyId: number;
-  personId: number;
+  companyId: number | null;
+  personId: number | null;
   /** True when an existing company was reused (deduped). */
   companyReused: boolean;
   /** True when an existing person was reused (deduped by email). */
@@ -114,12 +115,22 @@ export async function ingestLead(
   //       whatever the replier typed in their signature. Name dedupe is the
   //       weakest link in this intake (STATUS.md: every "(magánérdeklődő)"
   //       collapses onto one row); a thread key sidesteps it entirely.
-  const threadKey = input.thread_key?.trim() || null;
+  // `thread_key` is caller-supplied on a CORS-open, app-key endpoint, and real
+  // draft keys are `campaign-slug:companyId` — enumerable. Left untrusted, any
+  // key in the tenant could claim a thread: the forged lead owns it, so the
+  // genuine reply later comes back `deduped: true`, writes nothing, and alerts
+  // nobody. So a thread key is honoured ONLY on the cold-email channel and ONLY
+  // when `draft_key` resolves to a real draft of ours — the draft is what
+  // vouches for the claim. Anything else falls through to the ordinary intake
+  // path with no key stored. (Vanda, #89.)
+  const claimedThreadKey = input.thread_key?.trim() || null;
+  const draftKey = input.draft_key?.trim() || null;
+  const isColdEmailReply = input.channel === "cold_email";
 
-  if (threadKey) {
+  if (claimedThreadKey && isColdEmailReply) {
     const existingLead = await tx.lead.findFirst({
-      where: { tenantId, threadKey },
-      select: { id: true, companyId: true, contactId: true },
+      where: { tenantId, threadKey: claimedThreadKey },
+      select: { id: true, companyId: true },
     });
     if (existingLead) {
       return {
@@ -127,20 +138,28 @@ export async function ingestLead(
         deduped: true,
         draftId: null,
         tier: null,
-        companyId: existingLead.companyId ?? 0,
-        personId: 0,
+        companyId: existingLead.companyId,
+        personId: null,
         companyReused: true,
         personReused: true,
       };
     }
   }
 
-  const draft = threadKey
+  // The draft is found by the DRAFT key, never by the conversation key.
+  // Newest sent touch first: once touches 1 and 2 are both out they share one
+  // draft key, and an unordered findFirst reported whichever row Postgres
+  // happened to return as "the draft this reply answered". (Vanda, #89.)
+  const draft = draftKey && isColdEmailReply
     ? await tx.emailDraft.findFirst({
-        where: { tenantId, threadKey },
-        select: { id: true, companyId: true, personId: true },
+        where: { tenantId, threadKey: draftKey },
+        orderBy: [{ sentAt: "desc" }, { step: "desc" }],
+        select: { id: true, companyId: true, campaign: true },
       })
     : null;
+
+  // The key is only stored once a draft has vouched for it.
+  const threadKey = draft ? claimedThreadKey : null;
 
   // 1. Dedupe Company by exact name (case-insensitive) within the tenant —
   // unless the thread key already told us the company for certain.
@@ -283,10 +302,34 @@ export async function ingestLead(
   // can be replied to, so a never-sent row cannot be flipped by a forged
   // thread key, and an already-`replied` row is not rewritten on a later reply
   // in the same thread.
-  if (threadKey && draft) {
+  // Scoped to the ONE draft row we resolved, by id — not to every draft sharing
+  // this key. `threadKeyFor()` slugifies the campaign name, so "Q1 2026" and
+  // "Q1-2026" produce the same key for one company; an updateMany on the key
+  // would mark both campaigns' emails replied off a single answer.
+  // (Vanda, #89.)
+  if (draft) {
     await tx.emailDraft.updateMany({
-      where: { tenantId, threadKey, status: "sent" },
+      where: { id: draft.id, tenantId, status: "sent" },
       data: { status: "replied" },
+    });
+
+    // A reply must STOP the sequence. Marking the answered draft `replied` did
+    // nothing to touches 2-4: they sit at `draft`/`approved` with no thread key,
+    // so they survived the flip and `canSend("approved")` is still true — a
+    // human would open /outreach and send cold touch 3 to someone who had
+    // already answered. They are cancelled here, scoped to this company and
+    // campaign. Note this deliberately does NOT widen the `replied` filter
+    // above: only a SENT draft can be replied to, and loosening that is the
+    // hole that lets a forged key promote an email that never went out.
+    // (Vanda, #89.)
+    await tx.emailDraft.updateMany({
+      where: {
+        tenantId,
+        companyId: draft.companyId,
+        campaign: draft.campaign,
+        status: { in: ["draft", "approved"] },
+      },
+      data: { status: "cancelled" },
     });
   }
 
