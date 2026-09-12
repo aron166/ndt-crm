@@ -4,12 +4,12 @@
 -- database the FK blew up and the whole deploy failed, so CI/DR could not rebuild the
 -- schema. Create the default tenant here, before the first row that references it.
 --
--- No-op on any database that already has a tenant (prod included).
+-- No-op on any database that already has tenant 1 (prod included).
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM "tenants") THEN
+  IF NOT EXISTS (SELECT 1 FROM "tenants" WHERE "id" = 1) THEN
     INSERT INTO "tenants" ("id", "name", "slug") VALUES (1, 'Controllabor Kft.', 'controllabor');
-    -- keep the SERIAL in step with the explicit id
-    PERFORM setval(pg_get_serial_sequence('tenants', 'id'), 1);
+    -- advance the serial, never rewind it (a partial restore may hold higher ids)
+    PERFORM setval(pg_get_serial_sequence('tenants', 'id'), GREATEST((SELECT MAX("id") FROM "tenants"), 1));
   END IF;
 END $$;
