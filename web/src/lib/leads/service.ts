@@ -11,6 +11,7 @@ import {
 } from "./outcomes";
 import { parseAnswers, answersFrom } from "./qualification";
 import { computeTier } from "./tier";
+import { DEFAULT_BOOKING_MINUTES } from "@/lib/booking/conflicts";
 
 // The ONE write path for lead process changes — used by the server actions (UI)
 // and the public /api/leads routes alike, so the rules can't drift between the
@@ -306,6 +307,7 @@ export interface LogCallResult {
   status: string | null;
   outcome: LeadOutcome;
   taskId: number | null;
+  bookingTaskId: number | null;
 }
 
 /**
@@ -355,7 +357,7 @@ export async function logLeadCallOutcome(
   const p = lead.contact?.person;
   const who = p ? `${p.lastName} ${p.firstName}`.trim() : lead.company?.name ?? `Lead #${leadId}`;
 
-  const { interaction, task } = await db.$transaction(async (tx) => {
+  const { interaction, task, bookingTask } = await db.$transaction(async (tx) => {
     const interaction = await tx.interaction.create({
       data: {
         tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId, userId: ctx.userId,
@@ -379,6 +381,18 @@ export async function logLeadCallOutcome(
           select: { id: true },
         })
       : null;
+    const bookingTask = plan.bookingAt
+      ? await tx.task.create({
+          data: {
+            tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId,
+            assignedToId: input.assignedToId ?? ctx.userId,
+            title: `Demó: ${who}`, type: "meeting", category: "revenue_generating",
+            status: "created", startsAt: plan.bookingAt, dueDate: plan.bookingAt,
+            bookingKind: plan.bookingKind, estimatedMinutes: DEFAULT_BOOKING_MINUTES,
+          },
+          select: { id: true },
+        })
+      : null;
     await tx.lead.updateMany({
       where: { id: leadId, tenantId: ctx.tenantId },
       data: {
@@ -389,7 +403,7 @@ export async function logLeadCallOutcome(
     if (lead.companyId) {
       await tx.company.updateMany({ where: { id: lead.companyId, tenantId: ctx.tenantId }, data: { lastInteractionDate: now } });
     }
-    return { interaction, task };
+    return { interaction, task, bookingTask };
   });
   await recomputeCloseness({ tenantId: ctx.tenantId, companyId: lead.companyId, personId });
 
@@ -397,6 +411,9 @@ export async function logLeadCallOutcome(
     { type: "call", outcome: input.outcome, leadId, companyId: lead.companyId, personId }, auditOpts(ctx));
   if (task) {
     audit("task", task.id, "create", null, { title: `Visszahívás: ${who}`, dueDate: plan.callbackAt?.toISOString() ?? null, leadId }, auditOpts(ctx));
+  }
+  if (bookingTask) {
+    audit("task", bookingTask.id, "create", null, { title: `Demó: ${who}`, startsAt: plan.bookingAt?.toISOString() ?? null, bookingKind: plan.bookingKind, leadId }, auditOpts(ctx));
   }
   if (plan.status || plan.lost) {
     audit("lead", leadId, "update",
@@ -421,5 +438,6 @@ export async function logLeadCallOutcome(
     status: plan.status ?? lead.status,
     outcome: plan.lost ? "lost" : "open",
     taskId: task?.id ?? null,
+    bookingTaskId: bookingTask?.id ?? null,
   };
 }

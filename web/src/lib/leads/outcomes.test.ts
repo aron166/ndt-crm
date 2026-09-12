@@ -15,9 +15,13 @@ describe("callOutcomeSchema — the shared rules", () => {
     expect(parse({ outcome: "callback_requested", note: "hívj", callbackAt: "not-a-date" }).success).toBe(false);
     expect(parse({ outcome: "callback_requested", note: "hívj", callbackAt: "2026-09-10T10:00:00Z" }).success).toBe(true);
   });
-  it("meeting_booked needs demoWith", () => {
+  it("meeting_booked needs demoWith, bookingAt and bookingKind", () => {
     expect(parse({ outcome: "meeting_booked", note: "ok" }).success).toBe(false);
-    expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter" }).success).toBe(true);
+    expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter" }).success).toBe(false);
+    expect(parse({
+      outcome: "meeting_booked", note: "ok", demoWith: "peter",
+      bookingAt: "2026-09-10T10:00:00Z", bookingKind: "single_machine_demo",
+    }).success).toBe(true);
   });
   it("not_interested / disqualified need a real lost reason, not just the key", () => {
     expect(parse({ outcome: "not_interested", note: "n" }).success).toBe(false);
@@ -49,16 +53,20 @@ describe("planCallOutcome", () => {
     expect(plan.status).toBe("recall");
     expect(plan.callbackAt?.toISOString()).toBe("2026-09-10T10:00:00.000Z");
   });
-  it("meeting_booked → demo column of the chosen person", () => {
-    expect(p("meeting_booked", "call_2", { demoWith: "peter" }).status).toBe("demo_peter");
-    expect(p("meeting_booked", "demo_aron", { demoWith: "aron" }).status).toBeNull();
+  it("meeting_booked → demo column of the chosen person, carrying the booking", () => {
+    const bookingExtra = { bookingAt: "2026-09-10T10:00:00Z", bookingKind: "single_machine_demo" };
+    const plan = p("meeting_booked", "call_2", { demoWith: "peter", ...bookingExtra });
+    expect(plan.status).toBe("demo_peter");
+    expect(plan.bookingAt?.toISOString()).toBe("2026-09-10T10:00:00.000Z");
+    expect(plan.bookingKind).toBe("single_machine_demo");
+    expect(p("meeting_booked", "demo_aron", { demoWith: "aron", ...bookingExtra }).status).toBeNull();
   });
   it("not_interested / disqualified close as lost carrying the typed reason", () => {
     expect(p("not_interested", "call_1", { lostReason: "Van saját szkennerük" }).lost)
       .toEqual({ lostReason: "Van saját szkennerük" });
     expect(p("disqualified", "new", { lostReason: "Nincs betonszerkezetük" }).lost)
       .toEqual({ lostReason: "Nincs betonszerkezetük" });
-    expect(p("wrong_number", "new")).toEqual({ status: null, lost: null, callbackAt: null });
+    expect(p("wrong_number", "new")).toEqual({ status: null, lost: null, callbackAt: null, bookingAt: null, bookingKind: null });
   });
   it("never moves into a column the tenant removed", () => {
     const plan = planCallOutcome(

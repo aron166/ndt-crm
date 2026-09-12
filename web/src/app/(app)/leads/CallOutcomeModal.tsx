@@ -5,9 +5,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { logLeadCall } from "@/app/actions/leads";
+import { proposeBookingSlots } from "@/app/actions/bookings";
 import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX } from "@/lib/leads/outcomes";
+import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { FormField } from "@/components/ui/FormField";
 import type { ScriptVariant } from "@/lib/leads/scripts";
+
+// datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
+function toDatetimeLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const SLOT_REASON_LINE: Record<string, string> = {
+  same_area: "arrafelé leszel aznap",
+  free_day: "szabad nap",
+  next_free: "legközelebbi szabad idő",
+};
+
+type SlotProposalsResult = Extract<Awaited<ReturnType<typeof proposeBookingSlots>>, { success: true }>;
+type SlotProposal = SlotProposalsResult["proposals"][number];
 
 // "Hívás eredménye" — the core lead interaction. Validation (note required,
 // callback needs date+hour, meeting needs who) is enforced SERVER-side in
@@ -34,9 +51,15 @@ export function CallOutcomeModal({
   const [note, setNote] = useState("");
   const [callbackAt, setCallbackAt] = useState("");
   const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
+  const [bookingAt, setBookingAt] = useState("");
+  const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [slotsPending, startSlotsTransition] = useTransition();
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [slotProposals, setSlotProposals] = useState<SlotProposal[]>([]);
+  const [pickedConflicts, setPickedConflicts] = useState<SlotProposal["conflicts"] | null>(null);
   // A/B: deterministic per-lead assignment (leadId % length), not random or
   // "always A" — every variant needs data, and a re-render must not switch
   // the script mid-call. Empty ("Nincs szkript") when the tenant has none.
@@ -46,6 +69,7 @@ export function CallOutcomeModal({
 
   function reset() {
     setOutcome("no_answer"); setNote(""); setCallbackAt(""); setDemoWith("aron"); setLostReason(""); setError(null);
+    setBookingAt(""); setBookingKind(""); setSlotProposals([]); setSlotError(null); setPickedConflicts(null);
     setScriptKey(defaultScriptKey);
   }
   function handleClose() { reset(); onClose(); }
@@ -59,12 +83,29 @@ export function CallOutcomeModal({
         // datetime-local is wall-clock; Date parses it as local time → ISO for the wire.
         callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
         demoWith: outcome === "meeting_booked" ? demoWith : null,
+        bookingAt: outcome === "meeting_booked" && bookingAt ? new Date(bookingAt).toISOString() : null,
+        bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
         lostReason: isLostCallOutcome(outcome) ? lostReason : null,
         scriptVariant: scriptKey || undefined,
       });
       if ("error" in res) { setError(res.error); return; }
       reset(); onClose(); onLogged?.();
     });
+  }
+
+  function suggestSlots() {
+    if (!bookingKind) { setSlotError("Előbb válaszd ki a foglalás típusát"); return; }
+    setSlotError(null);
+    startSlotsTransition(async () => {
+      const res = await proposeBookingSlots(leadId, bookingKind);
+      if ("error" in res) { setSlotError(res.error); setSlotProposals([]); return; }
+      setSlotProposals(res.proposals);
+    });
+  }
+
+  function pickSlot(p: SlotProposal) {
+    setBookingAt(toDatetimeLocal(new Date(p.startsAt)));
+    setPickedConflicts(p.conflicts.length > 0 ? p.conflicts : null);
   }
 
   return (
@@ -106,16 +147,72 @@ export function CallOutcomeModal({
           )}
 
           {outcome === "meeting_booked" && (
-            <FormField label="Kivel lesz a demó?" required>
-              <div className="flex gap-4" style={{ fontSize: 14 }}>
-                {(["aron", "peter"] as const).map((w) => (
-                  <label key={w} className="flex items-center gap-1.5" style={{ cursor: "pointer" }}>
-                    <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
-                    {w === "aron" ? "Áron" : "Péter"}
-                  </label>
-                ))}
-              </div>
-            </FormField>
+            <>
+              <FormField label="Kivel lesz a demó?" required>
+                <div className="flex gap-4" style={{ fontSize: 14 }}>
+                  {(["aron", "peter"] as const).map((w) => (
+                    <label key={w} className="flex items-center gap-1.5" style={{ cursor: "pointer" }}>
+                      <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
+                      {w === "aron" ? "Áron" : "Péter"}
+                    </label>
+                  ))}
+                </div>
+              </FormField>
+
+              <FormField label="Foglalás típusa" required>
+                <select style={inputStyle} value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
+                  <option value="">Válassz típust</option>
+                  {BOOKING_KINDS.map((k) => <option key={k} value={k}>{BOOKING_KIND_LABEL[k]}</option>)}
+                </select>
+              </FormField>
+
+              <FormField label="Foglalás időpontja (dátum + óra)" required>
+                <input
+                  type="datetime-local" style={inputStyle} value={bookingAt} required
+                  onChange={(e) => { setBookingAt(e.target.value); setPickedConflicts(null); }}
+                />
+                <div style={{ marginTop: 6 }}>
+                  <Button type="button" variant="outline" onClick={suggestSlots} disabled={slotsPending}>
+                    {slotsPending ? "Keresés…" : "Javasolj időpontot"}
+                  </Button>
+                </div>
+                {slotError && <p className="text-sm" style={{ color: "var(--coral)", marginTop: 6 }}>{slotError}</p>}
+                {slotProposals.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                    {slotProposals.map((p, i) => {
+                      const d = new Date(p.startsAt);
+                      const dateLabel = d.toLocaleDateString("hu-HU", { month: "short", day: "numeric" });
+                      const timeLabel = d.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" });
+                      const reasonLine = SLOT_REASON_LINE[p.reason] ?? "";
+                      const kmLine = p.nearestKm != null ? ` · ${Math.round(p.nearestKm)} km` : "";
+                      return (
+                        <button
+                          key={i} type="button" onClick={() => pickSlot(p)}
+                          style={{ ...inputStyle, textAlign: "left", cursor: "pointer" }}
+                        >
+                          <strong>{dateLabel} {timeLabel}</strong> — {reasonLine}{kmLine}
+                          {p.conflicts.length > 0 && (
+                            <span style={{ color: "var(--amber)" }}> · ütközik</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {pickedConflicts && pickedConflicts.length > 0 && (
+                  <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 6, background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13 }}>
+                    {pickedConflicts.map((c, i) => (
+                      <p key={i} style={{ margin: 0 }}>
+                        Ütközik: {c.otherTitle} ({new Date(c.otherStartsAt).toLocaleString("hu-HU")}) —{" "}
+                        {c.movable === "other"
+                          ? "ez az alacsonyabb prioritású, áthelyezhető."
+                          : "ez az új foglalás az alacsonyabb prioritású, áthelyezhető."}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </FormField>
+            </>
           )}
 
           {isLostCallOutcome(outcome) && (

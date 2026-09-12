@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { logLeadCall } from "@/app/actions/leads";
 import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
+import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
 import type { ScriptVariant } from "@/lib/leads/scripts";
@@ -48,6 +49,8 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   const [selectedOutcome, setSelectedOutcome] = useState<CallOutcomeKey | null>(null);
   const [callbackAt, setCallbackAt] = useState("");
   const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
+  const [bookingAt, setBookingAt] = useState("");
+  const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +87,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
 
   function resetFields() {
     setNote(""); setSelectedOutcome(null); setCallbackAt("");
-    setDemoWith("aron"); setLostReason(""); setExpanded(false); setError(null);
+    setDemoWith("aron"); setBookingAt(""); setBookingKind(""); setLostReason(""); setExpanded(false); setError(null);
     // scriptKey is NOT reset here: `lead` still points at the OLD lead in this
     // closure, so defaultScriptKey would be the old lead's default. The
     // useEffect above recomputes it once the new `lead` is rendered.
@@ -108,6 +111,8 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           note,
           callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
           demoWith: outcome === "meeting_booked" ? demoWith : null,
+          bookingAt: outcome === "meeting_booked" && bookingAt ? new Date(bookingAt).toISOString() : null,
+          bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
           lostReason: isLostCallOutcome(outcome) ? lostReason : null,
           scriptVariant: scriptKey || undefined,
         });
@@ -267,14 +272,21 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
             <input type="datetime-local" style={inputStyle} value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} />
           )}
           {selectedOutcome === "meeting_booked" && (
-            <div style={{ display: "flex", gap: 16, fontSize: 15, color: "var(--fg)" }}>
-              {(["aron", "peter"] as const).map((w) => (
-                <label key={w} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
-                  {w === "aron" ? "Áron" : "Péter"}
-                </label>
-              ))}
-            </div>
+            <>
+              <div style={{ display: "flex", gap: 16, fontSize: 15, color: "var(--fg)" }}>
+                {(["aron", "peter"] as const).map((w) => (
+                  <label key={w} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
+                    {w === "aron" ? "Áron" : "Péter"}
+                  </label>
+                ))}
+              </div>
+              <input type="datetime-local" style={inputStyle} value={bookingAt} onChange={(e) => setBookingAt(e.target.value)} />
+              <select style={inputStyle} value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
+                <option value="">Foglalás típusa…</option>
+                {BOOKING_KINDS.map((k) => <option key={k} value={k}>{BOOKING_KIND_LABEL[k]}</option>)}
+              </select>
+            </>
           )}
           {(selectedOutcome === "not_interested" || selectedOutcome === "disqualified") && (
             <input
