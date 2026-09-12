@@ -304,6 +304,13 @@ model Lead {
   // Inbound channel (cold_email | landing | linkedin | meta_ads | referral | import | manual) + campaign tag.
   channel         String?
   campaign        String?
+  // Cold-email reply intake (addendum item 3). The stable handle for the email
+  // thread a reply came back on — `threadKeyFor(campaign, companyId)` in
+  // lib/outreach/drafts.ts writes the same string onto the sent draft. It is
+  // the IDEMPOTENCY key for POST /api/leads: the reply-intake skill is
+  // schedulable and will see the same thread again on its next run, and a
+  // second lead for one answered email is worse than no lead at all.
+  threadKey       String?   @map("thread_key")
   createdAt       DateTime  @default(now()) @map("created_at")
 
   tenant        Tenant             @relation(fields: [tenantId], references: [id])
@@ -316,6 +323,7 @@ model Lead {
   firings       AutomationFiring[]
   quotes        Quote[]
 
+  @@unique([tenantId, threadKey])
   @@index([tenantId, convertedDealId])
   @@index([tenantId, outcome, status])
   @@map("leads")

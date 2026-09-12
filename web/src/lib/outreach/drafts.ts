@@ -16,7 +16,11 @@ import { z } from "zod";
 // second tab, or a retried server-action POST finds nothing left to claim. A row
 // stuck in `sending` means the process died mid-send — deliberately NOT
 // re-sendable, because we cannot know whether the mail went out. (Vanda, #88.)
-export const DRAFT_STATUSES = ["draft", "approved", "sending", "sent", "failed", "replied"] as const;
+// `cancelled` is the terminal state for a queued touch that has been overtaken
+// by events — today, the prospect replied, so touches 2-4 must not go out.
+// Without it a reply flipped only the SENT rows and a human could still send
+// cold touch 3 to someone who already answered. (Vanda, #89.)
+export const DRAFT_STATUSES = ["draft", "approved", "sending", "sent", "failed", "replied", "cancelled"] as const;
 export type DraftStatus = (typeof DRAFT_STATUSES)[number];
 
 export function isDraftStatus(v: unknown): v is DraftStatus {
