@@ -45,6 +45,8 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/api/leads/") ||
     request.nextUrl.pathname === "/api/content" ||
     request.nextUrl.pathname === "/api/calls/result" ||
+    request.nextUrl.pathname.startsWith("/api/companies/") ||
+    request.nextUrl.pathname.startsWith("/api/persons/") ||
     request.nextUrl.pathname === "/api/outreach/targets" ||
     request.nextUrl.pathname === "/api/outreach/drafts" ||
     request.nextUrl.pathname === "/api/cron/automations" ||
