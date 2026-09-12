@@ -1,0 +1,407 @@
+"use client";
+
+import { useState } from "react";
+import { FormField } from "@/components/ui/FormField";
+import {
+  listDrafts,
+  updateDraft,
+  approveDraft,
+  approveAll,
+  sendDraft,
+  saveOutreachSettings,
+  type DraftRow,
+  type OutreachSettings,
+} from "@/app/actions/email-drafts";
+import { DRAFT_STATUSES, MAX_STEP, canEdit, canApprove, canSend, type DraftStatus } from "@/lib/outreach/drafts";
+
+const STATUS_LABEL: Record<DraftStatus, string> = {
+  draft: "Piszkozat",
+  approved: "Jóváhagyva",
+  sent: "Elküldve",
+  failed: "Sikertelen",
+  replied: "Válaszolt",
+};
+
+const STATUS_TONE: Record<DraftStatus, string> = {
+  draft: "var(--fg-mute)",
+  approved: "var(--indigo)",
+  sent: "var(--mint)",
+  failed: "var(--coral)",
+  replied: "var(--sky)",
+};
+
+function StatusBadge({ status }: { status: DraftStatus }) {
+  const color = STATUS_TONE[status];
+  return (
+    <span
+      style={{
+        fontSize: 12, fontWeight: 500, color, padding: "2px 8px", borderRadius: 999,
+        border: `1px solid ${color}`, background: "var(--bg-raised)", whiteSpace: "nowrap",
+      }}
+    >
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+export default function OutreachQueue({
+  initialDrafts,
+  campaigns,
+  initialSettings,
+}: {
+  initialDrafts: DraftRow[];
+  campaigns: string[];
+  initialSettings: OutreachSettings;
+}) {
+  const [drafts, setDrafts] = useState<DraftRow[]>(initialDrafts);
+  const [loading, setLoading] = useState(false);
+  const [campaignFilter, setCampaignFilter] = useState("");
+  const [stepFilter, setStepFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [drafted, setDrafted] = useState<Record<number, { subject: string; body: string }>>({});
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [approvingAll, setApprovingAll] = useState(false);
+  const [rowError, setRowError] = useState<Record<number, string>>({});
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState(initialSettings.replyTo ?? "");
+  const [footer, setFooter] = useState(initialSettings.footer ?? "");
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  async function refetch(next: { campaign?: string; step?: string; status?: string }) {
+    setLoading(true);
+    try {
+      const res = await listDrafts({
+        campaign: next.campaign || undefined,
+        step: next.step ? parseInt(next.step, 10) : undefined,
+        status: next.status || undefined,
+      });
+      setDrafts(res.drafts);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function patchRow(id: number, patch: Partial<DraftRow>) {
+    setDrafts((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  function toggleExpand(row: DraftRow) {
+    if (expandedId === row.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(row.id);
+    setDrafted((d) => ({ ...d, [row.id]: { subject: row.subject, body: row.body } }));
+  }
+
+  async function onSave(row: DraftRow) {
+    const edit = drafted[row.id];
+    if (!edit) return;
+    setBusyId(row.id);
+    setRowError((e) => ({ ...e, [row.id]: "" }));
+    const res = await updateDraft(row.id, edit);
+    setBusyId(null);
+    if (!res.ok) {
+      setRowError((e) => ({ ...e, [row.id]: res.error }));
+      return;
+    }
+    patchRow(row.id, { subject: edit.subject, body: edit.body });
+  }
+
+  async function onApprove(row: DraftRow) {
+    setBusyId(row.id);
+    setRowError((e) => ({ ...e, [row.id]: "" }));
+    const res = await approveDraft(row.id);
+    setBusyId(null);
+    if (!res.ok) {
+      setRowError((e) => ({ ...e, [row.id]: res.error }));
+      return;
+    }
+    patchRow(row.id, { status: "approved" });
+  }
+
+  async function onSend(row: DraftRow) {
+    setBusyId(row.id);
+    setRowError((e) => ({ ...e, [row.id]: "" }));
+    const res = await sendDraft(row.id);
+    setBusyId(null);
+    if (!res.ok) {
+      patchRow(row.id, { status: "failed", lastError: res.error });
+      return;
+    }
+    patchRow(row.id, { status: "sent", lastError: null });
+  }
+
+  async function onApproveAll() {
+    if (!campaignFilter) return;
+    setApprovingAll(true);
+    const res = await approveAll(campaignFilter, stepFilter ? parseInt(stepFilter, 10) : undefined);
+    setApprovingAll(false);
+    if (!res.ok) return;
+    setDrafts((rows) =>
+      rows.map((r) =>
+        r.status === "draft" &&
+        r.campaign === campaignFilter &&
+        (!stepFilter || r.step === parseInt(stepFilter, 10))
+          ? { ...r, status: "approved" }
+          : r,
+      ),
+    );
+  }
+
+  async function onSaveSettings() {
+    setSettingsSaving(true);
+    setSettingsError(null);
+    const res = await saveOutreachSettings({ replyTo, footer });
+    setSettingsSaving(false);
+    if (!res.ok) setSettingsError(res.error);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">Outreach átnézés</h1>
+          <p className="page-sub">Kampányonként generált emailek jóváhagyása és küldése</p>
+        </div>
+        <button
+          onClick={() => setSettingsOpen((v) => !v)}
+          style={{
+            fontSize: 14, color: "var(--fg-mute)", background: "var(--bg-raised)",
+            border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px", cursor: "pointer",
+          }}
+        >
+          {settingsOpen ? "Beállítások bezárása" : "Beállítások"}
+        </button>
+      </div>
+
+      {settingsOpen && (
+        <div className="panel panel-pad" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <FormField label="Válaszcím (reply-to)" hint="Ide érkeznek a válaszok — hagyd üresen a törléshez">
+            <input
+              className="input-ds"
+              type="email"
+              value={replyTo}
+              onChange={(e) => setReplyTo(e.target.value)}
+              placeholder="pl. sales@ceged.hu"
+              style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px" }}
+            />
+          </FormField>
+          <FormField label="Lezáró szöveg (jogi/leiratkozási közlemény)" full>
+            <textarea
+              className="input-ds"
+              value={footer}
+              onChange={(e) => setFooter(e.target.value)}
+              rows={2}
+              placeholder="pl. Ha nem szeretnél több emailt kapni, jelezd válaszban."
+              style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical" }}
+            />
+          </FormField>
+          <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={onSaveSettings}
+              disabled={settingsSaving}
+              style={{
+                fontSize: 14, fontWeight: 500, color: "var(--indigo)", background: "var(--indigo-soft)",
+                border: "1px solid var(--indigo-line)", borderRadius: 8, padding: "8px 16px",
+                cursor: settingsSaving ? "default" : "pointer", opacity: settingsSaving ? 0.5 : 1,
+              }}
+            >
+              {settingsSaving ? "Mentés…" : "Mentés"}
+            </button>
+            {settingsError && <span style={{ fontSize: 14, color: "var(--coral)" }}>{settingsError}</span>}
+          </div>
+        </div>
+      )}
+
+      <div className="panel panel-pad" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+        <select
+          className="input-ds"
+          value={campaignFilter}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCampaignFilter(v);
+            refetch({ campaign: v, step: stepFilter, status: statusFilter });
+          }}
+          style={{ fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px" }}
+        >
+          <option value="">Minden kampány</option>
+          {campaigns.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <select
+          className="input-ds"
+          value={stepFilter}
+          onChange={(e) => {
+            const v = e.target.value;
+            setStepFilter(v);
+            refetch({ campaign: campaignFilter, step: v, status: statusFilter });
+          }}
+          style={{ fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px" }}
+        >
+          <option value="">Minden lépés</option>
+          {Array.from({ length: MAX_STEP }, (_, i) => i + 1).map((s) => (
+            <option key={s} value={s}>{s}. lépés</option>
+          ))}
+        </select>
+        <select
+          className="input-ds"
+          value={statusFilter}
+          onChange={(e) => {
+            const v = e.target.value;
+            setStatusFilter(v);
+            refetch({ campaign: campaignFilter, step: stepFilter, status: v });
+          }}
+          style={{ fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px" }}
+        >
+          <option value="">Minden állapot</option>
+          {DRAFT_STATUSES.map((s) => (
+            <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+          ))}
+        </select>
+
+        <div style={{ flex: 1 }} />
+
+        <button
+          onClick={onApproveAll}
+          disabled={!campaignFilter || approvingAll}
+          title={!campaignFilter ? "Válassz kampányt a szűrőben" : undefined}
+          style={{
+            fontSize: 14, fontWeight: 500, color: "var(--indigo)", background: "var(--indigo-soft)",
+            border: "1px solid var(--indigo-line)", borderRadius: 8, padding: "8px 16px",
+            cursor: !campaignFilter || approvingAll ? "default" : "pointer",
+            opacity: !campaignFilter || approvingAll ? 0.5 : 1,
+          }}
+        >
+          {approvingAll ? "Jóváhagyás…" : "Összes jóváhagyása"}
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center" }}>
+          Betöltés…
+        </div>
+      ) : drafts.length === 0 ? (
+        <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center" }}>
+          Nincs a szűrőnek megfelelő piszkozat
+        </div>
+      ) : (
+        <div className="panel" style={{ padding: 0, overflow: "hidden" }}>
+          {drafts.map((row, i) => {
+            const expanded = expandedId === row.id;
+            const edit = drafted[row.id];
+            const editable = canEdit(row.status);
+            const busy = busyId === row.id;
+            return (
+              <div key={row.id} style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-soft)" }}>
+                <div
+                  onClick={() => toggleExpand(row)}
+                  className="tbl-row"
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer" }}
+                >
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {row.companyName}
+                      {row.personName && <span style={{ color: "var(--fg-faint)" }}> · {row.personName}</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {row.campaign} · {row.step}. lépés · {row.subject}
+                    </div>
+                  </div>
+                  <StatusBadge status={row.status} />
+                </div>
+
+                {row.status === "failed" && row.lastError && (
+                  <div style={{ padding: "0 16px 10px", fontSize: 14, color: "var(--coral)" }}>
+                    Küldési hiba: {row.lastError}
+                  </div>
+                )}
+
+                {expanded && (
+                  <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                    <FormField label="Tárgy">
+                      <input
+                        className="input-ds"
+                        value={edit?.subject ?? row.subject}
+                        disabled={!editable}
+                        onChange={(e) =>
+                          setDrafted((d) => ({ ...d, [row.id]: { subject: e.target.value, body: d[row.id]?.body ?? row.body } }))
+                        }
+                        style={{
+                          width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)",
+                          border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px",
+                          opacity: editable ? 1 : 0.6,
+                        }}
+                      />
+                    </FormField>
+                    <FormField label="Szöveg">
+                      <textarea
+                        className="input-ds"
+                        value={edit?.body ?? row.body}
+                        disabled={!editable}
+                        rows={6}
+                        onChange={(e) =>
+                          setDrafted((d) => ({ ...d, [row.id]: { subject: d[row.id]?.subject ?? row.subject, body: e.target.value } }))
+                        }
+                        style={{
+                          width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)",
+                          border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical",
+                          opacity: editable ? 1 : 0.6,
+                        }}
+                      />
+                    </FormField>
+
+                    {rowError[row.id] && (
+                      <div style={{ fontSize: 14, color: "var(--coral)" }}>{rowError[row.id]}</div>
+                    )}
+
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => onSave(row)}
+                        disabled={!editable || busy}
+                        style={{
+                          fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)",
+                          border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px",
+                          cursor: !editable || busy ? "default" : "pointer", opacity: !editable || busy ? 0.5 : 1,
+                        }}
+                      >
+                        Mentés
+                      </button>
+                      <button
+                        onClick={() => onApprove(row)}
+                        disabled={!canApprove(row.status) || busy}
+                        style={{
+                          fontSize: 14, fontWeight: 500, color: "var(--indigo)", background: "var(--indigo-soft)",
+                          border: "1px solid var(--indigo-line)", borderRadius: 8, padding: "8px 14px",
+                          cursor: !canApprove(row.status) || busy ? "default" : "pointer",
+                          opacity: !canApprove(row.status) || busy ? 0.5 : 1,
+                        }}
+                      >
+                        Jóváhagyás
+                      </button>
+                      <button
+                        onClick={() => onSend(row)}
+                        disabled={!canSend(row.status) || busy}
+                        style={{
+                          fontSize: 14, fontWeight: 600, color: "var(--mint)", background: "var(--mint-soft)",
+                          border: "1px solid oklch(0.80 0.13 165 / 0.35)", borderRadius: 8, padding: "8px 14px",
+                          cursor: !canSend(row.status) || busy ? "default" : "pointer",
+                          opacity: !canSend(row.status) || busy ? 0.5 : 1,
+                        }}
+                      >
+                        Küldés
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

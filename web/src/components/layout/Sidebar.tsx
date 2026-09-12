@@ -133,6 +133,14 @@ function IconMegaphone() {
   );
 }
 
+function IconMail() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7 10-7"/>
+    </svg>
+  );
+}
+
 
 const NAV = [
   {
@@ -150,6 +158,7 @@ const NAV = [
       { href: "/companies", label: "Cégek",     icon: IconBuilding },
       { href: "/leads",     label: "Leadek",    icon: IconLeads },
       { href: "/deals",     label: "Pipeline",  icon: IconPipe },
+      { href: "/outreach",  label: "Outreach",  icon: IconMail },
     ],
   },
   {
