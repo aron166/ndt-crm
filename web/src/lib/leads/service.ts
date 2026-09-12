@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { audit, type AuditOptions } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
+import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { getLeadStatuses, getQualificationQuestions } from "./queries";
 import { leadStatusLabel } from "./statuses";
 import {
@@ -374,6 +375,7 @@ export async function logLeadCallOutcome(
     }
     return { interaction, task };
   });
+  await recomputeCloseness({ tenantId: ctx.tenantId, companyId: lead.companyId, personId });
 
   audit("interaction", interaction.id, "create", null,
     { type: "call", outcome: input.outcome, leadId, companyId: lead.companyId, personId }, auditOpts(ctx));

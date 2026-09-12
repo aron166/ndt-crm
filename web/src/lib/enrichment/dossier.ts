@@ -20,7 +20,15 @@ export const dossierItemSchema = z.object({
   title: z.string().trim().min(1).max(300),
   detail: z.string().trim().max(2000).optional(),
   source: z.string().trim().max(200).optional(),
-  url: z.string().trim().url().max(600).optional(),
+  // http(s) only: `z.url()` alone happily accepts `javascript:alert(1)`, and this
+  // text comes from an external research agent and ends up in an href.
+  url: z
+    .string()
+    .trim()
+    .url()
+    .max(600)
+    .refine((v) => /^https?:\/\//i.test(v), { message: "url must be http(s)" })
+    .optional(),
 });
 
 export const dossierSchema = z

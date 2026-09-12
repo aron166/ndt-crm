@@ -101,9 +101,11 @@ panel, `PATCH`). It is a column, so the board filters and counts on it.
 `POST /api/leads` also accepts an optional `tier` in the payload, for a caller
 that already knows it — cold-outreach leads arrive pre-tiered by research and
 carry no qualification answers yet. That pre-tier is used **only** when the
-payload carries no qualification answers; the moment there are answers to
-derive from, the derived tier wins and the submitted `tier` is ignored, so a
-setter filling in answers later still takes over correctly.
+payload carries no qualification answers, or when the answers are not yet
+placeable (`computeTier` → `null`). The moment the answers do place the lead,
+the derived tier wins and the submitted `tier` is ignored — so a setter filling
+in answers later still takes over, while a half-answered reply never erases what
+the research already knew.
 
 | tier | rule | response Péter expects |
 |---|---|---|
@@ -347,7 +349,7 @@ carries `first_name`/`last_name` instead of `name`.
 |---|---|
 | `summary` | ≤4000 chars |
 | `apropo` | ≤3 items, each ≤600 chars — the "apropó" one-liners a caller opens the phone call with |
-| `items` | ≤200, each `{ date?≤40, title≤300, detail?≤2000, source?≤200, url?≤600 }` |
+| `items` | ≤200, each `{ date?≤40, title≤300, detail?≤2000, source?≤200, url?≤600 }` — `url` must be `http(s)`, and `date` is free text (`"2019"`, `"2023 tavasz"`) because dossier lines rarely carry a real date |
 | `sources` | ≤50 items, each ≤600 chars |
 | `meta` | free-form object, not rendered |
 
@@ -360,9 +362,13 @@ Sending `"enrichment": null` explicitly clears it. Every write (including a
 clearing `null`) stamps `enrichment_updated_at = now()`; callers cannot set that
 field themselves.
 
-`closeness_score` is **read-only** — the CRM computes it from interactions and
-invoices, recomputed on every interaction write. Sending it in the body at all
-(any value, including `null`) is rejected:
+`closeness_score` is **read-only** — the CRM computes it (`lib/enrichment/closeness.ts`,
+a pure function) from **invoice revenue (max 45 pts, threshold table)** plus
+**interactions weighted by type and recency (max 55 pts: meeting/site visit 8,
+call 5, email 3, else 2; ×1.0 within 30 days, ×0.7 to 90, ×0.4 to a year, ×0.15
+older)**, clamped to 0-100. It is recomputed on every interaction write, and
+`null` means "never computed yet". Sending it in the body at all (any value,
+including `null`) is rejected:
 
 ```json
 { "error": "closeness_score is computed by the CRM and cannot be set" }
