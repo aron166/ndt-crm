@@ -1,6 +1,31 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Paths that authenticate themselves (app key, CRON_SECRET) instead of a
+ * session cookie, so the session gate must not redirect them to /login.
+ * Exported so the list is testable — a route that silently falls off it is
+ * unreachable in production and nothing else in the build notices (PR #93).
+ *
+ * Entity routes are anchored to the id shape they actually serve: a prefix
+ * match would hand the bypass to any future nested route without review.
+ */
+export function isServiceApiPath(pathname: string): boolean {
+  return (
+    pathname === "/api/events" ||
+    pathname === "/api/conversations" ||
+    pathname === "/api/leads" ||
+    pathname.startsWith("/api/leads/") ||
+    pathname === "/api/content" ||
+    pathname === "/api/calls/result" ||
+    /^\/api\/(companies|persons)\/\d+$/.test(pathname) ||
+    pathname === "/api/outreach/targets" ||
+    pathname === "/api/outreach/drafts" ||
+    pathname === "/api/cron/automations" ||
+    pathname === "/api/health"
+  );
+}
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -38,17 +63,7 @@ export async function proxy(request: NextRequest) {
   // endpoint likewise self-authenticates with CRON_SECRET, not a session.
   // /api/health is intentionally public: uptime monitors can't hold a session,
   // and the route reveals nothing beyond up/down.
-  const isServiceApi =
-    request.nextUrl.pathname === "/api/events" ||
-    request.nextUrl.pathname === "/api/conversations" ||
-    request.nextUrl.pathname === "/api/leads" ||
-    request.nextUrl.pathname.startsWith("/api/leads/") ||
-    request.nextUrl.pathname === "/api/content" ||
-    request.nextUrl.pathname === "/api/calls/result" ||
-    request.nextUrl.pathname === "/api/outreach/targets" ||
-    request.nextUrl.pathname === "/api/outreach/drafts" ||
-    request.nextUrl.pathname === "/api/cron/automations" ||
-    request.nextUrl.pathname === "/api/health";
+  const isServiceApi = isServiceApiPath(request.nextUrl.pathname);
 
   if (!user && !isLoginPage && !isAuthRoute && !isServiceApi) {
     const url = request.nextUrl.clone();
