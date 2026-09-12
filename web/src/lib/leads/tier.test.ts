@@ -213,3 +213,188 @@ describe("computeTier", () => {
     }
   });
 });
+
+describe("real Hungarian setter answers", () => {
+  it("free-text sentences a phone setter would actually type", () => {
+    const cases: [Record<string, string>, string | null, string][] = [
+      [
+        { situation: "company", own_device: "Igen, de még nem döntöttünk" },
+        "A",
+        "igen wins over a later nem in the same sentence",
+      ],
+      [
+        { situation: "company", concrete: "betonfal", timing: "Igen, de még nem döntöttünk" },
+        null,
+        "igen isn't a real timeframe, and nem döntöttünk cancels it",
+      ],
+      [
+        { situation: "company", goal: "Milyen műszerrel csinálják?" },
+        null,
+        "a question about our tools is not a machine-ownership signal",
+      ],
+      [
+        { situation: "Saját ingatlan, kis projekt" },
+        "D",
+        "saját ingatlan is a private lead, not a company",
+      ],
+      [
+        { situation: "company", concrete: "Nem tudom pontosan, valószínűleg betonfal", timing: "jövő héten" },
+        "B",
+        "the comma ends the nem before betonfal, and jövő héten is a real date",
+      ],
+      [
+        { situation: "company", concrete: "betonfal", timing: "Még nem dőlt el, valamikor ősszel" },
+        null,
+        "valamikor ősszel is an undecided timing, not a booked date",
+      ],
+      [
+        { gate: "Csak érdeklődöm, még nem döntöttünk semmiben" },
+        "E",
+        "csak érdeklődöm is the curious gate, however it's phrased",
+      ],
+      [
+        { gate: "Körülnézünk egy kicsit, nincs még konkrét elképzelésünk" },
+        "E",
+        "körülnézünk is still the curious branch",
+      ],
+      [
+        { gate: "Csak tájékozódom, mennyibe kerülne egy ilyen vizsgálat" },
+        "E",
+        "tájékozódom is curious, not a task",
+      ],
+      [
+        { situation: "Statikus vagyok, sürgős munkánk van egy régi hídnál" },
+        "C",
+        "statikus is a professional, even with a hídnál nearby",
+      ],
+      [
+        { situation: "Kivitelező vagyok, egy társasházi projekten dolgozunk" },
+        "C",
+        "kivitelező is a professional; projekten is not a company keyword",
+      ],
+      [
+        { situation: "Építész vagyok, egy régi épület felmérésén dolgozom" },
+        "C",
+        "építész is a professional",
+      ],
+      [
+        { situation: "Műszaki ellenőrként dolgozom az önkormányzatnál" },
+        "C",
+        "műszaki ellenőr is the two-word professional phrase",
+      ],
+      [
+        { situation: "Villanyszerelőként dolgozom, kellene egy falvizsgálat" },
+        "C",
+        "villanyszerelő is a professional",
+      ],
+      [
+        { situation: "Saját ingatlanunkban lenne egy kisebb munka" },
+        "D",
+        "saját ingatlanunkban is the private phrase, inflected",
+      ],
+      [
+        { situation: "Családi házunkban szeretnénk pár helyen mérést végezni" },
+        "D",
+        "családi házunkban is a private lead",
+      ],
+      [
+        { situation: "Lakásfelújítás közben derült ki, hogy szükség van erre" },
+        "D",
+        "lakásfelújítás stems to lakás, a private signal",
+      ],
+      [
+        { situation: "Magánszemélyként keresem meg önöket egy kisebb feladattal" },
+        "D",
+        "magánszemélyként is the private token, inflected",
+      ],
+      [
+        { situation: "Egy lakást szeretnénk felújítani, ahhoz kellene a vizsgálat" },
+        "D",
+        "lakást stems to lakás",
+      ],
+      [
+        { situation: "Cégünk van", own_device: "Vásárolnánk egy sajátot, ha jó áron van" },
+        "A",
+        "vásárolnánk is purchase intent, a maybe-owns signal",
+      ],
+      [
+        { situation: "Kft vagyunk", own_device: "Gondolkodunk azon, hogy vegyünk egy saját műszert" },
+        "A",
+        "gondolkodunk is a maybe-owns signal",
+      ],
+      [
+        { situation: "Vállalkozásunk van", own_device: "Szeretnénk beszerezni egy saját gépet" },
+        "A",
+        "beszerezni is a maybe-owns signal",
+      ],
+      [
+        { situation: "Cégként keresnénk meg önöket", goal: "Leginkább maga a technológia érdekel minket" },
+        "A",
+        "a positive statement about the technology itself is tier A",
+      ],
+      [
+        { situation: "Kft-nk van", own_device: "Igen, van saját gépünk is" },
+        "A",
+        "igen at the front is an outright yes",
+      ],
+      [
+        { situation: "Cégünk van", concrete: "A falat kellene megvizsgálni", timing: "Jövő hét kedden" },
+        "B",
+        "falat stems to fal, and jövő hét kedden names a date",
+      ],
+      [
+        { situation: "Vállalkozás vagyunk", concrete: "Egy hidat kell megvizsgálni", timing: "Két hét múlva" },
+        "B",
+        "hidat stems to híd, and két hét múlva names a date",
+      ],
+      [
+        { situation: "Cégünk van", concrete: "A padlózatot szeretnénk leellenőriztetni", timing: "Szeptember végén" },
+        "B",
+        "padlózatot stems to padló, and szeptember végén names a date",
+      ],
+      [
+        { situation: "Kft vagyunk", concrete: "Egy műtárgy vizsgálata lenne", timing: "Holnapután" },
+        "B",
+        "műtárgy is a concrete structure, and holnapután names a date",
+      ],
+      [
+        { situation: "Cégünk van", concrete: "Leginkább fal, de még nem vagyunk biztosak melyik", timing: "Két héten belül" },
+        "B",
+        "de comes after fal, so it never gets to negate it",
+      ],
+      [
+        { situation: "Cégünk van", concrete: "Fal", timing: "Még nem tudjuk pontosan mikor" },
+        null,
+        "nem tudjuk pontosan mikor is not a real timeframe",
+      ],
+      [
+        { situation: "Vállalkozás vagyunk", concrete: "Más, nem beton", timing: "Jövő héten" },
+        null,
+        "más, nem beton is an explicit non-concrete structure",
+      ],
+      [
+        { situation: "Cégként keresnénk meg önöket" },
+        null,
+        "a bare company statement with nothing else is not placeable yet",
+      ],
+      [
+        { situation: "Cégünk van", concrete: "Fal", timing: "Talán majd tavasszal, még nem biztos" },
+        null,
+        "majd tavasszal is still an undecided timing",
+      ],
+      [
+        { situation: "Cégünk van", goal: "Milyen fúrásmintát fognak venni a falból?" },
+        null,
+        "a question about drilling is not a technology-ownership signal",
+      ],
+      [
+        { gate: "Még csak nézelődöm, nem döntöttünk semmiről", situation: "cég", own_device: "igen" },
+        "E",
+        "nézelődöm is the curious gate, overriding an otherwise tier-A company lead",
+      ],
+    ];
+    for (const [answers, want, note] of cases) {
+      expect(computeTier(answers), note).toBe(want);
+    }
+  });
+});
