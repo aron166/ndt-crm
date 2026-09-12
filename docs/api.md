@@ -116,6 +116,35 @@ sitting inside a negation is ignored — "nem a technológia érdekel" is not
 `goal=technology`. `hanem` / `de` end the negation, so "nem tégla, hanem beton"
 still reads as concrete.
 
+When an answer carries **two** competing tokens, **keyword-table order decides**,
+and each slot is ordered for the mistake that costs most:
+
+- `concrete`, `gate` and `situation` put the **kill answer first** — "Falban, de
+  nem beton" is not a concrete job, and "Érdeklődnék, de konkrét feladatunk van"
+  is a task, not a browse.
+- `own_device` is the one slot ordered **positive-first**, because the answer to
+  "van saját műszered?" almost always opens with *nem*: "Nincs, de vásárolnánk
+  egyet" and "Igen, de még nem döntöttünk" are both machine prospects. A bare
+  "nem" with no positive anywhere still reads as `no`.
+
+Tier A needs a **positive** machine signal — `own_device` yes/maybe (purchase
+intent counts: "vásárolnánk", "beszerezzük", "gondolkodunk rajta"), or a
+statement about the technology. An answer that **asks** something — an
+interrogative opener plus a question mark, "Milyen műszerrel csinálják?",
+"Milyen technológiával dolgoznak?" — states nothing about the lead and tiers
+nothing.
+
+A `timing` answer counts as "set" when it names a timeframe. **A named date
+always wins:** "Október 5-én, majd egyeztetünk" and "Nem biztos, de október 5-én
+kezdünk" are both set. Only when nothing in the answer points at a point in time
+do the undecided phrasings ("még nem dőlt el", "nem tudjuk", "valamikor ősszel")
+turn it off, so a shrug cannot promote a company lead to B.
+
+> ⚠️ An answer with neither a date nor a shrug still counts as set — that is the
+> long-standing permissive default, so junk like "igen" or "ok" in the `timing`
+> slot reads as a date. Tightening it is a product decision (it would start
+> dropping leads out of B), not a bug fix.
+
 > ⚠️ **`tier` only reaches an automation at intake.** `POST /api/leads` puts the
 > derived tier into the `lead_created` event, so a "tier A → call within 1 h"
 > rule fires for leads the landing form already tiered A. A setter who promotes a
