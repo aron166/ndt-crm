@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
+import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
 import {
   type DraftStatus,
@@ -14,6 +15,7 @@ import {
   canSend,
   threadKeyFor,
   withFooter,
+  CLAIMABLE_STATUSES,
 } from "@/lib/outreach/drafts";
 
 const TENANT_ID = 1;
@@ -45,10 +47,19 @@ export interface DraftFilter {
   status?: string;
 }
 
-/** Drafts for the tenant, newest first, plus the distinct campaign list for the filter bar. */
+/** The list view never carries `body` (up to 20 000 chars/row) — fetch it
+ * on demand per-row via `getDraftBody` when the editor expands. */
+export type DraftListRow = Omit<DraftRow, "body">;
+
+// A 2000-draft campaign must not push thousands of rows through a server
+// action on every filter change — cap the list, newest first, and let the
+// UI say so when it's truncated.
+const MAX_LIST_ROWS = 200;
+
+/** Drafts for the tenant, newest first (capped, body-free), plus the distinct campaign list for the filter bar. */
 export async function listDrafts(
   filter?: DraftFilter,
-): Promise<{ drafts: DraftRow[]; campaigns: string[] }> {
+): Promise<{ drafts: DraftListRow[]; campaigns: string[]; truncated: boolean }> {
   const where: Prisma.EmailDraftWhereInput = { tenantId: TENANT_ID };
   if (filter?.campaign) where.campaign = filter.campaign;
   if (filter?.step != null && isValidStep(filter.step)) where.step = filter.step;
@@ -58,9 +69,10 @@ export async function listDrafts(
     db.emailDraft.findMany({
       where,
       orderBy: { createdAt: "desc" },
+      take: MAX_LIST_ROWS + 1, // +1 just to detect truncation, not to show it
       select: {
         id: true, companyId: true, personId: true, campaign: true, step: true,
-        subject: true, body: true, toEmail: true, status: true, threadKey: true,
+        subject: true, toEmail: true, status: true, threadKey: true,
         providerMessageId: true, lastError: true, sentAt: true, createdAt: true,
         company: { select: { name: true } },
         person: { select: { firstName: true, lastName: true } },
@@ -74,8 +86,11 @@ export async function listDrafts(
     }),
   ]);
 
+  const truncated = rows.length > MAX_LIST_ROWS;
+  const page = truncated ? rows.slice(0, MAX_LIST_ROWS) : rows;
+
   return {
-    drafts: rows.map((r) => ({
+    drafts: page.map((r) => ({
       id: r.id,
       companyId: r.companyId,
       companyName: r.company.name,
@@ -84,7 +99,6 @@ export async function listDrafts(
       campaign: r.campaign,
       step: r.step,
       subject: r.subject,
-      body: r.body,
       toEmail: r.toEmail,
       status: r.status as DraftStatus,
       threadKey: r.threadKey,
@@ -94,7 +108,15 @@ export async function listDrafts(
       createdAt: r.createdAt.toISOString(),
     })),
     campaigns: campaignRows.map((c) => c.campaign),
+    truncated,
   };
+}
+
+/** A single draft's body, fetched only when the editor expands a row — tenant-scoped. */
+export async function getDraftBody(id: number): Promise<{ ok: true; body: string } | { ok: false; error: string }> {
+  const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID }, select: { body: true } });
+  if (!row) return { ok: false, error: "Piszkozat nem található" };
+  return { ok: true, body: row.body };
 }
 
 export interface OutreachSettings {
@@ -188,10 +210,17 @@ export async function approveDraft(id: number): Promise<{ ok: true } | { ok: fal
   return { ok: true };
 }
 
-/** Approve every `draft`-status row in the given campaign (+ optional step). */
+/**
+ * Approve every `draft`-status row in the given campaign (+ optional step).
+ * `dryRun` counts the affected rows without approving anything — the UI uses
+ * it to show "N piszkozat jóváhagyása?" before the user commits, since the
+ * count can otherwise silently exceed what's visible on screen (the status
+ * filter narrows the view, not this action's scope).
+ */
 export async function approveAll(
   campaign: string,
   step?: number,
+  opts?: { dryRun?: boolean },
 ): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
   const where: Prisma.EmailDraftWhereInput = {
     tenantId: TENANT_ID,
@@ -200,7 +229,7 @@ export async function approveAll(
     ...(step != null && isValidStep(step) ? { step } : {}),
   };
   const rows = await db.emailDraft.findMany({ where, select: { id: true } });
-  if (rows.length === 0) return { ok: true, count: 0 };
+  if (opts?.dryRun || rows.length === 0) return { ok: true, count: rows.length };
 
   await db.emailDraft.updateMany({ where, data: { status: "approved" } });
   for (const r of rows) {
@@ -212,7 +241,13 @@ export async function approveAll(
 
 /**
  * The only send path. One explicit human click per email — there is
- * deliberately no "send all" action.
+ * deliberately no "send all".
+ *
+ * The row is CLAIMED before Resend is called: one conditional UPDATE moves it
+ * out of every sendable status into `sending`, and only the caller that wins
+ * that update proceeds. Reading the status and then sending — which is what
+ * this did first — let a double-click, a second tab, or a retried server-action
+ * POST put the same cold email in front of the same company twice. (Vanda, #88.)
  */
 export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false; error: string }> {
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
@@ -221,12 +256,26 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
     return { ok: false, error: "Ez a piszkozat nem küldhető ebben az állapotban" };
   }
 
-  // Resolve recipient: explicit toEmail, else the linked person, else the
-  // company's first current contact.
+  // The consent/unsubscribe line is not optional. Without this guard a tenant
+  // who never opened the settings panel cold-emails with no opt-out at all —
+  // the placeholder in the UI is an HTML attribute, not a stored value.
+  const settings = await getOutreachSettings();
+  const footer = settings.footer?.trim();
+  if (!footer) {
+    return { ok: false, error: "Hiányzik a leiratkozási lábléc — töltsd ki a beállításokban" };
+  }
+
+  // Recipient resolution: explicit toEmail, else the linked person, else the
+  // company's first current contact. The person lookup is scoped to this
+  // tenant AND to the draft's company — `personId` arrives from an app-key
+  // payload and is not otherwise proven to belong here. (Vanda, #88.)
   let to = row.toEmail?.trim() || null;
   if (!to && row.personId) {
-    const person = await db.person.findFirst({ where: { id: row.personId }, select: { email: true } });
-    to = person?.email?.trim() || null;
+    const contact = await db.contact.findFirst({
+      where: { personId: row.personId, companyId: row.companyId, tenantId: TENANT_ID },
+      select: { email: true, person: { select: { email: true } } },
+    });
+    to = contact?.email?.trim() || contact?.person.email?.trim() || null;
   }
   if (!to) {
     const contact = await db.contact.findFirst({
@@ -238,18 +287,42 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   }
   if (!to) return { ok: false, error: "Ehhez a céghez nincs email cím" };
 
-  const settings = await getOutreachSettings();
-  const text = withFooter(row.body, settings.footer);
-
-  const result = await sendEmail({
-    tenantId: TENANT_ID,
-    to,
-    subject: row.subject,
-    text,
-    replyTo: settings.replyTo,
-    companyId: row.companyId,
-    personId: row.personId,
+  // Claim it. Nothing below this line may run twice for one row.
+  const claim = await db.emailDraft.updateMany({
+    where: { id, tenantId: TENANT_ID, status: { in: CLAIMABLE_STATUSES } },
+    data: { status: "sending" },
   });
+  if (claim.count === 0) {
+    revalidatePath("/outreach");
+    return { ok: false, error: "Ez a piszkozat épp küldés alatt van, vagy már elment" };
+  }
+  await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sending" });
+
+  const text = withFooter(row.body, footer);
+
+  let result: Awaited<ReturnType<typeof sendEmail>>;
+  try {
+    result = await sendEmail({
+      tenantId: TENANT_ID,
+      to,
+      subject: row.subject,
+      text,
+      replyTo: settings.replyTo,
+      companyId: row.companyId,
+      personId: row.personId,
+    });
+  } catch (err) {
+    // sendEmail catches its own transport errors, so reaching here means
+    // something unexpected threw AFTER the claim. We cannot know whether the
+    // mail went out, so the row stays `sending` — terminal, not re-sendable.
+    reportError("outreach.sendDraft", err, { draftId: id, companyId: row.companyId });
+    await db.emailDraft.update({
+      where: { id },
+      data: { lastError: "Ismeretlen hiba küldés közben — ellenőrizd a Resend naplót" },
+    });
+    revalidatePath("/outreach");
+    return { ok: false, error: "Ismeretlen hiba küldés közben — ellenőrizd a Resend naplót" };
+  }
 
   if (result.ok) {
     await db.emailDraft.update({
@@ -259,7 +332,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
         sentAt: new Date(),
         providerMessageId: result.id,
         threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
-        lastError: null,
+        lastError: result.warning ?? null,
       },
     });
     await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sent", providerMessageId: result.id });
@@ -268,7 +341,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   }
 
   await db.emailDraft.update({ where: { id }, data: { status: "failed", lastError: result.error } });
-  await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "failed", lastError: result.error });
+  await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "failed", lastError: result.error });
   revalidatePath("/outreach");
   return { ok: false, error: result.error };
 }

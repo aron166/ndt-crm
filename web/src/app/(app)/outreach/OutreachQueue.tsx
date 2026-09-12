@@ -13,8 +13,9 @@ import {
   approveDraft,
   approveAll,
   sendDraft,
+  getDraftBody,
   saveOutreachSettings,
-  type DraftRow,
+  type DraftListRow,
   type OutreachSettings,
 } from "@/app/actions/email-drafts";
 import { DRAFT_STATUSES, MAX_STEP, canEdit, canApprove, canSend, type DraftStatus } from "@/lib/outreach/drafts";
@@ -28,6 +29,7 @@ const FOOTER_PLACEHOLDER =
 const STATUS_LABEL: Record<DraftStatus, string> = {
   draft: "Piszkozat",
   approved: "Jóváhagyva",
+  sending: "Küldés alatt",
   sent: "Elküldve",
   failed: "Sikertelen",
   replied: "Válaszolt",
@@ -36,6 +38,7 @@ const STATUS_LABEL: Record<DraftStatus, string> = {
 const STATUS_TONE: Record<DraftStatus, string> = {
   draft: "var(--fg-mute)",
   approved: "var(--indigo)",
+  sending: "var(--indigo)",
   sent: "var(--mint)",
   failed: "var(--coral)",
   replied: "var(--sky)",
@@ -60,17 +63,19 @@ export default function OutreachQueue({
   campaigns,
   initialSettings,
 }: {
-  initialDrafts: DraftRow[];
+  initialDrafts: DraftListRow[];
   campaigns: string[];
   initialSettings: OutreachSettings;
 }) {
-  const [drafts, setDrafts] = useState<DraftRow[]>(initialDrafts);
+  const [drafts, setDrafts] = useState<DraftListRow[]>(initialDrafts);
+  const [truncated, setTruncated] = useState(initialDrafts.length >= 200);
   const [loading, setLoading] = useState(false);
   const [campaignFilter, setCampaignFilter] = useState("");
   const [stepFilter, setStepFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [drafted, setDrafted] = useState<Record<number, { subject: string; body: string }>>({});
+  const [bodyLoading, setBodyLoading] = useState<Record<number, boolean>>({});
   const [busyId, setBusyId] = useState<number | null>(null);
   const [approvingAll, setApprovingAll] = useState(false);
   const [rowError, setRowError] = useState<Record<number, string>>({});
@@ -89,25 +94,42 @@ export default function OutreachQueue({
         status: next.status || undefined,
       });
       setDrafts(res.drafts);
+      setTruncated(res.truncated);
     } finally {
       setLoading(false);
     }
   }
 
-  function patchRow(id: number, patch: Partial<DraftRow>) {
+  /** Re-fetch under the filters currently on screen — the server is the
+   * authority on status, so this is what "show me what really happened"
+   * means after a send or a bulk approve. */
+  function refetchCurrent() {
+    return refetch({ campaign: campaignFilter, step: stepFilter, status: statusFilter });
+  }
+
+  function patchRow(id: number, patch: Partial<DraftListRow>) {
     setDrafts((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
 
-  function toggleExpand(row: DraftRow) {
+  function toggleExpand(row: DraftListRow) {
     if (expandedId === row.id) {
       setExpandedId(null);
       return;
     }
     setExpandedId(row.id);
-    setDrafted((d) => ({ ...d, [row.id]: { subject: row.subject, body: row.body } }));
+    if (drafted[row.id]) return; // body already fetched once, reuse it
+    setBodyLoading((b) => ({ ...b, [row.id]: true }));
+    getDraftBody(row.id).then((res) => {
+      setBodyLoading((b) => ({ ...b, [row.id]: false }));
+      if (!res.ok) {
+        setRowError((e) => ({ ...e, [row.id]: res.error }));
+        return;
+      }
+      setDrafted((d) => ({ ...d, [row.id]: { subject: d[row.id]?.subject ?? row.subject, body: res.body } }));
+    });
   }
 
-  async function onSave(row: DraftRow) {
+  async function onSave(row: DraftListRow) {
     const edit = drafted[row.id];
     if (!edit) return;
     setBusyId(row.id);
@@ -118,10 +140,10 @@ export default function OutreachQueue({
       setRowError((e) => ({ ...e, [row.id]: res.error }));
       return;
     }
-    patchRow(row.id, { subject: edit.subject, body: edit.body });
+    patchRow(row.id, { subject: edit.subject });
   }
 
-  async function onApprove(row: DraftRow) {
+  async function onApprove(row: DraftListRow) {
     setBusyId(row.id);
     setRowError((e) => ({ ...e, [row.id]: "" }));
     const res = await approveDraft(row.id);
@@ -133,13 +155,22 @@ export default function OutreachQueue({
     patchRow(row.id, { status: "approved" });
   }
 
-  async function onSend(row: DraftRow) {
+  async function onSend(row: DraftListRow) {
     setBusyId(row.id);
     setRowError((e) => ({ ...e, [row.id]: "" }));
     const res = await sendDraft(row.id);
     setBusyId(null);
     if (!res.ok) {
-      patchRow(row.id, { status: "failed", lastError: res.error });
+      // sendDraft's {ok:false} covers a lot more than "the email failed to
+      // send": not found, wrong state, already claimed by another click,
+      // missing unsubscribe footer, no address — none of those means the
+      // row is actually `failed`, and blindly patching it to `failed` here
+      // would re-enable Küldés (canSend("failed") === true) on a row that
+      // may still be in flight. Only the server knows the true status
+      // (draft/failed/still `sending`/sent), so show the message and
+      // refetch instead of guessing — cheap, and always correct.
+      setRowError((e) => ({ ...e, [row.id]: res.error }));
+      await refetchCurrent();
       return;
     }
     patchRow(row.id, { status: "sent", lastError: null });
@@ -147,19 +178,20 @@ export default function OutreachQueue({
 
   async function onApproveAll() {
     if (!campaignFilter) return;
+    const step = stepFilter ? parseInt(stepFilter, 10) : undefined;
+    const preview = await approveAll(campaignFilter, step, { dryRun: true });
+    if (!preview.ok) return;
+    if (preview.count === 0) {
+      window.alert("Nincs jóváhagyható piszkozat ebben a kampányban.");
+      return;
+    }
+    if (!window.confirm(`${preview.count} piszkozat jóváhagyása?`)) return;
+
     setApprovingAll(true);
-    const res = await approveAll(campaignFilter, stepFilter ? parseInt(stepFilter, 10) : undefined);
+    const res = await approveAll(campaignFilter, step);
     setApprovingAll(false);
     if (!res.ok) return;
-    setDrafts((rows) =>
-      rows.map((r) =>
-        r.status === "draft" &&
-        r.campaign === campaignFilter &&
-        (!stepFilter || r.step === parseInt(stepFilter, 10))
-          ? { ...r, status: "approved" }
-          : r,
-      ),
-    );
+    await refetchCurrent();
   }
 
   async function onSaveSettings() {
@@ -291,6 +323,12 @@ export default function OutreachQueue({
         </button>
       </div>
 
+      {truncated && (
+        <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-mute)", background: "var(--bg-raised)" }}>
+          Csak az első 200 piszkozat látszik ennél a szűrésnél — szűrj tovább (kampány, lépés, állapot) a többi megtekintéséhez.
+        </div>
+      )}
+
       {loading ? (
         <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center" }}>
           Betöltés…
@@ -304,6 +342,7 @@ export default function OutreachQueue({
           {drafts.map((row, i) => {
             const expanded = expandedId === row.id;
             const edit = drafted[row.id];
+            const bodyIsLoading = !!bodyLoading[row.id];
             const editable = canEdit(row.status);
             const busy = busyId === row.id;
             return (
@@ -339,7 +378,7 @@ export default function OutreachQueue({
                         value={edit?.subject ?? row.subject}
                         disabled={!editable}
                         onChange={(e) =>
-                          setDrafted((d) => ({ ...d, [row.id]: { subject: e.target.value, body: d[row.id]?.body ?? row.body } }))
+                          setDrafted((d) => ({ ...d, [row.id]: { subject: e.target.value, body: d[row.id]?.body ?? "" } }))
                         }
                         style={{
                           width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)",
@@ -349,20 +388,24 @@ export default function OutreachQueue({
                       />
                     </FormField>
                     <FormField label="Szöveg">
-                      <textarea
-                        className="input-ds"
-                        value={edit?.body ?? row.body}
-                        disabled={!editable}
-                        rows={6}
-                        onChange={(e) =>
-                          setDrafted((d) => ({ ...d, [row.id]: { subject: d[row.id]?.subject ?? row.subject, body: e.target.value } }))
-                        }
-                        style={{
-                          width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)",
-                          border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical",
-                          opacity: editable ? 1 : 0.6,
-                        }}
-                      />
+                      {bodyIsLoading ? (
+                        <div style={{ fontSize: 14, color: "var(--fg-faint)", padding: "8px 10px" }}>Betöltés…</div>
+                      ) : (
+                        <textarea
+                          className="input-ds"
+                          value={edit?.body ?? ""}
+                          disabled={!editable}
+                          rows={6}
+                          onChange={(e) =>
+                            setDrafted((d) => ({ ...d, [row.id]: { subject: d[row.id]?.subject ?? row.subject, body: e.target.value } }))
+                          }
+                          style={{
+                            width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)",
+                            border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical",
+                            opacity: editable ? 1 : 0.6,
+                          }}
+                        />
+                      )}
                     </FormField>
 
                     {rowError[row.id] && (
@@ -372,11 +415,12 @@ export default function OutreachQueue({
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
                         onClick={() => onSave(row)}
-                        disabled={!editable || busy}
+                        disabled={!editable || busy || bodyIsLoading}
                         style={{
                           fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)",
                           border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px",
-                          cursor: !editable || busy ? "default" : "pointer", opacity: !editable || busy ? 0.5 : 1,
+                          cursor: !editable || busy || bodyIsLoading ? "default" : "pointer",
+                          opacity: !editable || busy || bodyIsLoading ? 0.5 : 1,
                         }}
                       >
                         Mentés

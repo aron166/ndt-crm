@@ -51,6 +51,7 @@ describe("state machine predicates", () => {
   const expected: Record<DraftStatus, { edit: boolean; approve: boolean; send: boolean }> = {
     draft: { edit: true, approve: true, send: false },
     approved: { edit: false, approve: false, send: true },
+    sending: { edit: false, approve: false, send: false },
     sent: { edit: false, approve: false, send: false },
     failed: { edit: true, approve: false, send: true },
     replied: { edit: false, approve: false, send: false },
