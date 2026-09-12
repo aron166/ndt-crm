@@ -6,6 +6,7 @@ import { logLeadCall } from "@/app/actions/leads";
 import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
+import type { ScriptVariant } from "@/lib/leads/scripts";
 
 // /drive — one column, thumb-reachable, phone-at-arm's-length in a car.
 // Outcome rules (which extra field, min lengths) live server-side in
@@ -36,7 +37,7 @@ function outcomeBtnStyle(tone: "red" | "green" | undefined): React.CSSProperties
   };
 }
 
-export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
+export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueue: DriveLead[]; scriptVariants?: ScriptVariant[] }) {
   const router = useRouter();
   const [queue, setQueue] = useState(initialQueue);
   // Which lead ids are done (skipped or saved) this session — an index would
@@ -52,6 +53,11 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const submitting = useRef(false);
+  // Same A/B default rule as the kanban's CallOutcomeModal.
+  const defaultScriptKey = scriptVariants.length > 1 ? scriptVariants[0].key : "";
+  const [scriptKey, setScriptKey] = useState(defaultScriptKey);
+  const [scriptOpen, setScriptOpen] = useState(false);
+  const script = scriptVariants.find((v) => v.key === scriptKey) ?? null;
 
   // A fresh queue arrives (router.refresh() re-runs the server component and
   // hands us a new array) — keep it, but never reset `done`: that's what was
@@ -68,6 +74,7 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
   function resetFields() {
     setNote(""); setSelectedOutcome(null); setCallbackAt("");
     setDemoWith("aron"); setLostReason(""); setExpanded(false); setError(null);
+    setScriptKey(defaultScriptKey); setScriptOpen(false);
   }
 
   function skip() {
@@ -88,6 +95,7 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
           callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
           demoWith: outcome === "meeting_booked" ? demoWith : null,
           lostReason: isLostCallOutcome(outcome) ? lostReason : null,
+          scriptVariant: scriptKey || undefined,
         });
         if ("error" in res) { setError(res.error); return; }
         resetFields();
@@ -191,6 +199,27 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
             <button onClick={() => setExpanded((e) => !e)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 12, padding: "6px 0 0", cursor: "pointer" }}>
               {expanded ? "kevesebb" : "több"}
             </button>
+          )}
+        </div>
+      )}
+
+      {scriptVariants.length > 0 && (
+        <div style={{ background: "var(--bg-1)", border: "1px solid var(--line-soft)", borderRadius: 10, padding: "10px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <select style={{ ...inputStyle, width: "auto", flex: 1 }} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
+              <option value="">Nincs szkript</option>
+              {scriptVariants.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
+            </select>
+            {script?.body && (
+              <button onClick={() => setScriptOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 13, padding: 4, cursor: "pointer" }}>
+                Szkript {scriptOpen ? "▲" : "▼"}
+              </button>
+            )}
+          </div>
+          {scriptOpen && script?.body && (
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+              {script.body}
+            </p>
           )}
         </div>
       )}

@@ -84,6 +84,7 @@ export const leadInteractionWireSchema = z.object({
   demo_with: z.preprocess(emptyToUndef, z.string().optional()),
   lost_reason: z.preprocess(emptyToUndef, z.string().optional()),
   assigned_to_id: optInt,
+  script_variant: z.preprocess(emptyToUndef, z.string().optional()),
 });
 export function toCallOutcomeInput(w: z.infer<typeof leadInteractionWireSchema>) {
   return {
@@ -93,6 +94,7 @@ export function toCallOutcomeInput(w: z.infer<typeof leadInteractionWireSchema>)
     ...(w.demo_with ? { demoWith: w.demo_with } : {}),
     ...(w.lost_reason ? { lostReason: w.lost_reason } : {}),
     ...(w.assigned_to_id ? { assignedToId: w.assigned_to_id } : {}),
+    ...(w.script_variant ? { scriptVariant: w.script_variant } : {}),
   };
 }
 

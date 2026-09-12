@@ -3,19 +3,23 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LeadStatusSetupClient } from "./LeadStatusSetupClient";
 import { QualificationQuestionsClient } from "./QualificationQuestionsClient";
-import { getQualificationQuestions } from "@/lib/leads/queries";
+import { ScriptVariantsClient } from "./ScriptVariantsClient";
+import { getQualificationQuestions, getScriptVariants } from "@/lib/leads/queries";
 import { getIntroMaterialUrl } from "@/lib/leads/intro";
+import { getScriptStats } from "@/lib/leads/script-stats";
 
 const TENANT_ID = 1;
 
 export default async function LeadStatusSetupPage() {
-  const [statuses, questions, introUrl] = await Promise.all([
+  const [statuses, questions, introUrl, scriptVariants, scriptStats] = await Promise.all([
     db.leadStatus.findMany({
       where: { tenantId: TENANT_ID },
       orderBy: { position: "asc" },
     }),
     getQualificationQuestions(TENANT_ID),
     getIntroMaterialUrl(TENANT_ID),
+    getScriptVariants(TENANT_ID),
+    getScriptStats(TENANT_ID),
   ]);
 
   return (
@@ -43,6 +47,7 @@ export default async function LeadStatusSetupPage() {
 
       <LeadStatusSetupClient statuses={statuses} />
       <QualificationQuestionsClient questions={questions} introUrl={introUrl} />
+      <ScriptVariantsClient variants={scriptVariants} stats={scriptStats} />
     </div>
   );
 }

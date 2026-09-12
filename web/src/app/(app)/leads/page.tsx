@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { serializeDates } from "@/lib/serialize";
-import { getLeadStatuses } from "@/lib/leads/queries";
+import { getLeadStatuses, getScriptVariants } from "@/lib/leads/queries";
 import { LeadsKanban } from "./LeadsKanban";
 import { Settings2 } from "lucide-react";
 import { fullName, formatRelativeTime } from "@/lib/utils";
@@ -162,7 +162,10 @@ export default async function LeadsPage({
     );
   }
 
-  const statuses = await getLeadStatuses(TENANT_ID);
+  const [statuses, scriptVariants] = await Promise.all([
+    getLeadStatuses(TENANT_ID),
+    getScriptVariants(TENANT_ID),
+  ]);
   // Fall back to the first configured column, never to a key with no column:
   // a tenant can end up with zero isInitial statuses (unchecking it at /leads/setup
   // clears the flag without electing a replacement), and orphaned leads must still land.
@@ -275,6 +278,7 @@ export default async function LeadsPage({
         leads={serializeDates(leadsForClient) as Parameters<typeof LeadsKanban>[0]["leads"]}
         columnTotals={columnTotals}
         columnLimit={COLUMN_LIMIT}
+        scriptVariants={scriptVariants}
       />
     </div>
   );

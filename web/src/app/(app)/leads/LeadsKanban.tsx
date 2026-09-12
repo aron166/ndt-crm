@@ -13,6 +13,7 @@ import {
   LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, promptLostReason, type LeadOutcome,
 } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import type { ScriptVariant } from "@/lib/leads/scripts";
 
 interface Lead {
   id: number;
@@ -44,6 +45,7 @@ interface LeadsKanbanProps {
   /** Total leads per column (the board shows at most `columnLimit` of them). */
   columnTotals: Record<string, number>;
   columnLimit: number;
+  scriptVariants: ScriptVariant[];
 }
 
 function personNameOf(lead: Lead): string | null {
@@ -230,7 +232,7 @@ function LeadCard({
   );
 }
 
-export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, columnLimit }: LeadsKanbanProps) {
+export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, columnLimit, scriptVariants }: LeadsKanbanProps) {
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -316,6 +318,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
       title={calling ? [personNameOf(calling), calling.company?.name].filter(Boolean).join(" · ") : null}
       stageDescription={statuses.find((s) => s.key === calling?.status)?.description ?? null}
       onLogged={() => router.refresh()}
+      scriptVariants={scriptVariants}
     />
     {error && (
       <div className="panel" style={{ marginBottom: 12 }}>

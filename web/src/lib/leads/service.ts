@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { audit, type AuditOptions } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
-import { getLeadStatuses, getQualificationQuestions } from "./queries";
+import { getLeadStatuses, getQualificationQuestions, getScriptVariants } from "./queries";
 import { leadStatusLabel } from "./statuses";
 import {
   callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
@@ -338,6 +338,16 @@ export async function logLeadCallOutcome(
     if (!user) return { error: "Felhasználó nem található" };
   }
 
+  // An unknown script key is a 400, never a silent write: the whole point of
+  // the variant is that its calls can be counted, and a typo'd key becomes a
+  // statistics bucket nobody is looking at. Same rule as a qualification slug.
+  if (input.scriptVariant) {
+    const variants = await getScriptVariants(ctx.tenantId);
+    if (!variants.some((v) => v.key === input.scriptVariant)) {
+      return { error: `Ismeretlen szkriptváltozat: ${input.scriptVariant}` };
+    }
+  }
+
   const statuses = await getLeadStatuses(ctx.tenantId);
   const plan = planCallOutcome(input, lead.status, statuses.map((s) => s.key));
   const personId = lead.contact?.personId ?? null;
@@ -350,6 +360,7 @@ export async function logLeadCallOutcome(
       data: {
         tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId, userId: ctx.userId,
         type: "call", direction: "outbound", outcome: input.outcome, notes: input.note, occurredAt: now,
+        scriptVariant: input.scriptVariant ?? null,
       },
       select: { id: true },
     });

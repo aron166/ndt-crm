@@ -11,6 +11,7 @@ import {
 import type { LeadOutcome } from "@/lib/leads/outcomes";
 import { userLeadCtx } from "@/lib/actor";
 import { parseQuestionLines } from "@/lib/leads/qualification";
+import { parseScriptBlocks } from "@/lib/leads/scripts";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
@@ -103,7 +104,7 @@ export async function assignLeadAction(leadId: number, assignedToId: number | nu
  */
 export async function logLeadCall(leadId: number, input: {
   outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
-  lostReason?: string | null;
+  lostReason?: string | null; scriptVariant?: string | null;
 }) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
@@ -115,6 +116,7 @@ export async function logLeadCall(leadId: number, input: {
       ...(input.callbackAt ? { callbackAt: input.callbackAt } : {}),
       ...(input.demoWith ? { demoWith: input.demoWith } : {}),
       ...(input.lostReason ? { lostReason: input.lostReason } : {}),
+      ...(input.scriptVariant ? { scriptVariant: input.scriptVariant } : {}),
     },
     ctx,
   );
@@ -419,6 +421,31 @@ export async function saveQualificationQuestions(text: string, introUrl?: string
 
   revalidatePath("/leads/setup");
   revalidatePath("/leads");
+  return { success: true };
+}
+
+/** Replace the tenant's call-script A/B variants (block format, see scripts.ts). */
+export async function saveScriptVariants(text: string) {
+  const parsed = parseScriptBlocks(text);
+  if ("error" in parsed) return parsed;
+
+  const before = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
+  const settings = {
+    ...((before?.settings ?? {}) as Record<string, unknown>),
+    scriptVariants: parsed,
+  };
+  await db.tenant.update({
+    where: { id: TENANT_ID },
+    // Prisma's InputJsonValue rejects an interface without an index signature;
+    // the value IS plain JSON, so the double cast is the whole story.
+    data: { settings: settings as unknown as Prisma.InputJsonValue },
+  });
+  const beforeSettings = (before?.settings as Record<string, unknown> | null) ?? {};
+  await audit("tenant", TENANT_ID, "update",
+    { scriptVariants: beforeSettings.scriptVariants ?? null },
+    { scriptVariants: parsed });
+
+  revalidatePath("/leads/setup");
   return { success: true };
 }
 
