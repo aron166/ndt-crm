@@ -14,8 +14,13 @@ Turns Gmail replies to a cold-outreach campaign into leads in the CRM, via `POST
 It is the string `threadKeyFor(campaign, companyId)` stamped on the draft when it was sent — from
 the documented example (campaign `"BirdsView Q4"`, `thread_key: "birdsview-q4:42"` for company
 42), the shape is `<slugified-campaign>:<companyId>`, but that's read off one example, not a
-formal spec — if you're unsure of the exact slug, it's safe to guess: get it wrong and the lead is
-still created (see below), you just lose the auto-link/auto-flip.
+formal spec.
+
+⚠️ **Do not guess it.** A key you invent is not harmless: thread keys are unique per tenant, so a
+wrong one can collide with a DIFFERENT company's thread — and then the CRM either hands you back
+that company's existing lead (`deduped: true`, your reply silently discarded) or attaches this
+reply to their company and flips THEIR draft to `replied`. Read the key off the draft you are
+answering. If you cannot determine it, post without it — see below.
 
 Posting the same `thread_key` twice is safe **on the server side, no local bookkeeping needed**:
 - If a lead with that `thread_key` already exists: **nothing is written**, you get back
