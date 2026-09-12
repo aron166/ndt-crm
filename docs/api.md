@@ -287,6 +287,30 @@ curl -X POST $CRM/api/leads/12/interactions \
 # → 201 { "ok": true, "interactionId": 91, "status": "recall", "outcome": "open", "taskId": 40 }
 ```
 
+#### ⚠️ BREAKING (2026-09-12): `meeting_booked` now needs a date
+
+Until now a booked demo recorded **no date anywhere** — the lead moved to
+`demo_aron`/`demo_peter` and nothing was scheduled. It now creates a real
+booking (a `meeting` task with `starts_at`), so `outcome: "meeting_booked"`
+requires two more fields and a payload without them is a `400`:
+
+| field | notes |
+|---|---|
+| `booking_at` | ISO datetime — when the visit starts |
+| `booking_kind` | `multi_unit_demo` \| `single_machine_demo` \| `job` \| `private` — the rung of the booking priority ladder (multi-unit demo > single machine > 1M+ job > 300k+ job > private). The money rungs are derived from the deal value or the lead estimate; the demo rungs cannot be, hence this field |
+
+```bash
+curl -X POST $CRM/api/leads/12/interactions \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "outcome": "meeting_booked", "note": "Kedden 10-kor demó", "demo_with": "peter",
+        "booking_at": "2026-09-22T08:00:00Z", "booking_kind": "single_machine_demo" }'
+# → 201 { "ok": true, "interactionId": 92, "status": "demo_peter", "bookingTaskId": 41 }
+```
+
+The response gains `bookingTaskId` (the scheduled task). Overlapping bookings
+for one person are **flagged**, never auto-cancelled: the CRM tells a human
+which of the two is the lower-priority one and lets them move it.
+
 `script_variant` (optional) records which call-script A/B variant was used. It
 must be one of the tenant's keys (`tenants.settings.scriptVariants`, edited at
 `/leads/setup`) — an unknown key is a `400`, never a silent write, because the
@@ -299,7 +323,7 @@ interaction row, so re-wording or deleting a script never rewrites history.
 | `wrong_number` | logged only |
 | `not_interested`, `disqualified` | **requires `lost_reason`**; lead `outcome = lost`, `lost_reason` = that free text (the outcome key stays on the interaction row); leaves the board |
 | `callback_requested` | creates a `call` task due at `callback_at` (assigned to `assigned_to_id`), moves to `recall` |
-| `meeting_booked` | moves to `demo_aron` / `demo_peter` per `demo_with` (`aron|peter`) |
+| `meeting_booked` | moves to `demo_aron` / `demo_peter` per `demo_with` (`aron|peter`), **and now also requires `booking_at` + `booking_kind`** — see below |
 
 Any earlier open callback task for the lead is marked done (the call happened).
 A closed lead (`won`/`lost`) rejects with `400` — re-open it first via PATCH.
