@@ -59,4 +59,19 @@ describe("compareDriveCandidates — the /drive priority ladder", () => {
     const tierA = lead({ tier: "A" });
     expect(order([future, tierA])[0]).toBe(tierA);
   });
+
+  it("equal dueAt among owed callbacks keeps a stable order", () => {
+    const same = at("2026-09-10T08:00:00Z");
+    const first = lead({ callbackDue: true, dueAt: same, tier: "A" });
+    const second = lead({ callbackDue: true, dueAt: same, tier: "B" });
+    expect(order([first, second])).toEqual([first, second]);
+    expect(order([second, first])).toEqual([second, first]);
+  });
+
+  it("a callbackDue candidate with a null dueAt does not throw", () => {
+    const broken = lead({ callbackDue: true, dueAt: null });
+    const tierA = lead({ tier: "A" });
+    expect(() => order([tierA, broken])).not.toThrow();
+    expect(order([tierA, broken])[0]).toBe(broken);
+  });
 });

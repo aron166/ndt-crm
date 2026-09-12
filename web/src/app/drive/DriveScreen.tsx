@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { logLeadCall } from "@/app/actions/leads";
-import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
 
@@ -12,7 +12,7 @@ import type { DriveLead } from "@/lib/leads/drive";
 // lib/leads/outcomes.ts; this screen only reveals the right field and relays
 // whatever error the server sends back.
 
-const NEEDS_FIELD = new Set<CallOutcomeKey>(["callback_requested", "meeting_booked", "not_interested", "disqualified"]);
+const NEEDS_FIELD = new Set<CallOutcomeKey>(CALL_OUTCOMES_NEEDING_DETAIL);
 const OUTCOME_TONE: Partial<Record<CallOutcomeKey, "red" | "green">> = {
   not_interested: "red",
   disqualified: "red",
@@ -39,7 +39,10 @@ function outcomeBtnStyle(tone: "red" | "green" | undefined): React.CSSProperties
 export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
   const router = useRouter();
   const [queue, setQueue] = useState(initialQueue);
-  const [index, setIndex] = useState(0);
+  // Which lead ids are done (skipped or saved) this session — an index would
+  // get scrambled every time a fresh queue reshuffles a `no_answer` lead back
+  // toward the top, replaying the same lead forever and undoing every skip.
+  const [done, setDone] = useState<Set<number>>(new Set());
   const [note, setNote] = useState("");
   const [selectedOutcome, setSelectedOutcome] = useState<CallOutcomeKey | null>(null);
   const [callbackAt, setCallbackAt] = useState("");
@@ -48,15 +51,19 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const submitting = useRef(false);
 
   // A fresh queue arrives (router.refresh() re-runs the server component and
-  // hands us a new array) — start over at the top of it.
+  // hands us a new array) — keep it, but never reset `done`: that's what was
+  // undoing every skip and re-serving `no_answer` leads on loop.
   useEffect(() => {
     setQueue(initialQueue);
-    setIndex(0);
   }, [initialQueue]);
 
-  const lead = queue[index];
+  const lead = queue.find((l) => !done.has(l.id));
+  // Count what is actually left in THIS queue — `done` can hold ids a refresh
+  // has already dropped from it.
+  const remaining = queue.filter((l) => !done.has(l.id)).length;
 
   function resetFields() {
     setNote(""); setSelectedOutcome(null); setCallbackAt("");
@@ -64,30 +71,42 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
   }
 
   function skip() {
+    if (!lead) return;
     resetFields();
-    setIndex((i) => i + 1);
+    setDone((d) => new Set(d).add(lead.id));
   }
 
   function submit(outcome: CallOutcomeKey) {
-    if (!lead) return;
+    if (!lead || submitting.current) return;
+    submitting.current = true;
     setError(null);
     startTransition(async () => {
-      const res = await logLeadCall(lead.id, {
-        outcome,
-        note,
-        callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
-        demoWith: outcome === "meeting_booked" ? demoWith : null,
-        lostReason: isLostCallOutcome(outcome) ? lostReason : null,
-      });
-      if ("error" in res) { setError(res.error); return; }
-      resetFields();
-      setIndex((i) => i + 1);
+      try {
+        const res = await logLeadCall(lead.id, {
+          outcome,
+          note,
+          callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
+          demoWith: outcome === "meeting_booked" ? demoWith : null,
+          lostReason: isLostCallOutcome(outcome) ? lostReason : null,
+        });
+        if ("error" in res) { setError(res.error); return; }
+        resetFields();
+        setDone((d) => new Set(d).add(lead.id));
+      } catch {
+        setError("Mentés sikertelen — próbáld újra");
+      } finally {
+        submitting.current = false;
+      }
     });
   }
 
   function tapOutcome(key: CallOutcomeKey) {
     setError(null);
-    if (NEEDS_FIELD.has(key)) {
+    // Every outcome needs a non-empty note server-side (callOutcomeSchema) —
+    // no_answer/wrong_number have no other field, so without a note typed
+    // already they must still stop at the confirm step instead of submitting
+    // an outcome that is guaranteed to fail.
+    if (NEEDS_FIELD.has(key) || note.trim() === "") {
       setSelectedOutcome(key);
     } else {
       submit(key);
@@ -115,7 +134,7 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px 16px 32px", minHeight: "100dvh", display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, color: "var(--fg-mute)" }}>
-        <span>{index + 1} / {queue.length}</span>
+        <span>{remaining} / {queue.length}</span>
         <button onClick={skip} disabled={pending} style={{ background: "none", border: "none", color: "var(--fg-mute)", fontSize: 13, padding: 4, cursor: "pointer" }}>
           Kihagyom
         </button>
@@ -141,7 +160,7 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
 
       {lead.phone ? (
         <a
-          href={`tel:${lead.phone}`}
+          href={`tel:${lead.phone.replace(/\s+/g, "")}`}
           style={{
             display: "block", width: "100%", textAlign: "center", boxSizing: "border-box",
             padding: "18px 16px", fontSize: 22, fontWeight: 700, borderRadius: 12,
@@ -168,7 +187,7 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
               </div>
             )}
           </div>
-          {(contextLines.length > 1 || (lead.lastNote && contextLines.length > 0)) && (
+          {(contextLines.length > 0 || lead.lastNote) && (
             <button onClick={() => setExpanded((e) => !e)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 12, padding: "6px 0 0", cursor: "pointer" }}>
               {expanded ? "kevesebb" : "több"}
             </button>
@@ -196,8 +215,11 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
         ))}
       </div>
 
-      {selectedOutcome && NEEDS_FIELD.has(selectedOutcome) && (
+      {selectedOutcome && (NEEDS_FIELD.has(selectedOutcome) || note.trim() === "") && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {note.trim() === "" && (
+            <p style={{ margin: 0, fontSize: 13, color: "var(--coral)" }}>A jegyzet kötelező</p>
+          )}
           {selectedOutcome === "callback_requested" && (
             <input type="datetime-local" style={inputStyle} value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} />
           )}
@@ -220,7 +242,7 @@ export function DriveScreen({ initialQueue }: { initialQueue: DriveLead[] }) {
               placeholder="Miért veszett el? (kötelező)"
             />
           )}
-          <button disabled={pending} onClick={() => submit(selectedOutcome)} style={outcomeBtnStyle("green")}>
+          <button disabled={pending || note.trim() === ""} onClick={() => submit(selectedOutcome)} style={outcomeBtnStyle("green")}>
             {pending ? "Mentés…" : "Mentés"}
           </button>
           <button
