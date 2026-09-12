@@ -48,6 +48,7 @@ model Tenant {
   automationEmailSends   AutomationEmailSend[]
   campaigns              Campaign[]
   contentItems           ContentItem[]
+  emailDrafts            EmailDraft[]
   contentAssets          ContentAsset[]
   companyAttributes      CompanyAttribute[]
   quotes                 Quote[]
@@ -101,6 +102,7 @@ model Person {
   conversations Conversation[]
   appEvents     AppEvent[]
   quotes        Quote[]
+  emailDrafts   EmailDraft[]
 
   @@map("persons")
 }
@@ -179,6 +181,7 @@ model Company {
   conversations Conversation[]
   appEvents     AppEvent[]
   attributes    CompanyAttribute[]
+  emailDrafts   EmailDraft[]
   quotes        Quote[]
 
   @@unique([tenantId, vatNumber])
@@ -255,6 +258,7 @@ model User {
   loggedInteractions Interaction[]
   assignedLeads      Lead[]        @relation("LeadAssignee")
   assignedDeals      Deal[]        @relation("DealAssignee")
+  emailDrafts        EmailDraft[]
 
   @@map("users")
 }
@@ -302,13 +306,13 @@ model Lead {
   campaign        String?
   createdAt       DateTime  @default(now()) @map("created_at")
 
-  tenant        Tenant   @relation(fields: [tenantId], references: [id])
-  company       Company? @relation(fields: [companyId], references: [id])
-  contact       Contact? @relation(fields: [contactId], references: [id])
-  assignedTo    User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
-  convertedDeal Deal?    @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  company       Company?           @relation(fields: [companyId], references: [id])
+  contact       Contact?           @relation(fields: [contactId], references: [id])
+  assignedTo    User?              @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  convertedDeal Deal?              @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
   interactions  Interaction[]
-  tasks         Task[]   @relation("TaskLead")
+  tasks         Task[]             @relation("TaskLead")
   firings       AutomationFiring[]
   quotes        Quote[]
 
@@ -490,7 +494,7 @@ model Task {
   companyId        Int?      @map("company_id")
   dealId           Int?      @map("deal_id")
   personId         Int?      @map("person_id")
-  leadId           Int?      @map("lead_id")          // the lead this task serves (e.g. a callback)
+  leadId           Int?      @map("lead_id") // the lead this task serves (e.g. a callback)
   parentTaskId     Int?      @map("parent_task_id")
   title            String
   description      String?
@@ -916,7 +920,7 @@ model AutomationFiring {
   tenantId       Int      @map("tenant_id")
   ruleId         Int      @map("rule_id")
   dealId         Int?     @map("deal_id")
-  leadId         Int?     @map("lead_id")            // lead_idle firings: once per (rule, lead)
+  leadId         Int?     @map("lead_id") // lead_idle firings: once per (rule, lead)
   stageEnteredAt DateTime @map("stage_entered_at")
   firedAt        DateTime @default(now()) @map("fired_at")
 
@@ -1047,4 +1051,54 @@ model ContentAsset {
   @@index([tenantId])
   @@index([contentItemId])
   @@map("content_assets")
+}
+
+// ─────────────────────────────────────────────
+// Outreach queue — personalized cold email, drafted by an external agent skill
+// (`cold-email-batch`), APPROVED BY A HUMAN in /outreach, then sent via the
+// tenant's existing Resend integration. Nothing here sends itself: `draft` is
+// the only state the API can create, and only a person moves a row past it.
+//
+// One row = one touch of the 4-touch sequence for one company in one campaign,
+// which is exactly what @@unique([tenantId, companyId, campaign, step]) pins —
+// so a re-run of the drafting skill UPDATES its draft instead of queueing a
+// second copy of the same email. Rows already sent are never overwritten.
+//
+// `campaign` is a free string, deliberately NOT a FK to `campaigns`: that table
+// is the marketing content queue and an outreach batch does not need a row in
+// it. Promote it to a relation if the two ever have to share reporting.
+
+model EmailDraft {
+  id                Int       @id @default(autoincrement())
+  tenantId          Int       @map("tenant_id")
+  companyId         Int       @map("company_id")
+  personId          Int?      @map("person_id") // the human it is addressed to
+  campaign          String
+  step              Int // 1-4, the touch in the sequence
+  subject           String
+  body              String
+  toEmail           String?   @map("to_email") // resolved at draft time; re-resolved on send
+  // draft → approved → sent | failed ; `replied` is set by the reply-intake
+  // contract (addendum item 3) when an answer comes back on the thread.
+  status            String    @default("draft")
+  // Stable handle for the email thread, so a reply can find its way back to
+  // this row. Written on the first successful send of a campaign+company.
+  threadKey         String?   @map("thread_key")
+  providerMessageId String?   @map("provider_message_id")
+  lastError         String?   @map("last_error")
+  sentAt            DateTime? @map("sent_at")
+  createdById       Int?      @map("created_by")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  // Restrict, not Cascade: a sent draft records an email that left the building.
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  person    Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, companyId, campaign, step])
+  @@index([tenantId, campaign, status])
+  @@index([tenantId, threadKey])
+  @@map("email_drafts")
 }

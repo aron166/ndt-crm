@@ -262,6 +262,72 @@ see above). Answers are ≤2000 chars each. Every write recomputes `tier`.
 The default list is the locked model's `gate` + Branch A seven + Branch B three,
 with the spec's draft Hungarian marked ⚠️ until Áron signs off on the wording.
 
+## Outreach
+
+The outreach queue is a drafting worklist: a drafting agent skill pulls undrafted
+companies for a campaign, writes personalized emails, and posts them back as
+`draft`-status rows for a human to review at `/outreach`. **Nothing here ever
+sends an email** — approving and sending are human actions taken in that UI
+(`Küldés`, via the tenant's Resend integration); this API can only create or
+update rows already sitting in `draft` status.
+
+### `GET /api/outreach/targets` — undrafted companies for a campaign
+
+```bash
+curl "$CRM/api/outreach/targets?campaign=BirdsView%20Q4&limit=50" \
+  -H "Authorization: Bearer $KEY"
+# → 200 { "ok": true, "items": [...], "campaign": "BirdsView Q4", "limit": 50, "total_remaining": 214 }
+```
+
+Returns companies with no `email_drafts` row yet for that campaign (any step),
+excluding soft-deleted companies, "F.A." (under liquidation), and anything
+outside the call cockpit's callable pipeline statuses — so status `0` (KUKA) and
+`4` (Nem érdekelt), the people who already said no, are never handed to the
+drafting agent. Each item carries the company facts
+(`id, name, website, city, county, zipCode, warmth, teaorCode, teaorDescription,
+scopeOfActivity, notes, ndtMethods, lat, lng`) plus up to 3 current `contacts`
+(`{ personId, name, role, email, phone }`). `total_remaining` is the full
+undrafted count, not capped by `limit`. `campaign` is required; a missing or
+invalid `campaign`/`limit` (1-200, default 50) is a `400 { error, details }`.
+
+> ⚠️ This does **not** return an enrichment dossier or a lead-scoring tier: the
+> addendum's "dossier + tier" ask needs `companies.enrichment` /
+> `closeness_score` (addendum item 2 — not built yet) and `tier`, which today
+> only exists on `leads`, not `companies`. This endpoint returns only the
+> company facts that exist right now; wire in the dossier/tier once addendum
+> item 2 lands.
+
+### `POST /api/outreach/drafts` — bulk upsert drafts
+
+```bash
+curl -X POST $CRM/api/outreach/drafts \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "drafts": [ { "companyId": 42, "campaign": "BirdsView Q4", "step": 1, "subject": "…", "body": "…", "toEmail": "info@example.hu" } ] }'
+# → 200 { "ok": true, "created": 1, "updated": 0, "skipped": [] }
+```
+
+Upserts on `(companyId, campaign, step)` within the key's tenant, up to 200 items
+per call. A new row is created in `status: "draft"`. An existing row is updated
+only while it is still editable (`draft`/`failed`); one already `approved`,
+`sent`, or `replied` is left untouched and reported back in `skipped` with
+reason `"already_sent"` — a re-run of the drafting skill must never clobber
+something a human already approved or that already went out. A `companyId`
+outside the key's tenant is skipped as `"unknown_company"`, never a 500 and
+never a cross-tenant write; a per-item failure is skipped as `"error"` rather
+than failing the whole batch.
+
+`personId` is accepted but **verified, not trusted**: it is kept only when that
+person holds a `Contact` at that company in the key's tenant, and silently
+dropped to `null` otherwise. Without that check an app key could address a draft
+at any person row in the database and the send would resolve their email.
+
+Sending is a separate, human act in `/outreach`, and it refuses to run at all
+until `tenants.settings.outreachFooter` (the consent/unsubscribe line) is set.
+A row is claimed into a `sending` status by one conditional update before Resend
+is called, so a double-click or a retried request cannot put the same email in
+front of the same company twice; a row left in `sending` means the process died
+mid-send and is deliberately **not** re-sendable.
+
 ## Ecosystem hub
 
 ### `POST /api/events` — append an app event
