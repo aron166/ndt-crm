@@ -8,33 +8,39 @@ description: Finds Gmail replies to cold-outreach drafts and turns each one into
 Turns Gmail replies to a cold-outreach campaign into leads in the CRM, via `POST /api/leads` with
 `channel: "cold_email"` and `thread_key`.
 
-## Idempotency — how it actually works
+## The two keys (read this first)
 
-`POST /api/leads` accepts `thread_key` (`docs/api.md`, "`thread_key` — cold-email reply intake").
-It is the string `threadKeyFor(campaign, companyId)` stamped on the draft when it was sent — from
-the documented example (campaign `"BirdsView Q4"`, `thread_key: "birdsview-q4:42"` for company
-42), the shape is `<slugified-campaign>:<companyId>`, but that's read off one example, not a
-formal spec.
+`POST /api/leads` takes **two** keys for a reply, and they are not the same thing
+(`docs/api.md` → "`thread_key` + `draft_key` — cold-email reply intake"):
 
-⚠️ **Do not guess it.** A key you invent is not harmless: thread keys are unique per tenant, so a
-wrong one can collide with a DIFFERENT company's thread — and then the CRM either hands you back
-that company's existing lead (`deduped: true`, your reply silently discarded) or attaches this
-reply to their company and flips THEIR draft to `replied`. Read the key off the draft you are
-answering. If you cannot determine it, post without it — see below.
+| field | what it is | where you get it |
+|---|---|---|
+| `thread_key` | the **Gmail thread id** — one real conversation | the thread you are reading |
+| `draft_key` | `email_drafts.thread_key` — the outreach we sent, shared by all 4 touches | the draft this reply answers |
 
-Posting the same `thread_key` twice is safe **on the server side, no local bookkeeping needed**:
-- If a lead with that `thread_key` already exists: **nothing is written**, you get back
-  `200 { ok, leadId, deduped: true, companyId }` with the *original* lead. No second lead, no
-  second intro email, no second automation firing. Run this skill as often as you like.
-- The matching draft (the one this `thread_key` names, if it's still `sent`) **flips to
-  `replied`** automatically — you don't call anything else for that.
-- A `thread_key` that matches no draft is still accepted: the lead is created via the ordinary
-  name-dedupe path and the response omits `draftId`. Nothing errors.
+`thread_key` is the idempotency key. `draft_key` only tells the CRM which outreach
+this answers. They were once one field, and that was a bug: a prospect who said
+"not now" to touch 1 and "send the quote" three weeks later had the second reply
+silently swallowed as a duplicate, because the shared key made it look like the
+same thread.
 
-So: always send `thread_key` when you can determine it. If you genuinely can't (e.g. you can't
-tell which company/campaign a reply belongs to), it's fine to post without it — you just fall back
-to the ordinary (non-idempotent) `POST /api/leads` behavior for that one lead, so don't post the
-same reply twice by hand.
+**Send both.** A `thread_key` is honoured **only** when `channel` is
+`"cold_email"` **and** `draft_key` matches a real draft — otherwise it is
+dropped and you get an ordinary lead with no idempotency. That gate exists
+because this endpoint is CORS-open and draft keys are guessable.
+
+### Re-running is safe
+
+- Same `thread_key` already seen → **`200 { ok, leadId, deduped: true, companyId }`**,
+  nothing written: no second lead, no second intro email, no second automation.
+  This is a success, not an error — count it as "already processed" and move on.
+- Both keys are lowercased server-side, so case variants are the same key.
+- Posting a reply also flips the answered draft to `replied` **and cancels the
+  still-queued touches** for that company and campaign, so nobody sends cold
+  touch 3 to someone who already answered. You do not call anything else.
+
+No local ledger, no bookkeeping of your own. Post every reply you find; the CRM
+decides what is new.
 
 ## Setup (once)
 
@@ -55,19 +61,27 @@ tell you the subject pattern to search, or you're working from your own memory o
 For each Gmail thread that has a reply (more than just the original outbound message), read the
 latest reply: sender name/email, and body text.
 
-## Step 2 — work out the thread_key and the fields
+## Step 2 — work out the two keys and the fields
 
+- `thread_key` — **the Gmail thread id, verbatim.** Don't construct it, don't slugify anything;
+  it is whatever the mail tool calls this conversation. One conversation, one value, forever.
 - `campaign` — the campaign name you're running intake for.
-- `companyId` — the company this reply's thread belongs to. Recover it from what you know: the
-  dossier/target list `cold-email-batch` built for this campaign (name → companyId), or by
-  matching the reply's sender domain/company name against `/api/outreach/targets` for this
-  campaign if you still have it, or the zoho `Accounts_2026_03_31.csv`
-  (`/home/aron166/Projects/zoho_data/Accounts_2026_03_31.csv`) as a last resort for the name.
-- `thread_key` — `<slugified campaign>:<companyId>` per above.
+- `companyId` — the company this outreach went to. Recover it from the dossier/target list
+  `cold-email-batch` built for this campaign (name → companyId), or by matching the sender's
+  domain/company name against `/api/outreach/targets` for this campaign if you still have it,
+  or the zoho `Accounts_2026_03_31.csv`
+  (`/home/aron166/Projects/zoho_data/Accounts_2026_03_31.csv`) as a last resort.
+- `draft_key` — `<slugified campaign>:<companyId>`, e.g. `birdsview-q4:42`. Slugify = lowercase,
+  every run of non-alphanumerics → `-`.
+
+  ⚠️ **Do not guess the companyId.** A `draft_key` you invent can match a DIFFERENT company's
+  outreach, and then the CRM takes the company from *their* draft, attaches this reply to them
+  and cancels *their* remaining touches. If you cannot establish the company, omit `draft_key`
+  (and with it the idempotency — post once, and tell the operator you did) rather than guess.
 - From the reply body/sender:
   - `contact_name`, `contact_email` (the reply's sender), `contact_phone` (only if it's actually
     in the signature/body — don't guess).
-  - `company_name` — required by `POST /api/leads`; if a `thread_key` resolves to a known draft
+  - `company_name` — required by `POST /api/leads`; if a `draft_key` resolves to a known draft
     you likely already know this from the dossier.
   - Intent, read from the reply text, per the addendum's routing:
     - **warm** (wants to talk now, gives availability) → route to a call.
@@ -90,8 +104,11 @@ curl -X POST $CRM/api/leads \
     "message": "<reply text or summary, plus your warm/lukewarm/not-now read>",
     "channel": "cold_email",
     "campaign": "<campaign name>",
-    "thread_key": "<slugified-campaign>:<companyId>"
+    "thread_key": "<gmail thread id>",
+    "draft_key": "<campaign slug>:<companyId>"
   }'
+# new reply   → 201 { "ok": true, "leadId": …, "tier": …, "companyId": …, "personId": …, "draftId": 5 }
+# seen before → 200 { "ok": true, "leadId": …, "deduped": true, "companyId": … }
 ```
 Check the response:
 - `201 { leadId, tier, companyId, personId, draftId }` — new lead, draft (if `draftId` present)
