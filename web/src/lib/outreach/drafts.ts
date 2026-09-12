@@ -11,7 +11,12 @@
 
 import { z } from "zod";
 
-export const DRAFT_STATUSES = ["draft", "approved", "sent", "failed", "replied"] as const;
+// `sending` is a CLAIM, not a user-visible stage: sendDraft moves the row into
+// it in one conditional UPDATE before it talks to Resend, so a double-click, a
+// second tab, or a retried server-action POST finds nothing left to claim. A row
+// stuck in `sending` means the process died mid-send — deliberately NOT
+// re-sendable, because we cannot know whether the mail went out. (Vanda, #88.)
+export const DRAFT_STATUSES = ["draft", "approved", "sending", "sent", "failed", "replied"] as const;
 export type DraftStatus = (typeof DRAFT_STATUSES)[number];
 
 export function isDraftStatus(v: unknown): v is DraftStatus {
@@ -38,6 +43,9 @@ export function canApprove(status: DraftStatus): boolean {
 export function canSend(status: DraftStatus): boolean {
   return status === "approved" || status === "failed";
 }
+
+/** The statuses sendDraft is allowed to claim. Keep in step with canSend(). */
+export const CLAIMABLE_STATUSES: DraftStatus[] = DRAFT_STATUSES.filter((s) => canSend(s));
 
 /**
  * Deterministic thread key for campaign+company, e.g. ("BirdsView Q4", 12) ->

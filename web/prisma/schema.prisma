@@ -1092,7 +1092,8 @@ model EmailDraft {
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   tenant    Tenant  @relation(fields: [tenantId], references: [id])
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade: a sent draft records an email that left the building.
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
   person    Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
   createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 

@@ -251,8 +251,10 @@ curl "$CRM/api/outreach/targets?campaign=BirdsView%20Q4&limit=50" \
 ```
 
 Returns companies with no `email_drafts` row yet for that campaign (any step),
-excluding soft-deleted companies and "F.A." (under liquidation) — the same
-guardrail the call cockpit uses. Each item carries the company facts
+excluding soft-deleted companies, "F.A." (under liquidation), and anything
+outside the call cockpit's callable pipeline statuses — so status `0` (KUKA) and
+`4` (Nem érdekelt), the people who already said no, are never handed to the
+drafting agent. Each item carries the company facts
 (`id, name, website, city, county, zipCode, warmth, teaorCode, teaorDescription,
 scopeOfActivity, notes, ndtMethods, lat, lng`) plus up to 3 current `contacts`
 (`{ personId, name, role, email, phone }`). `total_remaining` is the full
@@ -284,6 +286,18 @@ something a human already approved or that already went out. A `companyId`
 outside the key's tenant is skipped as `"unknown_company"`, never a 500 and
 never a cross-tenant write; a per-item failure is skipped as `"error"` rather
 than failing the whole batch.
+
+`personId` is accepted but **verified, not trusted**: it is kept only when that
+person holds a `Contact` at that company in the key's tenant, and silently
+dropped to `null` otherwise. Without that check an app key could address a draft
+at any person row in the database and the send would resolve their email.
+
+Sending is a separate, human act in `/outreach`, and it refuses to run at all
+until `tenants.settings.outreachFooter` (the consent/unsubscribe line) is set.
+A row is claimed into a `sending` status by one conditional update before Resend
+is called, so a double-click or a retried request cannot put the same email in
+front of the same company twice; a row left in `sending` means the process died
+mid-send and is deliberately **not** re-sendable.
 
 ## Ecosystem hub
 

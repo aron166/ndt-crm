@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
 
 // Outreach targeting: which companies in this tenant still need a first (or
 // next) draft written for a given campaign. Addendum item 1 — the drafting
@@ -53,9 +54,14 @@ export async function GET(request: Request) {
   if (!q.success) return json({ error: "Validation failed", details: q.error.flatten() }, 400);
   const { campaign, limit } = q.data;
 
+  // Same do-not-contact guard the call cockpit uses (CALLABLE_STATUSES in
+  // lib/outreach/queue.ts): status 0 (KUKA) and 4 (Nem érdekelt) are people who
+  // already said no. Filtering only on deletedAt + "F.A." would have handed the
+  // drafting agent exactly those companies to cold-email. (Vanda, #88.)
   const where = {
     tenantId: key.tenantId,
     deletedAt: null,
+    pipelineStatus: { in: [...CALLABLE_STATUSES] },
     NOT: [
       { name: { contains: "F.A." } },
       { emailDrafts: { some: { tenantId: key.tenantId, campaign } } },

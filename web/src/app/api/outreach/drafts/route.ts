@@ -59,6 +59,22 @@ export async function POST(request: Request) {
   });
   const ownedIds = new Set(ownedCompanies.map((c) => c.id));
 
+  // `personId` arrives from the agent payload and is NOT proven to belong here
+  // just because the company does. Without this check an app key could address
+  // a draft at any person row in the database — and sendDraft would resolve
+  // their email. Only a person with a Contact at that company survives.
+  // (Vanda, #88.)
+  const wantedPersonIds = [...new Set(items.map((d) => d.personId).filter((p): p is number => typeof p === "number"))];
+  const validContacts = wantedPersonIds.length
+    ? await db.contact.findMany({
+        where: { tenantId: key.tenantId, personId: { in: wantedPersonIds }, companyId: { in: [...ownedIds] } },
+        select: { personId: true, companyId: true },
+      })
+    : [];
+  const validPairs = new Set(validContacts.map((c) => `${c.personId}:${c.companyId}`));
+  const personFor = (item: { personId?: number | null; companyId: number }) =>
+    item.personId != null && validPairs.has(`${item.personId}:${item.companyId}`) ? item.personId : null;
+
   let created = 0;
   let updated = 0;
   const skipped: SkippedItem[] = [];
@@ -91,7 +107,7 @@ export async function POST(request: Request) {
           data: {
             tenantId: key.tenantId,
             companyId: item.companyId,
-            personId: item.personId ?? null,
+            personId: personFor(item),
             campaign: item.campaign,
             step: item.step,
             subject: item.subject,
@@ -127,7 +143,7 @@ export async function POST(request: Request) {
       const row = await db.emailDraft.update({
         where: { id: existing.id },
         data: {
-          personId: item.personId ?? null,
+          personId: personFor(item),
           subject: item.subject,
           body: item.body,
           toEmail: item.toEmail ?? null,
