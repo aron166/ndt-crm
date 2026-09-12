@@ -11,7 +11,7 @@ import { getScriptStats } from "@/lib/leads/script-stats";
 const TENANT_ID = 1;
 
 export default async function LeadStatusSetupPage() {
-  const [statuses, questions, introUrl, scriptVariants, scriptStats] = await Promise.all([
+  const [statuses, questions, introUrl, scriptVariants] = await Promise.all([
     db.leadStatus.findMany({
       where: { tenantId: TENANT_ID },
       orderBy: { position: "asc" },
@@ -19,8 +19,10 @@ export default async function LeadStatusSetupPage() {
     getQualificationQuestions(TENANT_ID),
     getIntroMaterialUrl(TENANT_ID),
     getScriptVariants(TENANT_ID),
-    getScriptStats(TENANT_ID),
   ]);
+  // getScriptStats takes the already-fetched variants instead of reading the
+  // tenant a second time (see lib/leads/script-stats.ts).
+  const scriptStats = await getScriptStats(TENANT_ID, scriptVariants);
 
   return (
     <div className="mount">

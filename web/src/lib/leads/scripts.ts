@@ -74,11 +74,16 @@ export function slugifyScriptKey(raw: string): string {
 
 /**
  * Parse the /leads/setup editor. One block per variant, blocks separated by a
- * line of `---`; the block's FIRST line is `key|label` (or just a label, which
- * is slugified into the key), the rest is the script body.
+ * line of `---`; the block's FIRST line MUST be `key|label` (explicit key,
+ * required — see below), the rest is the script body.
  *
  * The key is explicit on purpose: it is what lands on every interaction row, so
- * re-wording a label must not silently start a new statistics bucket.
+ * re-wording a label must not silently start a new statistics bucket. Requiring
+ * `|` on every head line also catches the case where a `---` line INSIDE a
+ * script body would otherwise silently split it into a phantom variant — a body
+ * line never contains `|<rest>` that looks like a key by accident as easily as
+ * it collides with a bare `---`, so this turns that mistake into an error
+ * instead of a silent data-losing split.
  */
 export function parseScriptBlocks(text: string): ScriptVariant[] | { error: string } {
   const out: ScriptVariant[] = [];
@@ -91,8 +96,15 @@ export function parseScriptBlocks(text: string): ScriptVariant[] | { error: stri
 
     const head = lines[headIndex].trim();
     const sep = head.indexOf("|");
-    const label = (sep >= 0 ? head.slice(sep + 1) : head).trim();
-    const key = sep >= 0 ? slugifyScriptKey(head.slice(0, sep)) : slugifyScriptKey(label);
+    if (sep < 0) {
+      return {
+        error: `Hiányzik az "azonosító|név" az alábbi sorból: "${head}". `
+          + `Ha ez egy szkript szövegén belüli rész, valószínűleg egy önálló "---" sor `
+          + `véletlenül kettévágta a szkriptet — a "---" csak szkriptek KÖZÖTT megengedett.`,
+      };
+    }
+    const label = head.slice(sep + 1).trim();
+    const key = slugifyScriptKey(head.slice(0, sep));
     const body = lines.slice(headIndex + 1).join("\n").trim();
 
     if (!label) return { error: "Üres szkriptnév" };

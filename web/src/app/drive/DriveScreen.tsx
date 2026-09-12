@@ -53,11 +53,8 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const submitting = useRef(false);
-  // Same A/B default rule as the kanban's CallOutcomeModal.
-  const defaultScriptKey = scriptVariants.length > 1 ? scriptVariants[0].key : "";
-  const [scriptKey, setScriptKey] = useState(defaultScriptKey);
+  const [scriptKey, setScriptKey] = useState("");
   const [scriptOpen, setScriptOpen] = useState(false);
-  const script = scriptVariants.find((v) => v.key === scriptKey) ?? null;
 
   // A fresh queue arrives (router.refresh() re-runs the server component and
   // hands us a new array) — keep it, but never reset `done`: that's what was
@@ -70,11 +67,28 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   // Count what is actually left in THIS queue — `done` can hold ids a refresh
   // has already dropped from it.
   const remaining = queue.filter((l) => !done.has(l.id)).length;
+  // Same A/B default rule as the kanban's CallOutcomeModal: deterministic on
+  // the lead id, not random — a re-render must not switch the script mid-call.
+  const defaultScriptKey = lead ? scriptVariants[lead.id % scriptVariants.length]?.key ?? "" : "";
+  // Recompute for the NEW lead once the queue advances — resetFields() runs
+  // before this re-render sees the new `lead`, so it can't pick the right
+  // default itself. Adjusting state during render (React's documented pattern
+  // for this) instead of an effect: correct on the SAME render as the new
+  // lead, no extra commit.
+  const [trackedLeadId, setTrackedLeadId] = useState(lead?.id);
+  if (lead?.id !== trackedLeadId) {
+    setTrackedLeadId(lead?.id);
+    setScriptKey(defaultScriptKey);
+  }
+  const script = scriptVariants.find((v) => v.key === scriptKey) ?? null;
 
   function resetFields() {
     setNote(""); setSelectedOutcome(null); setCallbackAt("");
     setDemoWith("aron"); setLostReason(""); setExpanded(false); setError(null);
-    setScriptKey(defaultScriptKey); setScriptOpen(false);
+    // scriptKey is NOT reset here: `lead` still points at the OLD lead in this
+    // closure, so defaultScriptKey would be the old lead's default. The
+    // useEffect above recomputes it once the new `lead` is rendered.
+    setScriptOpen(false);
   }
 
   function skip() {

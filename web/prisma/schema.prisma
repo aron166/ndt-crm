@@ -82,13 +82,13 @@ model SavedView {
 // Person = a human being. Persists across employers.
 // Do NOT collapse this into Contact.
 model Person {
-  id          Int     @id @default(autoincrement())
-  tenantId    Int     @map("tenant_id")
-  firstName   String  @map("first_name")
-  lastName    String  @map("last_name")
+  id          Int       @id @default(autoincrement())
+  tenantId    Int       @map("tenant_id")
+  firstName   String    @map("first_name")
+  lastName    String    @map("last_name")
   email       String?
   phone       String?
-  linkedinUrl String? @map("linkedin_url")
+  linkedinUrl String?   @map("linkedin_url")
   notes       String?
 
   // ── Enrichment dossier (written by the research skill via PATCH /api/persons/:id) ──
@@ -96,9 +96,9 @@ model Person {
   closenessScore      Int?      @map("closeness_score") // 0-100, CRM-computed, never written from outside
   enrichmentUpdatedAt DateTime? @map("enrichment_updated_at")
 
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   contacts      Contact[] // all company relationships this person has had
@@ -174,13 +174,13 @@ model Company {
   customFields         Json?     @map("custom_fields")
 
   // ── Enrichment dossier (written by the research skill via PATCH /api/companies/:id) ──
-  enrichment          Json?     @map("enrichment") // see lib/enrichment/dossier.ts for the shape
-  closenessScore      Int?      @map("closeness_score") // 0-100, CRM-computed, never written from outside
-  enrichmentUpdatedAt DateTime? @map("enrichment_updated_at")
+  enrichment           Json?     @map("enrichment") // see lib/enrichment/dossier.ts for the shape
+  closenessScore       Int?      @map("closeness_score") // 0-100, CRM-computed, never written from outside
+  enrichmentUpdatedAt  DateTime? @map("enrichment_updated_at")
 
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   tenant        Tenant             @relation(fields: [tenantId], references: [id])
   contacts      Contact[]
@@ -643,21 +643,21 @@ model QuoteLineItem {
 // ─────────────────────────────────────────────
 
 model Interaction {
-  id            Int      @id @default(autoincrement())
-  tenantId      Int      @map("tenant_id")
-  companyId     Int?     @map("company_id")
-  personId      Int?     @map("person_id")
-  leadId        Int?     @map("lead_id") // the lead this touch belongs to (exact per-lead history)
-  userId        Int?     @map("user_id") // who logged this
-  type          String? // call, email, meeting, note, site_visit
-  direction     String? // inbound, outbound
-  notes         String?
-  outcome       String? // maps to 0-8 status codes
+  id         Int      @id @default(autoincrement())
+  tenantId   Int      @map("tenant_id")
+  companyId  Int?     @map("company_id")
+  personId   Int?     @map("person_id")
+  leadId     Int?     @map("lead_id") // the lead this touch belongs to (exact per-lead history)
+  userId     Int?     @map("user_id") // who logged this
+  type       String? // call, email, meeting, note, site_visit
+  direction  String? // inbound, outbound
+  notes      String?
+  outcome    String? // maps to 0-8 status codes
   // Which call-script variant this call used — the key only; the definitions
   // live in tenants.settings.scriptVariants (lib/leads/scripts.ts).
   scriptVariant String?  @map("script_variant")
-  occurredAt    DateTime @default(now()) @map("occurred_at")
-  createdAt     DateTime @default(now()) @map("created_at")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id])
   company Company? @relation(fields: [companyId], references: [id])

@@ -85,7 +85,7 @@ export const callOutcomeSchema = z
      * same way a qualification slug is: an unknown key is a 400, never a silent
      * write into a statistics bucket nobody is looking at.
      */
-    scriptVariant: z.string().trim().max(SCRIPT_KEY_MAX).optional(),
+    scriptVariant: z.string().trim().min(1).max(SCRIPT_KEY_MAX).optional(),
   })
   .superRefine((d, ctx) => {
     if (d.outcome === "callback_requested") {

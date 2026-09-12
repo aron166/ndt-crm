@@ -10,6 +10,7 @@ import {
 } from "@/lib/leads/service";
 import type { LeadOutcome } from "@/lib/leads/outcomes";
 import { userLeadCtx } from "@/lib/actor";
+import { setTenantSettings } from "@/lib/tenant-settings";
 import { parseQuestionLines } from "@/lib/leads/qualification";
 import { parseScriptBlocks } from "@/lib/leads/scripts";
 import { getLeadStatuses } from "@/lib/leads/queries";
@@ -391,6 +392,12 @@ export async function saveLeadQualification(leadId: number, answers: Record<stri
  * intro-material link. Both live in tenants.settings, so they save together.
  */
 export async function saveQualificationQuestions(text: string, introUrl?: string) {
+  // Server actions are callable by id — the (app) layout's session redirect
+  // gates RENDERING, not this POST. Tenant config needs the same gate as every
+  // other lead mutation.
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+
   const parsed = parseQuestionLines(text);
   if ("error" in parsed) return parsed;
 
@@ -399,24 +406,11 @@ export async function saveQualificationQuestions(text: string, introUrl?: string
   if (url && !/^https:\/\//i.test(url)) return { error: "A termékismertető linkje https:// címmel kezdődjön" };
   if (url.length > 500) return { error: "A link túl hosszú" };
 
-  const before = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  const settings = {
-    ...((before?.settings ?? {}) as Record<string, unknown>),
+  const before = await setTenantSettings(TENANT_ID, {
     qualificationQuestions: parsed,
     introMaterialUrl: url || null,
-  };
-  await db.tenant.update({
-    where: { id: TENANT_ID },
-    // Prisma's InputJsonValue rejects an interface without an index signature;
-    // the value IS plain JSON, so the double cast is the whole story.
-    data: { settings: settings as unknown as Prisma.InputJsonValue },
   });
-  const beforeSettings = (before?.settings as Record<string, unknown> | null) ?? {};
-  await audit("tenant", TENANT_ID, "update",
-    {
-      qualificationQuestions: beforeSettings.qualificationQuestions ?? null,
-      introMaterialUrl: beforeSettings.introMaterialUrl ?? null,
-    },
+  await audit("tenant", TENANT_ID, "update", before,
     { qualificationQuestions: parsed, introMaterialUrl: url || null });
 
   revalidatePath("/leads/setup");
@@ -426,26 +420,20 @@ export async function saveQualificationQuestions(text: string, introUrl?: string
 
 /** Replace the tenant's call-script A/B variants (block format, see scripts.ts). */
 export async function saveScriptVariants(text: string) {
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
+
   const parsed = parseScriptBlocks(text);
   if ("error" in parsed) return parsed;
 
-  const before = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  const settings = {
-    ...((before?.settings ?? {}) as Record<string, unknown>),
-    scriptVariants: parsed,
-  };
-  await db.tenant.update({
-    where: { id: TENANT_ID },
-    // Prisma's InputJsonValue rejects an interface without an index signature;
-    // the value IS plain JSON, so the double cast is the whole story.
-    data: { settings: settings as unknown as Prisma.InputJsonValue },
-  });
-  const beforeSettings = (before?.settings as Record<string, unknown> | null) ?? {};
-  await audit("tenant", TENANT_ID, "update",
-    { scriptVariants: beforeSettings.scriptVariants ?? null },
-    { scriptVariants: parsed });
+  const before = await setTenantSettings(TENANT_ID, { scriptVariants: parsed });
+  await audit("tenant", TENANT_ID, "update", before, { scriptVariants: parsed });
 
+  // The variants ride as a prop on every call surface — a deleted one must stop
+  // being offered, or the next call fails validation AFTER it was made.
   revalidatePath("/leads/setup");
+  revalidatePath("/leads");
+  revalidatePath("/drive");
   return { success: true };
 }
 

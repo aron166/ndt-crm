@@ -79,12 +79,15 @@ export function ScriptVariantsClient({
                         </td>
                       ))}
                       <td style={{ textAlign: "right", padding: "4px 8px" }}>
-                        {(row.demoRate * 100).toFixed(1)}%
+                        {row.reached < 10 ? "—" : `${(row.demoRate * 100).toFixed(1)}%`}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <p style={{ fontSize: 11, color: "var(--fg-mute)", marginTop: 4 }}>
+                A demó arány csak legalább 10 elért hívás után jelenik meg — kevesebb adatnál a szám nem mond semmit.
+              </p>
             </div>
           )}
         </div>

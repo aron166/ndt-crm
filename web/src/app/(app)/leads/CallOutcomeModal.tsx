@@ -37,9 +37,10 @@ export function CallOutcomeModal({
   const [lostReason, setLostReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  // A/B: default to the first variant when there's more than one so a test
-  // actually collects data; empty ("Nincs szkript") when the tenant has none.
-  const defaultScriptKey = scriptVariants.length > 1 ? scriptVariants[0].key : "";
+  // A/B: deterministic per-lead assignment (leadId % length), not random or
+  // "always A" — every variant needs data, and a re-render must not switch
+  // the script mid-call. Empty ("Nincs szkript") when the tenant has none.
+  const defaultScriptKey = scriptVariants[leadId % scriptVariants.length]?.key ?? "";
   const [scriptKey, setScriptKey] = useState(defaultScriptKey);
   const script = scriptVariants.find((v) => v.key === scriptKey) ?? null;
 

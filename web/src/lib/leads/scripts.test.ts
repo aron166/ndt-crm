@@ -21,9 +21,16 @@ describe("parseScriptBlocks", () => {
     expect(v[1].key).toBe("b");
   });
 
-  it("slugifies the key from the label when no explicit key is given", () => {
-    const v = ok(parseScriptBlocks("Rövid nyitás\nszöveg"));
-    expect(v[0].key).toBe("rovid_nyitas");
+  it("rejects a head line with no explicit key|label — a bare label is no longer accepted", () => {
+    const r = parseScriptBlocks("Rövid nyitás\nszöveg");
+    expect(r).toHaveProperty("error");
+  });
+
+  it("rejects a `---` line inside a script body instead of silently splitting it into a phantom variant", () => {
+    const r = parseScriptBlocks("a|A\nJó napot.\n---\nMásodik rész");
+    expect(r).toHaveProperty("error");
+    if (!("error" in r)) throw new Error("expected an error");
+    expect(r.error).toMatch(/---/);
   });
 
   it("keeps a body with blank lines intact", () => {
@@ -71,6 +78,11 @@ describe("scriptVariantsFromSettings", () => {
                        { scriptVariants: [{ key: "NAGY BETŰ", label: "A", body: "" }] }]) {
       expect(scriptVariantsFromSettings(bad)).toEqual(DEFAULT_SCRIPT_VARIANTS);
     }
+  });
+
+  it("falls back to the placeholders when more than SCRIPT_VARIANT_MAX variants are stored — the overflow is discarded, not silently truncated", () => {
+    const six = Array.from({ length: SCRIPT_VARIANT_MAX + 1 }, (_, i) => ({ key: `k${i}`, label: `N${i}`, body: "" }));
+    expect(scriptVariantsFromSettings({ scriptVariants: six })).toEqual(DEFAULT_SCRIPT_VARIANTS);
   });
 
   it("drops a duplicate key rather than merging two variants' stats", () => {
