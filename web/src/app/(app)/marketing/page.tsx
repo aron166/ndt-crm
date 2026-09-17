@@ -1,44 +1,57 @@
-import { db } from "@/lib/db";
-import { MarketingQueueClient } from "./MarketingQueueClient";
+import { getActor } from "@/lib/actor";
+import { getInbox, getFilterOptions } from "@/lib/content/queries";
+import { UI } from "@/lib/content/labels";
+import { MarketingTabs } from "./MarketingTabs";
+import { InboxClient } from "./InboxClient";
 
 const TENANT_ID = 1;
 
 export const dynamic = "force-dynamic";
 
-export default async function MarketingPage() {
-  const [items, campaigns] = await Promise.all([
-    db.contentItem.findMany({
-      where: { tenantId: TENANT_ID },
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true, title: true, body: true, channel: true, contentType: true,
-        status: true, internal: true, source: true, externalUrl: true,
-        createdAt: true, updatedAt: true,
-        campaign: { select: { id: true, name: true } },
-      },
-    }),
-    db.campaign.findMany({
-      where: { tenantId: TENANT_ID, isArchived: false },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
+interface SearchParams {
+  category?: string;
+  campaign?: string;
+  format?: string;
+  status?: string;
+}
+
+export default async function MarketingPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
+  const { userId } = await getActor(TENANT_ID);
+
+  if (userId == null) {
+    return (
+      <div className="mount">
+        <MarketingTabs active="inbox" />
+        <div className="panel">
+          <div className="panel-pad" style={{ textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }}>
+            {UI.notReviewer}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const filter = {
+    category: params.category,
+    campaignId: params.campaign ? Number(params.campaign) : undefined,
+    format: params.format,
+    status: params.status,
+  };
+
+  const [sections, filterOptions] = await Promise.all([
+    getInbox(TENANT_ID, userId, filter),
+    getFilterOptions(TENANT_ID),
   ]);
 
-  const serialized = items.map((i) => ({
-    id: i.id,
-    title: i.title,
-    excerpt: i.body.slice(0, 160),
-    channel: i.channel,
-    contentType: i.contentType,
-    status: i.status,
-    internal: i.internal,
-    source: i.source,
-    externalUrl: i.externalUrl,
-    campaignId: i.campaign?.id ?? null,
-    campaignName: i.campaign?.name ?? null,
-    createdAt: i.createdAt.toISOString(),
-    updatedAt: i.updatedAt.toISOString(),
-  }));
-
-  return <MarketingQueueClient items={serialized} campaigns={campaigns} />;
+  return (
+    <div className="mount">
+      <MarketingTabs active="inbox" />
+      <InboxClient sections={sections} filterOptions={filterOptions} />
+    </div>
+  );
 }

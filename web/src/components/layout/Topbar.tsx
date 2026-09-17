@@ -81,12 +81,14 @@ interface PipelineStub {
 
 interface TopbarProps {
   collapsed: boolean;
+  /** Phones (< 768 px, CSS): full-width bar; the menu button opens the sidebar drawer. */
+  onMenu?: () => void;
   email: string;
   defaultPipeline: PipelineStub | null;
   onSearchOpen: () => void;
 }
 
-export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: TopbarProps) {
+export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen }: TopbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const crumbs = useCrumb(pathname);
@@ -146,7 +148,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
       )}
 
       <header
-        className="fixed top-0 right-0 z-20 flex items-center gap-4 px-6 transition-all duration-200"
+        className="fixed top-0 right-0 z-20 flex items-center gap-3 px-3 md:gap-4 md:px-6 transition-all duration-200 max-md:!left-0"
         style={{
           left: collapsed ? "3.5rem" : "240px",
           height: 60,
@@ -155,9 +157,22 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
           borderBottom: "1px solid var(--line-soft)",
         }}
       >
+        {(
+          <button
+            type="button"
+            className="grid place-items-center md:hidden"
+            onClick={onMenu}
+            aria-label="Menü"
+            style={{ width: 44, height: 44, borderRadius: 8, color: "var(--fg)", flexShrink: 0 }}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+              <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
         {/* Breadcrumbs */}
         <nav className="flex items-center gap-2 text-sm" style={{ color: "var(--fg-mute)" }}>
-          <span style={{ color: "var(--fg-faint)" }}>Helm CRM</span>
+          <span className="hidden md:inline" style={{ color: "var(--fg-faint)" }}>Helm CRM</span>
           {crumbs.map((c, i) => (
             <span key={c.href} className="flex items-center gap-2">
               <span style={{ color: "var(--fg-faint)" }}>/</span>
@@ -189,7 +204,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
           onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--line-soft)")}
         >
           <Search style={{ width: 13, height: 13, opacity: 0.6 }} />
-          <span>Ugrás személyhez, céghez, feladathoz...</span>
+          <span className="hidden md:inline">Ugrás személyhez, céghez, feladathoz...</span>
           <span
             className="ml-auto font-mono-ndt rounded"
             style={{
@@ -227,7 +242,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
           </button>
 
           {/* + New split button */}
-          <div className="flex items-stretch" style={{ borderRadius: 6, overflow: "hidden" }}>
+          <div className="hidden md:flex items-stretch" style={{ borderRadius: 6, overflow: "hidden" }}>
             <button
               onClick={openTask}
               onMouseEnter={prepTask}

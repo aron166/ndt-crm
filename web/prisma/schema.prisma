@@ -50,6 +50,8 @@ model Tenant {
   contentItems           ContentItem[]
   emailDrafts            EmailDraft[]
   contentAssets          ContentAsset[]
+  contentVersions        ContentVersion[]
+  contentReviews         ContentReview[]
   companyAttributes      CompanyAttribute[]
   quotes                 Quote[]
   quoteLineItems         QuoteLineItem[]
@@ -265,13 +267,15 @@ model User {
   role         String   @default("member") // admin, manager, member
   createdAt    DateTime @default(now()) @map("created_at")
 
-  tenant             Tenant        @relation(fields: [tenantId], references: [id])
-  assignedTasks      Task[]        @relation("TaskAssignee")
+  tenant             Tenant           @relation(fields: [tenantId], references: [id])
+  assignedTasks      Task[]           @relation("TaskAssignee")
   loggedInteractions Interaction[]
-  assignedLeads      Lead[]        @relation("LeadAssignee")
-  assignedDeals      Deal[]        @relation("DealAssignee")
-  emailDrafts        EmailDraft[]  @relation("DraftCreator")
-  sentEmailDrafts    EmailDraft[]  @relation("DraftSender")
+  assignedLeads      Lead[]           @relation("LeadAssignee")
+  assignedDeals      Deal[]           @relation("DealAssignee")
+  emailDrafts        EmailDraft[]     @relation("DraftCreator")
+  sentEmailDrafts    EmailDraft[]     @relation("DraftSender")
+  contentVersions    ContentVersion[]
+  contentReviews     ContentReview[]
 
   @@map("users")
 }
@@ -1043,31 +1047,54 @@ model Campaign {
 }
 
 model ContentItem {
-  id           Int       @id @default(autoincrement())
-  tenantId     Int       @map("tenant_id")
-  campaignId   Int?      @map("campaign_id")
-  channel      String // linkedin_personal | linkedin_company | facebook | blog | email | other
-  contentType  String    @map("content_type") // post | article | email | video_script | other
-  title        String
-  body         String // markdown
-  status       String    @default("draft") // draft | in_review | approved | scheduled | published | rejected
+  id               Int       @id @default(autoincrement())
+  tenantId         Int       @map("tenant_id")
+  campaignId       Int?      @map("campaign_id")
+  channel          String // linkedin_personal | linkedin_company | facebook | blog | email | other
+  contentType      String    @map("content_type") // post | article | email | video_script | other
+  title            String
+  body             String // markdown — mirrors the CURRENT version (written by the content service only)
+  // Content approval pipeline (2026-09-17) — lib/content/types.ts:
+  // draft | in_review | changes_requested | rewrite_requested | ai_working | live | archived
+  // Only lib/content/service.ts writes it (through lib/content/transitions.ts).
+  status           String    @default("draft")
   // INTERNAL angles (BVQ) are never postable — the publish flow is hidden for them.
-  internal     Boolean   @default(false)
-  scheduledFor DateTime? @map("scheduled_for")
-  publishedAt  DateTime? @map("published_at")
-  externalUrl  String?   @map("external_url")
-  source       String // content_factory | manual | <app slug>
-  sourceMeta   Json?     @map("source_meta") // hook refs, week, generator notes
-  metrics      Json? // impressions, reactions, comments, clicks, leads (manual)
-  reviewNote   String?   @map("review_note") // rejection reason / edit note
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  internal         Boolean   @default(false)
+  scheduledFor     DateTime? @map("scheduled_for")
+  publishedAt      DateTime? @map("published_at")
+  externalUrl      String?   @map("external_url")
+  source           String // content_factory | manual | <app slug>
+  sourceMeta       Json?     @map("source_meta") // hook refs, week, generator notes
+  metrics          Json? // impressions, reactions, comments, clicks, leads (manual)
+  reviewNote       String?   @map("review_note") // legacy (pre-versions) rejection note
+  // What it is and what it is for (spec §1).
+  category         String    @default("other") // script | email | ad | lead_magnet | landing | video | image | other
+  format           String? // plain_text_email | pdf | 9x16_video | 16x9_video | phone_script | meta_ad | …
+  purpose          String? // "Q4 cold email, step 1"
+  externalRef      String?   @map("external_ref") // source file / consumer, e.g. growth/…/a-hid.md#touch-1
+  // The version under review, and the version operations read (dual-approved).
+  currentVersionId Int?      @unique @map("current_version_id")
+  liveVersionId    Int?      @unique @map("live_version_id")
+  // AI rewrite claim (content-revise skill). claimedFrom = the status to
+  // restore when a claim goes stale (> 2 h).
+  claimedAt        DateTime? @map("claimed_at")
+  claimedBy        String?   @map("claimed_by")
+  claimedFrom      String?   @map("claimed_from")
+  // The AI could not produce the change (image/video) — a human must.
+  needsHumanAsset  Boolean   @default(false) @map("needs_human_asset")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  tenant   Tenant         @relation(fields: [tenantId], references: [id])
-  campaign Campaign?      @relation(fields: [campaignId], references: [id])
-  assets   ContentAsset[]
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  campaign       Campaign?        @relation(fields: [campaignId], references: [id])
+  assets         ContentAsset[]
+  versions       ContentVersion[] @relation("ItemVersions")
+  currentVersion ContentVersion?  @relation("ItemCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  liveVersion    ContentVersion?  @relation("ItemLiveVersion", fields: [liveVersionId], references: [id], onDelete: SetNull)
 
+  @@unique([tenantId, externalRef])
   @@index([tenantId, status])
+  @@index([tenantId, category])
   @@index([tenantId, campaignId])
   @@map("content_items")
 }
@@ -1077,17 +1104,77 @@ model ContentAsset {
   tenantId      Int      @map("tenant_id")
   contentItemId Int      @map("content_item_id")
   kind          String // image | video | file | link
-  url           String // URL or storage path (no upload UI this phase)
+  url           String // external URL, or the storage path for uploaded files
   caption       String?
   position      Int      @default(0)
+  // Files belong to a VERSION (spec §2). Uploaded files live in the private
+  // `content-assets` bucket under storagePath; viewed via signed URLs only.
+  versionId     Int?     @map("version_id")
+  storagePath   String?  @map("storage_path")
+  mimeType      String?  @map("mime_type")
+  sizeBytes     Int?     @map("size_bytes")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  tenant      Tenant      @relation(fields: [tenantId], references: [id])
-  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  contentItem ContentItem     @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  version     ContentVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([contentItemId])
+  @@index([versionId])
   @@map("content_assets")
+}
+
+// One immutable version of a content item's body. Never updated: any edit is a
+// new row (spec decision 3), which is also what resets both approvals — reviews
+// hang off the version, not the item.
+model ContentVersion {
+  id               Int      @id @default(autoincrement())
+  tenantId         Int      @map("tenant_id")
+  itemId           Int      @map("item_id")
+  number           Int // 1..n per item
+  body             String // markdown
+  authorType       String   @map("author_type") // ai | user | import
+  authorUserId     Int?     @map("author_user_id")
+  authorApp        String?  @map("author_app") // app-key slug for ai/import
+  changeNote       String?  @map("change_note") // what changed and which comment it answers
+  basedOnVersionId Int?     @map("based_on_version_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  item          ContentItem      @relation("ItemVersions", fields: [itemId], references: [id], onDelete: Cascade)
+  authorUser    User?            @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  basedOn       ContentVersion?  @relation("VersionBase", fields: [basedOnVersionId], references: [id], onDelete: SetNull)
+  derived       ContentVersion[] @relation("VersionBase")
+  reviews       ContentReview[]
+  assets        ContentAsset[]
+  currentOfItem ContentItem?     @relation("ItemCurrentVersion")
+  liveOfItem    ContentItem?     @relation("ItemLiveVersion")
+
+  @@unique([itemId, number])
+  @@index([tenantId])
+  @@map("content_versions")
+}
+
+// One reviewer's verdict on one version. Changing your mind updates the row;
+// the history is in audit_log.
+model ContentReview {
+  id             Int      @id @default(autoincrement())
+  tenantId       Int      @map("tenant_id")
+  versionId      Int      @map("version_id")
+  reviewerUserId Int      @map("reviewer_user_id")
+  verdict        String // approve | changes | rewrite
+  comment        String? // required unless approve
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  version  ContentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  reviewer User           @relation(fields: [reviewerUserId], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, reviewerUserId])
+  @@index([tenantId, reviewerUserId])
+  @@map("content_reviews")
 }
 
 // ─────────────────────────────────────────────

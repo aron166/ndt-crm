@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
-import { contentIntakeSchema, resolveCampaignSlug } from "@/lib/marketing/schema";
+import { contentIntakeSchema, resolveCampaignSlug, defaultCategory } from "@/lib/marketing/schema";
+import { createItem } from "@/lib/content/service";
 
 // Content-draft intake endpoint (Marketing module). Same per-app-key auth as
 // POST /api/leads — the content factory posts drafts here; the shared
 // service-role key is NOT accepted. The key is the gate, so CORS is open.
+//
+// Item + version 1 are created through lib/content/service.ts (the one write
+// path for the approval pipeline) — this route only resolves the campaign,
+// then attaches assets to the new version.
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -45,9 +51,10 @@ export async function POST(request: Request) {
   const input = parsed.data;
   const tenantId = key.tenantId;
   const sourceApp = key.appSlug.trim();
+  const actor = { tenantId, kind: "app" as const, appSlug: sourceApp };
 
   try {
-    const contentItemId = await db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       // 1. Resolve / auto-create the campaign (by slug, tenant-scoped).
       let campaignId: number | null = null;
       const slug = resolveCampaignSlug(input);
@@ -82,32 +89,40 @@ export async function POST(request: Request) {
         }
       }
 
-      // 2. Create the content item. Factory drafts skip `draft` → land in_review.
-      const item = await tx.contentItem.create({
-        data: {
-          tenantId,
-          campaignId,
-          channel: input.channel,
-          contentType: input.content_type,
+      // 2. Create the item (+ version 1) through the one write path.
+      const created = await createItem(
+        actor,
+        {
           title: input.title,
           body: input.body,
-          status: "in_review",
+          category: input.category ?? defaultCategory(input.content_type),
+          channel: input.channel,
+          contentType: input.content_type,
+          format: input.format ?? null,
+          purpose: input.purpose ?? null,
+          campaignId,
+          externalRef: input.external_ref ?? null,
+          changeNote: input.change_note ?? null,
           internal: input.internal,
           source: sourceApp,
+          ...(input.source_meta ? { sourceMeta: input.source_meta as Prisma.InputJsonValue } : {}),
           scheduledFor: input.scheduled_for ? new Date(input.scheduled_for) : null,
-          ...(input.source_meta
-            ? { sourceMeta: input.source_meta as Prisma.InputJsonValue }
-            : {}),
+          importing: input.import,
         },
-        select: { id: true },
-      });
+        tx,
+      );
+      if (!created.ok) return created;
+      if (created.existed) {
+        return { ok: true as const, contentItemId: created.itemId, versionId: created.versionId, existed: true };
+      }
 
-      // 3. Assets (URL/path only — no upload in this phase).
+      // 3. Assets (URL/path only — no upload in this phase), attached to v1.
       if (input.assets?.length) {
         await tx.contentAsset.createMany({
           data: input.assets.map((a, i) => ({
             tenantId,
-            contentItemId: item.id,
+            contentItemId: created.itemId,
+            versionId: created.versionId,
             kind: a.kind,
             url: a.url,
             caption: a.caption ?? null,
@@ -116,29 +131,7 @@ export async function POST(request: Request) {
         });
       }
 
-      // 4. Audit (append-only, attributed to the source app).
-      await tx.auditLog.create({
-        data: {
-          tenantId,
-          actorUserId: null,
-          action: "create",
-          entityType: "content_item",
-          entityId: item.id,
-          changes: {
-            before: null,
-            after: {
-              campaignId,
-              channel: input.channel,
-              contentType: input.content_type,
-              status: "in_review",
-              internal: input.internal,
-              source: sourceApp,
-            },
-          } as Prisma.InputJsonValue,
-        },
-      });
-
-      // 5. Emit an app_events row so the ecosystem hub sees the submission.
+      // 4. Emit an app_events row so the ecosystem hub sees the submission.
       await tx.appEvent.create({
         data: {
           tenantId,
@@ -148,12 +141,19 @@ export async function POST(request: Request) {
         },
       });
 
-      return item.id;
+      return { ok: true as const, contentItemId: created.itemId, versionId: created.versionId, existed: false };
     });
 
-    return json({ ok: true, contentItemId }, 201);
+    if (!result.ok) return json({ error: result.error }, result.status);
+    if (result.existed) {
+      return json({ ok: true, contentItemId: result.contentItemId, versionId: result.versionId, existed: true }, 200);
+    }
+    return json(
+      { ok: true, contentItemId: result.contentItemId, versionId: result.versionId, status: "in_review" },
+      201,
+    );
   } catch (err) {
-    console.error("[/api/content] ingest failed:", err);
+    reportError("api.content.create", err, { tenantId });
     return json({ error: "Internal error" }, 500);
   }
 }

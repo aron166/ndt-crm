@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { NOT_A_CRM_USER } from "@/lib/crm-user-message";
+
+// The proxy sends signed-in accounts without a CRM user here with ?denied=1.
+const noSubscribe = () => () => {};
+const readDenied = () => new URLSearchParams(window.location.search).has("denied");
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +15,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const denied = useSyncExternalStore(noSubscribe, readDenied, () => false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -134,6 +140,9 @@ export default function LoginPage() {
               />
             </div>
 
+            {denied && !error && (
+              <p style={{ fontSize: 14, color: "var(--coral)" }}>{NOT_A_CRM_USER}</p>
+            )}
             {error && (
               <p style={{ fontSize: 14, color: "var(--coral)" }}>{error}</p>
             )}

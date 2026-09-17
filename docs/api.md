@@ -493,6 +493,86 @@ is called, so a double-click or a retried request cannot put the same email in
 front of the same company twice; a row left in `sending` means the process died
 mid-send and is deliberately **not** re-sendable.
 
+## Content
+
+The content approval pipeline (spec `docs/specs/2026-09-17-content-approval-design.md`).
+App-key auth throughout. **No route here can set a verdict or mark anything
+live** — approving/requesting changes/rewrite is a human action taken at
+`/content`; only a reviewer's own review write, through the UI, can move an
+item to `live`.
+
+Statuses: `draft | in_review | changes_requested | rewrite_requested |
+ai_working | live | archived`. Categories: `script | email | ad | lead_magnet |
+landing | video | image | other`.
+
+### `POST /api/content` — submit a new item (v1, straight into review)
+
+```bash
+curl -X POST $CRM/api/content \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "channel": "blog", "content_type": "email", "title": "…", "body": "…", "purpose": "Q4 cold email, step 1" }'
+# → 201 { "ok": true, "contentItemId": 10, "versionId": 20, "status": "in_review" }
+```
+
+Creates the item and its version 1 through `lib/content/service.ts` (the one
+write path for the pipeline); campaign auto-create and assets are unchanged
+from before. New optional fields: `category` (defaults from `content_type`:
+`email`→`email`, `video_script`→`video`, else `other`), `format` (≤ 60 chars,
+e.g. `plain_text_email`, `9x16_video`), `purpose` (≤ 300), `external_ref`
+(≤ 500 — traceback to the source file/row), `change_note` (≤ 4000 — why v1
+exists), `import` (boolean — `true` authors the version as `import` instead
+of `ai`, for migrating existing material).
+
+Idempotent on `external_ref`: an item with the same ref already existing
+returns `200 { "ok": true, "contentItemId", "versionId", "existed": true }`
+and writes **no** new assets, no `content.submitted` app event — the caller
+already has an item, nothing is duplicated.
+
+### `GET /api/content/queue?status=changes_requested,rewrite_requested`
+
+Items the `content-revise` skill should pick up: current version body, assets,
+category/format/purpose, and every reviewer comment across the version
+history (so the AI sees why earlier versions failed). `status` is a
+comma-separated list validated against the status enum above; an unknown
+value is `400`. Defaults to `changes_requested,rewrite_requested`.
+`200 { "ok": true, "items": [...] }`.
+
+### `GET /api/content/live?category=&campaign=&format=`
+
+Dual-approved versions only — never a draft (spec §6). `campaign` is the
+campaign **slug**. `200 { "ok": true, "items": [...] }`.
+
+### `POST /api/content/:id/claim`
+
+The `content-revise` skill claims an item before rewriting it → `ai_working`.
+`id` must be a positive integer or `400`. Idempotent for the same app while
+its own claim is fresh; otherwise `409` if the item isn't in a requestable
+status (`changes_requested`/`rewrite_requested`) or is already claimed.
+**Stale claims are released after 2 hours** — back to the status the claim
+was taken from — so a dead/aborted run never wedges an item.
+`200 { "ok": true, "alreadyClaimed": boolean }`.
+
+### `POST /api/content/:id/versions`
+
+```bash
+curl -X POST $CRM/api/content/5/versions \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "body": "…", "change_note": "addressed Áron'"'"'s CTA comment", "based_on_version_id": 4 }'
+# → 201 { "ok": true, "versionId": 9, "number": 2 }
+```
+
+Posts the app's rewrite as a new, immutable version. `body` (1-50000),
+`change_note` (1-4000, required), `based_on_version_id` (positive int,
+required); a Zod failure is `400 { error, details }`. Optional
+`needs_human_asset` flags that the change needs an image/video a human must
+produce (the skill doesn't regenerate media).
+
+**Race rule (409):** the app must hold a live claim on the item and
+`based_on_version_id` must equal the item's current version — if a human
+version was created after the claim, or a newer version exists, the post is
+rejected with `409` and the app must re-claim and re-read the (now current)
+version before retrying. The AI never overwrites a human edit.
+
 ## Ecosystem hub
 
 ### `POST /api/events` — append an app event
