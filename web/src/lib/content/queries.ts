@@ -145,6 +145,7 @@ export interface ReviewPageData {
     campaign: { id: number; name: string } | null;
     currentVersionId: number | null; liveVersionId: number | null;
     claimedBy: string | null;
+    metrics: Record<string, number> | null;
   };
   versions: {
     id: number; number: number; body: string; authorType: string; authorName: string | null;
@@ -162,7 +163,7 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
     select: {
       id: true, title: true, category: true, format: true, purpose: true, channel: true, status: true,
       internal: true, externalRef: true, needsHumanAsset: true, externalUrl: true, publishedAt: true,
-      currentVersionId: true, liveVersionId: true, claimedBy: true,
+      currentVersionId: true, liveVersionId: true, claimedBy: true, metrics: true,
       campaign: { select: { id: true, name: true } },
       versions: {
         orderBy: { number: "desc" },
@@ -186,7 +187,11 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
   const reviewers = await reviewerNames(tenantId);
   const { versions, publishedAt, ...rest } = item;
   return {
-    item: { ...rest, publishedAt: publishedAt?.toISOString() ?? null },
+    item: {
+      ...rest,
+      publishedAt: publishedAt?.toISOString() ?? null,
+      metrics: rest.metrics as Record<string, number> | null,
+    },
     versions: versions.map((v) => ({
       id: v.id, number: v.number, body: v.body, authorType: v.authorType,
       authorName: v.authorUser?.name ?? null, authorApp: v.authorApp, changeNote: v.changeNote,

@@ -40,7 +40,7 @@ export default async function ContentReviewPage({
         </Link>
       </div>
 
-      <ReviewClient data={data} userId={userId} signedUrls={signedUrls} />
+      <ReviewClient key={data.item.currentVersionId ?? "none"} data={data} userId={userId} signedUrls={signedUrls} />
     </div>
   );
 }

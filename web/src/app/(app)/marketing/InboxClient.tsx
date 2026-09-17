@@ -201,7 +201,7 @@ export function InboxClient({
         </select>
         <select style={selectStyle} value={searchParams.get("status") ?? "all"} onChange={(e) => setFilter("status", e.target.value)}>
           <option value="all">{UI.status}: {UI.all}</option>
-          {CONTENT_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+          {CONTENT_STATUSES.filter((s) => s !== "archived").map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
       </div>
 

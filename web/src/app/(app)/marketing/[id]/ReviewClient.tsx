@@ -75,6 +75,10 @@ export function ReviewClient({
     : null;
 
   const [showDiff, setShowDiff] = useState(false);
+  const diffParts = useMemo(
+    () => (showDiff && prevVersion && viewed ? wordDiff(prevVersion.body, viewed.body) : []),
+    [showDiff, prevVersion?.body, viewed?.body],
+  );
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const [actionError, setActionError] = useState<string | null>(null);
@@ -95,7 +99,7 @@ export function ReviewClient({
   const [publishUrl, setPublishUrl] = useState(item.externalUrl ?? "");
   const [copied, setCopied] = useState(false);
   const [metrics, setMetrics] = useState<Record<string, string>>(
-    Object.fromEntries(METRIC_FIELDS.map((f) => [f.key, ""])),
+    Object.fromEntries(METRIC_FIELDS.map((f) => [f.key, item.metrics?.[f.key]?.toString() ?? ""])),
   );
 
   useEffect(() => {
@@ -123,9 +127,9 @@ export function ReviewClient({
   }
 
   function submitVerdict(verdict: Verdict, comment?: string) {
-    if (!item.currentVersionId) return;
+    if (!viewed || viewed.id !== item.currentVersionId) return;
     run(
-      () => submitContentReview({ versionId: item.currentVersionId!, verdict, comment }),
+      () => submitContentReview({ versionId: viewed.id, verdict, comment }),
       () => { setReviewPanel(null); setReviewComment(""); },
     );
   }
@@ -219,9 +223,11 @@ export function ReviewClient({
   };
   const activeStep = pipelineActive[item.status] ?? null;
 
-  const canReviewButtons = isReviewer && item.status !== "archived" && item.status !== "ai_working" && item.currentVersionId != null;
+  const reviewEligible = isReviewer && item.status !== "archived" && item.status !== "ai_working" && item.currentVersionId != null;
+  const canReviewButtons = reviewEligible && viewed?.id === item.currentVersionId;
+  const showOldVersionNotice = reviewEligible && viewed != null && viewed.id !== item.currentVersionId;
   const canEditButton = userId != null && item.status !== "archived";
-  const showActionBar = canReviewButtons || canEditButton;
+  const showActionBar = canReviewButtons || showOldVersionNotice || canEditButton;
   const showLive = item.liveVersionId != null && !item.internal;
 
   return (
@@ -335,7 +341,7 @@ export function ReviewClient({
                     <span className="diff-mark ins">+</span>
                   </div>
                   <p className="diff-body">
-                    {wordDiff(prevVersion.body, viewed.body).map((part, i) => {
+                    {diffParts.map((part, i) => {
                       if (part.type === "same") return <span key={i}>{part.text}</span>;
                       if (part.type === "del") return <del key={i}>{part.text}</del>;
                       return <ins key={i}>{part.text}</ins>;
@@ -447,7 +453,7 @@ export function ReviewClient({
 
               <div className="editor-save-row">
                 <button type="button" className="btn" disabled={isPending} onClick={() => setEditing(false)}>{UI.cancel}</button>
-                <button type="button" className="btn primary" disabled={isPending || !editBody.trim()} onClick={saveEdit}>
+                <button type="button" className="btn primary" disabled={isPending || !editBody.trim() || uploading.length > 0} onClick={saveEdit}>
                   {UI.saveAsVersion}
                 </button>
                 <span className="editor-reset-warning">{UI.resetWarning}</span>
@@ -532,6 +538,15 @@ export function ReviewClient({
                       ♻️ {VERDICT_ACTION.rewrite}
                     </button>
                   </>
+                )}
+                {showOldVersionNotice && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => { setViewedId(item.currentVersionId); setShowDiff(false); }}
+                  >
+                    {`→ ${UI.version(currentVersion?.number ?? 0)}`}
+                  </button>
                 )}
                 {canEditButton && (
                   <button type="button" className="actionbar-btn edit" disabled={isPending} onClick={openEditor}>

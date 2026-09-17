@@ -13,6 +13,15 @@ const selectStyle: React.CSSProperties = {
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
 
+function isHttpUrl(u: string): boolean {
+  try {
+    const p = new URL(u);
+    return p.protocol === "http:" || p.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function plainTextPreview(body: string): string {
   const plain = body
     .replace(/```[\s\S]*?```/g, "")
@@ -75,7 +84,7 @@ function Card({ row, signedUrls }: { row: LibraryRow; signedUrls: Record<string,
         {row.assets.length > 0 && (
           <div className="flex gap-2 flex-wrap" style={{ marginBottom: row.usedBy.length > 0 ? 12 : 0 }}>
             {row.assets.map((a) => {
-              const url = a.storagePath ? signedUrls[a.storagePath] : a.url;
+              const url = a.storagePath ? signedUrls[a.storagePath] : (isHttpUrl(a.url) ? a.url : null);
               if (!url) return null;
               if (a.kind === "image") {
                 return (
