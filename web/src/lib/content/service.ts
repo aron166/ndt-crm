@@ -165,6 +165,21 @@ export interface CreateVersionInput {
   basedOnVersionId: number;
   /** AI only: the change needs an image/video a human must produce. */
   needsHumanAsset?: boolean;
+  /**
+   * The files of the new version. Omitted → the base version's files are
+   * carried forward (always the case for AI versions, which cannot upload).
+   * Given → exactly these (the caller has verified storage paths / tenancy).
+   */
+  assets?: NewAssetInput[];
+}
+
+export interface NewAssetInput {
+  kind: string;
+  url: string;
+  storagePath?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  caption?: string | null;
 }
 
 export async function createVersion(
@@ -210,6 +225,21 @@ export async function createVersion(
       },
       select: { id: true },
     });
+
+    const assets: NewAssetInput[] = input.assets ?? (await tx.contentAsset.findMany({
+      where: { tenantId: actor.tenantId, versionId: input.basedOnVersionId },
+      orderBy: { position: "asc" },
+      select: { kind: true, url: true, storagePath: true, mimeType: true, sizeBytes: true, caption: true },
+    }));
+    if (assets.length) {
+      await tx.contentAsset.createMany({
+        data: assets.map((a, i) => ({
+          tenantId: actor.tenantId, contentItemId: itemId, versionId: version.id, position: i,
+          kind: a.kind, url: a.url, storagePath: a.storagePath ?? null, mimeType: a.mimeType ?? null,
+          sizeBytes: a.sizeBytes ?? null, caption: a.caption ?? null,
+        })),
+      });
+    }
 
     const next = applyEvent(state, { type: "version_created", versionId: version.id });
     if (!next.ok) return fail(409, next.reason);
