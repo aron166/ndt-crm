@@ -307,10 +307,17 @@ if (ONLY) items = items.filter((it) => it.category === ONLY);
 function flagsFor(it) {
   const f = [];
   if (/<[A-Z_]+>/.test(it.body)) f.push("placeholder");
-  if (it.body.includes("⚠️")) f.push("⚠️");
   if (/\bDRAFT\b/.test(it.body)) f.push("DRAFT");
   if (it.body.length > 50000) f.push(">50000 chars");
   return f;
+}
+
+// Raw ⚠/⚠️ marker count. The server (POST /api/content, extract_warnings)
+// does the real dedup/scaffold-stripping extraction via lib/content/warnings.ts
+// (TS, not importable from this plain-JS script) — this is just a cheap
+// dry-run signal of how many ContentChecks each item is likely to get.
+function markerCount(it) {
+  return (it.body.match(/⚠️?/g) ?? []).length;
 }
 
 // ---------- report ----------
@@ -319,14 +326,25 @@ console.log(`Mode: ${DO_APPLY ? "APPLY" : "DRY-RUN"}${ONLY ? ` (only=${ONLY})` :
 console.log("");
 
 const byCategory = {};
-for (const it of items) byCategory[it.category] = (byCategory[it.category] ?? 0) + 1;
+const markersByCategory = {};
+for (const it of items) {
+  byCategory[it.category] = (byCategory[it.category] ?? 0) + 1;
+  markersByCategory[it.category] = (markersByCategory[it.category] ?? 0) + markerCount(it);
+}
 console.log("Items per category:");
-for (const [cat, n] of Object.entries(byCategory).sort()) console.log(`  ${cat}: ${n}`);
-console.log(`  TOTAL: ${items.length}`);
+for (const [cat, n] of Object.entries(byCategory).sort()) {
+  console.log(`  ${cat}: ${n} (⚠ jelölés: ${markersByCategory[cat]})`);
+}
+console.log(`  TOTAL: ${items.length} (⚠ jelölés: ${items.reduce((s, it) => s + markerCount(it), 0)})`);
 console.log("");
 
 console.log(
-  "external_ref".padEnd(70) + "category".padEnd(12) + "title".padEnd(45) + "body_len".padEnd(10) + "flags",
+  "external_ref".padEnd(70) +
+    "category".padEnd(12) +
+    "title".padEnd(45) +
+    "body_len".padEnd(10) +
+    "⚠ jelölés".padEnd(11) +
+    "flags",
 );
 for (const it of items) {
   console.log(
@@ -334,6 +352,7 @@ for (const it of items) {
       it.category.padEnd(12) +
       it.title.slice(0, 43).padEnd(45) +
       String(it.body.length).padEnd(10) +
+      String(markerCount(it)).padEnd(11) +
       (flagsFor(it).join(", ") || "-"),
   );
 }

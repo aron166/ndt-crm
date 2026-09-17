@@ -6,6 +6,7 @@ vi.mock("@/lib/app-key-auth", () => ({
 }));
 vi.mock("@/lib/content/service", () => ({
   createItem: vi.fn(),
+  addChecks: vi.fn(),
 }));
 vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
 
@@ -21,7 +22,7 @@ vi.mock("@/lib/db", () => ({
 
 import { POST } from "./route";
 import { validateAppKey } from "@/lib/app-key-auth";
-import { createItem } from "@/lib/content/service";
+import { createItem, addChecks } from "@/lib/content/service";
 
 const KEY = { keyId: 1, tenantId: 7, appSlug: "content-factory" };
 const VALID_BODY = {
@@ -43,6 +44,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   tx.campaign.findFirst.mockResolvedValue(null);
   tx.campaign.create.mockResolvedValue({ id: 1 });
+  (addChecks as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, created: 0 });
 });
 
 describe("POST /api/content", () => {
@@ -67,6 +69,39 @@ describe("POST /api/content", () => {
       tx,
     );
     expect(tx.contentAsset.createMany).not.toHaveBeenCalled();
+    expect(addChecks).not.toHaveBeenCalled(); // import not set → no extraction
+  });
+
+  it("import: true extracts ⚠ warnings into checks after commit, returns checksCreated", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    (createItem as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, itemId: 10, versionId: 20, existed: false,
+    });
+    (addChecks as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, created: 2 });
+    const res = await POST(req({ ...VALID_BODY, body: "⚠️ Áron dönti el.\n⚠️ Péter dönti el.", import: true }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.checksCreated).toBe(2);
+    expect(addChecks).toHaveBeenCalledWith(
+      { tenantId: 7, kind: "app", appSlug: "content-factory" },
+      10,
+      [
+        { question: "Áron dönti el.", forWhom: "aron", source: "import" },
+        { question: "Péter dönti el.", forWhom: "peter", source: "import" },
+      ],
+    );
+  });
+
+  it("addChecks failure does not fail the request (item already created)", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    (createItem as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, itemId: 10, versionId: 20, existed: false,
+    });
+    (addChecks as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("db down"));
+    const res = await POST(req({ ...VALID_BODY, body: "⚠️ Áron dönti el.", import: true }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.checksCreated).toBe(0);
   });
 
   it("existed → 200, no asset write", async () => {
