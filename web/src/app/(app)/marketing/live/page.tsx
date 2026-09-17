@@ -10,6 +10,7 @@ interface SearchParams {
   category?: string;
   campaign?: string;
   format?: string;
+  page?: string;
 }
 
 export default async function MarketingLivePage({
@@ -22,8 +23,9 @@ export default async function MarketingLivePage({
     category: params.category,
     campaignId: params.campaign ? Number(params.campaign) : undefined,
     format: params.format,
+    page: params.page ? Number(params.page) : undefined,
   };
-  const [rows, filterOptions] = await Promise.all([
+  const [library, filterOptions] = await Promise.all([
     getLibrary(TENANT_ID, filter),
     getFilterOptions(TENANT_ID),
   ]);
@@ -31,7 +33,12 @@ export default async function MarketingLivePage({
   return (
     <div className="mount">
       <MarketingTabs active="live" />
-      <LibraryClient rows={rows} filterOptions={filterOptions} />
+      <LibraryClient
+        rows={library.rows}
+        filterOptions={filterOptions}
+        page={library.page}
+        hasMore={library.hasMore}
+      />
     </div>
   );
 }

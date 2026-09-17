@@ -32,6 +32,9 @@ export interface InboxRow {
 }
 
 export interface InboxSections {
+  /** True when more rows exist past this page. */
+  hasMore: boolean;
+  page: number;
   mine: InboxRow[];
   otherReviewer: InboxRow[];
   aiWorking: InboxRow[];
@@ -41,11 +44,16 @@ export interface InboxSections {
   isReviewer: boolean;
 }
 
+/** Page size for every content list (performance golden rule §6c). */
+export const PAGE_SIZE = 50;
+
 export interface InboxFilter {
   category?: string;
   campaignId?: number;
   format?: string;
   status?: string;
+  /** 1-based page over the *pipeline* rows (live has its own page). */
+  page?: number;
 }
 
 const ROW_SELECT = {
@@ -98,22 +106,26 @@ export async function getInbox(tenantId: number, userId: number, filter: InboxFi
     ...(filter.format ? { format: filter.format } : {}),
     ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
   };
-  // ponytail: capped at 500 newest; the live section is capped separately.
-  // Paginate when a tenant has more than that in flight.
+  // Paginated, PAGE_SIZE per page: the pipeline rows and the live rows are two
+  // pages, so a long live list can never push the work-in-progress off the page.
+  const page = Math.max(1, filter.page ?? 1);
+  const skip = (page - 1) * PAGE_SIZE;
   const [rows, liveRows] = await Promise.all([
     db.contentItem.findMany({
       where: filter.status ? where : { ...where, status: { notIn: ["archived", "live"] } },
-      select: ROW_SELECT, orderBy: { updatedAt: "desc" }, take: 500,
+      select: ROW_SELECT, orderBy: { updatedAt: "desc" }, skip, take: PAGE_SIZE + 1,
     }),
     filter.status && filter.status !== "live"
       ? Promise.resolve([])
       : db.contentItem.findMany({
-          where: { ...where, status: "live" }, select: ROW_SELECT, orderBy: { updatedAt: "desc" }, take: 200,
+          where: { ...where, status: "live" }, select: ROW_SELECT, orderBy: { updatedAt: "desc" },
+          skip, take: PAGE_SIZE + 1,
         }),
   ]);
+  const hasMore = rows.length > PAGE_SIZE || liveRows.length > PAGE_SIZE;
   const now = Date.now();
   const seen = new Set<number>();
-  const all = [...rows, ...liveRows].filter((r) => !seen.has(r.id) && seen.add(r.id)).map((r) => toRow(r, reviewers, now));
+  const all = [...rows.slice(0, PAGE_SIZE), ...liveRows.slice(0, PAGE_SIZE)].filter((r) => !seen.has(r.id) && seen.add(r.id)).map((r) => toRow(r, reviewers, now));
   const isReviewer = reviewers.some((r) => r.id === userId);
   const myVerdict = (r: InboxRow) => r.verdicts.find((v) => v.reviewerId === userId)?.verdict ?? null;
   const oldestFirst = (a: InboxRow, b: InboxRow) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "");
@@ -127,6 +139,8 @@ export async function getInbox(tenantId: number, userId: number, filter: InboxFi
     live: all.filter((r) => r.status === "live"),
     reviewers,
     isReviewer,
+    hasMore,
+    page,
   };
 }
 
@@ -243,7 +257,8 @@ export interface LibraryRow {
 }
 
 /** "Élő anyagok": only the dual-approved version of each item. */
-export async function getLibrary(tenantId: number, filter: InboxFilter = {}): Promise<LibraryRow[]> {
+export async function getLibrary(tenantId: number, filter: InboxFilter = {}): Promise<{ rows: LibraryRow[]; hasMore: boolean; page: number }> {
+  const page = Math.max(1, filter.page ?? 1);
   const rows = await db.contentItem.findMany({
     where: {
       tenantId,
@@ -254,7 +269,8 @@ export async function getLibrary(tenantId: number, filter: InboxFilter = {}): Pr
       ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
     },
     orderBy: [{ category: "asc" }, { title: "asc" }],
-    take: 300, // ponytail: the page signs every asset URL at once — paginate past this
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE + 1,
     select: {
       id: true, title: true, category: true, format: true, purpose: true,
       campaign: { select: { id: true, name: true } },
@@ -269,13 +285,18 @@ export async function getLibrary(tenantId: number, filter: InboxFilter = {}): Pr
       },
     },
   });
-  return rows
-    .filter((r) => r.liveVersion)
-    .map((r) => ({
-      id: r.id, title: r.title, category: r.category, format: r.format, purpose: r.purpose,
-      campaign: r.campaign, versionNumber: r.liveVersion!.number, body: r.liveVersion!.body,
-      assets: r.liveVersion!.assets, usedBy: [],
-    }));
+  return {
+    page,
+    hasMore: rows.length > PAGE_SIZE,
+    rows: rows
+      .slice(0, PAGE_SIZE)
+      .filter((r) => r.liveVersion)
+      .map((r) => ({
+        id: r.id, title: r.title, category: r.category, format: r.format, purpose: r.purpose,
+        campaign: r.campaign, versionNumber: r.liveVersion!.number, body: r.liveVersion!.body,
+        assets: r.liveVersion!.assets, usedBy: [],
+      })),
+  };
 }
 
 export async function getFilterOptions(tenantId: number) {

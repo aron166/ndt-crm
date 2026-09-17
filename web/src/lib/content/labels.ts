@@ -122,4 +122,7 @@ export const UI = {
   checkForPeter: "Péter",
   checkForEither: "Bármelyik",
   checkAskedBy: "Forrás: import",
+  pagePrev: "Előző",
+  pageNext: "Következő",
+  pageLabel: (n: number) => `${n}. oldal`,
 };

@@ -9,16 +9,27 @@ import { normalizeEmail } from "./email";
  * warm instance. Use a shared cache or a DB flag check if that ever matters.
  */
 const TTL_MS = 60_000;
-const cache = new Map<string, { ok: boolean; at: number }>();
+const cache = new Map<string, { userId: number | null; at: number }>();
 
-export async function isCrmUserEmail(tenantId: number, rawEmail: string | null | undefined): Promise<boolean> {
+/**
+ * The CRM `users.id` for a login email, or null. Cached per server instance for
+ * a minute, so the proxy AND getActor cost one query per instance per minute
+ * instead of one per request (2026-09-17 query pass).
+ */
+export async function crmUserIdForEmail(tenantId: number, rawEmail: string | null | undefined): Promise<number | null> {
   const email = normalizeEmail(rawEmail);
-  if (!email) return false;
+  if (!email) return null;
   const key = `${tenantId}:${email}`;
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.ok;
-  const users = await db.user.findMany({ where: { tenantId }, select: { email: true } });
-  const ok = users.some((u) => normalizeEmail(u.email) === email);
-  cache.set(key, { ok, at: Date.now() });
-  return ok;
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.userId;
+  // ponytail: users is a handful of rows — compare normalized in memory rather
+  // than storing a normalized column.
+  const users = await db.user.findMany({ where: { tenantId }, select: { id: true, email: true } });
+  const userId = users.find((u) => normalizeEmail(u.email) === email)?.id ?? null;
+  cache.set(key, { userId, at: Date.now() });
+  return userId;
+}
+
+export async function isCrmUserEmail(tenantId: number, rawEmail: string | null | undefined): Promise<boolean> {
+  return (await crmUserIdForEmail(tenantId, rawEmail)) !== null;
 }

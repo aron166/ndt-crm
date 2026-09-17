@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { crmUserIdForEmail } from "./crm-user";
 import { createClient } from "./supabase/server";
 import type { LeadCtx } from "./leads/service";
 
@@ -21,11 +21,9 @@ export async function getActor(tenantId: number): Promise<Actor> {
   const { data } = await supabase.auth.getUser();
   const email = normalizeEmail(data.user?.email);
   if (!email) return { userId: null, email: null };
-  // ponytail: users is a handful of rows per tenant — compare in memory rather than
-  // storing a normalized column. Add `users.email_normalized` if the table grows.
-  const users = await db.user.findMany({ where: { tenantId }, select: { id: true, email: true } });
-  const user = users.find((u) => normalizeEmail(u.email) === email);
-  return { userId: user?.id ?? null, email };
+  // Cached email → users.id (lib/crm-user.ts). The proxy resolved the same
+  // email for this request, so this is normally free (2026-09-17 query pass).
+  return { userId: await crmUserIdForEmail(tenantId, email), email };
 }
 
 import { NOT_A_CRM_USER } from "./crm-user-message";

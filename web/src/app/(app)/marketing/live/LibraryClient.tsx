@@ -97,9 +97,11 @@ function Card({ row }: { row: LibraryRow }) {
 }
 
 export function LibraryClient({
-  rows, filterOptions,
+  rows, filterOptions, page, hasMore,
 }: {
   rows: LibraryRow[];
+  page: number;
+  hasMore: boolean;
   filterOptions: { campaigns: { id: number; name: string }[]; formats: string[] };
 }) {
   const router = useRouter();
@@ -109,6 +111,7 @@ export function LibraryClient({
     const params = new URLSearchParams(searchParams.toString());
     if (value === "all") params.delete(key);
     else params.set(key, value);
+    if (key !== "page") params.delete("page"); // a new filter starts on page 1
     router.push(`/marketing/live?${params.toString()}`);
   }
 
@@ -156,6 +159,29 @@ export function LibraryClient({
               </div>
             </section>
           ))}
+        </div>
+      )}
+      {(page > 1 || hasMore) && (
+        <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
+          <button
+            type="button"
+            className="btn sm"
+            style={{ minHeight: 44, opacity: page > 1 ? 1 : 0.5 }}
+            disabled={page <= 1}
+            onClick={() => setFilter("page", String(page - 1))}
+          >
+            {UI.pagePrev}
+          </button>
+          <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>{UI.pageLabel(page)}</span>
+          <button
+            type="button"
+            className="btn sm"
+            style={{ minHeight: 44, opacity: hasMore ? 1 : 0.5 }}
+            disabled={!hasMore}
+            onClick={() => setFilter("page", String(page + 1))}
+          >
+            {UI.pageNext}
+          </button>
         </div>
       )}
     </div>
