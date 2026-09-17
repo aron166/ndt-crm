@@ -117,15 +117,17 @@ export async function getInbox(tenantId: number, userId: number, filter: InboxFi
     }),
     filter.status && filter.status !== "live"
       ? Promise.resolve([])
-      : db.contentItem.findMany({
+      : // The live section is a preview only (browse them on /marketing/live), so
+        // it is not paged with the pipeline rows.
+        db.contentItem.findMany({
           where: { ...where, status: "live" }, select: ROW_SELECT, orderBy: { updatedAt: "desc" },
-          skip, take: PAGE_SIZE + 1,
+          take: PAGE_SIZE,
         }),
   ]);
-  const hasMore = rows.length > PAGE_SIZE || liveRows.length > PAGE_SIZE;
+  const hasMore = rows.length > PAGE_SIZE;
   const now = Date.now();
   const seen = new Set<number>();
-  const all = [...rows.slice(0, PAGE_SIZE), ...liveRows.slice(0, PAGE_SIZE)].filter((r) => !seen.has(r.id) && seen.add(r.id)).map((r) => toRow(r, reviewers, now));
+  const all = [...rows.slice(0, PAGE_SIZE), ...liveRows].filter((r) => !seen.has(r.id) && seen.add(r.id)).map((r) => toRow(r, reviewers, now));
   const isReviewer = reviewers.some((r) => r.id === userId);
   const myVerdict = (r: InboxRow) => r.verdicts.find((v) => v.reviewerId === userId)?.verdict ?? null;
   const oldestFirst = (a: InboxRow, b: InboxRow) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "");

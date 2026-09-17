@@ -57,14 +57,22 @@ export function BulkBar({
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * The delete that is waiting out its undo window. One at a time: a second
+   * action cancels the first, so an Undo can never leave an older timer armed
+   * (Vanda, #103 finding 3).
+   */
+  const pendingDelete = useRef<{ cancelled: boolean } | null>(null);
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   function clearTimer() {
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    if (pendingDelete.current) { pendingDelete.current.cancelled = true; pendingDelete.current = null; }
   }
 
   async function handleArchive() {
+    clearTimer(); // never leave an earlier pending delete armed
     setBusy(true);
     const res = await archiveContentBulk(selectedIds);
     setBusy(false);
@@ -84,6 +92,7 @@ export function BulkBar({
   }
 
   async function handleDelete() {
+    clearTimer(); // never leave an earlier pending delete armed
     setBusy(true);
     const checks = await checkContentDeletable(selectedIds);
     const deletable = checks.filter((c) => c.deletable).map((c) => c.itemId);
@@ -98,13 +107,15 @@ export function BulkBar({
     }
     if (!window.confirm(UI.deleteConfirm(deletable.length))) return;
 
-    let cancelled = false;
+    const token = { cancelled: false };
+    pendingDelete.current = token;
     setToast({
       text: UI.deleteConfirm(deletable.length),
-      undo: () => { cancelled = true; clearTimer(); setToast(null); },
+      undo: () => { clearTimer(); setToast(null); },
     });
     timer.current = setTimeout(async () => {
-      if (cancelled) return;
+      if (token.cancelled) return;
+      pendingDelete.current = null;
       const res = await deleteContent(deletable);
       if (!res.ok) { setToast({ text: res.error }); return; }
       onDone();

@@ -22,6 +22,7 @@ vi.mock("@/lib/integrations/resend", () => ({ sendEmail: (...a: unknown[]) => se
 const reportError = vi.fn();
 vi.mock("@/lib/report-error", () => ({ reportError: (...a: unknown[]) => reportError(...a) }));
 
+import { STALE_REVIEW_MS } from "./types";
 import { buildDigest, isDigestTime, sendContentDigests } from "./digest";
 
 const BASE = "https://ndt-crm.vercel.app";
@@ -56,9 +57,20 @@ describe("buildDigest", () => {
       ],
     })!;
     // Over the stale threshold the row says so in words, not with a glyph.
-    expect(d.text).toMatch(/Régi \(E-mail\): Régóta várakozik: 4 napja: .*\/marketing\/1/);
-    expect(d.text).toMatch(/Friss \(E-mail\): 3 napja vár: .*\/marketing\/2/);
+    expect(d.text).toMatch(/Régi \(E-mail\), 4 napja vár, régóta\. .*\/marketing\/1/);
+    expect(d.text).toMatch(/Friss \(E-mail\), 3 napja vár\. .*\/marketing\/2/);
     expect(d.text).not.toMatch(/⚠/);
+  });
+
+  it("the stale callout follows STALE_REVIEW_MS exactly", () => {
+    const justOver = new Date(NOW.getTime() - STALE_REVIEW_MS - 60_000);
+    const justUnder = new Date(NOW.getTime() - STALE_REVIEW_MS + 60_000);
+    const over = buildDigest({ reviewerId: 1, reviewerName: "Áron", now: NOW, baseUrl: BASE,
+      items: [{ id: 1, title: "Régi", category: "email", waitingSince: justOver }] })!;
+    const under = buildDigest({ reviewerId: 1, reviewerName: "Áron", now: NOW, baseUrl: BASE,
+      items: [{ id: 2, title: "Friss", category: "email", waitingSince: justUnder }] })!;
+    expect(over.text).toMatch(/régóta/);
+    expect(under.text).not.toMatch(/régóta/);
   });
 
   it("subject counts the items", () => {

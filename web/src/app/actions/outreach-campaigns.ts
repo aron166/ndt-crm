@@ -98,7 +98,7 @@ export async function markDraftSentManually(
   const row = await db.emailDraft.findFirst({ where: { id: draftId, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!MANUAL_SENDABLE_STATUSES.includes(row.status as DraftStatus)) {
-    return { ok: false, error: "Előbb hagyd jóvá: vagy ez az érintés már elment" };
+    return { ok: false, error: "Előbb hagyd jóvá, vagy ez az érintés már elment" };
   }
 
   // Same rule as the Resend path: no unsubscribe line, no cold email. The copy

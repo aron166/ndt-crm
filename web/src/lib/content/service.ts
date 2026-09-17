@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { applyEvent, isClaimStale, type ItemState } from "./transitions";
 import { getContentReviewers } from "./reviewers";
 import { isReviewReason, reasonRequiredFor, type ReviewReason } from "./reasons";
-import { runContentRules, type RuleViolation } from "./rules";
 import {
   CLAIM_TTL_MS, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX,
   isContentStatus, type ContentCategory, type ContentStatus, type Verdict,
@@ -341,10 +340,14 @@ export async function submitReview(
       where: { versionId }, select: { reviewerUserId: true, verdict: true },
     });
 
+    // The check gate must be evaluated HERE too: two approvals must not make an
+    // item live while a ⚠ check is open (Vanda, #103 finding 1).
+    const openChecks = await tx.contentCheck.count({ where: { itemId: row.id, state: "open" } });
     const next = applyEvent(state, {
       type: "reviews_changed",
       reviewers,
       reviews: all.map((r) => ({ reviewerUserId: r.reviewerUserId, verdict: r.verdict as Verdict })),
+      openChecks,
     });
     if (!next.ok) return fail(409, next.reason);
 
@@ -426,12 +429,17 @@ export async function archiveItem(actor: UserActor, itemId: number): Promise<{ o
     const row = await lockItem(tx, actor.tenantId, itemId);
     if (!row) return fail(404, "Nem található");
     const state = stateOf(row);
+    if (state.status === "archived") return { ok: true as const }; // already archived: keep prevStatus
     const next = applyEvent(state, { type: "archive" });
     if (!next.ok) return fail(409, next.reason);
+    // Never restore INTO ai_working: the claim is cleared here, so the item would
+    // be stuck (not stale, not claimable, not reviewable). Restore where the AI
+    // took it from instead (Vanda, #103 finding 4).
+    const restoreTo = state.status === "ai_working" ? (state.claimedFrom ?? "in_review") : state.status;
     await tx.contentItem.update({
       where: { id: itemId },
       data: {
-        status: "archived", prevStatus: state.status,
+        status: "archived", prevStatus: restoreTo,
         claimedAt: null, claimedFrom: null, claimedBy: null,
       },
     });
@@ -476,14 +484,8 @@ export async function addChecks(
     skipDuplicates: true,
   });
   if (res.count > 0) {
-    await db.auditLog.create({
-      data: {
-        tenantId: actor.tenantId, actorUserId: null,
-        actorAgentId: actor.kind === "app" ? actor.appSlug : null,
-        action: "create", entityType: "content_item", entityId: itemId,
-        changes: { before: null, after: { checksCreated: res.count }, by: actorInfo(actor) } as Prisma.InputJsonValue,
-      },
-    });
+    await db.$transaction((tx) =>
+      writeAudit(tx, actor, "content_item", itemId, "create", null, { checksCreated: res.count }));
   }
   return { ok: true, created: res.count };
 }

@@ -106,7 +106,10 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     const forbidden = await service.submitReview(nonReviewer, versionId, "approve");
     expect(forbidden).toMatchObject({ ok: false, status: 403 });
 
-    const noComment = await service.submitReview(actorA(), versionId, "changes");
+    const noComment = await service.submitReview(actorA(), versionId, "changes", undefined, "wording");
+    // …and a send-back without a reason tag is refused too.
+    const noReason = await service.submitReview(actorA(), versionId, "changes", "javítsd");
+    expect(noReason).toMatchObject({ ok: false, status: 400 });
     expect(noComment).toMatchObject({ ok: false, status: 400 });
 
     const first = await service.submitReview(actorA(), versionId, "approve");
@@ -134,7 +137,7 @@ describe.skipIf(!enabled)("content service (integration)", () => {
 
   it("rewrite request → claim → app version cycle", async () => {
     const r = await newItem();
-    const rewrite = await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite");
+    const rewrite = await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite", "wording");
     expect(rewrite).toMatchObject({ ok: true, status: "rewrite_requested" });
 
     const claim1 = await service.claimItem(appActor, r.itemId);
@@ -177,7 +180,7 @@ describe.skipIf(!enabled)("content service (integration)", () => {
 
   it("a human edit after a claim beats the app's pending version (race rule)", async () => {
     const r = await newItem();
-    await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite");
+    await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite", "wording");
     await service.claimItem(appActor, r.itemId);
 
     const humanVersion = await service.createVersion(actorA(), r.itemId, {
@@ -198,7 +201,7 @@ describe.skipIf(!enabled)("content service (integration)", () => {
 
   it("releases a stale claim and rejects a version built on it", async () => {
     const r = await newItem();
-    await service.submitReview(actorA(), r.versionId!, "changes", "fix typo");
+    await service.submitReview(actorA(), r.versionId!, "changes", "fix typo", "wording");
     const claim = await service.claimItem(appActor, r.itemId);
     expect(claim.ok).toBe(true);
 
@@ -240,7 +243,7 @@ describe.skipIf(!enabled)("content service (integration)", () => {
 
   it("getQueue surfaces reviews with reviewer names and comments", async () => {
     const r = await newItem();
-    await service.submitReview(actorA(), r.versionId!, "changes", "fix the CTA");
+    await service.submitReview(actorA(), r.versionId!, "changes", "fix the CTA", "wording");
 
     const queue = await service.getQueue(1, ["changes_requested", "rewrite_requested"]);
     const entry = queue.find((q) => q.id === r.itemId);
@@ -253,7 +256,7 @@ describe.skipIf(!enabled)("content service (integration)", () => {
 
   it("concurrent createVersion calls: exactly one wins", async () => {
     const r = await newItem();
-    await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite");
+    await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite", "wording");
     await service.claimItem(appActor, r.itemId);
 
     const [userResult, appResult] = await Promise.all([
@@ -279,7 +282,7 @@ describe.skipIf(!enabled)("content service (integration)", () => {
 
   it("a review refused because the AI holds the claim leaves no review row", async () => {
     const r = await newItem();
-    await service.submitReview(actorA(), r.versionId!, "rewrite", "írd újra");
+    await service.submitReview(actorA(), r.versionId!, "rewrite", "írd újra", "wording");
     expect((await service.claimItem(appActor, r.itemId)).ok).toBe(true);
     const refused = await service.submitReview(actorB(), r.versionId!, "approve");
     expect(refused).toMatchObject({ ok: false, status: 409 });
@@ -289,7 +292,7 @@ describe.skipIf(!enabled)("content service (integration)", () => {
 
   it("a review on an item whose claim went stale releases the claim first", async () => {
     const r = await newItem();
-    await service.submitReview(actorA(), r.versionId!, "changes", "javítsd");
+    await service.submitReview(actorA(), r.versionId!, "changes", "javítsd", "wording");
     await service.claimItem(appActor, r.itemId);
     await db.contentItem.update({ where: { id: r.itemId }, data: { claimedAt: new Date(Date.now() - 3 * 3600_000) } });
     const res = await service.submitReview(actorB(), r.versionId!, "approve");
@@ -317,7 +320,7 @@ describe.skipIf(!enabled)("content service (integration)", () => {
         { tenantId: 1, contentItemId: r.itemId, versionId: r.versionId!, position: 1, kind: "file", url: "b" },
       ],
     });
-    await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite");
+    await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite", "wording");
     await service.claimItem(appActor, r.itemId);
     const v2 = await service.createVersion(appActor, r.itemId, {
       body: "carried forward", changeNote: "note", basedOnVersionId: r.versionId!,
@@ -364,5 +367,44 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     if (y.ok) createdItemIds.push(y.itemId);
     expect(x.ok && y.ok).toBe(true);
     if (x.ok && y.ok) expect(x.itemId).toBe(y.itemId);
+  });
+
+  it("an open check keeps a dual-approved item out of live, and settling it flips it", async () => {
+    const r = await newItem();
+    await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `IT-check-${Date.now()}`, state: "open", source: "import" },
+    });
+    const a = await service.submitReview(actorA(), r.versionId!, "approve");
+    const b = await service.submitReview(actorB(), r.versionId!, "approve");
+    expect(a).toMatchObject({ ok: true });
+    // Both approved, but the open check blocks live.
+    expect(b).toMatchObject({ ok: true, status: "in_review", wentLive: false });
+    let item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId }, select: { status: true, liveVersionId: true, wasLive: true } });
+    expect(item).toMatchObject({ status: "in_review", liveVersionId: null, wasLive: false });
+
+    const check = await db.contentCheck.findFirstOrThrow({ where: { itemId: r.itemId } });
+    const settled = await service.setCheckState(actorA(), check.id, "resolved", "Áron válaszolt rá");
+    expect(settled).toMatchObject({ ok: true, itemStatus: "live", wentLive: true });
+    item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId }, select: { status: true, liveVersionId: true, wasLive: true } });
+    expect(item).toMatchObject({ status: "live", wasLive: true });
+    expect(item.liveVersionId).toBe(r.versionId);
+  });
+
+  it("archive of an ai_working item restores to where the AI took it from", async () => {
+    const r = await newItem();
+    await service.submitReview(actorA(), r.versionId!, "rewrite", "írd újra", "wording");
+    await service.claimItem(appActor, r.itemId);
+    expect(await service.archiveItem(actorA(), r.itemId)).toMatchObject({ ok: true });
+    const restored = await service.restoreItem(actorA(), r.itemId);
+    expect(restored).toMatchObject({ ok: true, status: "rewrite_requested" });
+    // …and it is workable again: the AI can claim it.
+    expect(await service.claimItem(appActor, r.itemId)).toMatchObject({ ok: true });
+  });
+
+  it("archiving an already archived item leaves its restore target alone", async () => {
+    const r = await newItem();
+    await service.archiveItem(actorA(), r.itemId);
+    await service.archiveItem(actorA(), r.itemId);
+    expect(await service.restoreItem(actorA(), r.itemId)).toMatchObject({ ok: true, status: "in_review" });
   });
 });
