@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { applyEvent, isClaimStale, type ItemState } from "./transitions";
-import { getContentReviewers } from "./reviewers";
+import { getApprovalRule, getContentReviewers } from "./reviewers";
 import { isReviewReason, reasonRequiredFor, type ReviewReason } from "./reasons";
 import {
   CLAIM_TTL_MS, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX,
@@ -37,7 +37,7 @@ type Tx = Prisma.TransactionClient;
 
 const STATE_SELECT = {
   id: true, status: true, currentVersionId: true, liveVersionId: true,
-  claimedAt: true, claimedFrom: true, claimedBy: true, prevStatus: true, wasLive: true,
+  claimedAt: true, claimedFrom: true, claimedBy: true, prevStatus: true, wasLive: true, category: true,
 } satisfies Prisma.ContentItemSelect;
 type StateRow = Prisma.ContentItemGetPayload<{ select: typeof STATE_SELECT }>;
 
@@ -343,11 +343,14 @@ export async function submitReview(
     // The check gate must be evaluated HERE too: two approvals must not make an
     // item live while a ⚠ check is open (Vanda, #103 finding 1).
     const openChecks = await tx.contentCheck.count({ where: { itemId: row.id, state: "open" } });
+    // How many approvals THIS item needs (per-category setting, default 2).
+    const rule = await getApprovalRule(actor.tenantId, row.category);
     const next = applyEvent(state, {
       type: "reviews_changed",
-      reviewers,
+      reviewers: rule.reviewers,
       reviews: all.map((r) => ({ reviewerUserId: r.reviewerUserId, verdict: r.verdict as Verdict })),
       openChecks,
+      requiredApprovals: rule.required,
     });
     if (!next.ok) return fail(409, next.reason);
 
@@ -503,7 +506,6 @@ export async function setCheckState(
   }
   if (answer && answer.length > CHECK_ANSWER_MAX) return fail(400, "A válasz túl hosszú");
 
-  const reviewers = await getContentReviewers(actor.tenantId);
   return db.$transaction(async (tx) => {
     const check = await tx.contentCheck.findFirst({
       where: { id: checkId, tenantId: actor.tenantId },
@@ -533,10 +535,12 @@ export async function setCheckState(
       where: { versionId: state0.currentVersionId }, select: { reviewerUserId: true, verdict: true },
     });
     const openChecks = await tx.contentCheck.count({ where: { itemId: check.itemId, state: "open" } });
+    const rule = await getApprovalRule(actor.tenantId, row.category);
     const next = applyEvent(state0, {
-      type: "reviews_changed", reviewers,
+      type: "reviews_changed", reviewers: rule.reviewers,
       reviews: reviews.map((r) => ({ reviewerUserId: r.reviewerUserId, verdict: r.verdict as Verdict })),
       openChecks,
+      requiredApprovals: rule.required,
     });
     if (!next.ok) return { ok: true as const, itemStatus: state0.status, wentLive: false };
     await tx.contentItem.update({

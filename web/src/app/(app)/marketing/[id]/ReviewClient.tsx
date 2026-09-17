@@ -72,7 +72,7 @@ export function ReviewClient({
   const supabase = useMemo(() => createClient(), []);
   const [isPending, startTransition] = useTransition();
 
-  const { item, versions, reviewers, isReviewer, checks } = data;
+  const { item, versions, reviewers, isReviewer, checks, approvals } = data;
 
   const currentVersion = versions.find((v) => v.id === item.currentVersionId) ?? null;
   const liveVersion = item.liveVersionId ? versions.find((v) => v.id === item.liveVersionId) ?? null : null;
@@ -308,6 +308,13 @@ export function ReviewClient({
         )}
         {item.status === "ai_working" && <p className="review-note amber">{UI.aiBusy}</p>}
         {item.needsHumanAsset && <p className="review-note amber">{UI.needsHumanAsset}</p>}
+        {/* What the approval rule for THIS category is, in words. */}
+        <p className="review-note">
+          {approvals.required >= 2 ? UI.approvalsTwo : UI.approvalsOne}
+          {" · "}
+          {UI.approvalsCount(approvals.approved, approvals.required)}
+        </p>
+        {!approvals.enoughReviewers && <p className="review-note amber">{UI.approvalsBlocked}</p>}
         {hasOpenChecks && <p className="review-note amber">{UI.checkBlocksLive}</p>}
         {!isReviewer && <p className="review-note">{UI.notReviewer}</p>}
         {reviewers.length < 2 && <p className="review-note">{UI.noReviewers}</p>}

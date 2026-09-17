@@ -13,9 +13,11 @@ import {
   setCheckState, submitReview, CHECK_ANSWER_MAX, CHECK_FOR, CHECK_QUESTION_MAX, CHECK_STATES,
   type UserActor,
 } from "@/lib/content/service";
-import { getContentReviewers, REQUIRED_REVIEWERS } from "@/lib/content/reviewers";
+import {
+  approvalsFromSettings, getContentReviewers, requiredApprovalsFor, MAX_REVIEWERS, MIN_REVIEWERS,
+} from "@/lib/content/reviewers";
 import { digestOptOutFromSettings } from "@/lib/content/digest";
-import { CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from "@/lib/content/types";
+import { CONTENT_CATEGORIES, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from "@/lib/content/types";
 import {
   ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, removeObjects, stagingPath, statObject,
 } from "@/lib/content/storage";
@@ -262,17 +264,19 @@ export async function getContentReviewerOptions(): Promise<ReviewerOption[]> {
 }
 
 /**
- * Tenant config: who the two reviewers are. Exactly two distinct, logged-in-able
- * CRM users; the caller must be one of them (a non-reviewer cannot hand the
- * approval power to someone else). Audited.
+ * Tenant config: who the reviewers are. One or two distinct CRM users, and the
+ * caller must be one of them (a non-reviewer cannot hand the approval power to
+ * someone else). How many approvals an item needs is a separate setting.
  */
 export async function saveContentReviewers(userIds: number[]): Promise<{ ok: true } | Fail> {
   const actor = await userActor();
   if ("ok" in actor) return actor;
-  const parsed = z.array(z.number().int().positive()).length(REQUIRED_REVIEWERS).safeParse(userIds);
+  const parsed = z.array(z.number().int().positive()).min(MIN_REVIEWERS).max(MAX_REVIEWERS).safeParse(userIds);
   const ids = parsed.success ? [...new Set(parsed.data)] : [];
-  if (ids.length !== REQUIRED_REVIEWERS) return { ok: false, error: "Pontosan két különböző bírálót kell megadni" };
-  if (!ids.includes(actor.userId)) return { ok: false, error: "Csak saját magadat és egy társbírálót adhatsz meg" };
+  if (ids.length < MIN_REVIEWERS || ids.length > MAX_REVIEWERS) {
+    return { ok: false, error: `Egy vagy két bírálót adj meg` };
+  }
+  if (!ids.includes(actor.userId)) return { ok: false, error: "Magadat is add meg bírálóként" };
   const found = await db.user.count({ where: { tenantId: TENANT_ID, id: { in: ids }, passwordHash: "supabase-auth" } });
   if (found !== ids.length) return { ok: false, error: "Ismeretlen felhasználó" };
   const before = await setTenantSettings(TENANT_ID, { contentReviewers: ids });
@@ -440,4 +444,39 @@ export async function restoreContentBulk(itemIds: number[]): Promise<{ ok: true;
   }
   revalidateContent();
   return { ok: true, restored };
+}
+
+
+/** How many approvals each category needs (1 or 2). Audited; default stays 2. */
+export async function getContentApprovals(): Promise<{ default: number; byCategory: Record<string, number> }> {
+  const actor = await userActor();
+  if ("ok" in actor) return { default: 2, byCategory: {} };
+  const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
+  const cfg = approvalsFromSettings(tenant?.settings);
+  const byCategory: Record<string, number> = {};
+  for (const c of CONTENT_CATEGORIES) byCategory[c] = requiredApprovalsFor(tenant?.settings, c);
+  return { default: cfg.default ?? 2, byCategory };
+}
+
+export async function saveContentApprovals(input: {
+  default?: number; byCategory?: Record<string, number>;
+}): Promise<{ ok: true } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  const count = z.union([z.literal(1), z.literal(2)]);
+  const parsed = z.object({
+    default: count.optional(),
+    byCategory: z.record(z.enum(CONTENT_CATEGORIES), count).optional(),
+  }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Egy vagy két jóváhagyás adható meg" };
+  const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
+  const before = approvalsFromSettings(tenant?.settings);
+  const next = {
+    ...(parsed.data.default ? { default: parsed.data.default } : {}),
+    ...(parsed.data.byCategory ? { byCategory: parsed.data.byCategory } : {}),
+  };
+  await setTenantSettings(TENANT_ID, { contentApprovals: next });
+  audit("tenant", TENANT_ID, "update", { contentApprovals: before }, { contentApprovals: next }, { tenantId: TENANT_ID });
+  revalidateContent();
+  return { ok: true };
 }

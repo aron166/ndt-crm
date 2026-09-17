@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { UI } from "@/lib/content/labels";
+import { UI, CATEGORY_LABEL } from "@/lib/content/labels";
+import { CONTENT_CATEGORIES } from "@/lib/content/types";
 import {
   getContentReviewerOptions, saveContentReviewers, getMyDigestSetting, setMyDigestEnabled,
+  getContentApprovals, saveContentApprovals,
   type ReviewerOption,
 } from "@/app/actions/content";
 
@@ -16,6 +18,9 @@ export function ReviewerSettings() {
   const [saving, setSaving] = useState(false);
   const [options, setOptions] = useState<ReviewerOption[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
+  const [approvals, setApprovals] = useState<{ default: number; byCategory: Record<string, number> } | null>(null);
+  const [approvalsSaving, setApprovalsSaving] = useState(false);
+  const [approvalsError, setApprovalsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [digest, setDigest] = useState<{ enabled: boolean; isReviewer: boolean } | null>(null);
   const [digestSaving, setDigestSaving] = useState(false);
@@ -28,6 +33,7 @@ export function ReviewerSettings() {
       const [opts, digestSetting] = await Promise.all([getContentReviewerOptions(), getMyDigestSetting()]);
       setOptions(opts);
       setSelected(opts.filter((o) => o.selected).map((o) => o.id));
+      setApprovals(await getContentApprovals());
       setDigest(digestSetting);
       setLoading(false);
     }
@@ -115,12 +121,59 @@ export function ReviewerSettings() {
               )}
               <button
                 onClick={save}
-                disabled={saving || selected.length !== 2}
+                disabled={saving || selected.length < 1 || selected.length > 2}
                 className="btn primary"
                 style={{ marginTop: 14, minHeight: 44 }}
               >
                 {UI.saveReviewers}
               </button>
+              {approvals && (
+                <div style={{ marginTop: 18, borderTop: "1px solid var(--line-soft)", paddingTop: 14 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{UI.approvalsSettings}</div>
+                  <p style={{ fontSize: 13, color: "var(--fg-mute)", margin: "6px 0 10px", maxWidth: "60ch" }}>
+                    {UI.approvalsWarning}
+                  </p>
+                  <div className="space-y-2">
+                    {CONTENT_CATEGORIES.map((c) => (
+                      <label key={c} className="flex items-center gap-2.5" style={{ minHeight: 44 }}>
+                        <span style={{ fontSize: 14, color: "var(--fg)", minWidth: 140 }}>{CATEGORY_LABEL[c]}</span>
+                        <select
+                          value={approvals.byCategory[c] ?? approvals.default}
+                          onChange={(e) =>
+                            setApprovals({
+                              ...approvals,
+                              byCategory: { ...approvals.byCategory, [c]: Number(e.target.value) },
+                            })
+                          }
+                          style={{ minHeight: 44, padding: "6px 10px", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, color: "var(--fg)" }}
+                        >
+                          <option value={1}>{UI.approvalsOne}</option>
+                          <option value={2}>{UI.approvalsTwo}</option>
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                  {approvalsError && <p style={{ fontSize: 13, color: "var(--coral)", marginTop: 8 }}>{approvalsError}</p>}
+                  <button
+                    className="btn"
+                    style={{ marginTop: 12, minHeight: 44 }}
+                    disabled={approvalsSaving}
+                    onClick={async () => {
+                      setApprovalsSaving(true);
+                      setApprovalsError(null);
+                      const byCategory = Object.fromEntries(
+                        CONTENT_CATEGORIES.map((c) => [c, approvals.byCategory[c] ?? approvals.default]),
+                      );
+                      const res = await saveContentApprovals({ byCategory });
+                      setApprovalsSaving(false);
+                      if (!res.ok) setApprovalsError(res.error);
+                      else router.refresh();
+                    }}
+                  >
+                    {UI.saveApprovals}
+                  </button>
+                </div>
+              )}
               {digest?.isReviewer && (
                 <label
                   className="flex items-center gap-2.5"

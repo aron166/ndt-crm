@@ -407,4 +407,55 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     await service.archiveItem(actorA(), r.itemId);
     expect(await service.restoreItem(actorA(), r.itemId)).toMatchObject({ ok: true, status: "in_review" });
   });
+
+  it("one reviewer plus a category set to one approval: solo approve goes live", async () => {
+    const tenant = await db.tenant.findUniqueOrThrow({ where: { id: 1 }, select: { settings: true } });
+    const saved = tenant.settings;
+    try {
+      await db.tenant.update({
+        where: { id: 1 },
+        data: { settings: { ...(saved as Record<string, unknown>), contentReviewers: [userA], contentApprovals: { byCategory: { other: 1 } } } },
+      });
+      const r = await newItem();
+      const res = await service.submitReview(actorA(), r.versionId!, "approve");
+      expect(res).toMatchObject({ ok: true, status: "live", wentLive: true });
+    } finally {
+      await db.tenant.update({ where: { id: 1 }, data: { settings: saved as never } });
+    }
+  });
+
+  it("one reviewer but the category needs two: stays blocked and says nothing went live", async () => {
+    const tenant = await db.tenant.findUniqueOrThrow({ where: { id: 1 }, select: { settings: true } });
+    const saved = tenant.settings;
+    try {
+      await db.tenant.update({
+        where: { id: 1 },
+        data: { settings: { ...(saved as Record<string, unknown>), contentReviewers: [userA], contentApprovals: { byCategory: { other: 2 } } } },
+      });
+      const r = await newItem();
+      const res = await service.submitReview(actorA(), r.versionId!, "approve");
+      expect(res).toMatchObject({ ok: true, status: "in_review", wentLive: false });
+      const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId }, select: { liveVersionId: true } });
+      expect(item.liveVersionId).toBeNull();
+    } finally {
+      await db.tenant.update({ where: { id: 1 }, data: { settings: saved as never } });
+    }
+  });
+
+  it("solo approval never skips an open check", async () => {
+    const tenant = await db.tenant.findUniqueOrThrow({ where: { id: 1 }, select: { settings: true } });
+    const saved = tenant.settings;
+    try {
+      await db.tenant.update({
+        where: { id: 1 },
+        data: { settings: { ...(saved as Record<string, unknown>), contentReviewers: [userA], contentApprovals: { byCategory: { other: 1 } } } },
+      });
+      const r = await newItem();
+      await db.contentCheck.create({ data: { tenantId: 1, itemId: r.itemId, question: `IT-solo-${Date.now()}`, state: "open", source: "import" } });
+      const res = await service.submitReview(actorA(), r.versionId!, "approve");
+      expect(res).toMatchObject({ ok: true, status: "in_review", wentLive: false });
+    } finally {
+      await db.tenant.update({ where: { id: 1 }, data: { settings: saved as never } });
+    }
+  });
 });

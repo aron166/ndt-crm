@@ -73,6 +73,36 @@ describe("reviews_changed — the table", () => {
   });
 });
 
+describe("configurable approvals (per category, default 2)", () => {
+  it("required 1: a single approval from a single configured reviewer goes live", () => {
+    expect(statusFromReviews([2], [{ reviewerUserId: 2, verdict: "approve" }], 1)).toBe("live");
+  });
+  it("required 1 with two reviewers: the first approval is enough", () => {
+    expect(statusFromReviews([2, 3], [{ reviewerUserId: 3, verdict: "approve" }], 1)).toBe("live");
+  });
+  it("required 2 with only one configured reviewer NEVER goes live", () => {
+    expect(statusFromReviews([2], [{ reviewerUserId: 2, verdict: "approve" }], 2)).toBe("in_review");
+  });
+  it("required 2 still needs both", () => {
+    expect(statusFromReviews([2, 3], [{ reviewerUserId: 2, verdict: "approve" }], 2)).toBe("in_review");
+    expect(statusFromReviews([2, 3], [{ reviewerUserId: 2, verdict: "approve" }, { reviewerUserId: 3, verdict: "approve" }], 2)).toBe("live");
+  });
+  it("a send-back beats the approval count at required 1", () => {
+    expect(statusFromReviews([2, 3], [{ reviewerUserId: 2, verdict: "approve" }, { reviewerUserId: 3, verdict: "changes" }], 1)).toBe("changes_requested");
+    expect(statusFromReviews([2, 3], [{ reviewerUserId: 2, verdict: "approve" }, { reviewerUserId: 3, verdict: "rewrite" }], 1)).toBe("rewrite_requested");
+  });
+  it("an open check still blocks live at required 1", () => {
+    const r = applyEvent(st("in_review"), {
+      type: "reviews_changed", reviewers: [2], reviews: [{ reviewerUserId: 2, verdict: "approve" }],
+      requiredApprovals: 1, openChecks: 1,
+    });
+    expect(r).toMatchObject({ ok: true, state: { status: "in_review" }, wentLive: false });
+  });
+  it("required 1 with no reviewers configured is never live", () => {
+    expect(statusFromReviews([], [{ reviewerUserId: 2, verdict: "approve" }], 1)).toBe("in_review");
+  });
+});
+
 describe("claim", () => {
   it.each(["changes_requested", "rewrite_requested"] as const)("from %s → ai_working, remembers where from", (s) => {
     expect(applyEvent(st(s), { type: "claim", now: NOW })).toMatchObject({

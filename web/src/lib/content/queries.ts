@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { getContentReviewers } from "./reviewers";
+import { getApprovalRule, getContentReviewers } from "./reviewers";
 import { STALE_REVIEW_MS } from "./types";
 
 /**
@@ -181,6 +181,8 @@ export interface ReviewPageData {
   }[];
   reviewers: { id: number; name: string }[];
   isReviewer: boolean;
+  /** How many approvals this item's category needs, and whether that is possible. */
+  approvals: { required: number; enoughReviewers: boolean; approved: number };
   /** §6c: ⚠ questions; an open one blocks going live. */
   checks: {
     id: number; question: string; forWhom: string; state: string; answer: string | null;
@@ -223,6 +225,11 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
   });
   if (!item) return null;
   const reviewers = await reviewerNames(tenantId);
+  const rule = await getApprovalRule(tenantId, item.category);
+  const currentVersion = item.versions.find((v) => v.id === item.currentVersionId);
+  const approved = (currentVersion?.reviews ?? []).filter(
+    (r) => r.verdict === "approve" && rule.reviewers.includes(r.reviewerUserId),
+  ).length;
   const { versions, publishedAt, checks, ...rest } = item;
   return {
     item: {
@@ -246,6 +253,7 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
     })),
     reviewers,
     isReviewer: reviewers.some((r) => r.id === userId),
+    approvals: { required: rule.required, enoughReviewers: rule.enoughReviewers, approved },
   };
 }
 
