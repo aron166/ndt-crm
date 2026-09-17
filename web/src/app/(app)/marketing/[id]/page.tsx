@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { getActor } from "@/lib/actor";
 import { getReviewPage } from "@/lib/content/queries";
 import { signedViewUrls } from "@/lib/content/storage";
@@ -36,7 +35,6 @@ export default async function ContentReviewPage({
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
           className="row-link"
         >
-          <ArrowLeft style={{ width: 14, height: 14 }} />
           ← Anyagok
         </Link>
       </div>

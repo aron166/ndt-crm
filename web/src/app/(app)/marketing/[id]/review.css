@@ -358,10 +358,10 @@
   resize: vertical;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 767px) {
   .review-actionbar-wrap {
     position: fixed;
-    left: 0;
+    left: 3.5rem; /* the phone icon rail (AppShell) */
     right: 0;
     bottom: 0;
     top: auto;
