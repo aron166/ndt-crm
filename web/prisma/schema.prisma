@@ -1121,6 +1121,9 @@ model ContentAsset {
   storagePath   String?  @map("storage_path")
   mimeType      String?  @map("mime_type")
   sizeBytes     Int?     @map("size_bytes")
+  // WebP thumbnail path (NATE-STORAGE-1), sibling of storagePath: <storagePath>.thumb.webp.
+  // Null for non-images, oversized originals, or a failed conversion.
+  thumbPath     String?  @map("thumb_path")
   createdAt     DateTime @default(now()) @map("created_at")
 
   tenant      Tenant          @relation(fields: [tenantId], references: [id])

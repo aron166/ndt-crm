@@ -7,6 +7,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * prefix, signed URLs for viewing, size/type allow-list. Server-only — the
  * service-role key never reaches the browser; the browser only ever gets a
  * one-off signed upload URL for one exact path, or a short-lived view URL.
+ *
+ * NATE-STORAGE-1: never ship a full-size asset where a thumbnail exists —
+ * images get a `.thumb.webp` (see thumbnails.ts, `content_assets.thumb_path`);
+ * the UI wiring to prefer it is a separate ticket.
  */
 
 export const CONTENT_BUCKET = "content-assets";
@@ -69,6 +73,18 @@ export async function statObject(path: string): Promise<{ size: number; mimeType
   return { size, mimeType };
 }
 
+/** Raw bytes of an uploaded object, or null when it does not exist. */
+export async function downloadObject(path: string): Promise<Uint8Array | null> {
+  const { data, error } = await admin().storage.from(CONTENT_BUCKET).download(path);
+  if (error || !data) return null;
+  return new Uint8Array(await data.arrayBuffer());
+}
+
+export async function uploadObject(path: string, bytes: Uint8Array, contentType: string): Promise<void> {
+  const { error } = await admin().storage.from(CONTENT_BUCKET).upload(path, bytes, { contentType, upsert: true });
+  if (error) throw new Error(`storage upload failed: ${error.message}`);
+}
+
 export async function signedViewUrls(paths: string[]): Promise<Record<string, string>> {
   const unique = [...new Set(paths)];
   if (unique.length === 0) return {};
@@ -81,7 +97,8 @@ export async function signedViewUrls(paths: string[]): Promise<Record<string, st
 
 /** Delete uploaded objects (hard delete of an item, §6c). Best effort. */
 export async function removeObjects(paths: string[]): Promise<void> {
-  const unique = [...new Set(paths)].filter(Boolean);
+  const { thumbPathFor } = await import("./thumbnails");
+  const unique = [...new Set([...paths, ...paths.map(thumbPathFor)])].filter(Boolean);
   if (unique.length === 0) return;
   const { error } = await admin().storage.from(CONTENT_BUCKET).remove(unique);
   if (error) throw new Error(`storage remove failed: ${error.message}`);

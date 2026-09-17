@@ -19,6 +19,7 @@ import { CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from 
 import {
   ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, removeObjects, stagingPath, statObject,
 } from "@/lib/content/storage";
+import { generateThumbnail } from "@/lib/content/thumbnails";
 import type { NewAssetInput } from "@/lib/content/service";
 
 // Content approval — human side (spec 2026-09-17). Every action resolves the
@@ -176,7 +177,13 @@ async function resolveAssets(
     if (!stat) return { ok: false, error: "A feltöltött fájl nem található — töltsd fel újra" };
     const kind = ALLOWED_MIME[stat.mimeType];
     if (!kind || stat.size > MAX_ASSET_BYTES) return { ok: false, error: "A feltöltött fájl típusa vagy mérete nem megengedett" };
-    out.push({ kind, url: u.path, storagePath: u.path, mimeType: stat.mimeType, sizeBytes: stat.size, caption: u.caption ?? null });
+    // A missing/failed thumbnail never blocks the save — generateThumbnail
+    // reports and swallows its own errors, returning null.
+    const thumb = kind === "image" ? await generateThumbnail(u.path) : null;
+    out.push({
+      kind, url: u.path, storagePath: u.path, mimeType: stat.mimeType, sizeBytes: stat.size,
+      thumbPath: thumb?.path ?? null, caption: u.caption ?? null,
+    });
   }
   for (const l of links ?? []) {
     if (!isHttpUrl(l.url)) return { ok: false, error: "Csak http/https link adható meg" };

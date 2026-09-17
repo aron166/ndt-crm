@@ -192,6 +192,7 @@ export interface NewAssetInput {
   storagePath?: string | null;
   mimeType?: string | null;
   sizeBytes?: number | null;
+  thumbPath?: string | null;
   caption?: string | null;
 }
 
