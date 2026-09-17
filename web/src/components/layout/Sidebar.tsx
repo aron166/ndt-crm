@@ -182,12 +182,16 @@ interface SidebarProps {
   onToggle: (collapsed: boolean) => void;
   /** Count badges keyed by nav href (e.g. { "/marketing": 3 }). */
   badges?: Record<string, number>;
+  /** Phones: render as an off-canvas drawer instead of a rail. */
+  /** Phones (< 768 px, CSS): an off-canvas drawer. `active` = the phone layout is on. */
+  mobile?: { open: boolean; onClose: () => void; active: boolean };
 }
 
-export function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
   const pathname = usePathname();
 
   function toggle() {
+    if (mobile?.active) { mobile.onClose(); return; }
     const next = !collapsed;
     onToggle(next);
     localStorage.setItem("sidebar-collapsed", String(next));
@@ -197,9 +201,12 @@ export function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
     <aside
       style={{ background: "var(--bg-sidebar)", borderRight: "1px solid var(--line-soft)" }}
       className={cn(
-        "fixed top-0 left-0 h-full flex flex-col transition-all duration-200 z-30 overflow-hidden",
-        collapsed ? "w-14" : "w-[240px]"
+        "fixed top-0 left-0 h-full flex flex-col transition-all duration-200 overflow-hidden z-30",
+        collapsed ? "w-14" : "w-[240px]",
+        "max-md:z-50 max-md:w-[260px]",
+        !mobile?.open && "max-md:-translate-x-full"
       )}
+      aria-hidden={mobile?.active ? !mobile.open : undefined}
     >
       {/* Indigo gradient glow top-left */}
       <div
@@ -279,6 +286,7 @@ export function Sidebar({ collapsed, onToggle, badges }: SidebarProps) {
                   <li key={href}>
                     <Link
                       href={href}
+                      onClick={mobile?.active ? mobile.onClose : undefined}
                       title={collapsed ? label : undefined}
                       className="relative flex items-center gap-2.5 rounded transition-colors duration-150"
                       style={{

@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { isCrmUserEmail } from "@/lib/crm-user";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
@@ -77,9 +78,26 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isLoginPage) {
+  // A session is not a CRM user (signups are open; `users` is the allow-list).
+  // Gate here, not only in the (app) layout: a layout does not run for an RSC
+  // request of a page segment (Vanda, #100). Service APIs authenticate themselves.
+  const needsCrmUser = Boolean(user) && !isServiceApi && !isAuthRoute;
+  const isCrmUser = needsCrmUser ? await isCrmUserEmail(1, user!.email) : false;
+
+  if (needsCrmUser && !isCrmUser && !isLoginPage) {
+    if (request.nextUrl.pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "?denied=1";
+    return NextResponse.redirect(url);
+  }
+
+  if (user && isLoginPage && isCrmUser) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

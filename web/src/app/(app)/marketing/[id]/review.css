@@ -362,14 +362,14 @@
 @media (max-width: 767px) {
   .review-actionbar-wrap {
     position: fixed;
-    left: 3.5rem; /* the phone icon rail (AppShell) */
+    left: 0; /* phones: no rail and no status bar (AppShell) */
     right: 0;
-    bottom: 26px; /* above the StatusBar — main's stacking context sits below it */
+    bottom: 0;
     top: auto;
     z-index: 40;
     background: var(--bg-1);
     border-top: 1px solid var(--line-soft);
-    padding: 8px 10px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
     margin: 0;
   }
   .review-actionbar-wrap .review-actionbar { margin-bottom: 0; border: none; padding: 0; background: none; }
