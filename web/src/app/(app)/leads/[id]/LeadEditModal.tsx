@@ -21,6 +21,7 @@ export interface LeadEditInitial {
   lostReason?: string | null;
   companyId?: number | null;
   companyName?: string | null;
+  campaign?: string | null;
 }
 
 interface LeadEditModalProps {
@@ -96,6 +97,10 @@ export function LeadEditModal({ open, onClose, onSaved, initial }: LeadEditModal
 
           <FormField label="Elvesztés oka">
             <Input name="lostReason" defaultValue={initial.lostReason ?? ""} placeholder="Ha elveszett, miért" />
+          </FormField>
+
+          <FormField label="Kampány">
+            <Input name="campaign" defaultValue={initial.campaign ?? ""} placeholder="pl. BirdsView Q3" />
           </FormField>
 
           {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}

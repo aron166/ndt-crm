@@ -172,6 +172,10 @@ export function LogInteractionModal({
             </FormField>
           </div>
 
+          <FormField label="Kampány (nem kötelező)">
+            <Input name="campaign" placeholder="pl. BirdsView Q3" />
+          </FormField>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <DialogFooter>

@@ -147,6 +147,7 @@ export async function updateLead(id: number, formData: FormData) {
     select: {
       subject: true, serviceInterest: true, source: true,
       estimatedValue: true, message: true, lostReason: true, companyId: true, outcome: true,
+      campaign: true,
     },
   });
   if (!before) return { error: "Lead nem található" };
@@ -164,6 +165,10 @@ export async function updateLead(id: number, formData: FormData) {
   const source = text("source");
   const message = text("message");
   const lostReason = text("lostReason");
+  const campaign = text("campaign");
+  if (campaign !== undefined && campaign !== null && campaign.length > 80) {
+    return { error: "A kampány neve legfeljebb 80 karakter" };
+  }
   // Editing must not be a back door around the mandatory-reason rule: a lost lead
   // keeps a reason (setLeadOutcome enforces it on the way in).
   if (before.outcome === "lost" && lostReason === null) {
@@ -208,6 +213,7 @@ export async function updateLead(id: number, formData: FormData) {
       ...(lostReason !== undefined ? { lostReason } : {}),
       ...(estimatedValue !== undefined ? { estimatedValue } : {}),
       ...(companyId !== undefined ? { companyId } : {}),
+      ...(campaign !== undefined ? { campaign } : {}),
     },
   });
 
@@ -216,7 +222,7 @@ export async function updateLead(id: number, formData: FormData) {
     {
       subject: before.subject, serviceInterest: before.serviceInterest, source: before.source,
       estimatedValue: beforeValue, message: before.message, lostReason: before.lostReason,
-      companyId: before.companyId,
+      companyId: before.companyId, campaign: before.campaign,
     },
     {
       subject: subject !== undefined ? subject : before.subject,
@@ -226,6 +232,7 @@ export async function updateLead(id: number, formData: FormData) {
       message: message !== undefined ? message : before.message,
       lostReason: lostReason !== undefined ? lostReason : before.lostReason,
       companyId: companyId !== undefined ? companyId : before.companyId,
+      campaign: campaign !== undefined ? campaign : before.campaign,
     },
   );
 

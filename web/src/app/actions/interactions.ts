@@ -17,9 +17,15 @@ export async function logInteraction(formData: FormData) {
   const occurredAt = formData.get("occurredAt") as string;
   const companyIdStr = formData.get("companyId") as string | null;
   const personIdStr = formData.get("personId") as string | null;
+  const campaignRaw = formData.get("campaign");
 
   const error = validateInteractionInput({ type, notes, occurredAt });
   if (error) return { error };
+
+  const campaign = campaignRaw === null ? null : String(campaignRaw).trim() || null;
+  if (campaign && campaign.length > 80) {
+    return { error: "A kampány neve legfeljebb 80 karakter" };
+  }
 
   const companyId = companyIdStr ? parseInt(companyIdStr, 10) : null;
   const personId = personIdStr ? parseInt(personIdStr, 10) : null;
@@ -35,6 +41,7 @@ export async function logInteraction(formData: FormData) {
       companyId,
       personId,
       userId,
+      campaign,
     },
   });
   await audit("interaction", interaction.id, "create", null,
