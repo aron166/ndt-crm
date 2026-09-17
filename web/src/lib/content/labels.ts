@@ -122,6 +122,8 @@ export const UI = {
   checkForPeter: "Péter",
   checkForEither: "Bármelyik",
   checkAskedBy: "Forrás: import",
+  reasonLabel: "Miért küldöd vissza?",
+  reasonPick: "Válassz okot",
   pagePrev: "Előző",
   pageNext: "Következő",
   pageLabel: (n: number) => `${n}. oldal`,

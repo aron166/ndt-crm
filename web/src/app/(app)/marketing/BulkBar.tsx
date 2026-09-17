@@ -109,7 +109,7 @@ export function BulkBar({
       if (!res.ok) { setToast({ text: res.error }); return; }
       onDone();
       if (res.refused.length > 0) {
-        setToast({ text: `${UI.deletedToast(res.deleted.length)} — ${res.refused.map((r) => r.reason).join(", ")}` });
+        setToast({ text: `${UI.deletedToast(res.deleted.length)}: ${res.refused.map((r) => r.reason).join(", ")}` });
       } else {
         setToast({ text: UI.deletedToast(res.deleted.length) });
       }

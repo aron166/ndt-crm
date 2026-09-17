@@ -68,7 +68,7 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
       <div className="page-head flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">Kampányok</h1>
-          <p className="page-sub">Kampányok és célközönségük — szegmensből kimenő lista.</p>
+          <p className="page-sub">Kampányok és célközönségük: szegmensből kimenő lista.</p>
         </div>
         <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setOpen(true)}>
           <Plus className="size-4" /> Új kampány
@@ -151,7 +151,7 @@ function CampaignGroup({ rows }: { rows: CampaignRow[] }) {
           <div className="flex items-center gap-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", whiteSpace: "nowrap" }}>
             <span className="flex items-center gap-1" title="Célközönség">
               <Users className="size-3.5" />
-              {c.audienceName ?? "—"}
+              {c.audienceName ?? "-"}
             </span>
             <span className="flex items-center gap-1" title="Tartalmak">
               <FileText className="size-3.5" />

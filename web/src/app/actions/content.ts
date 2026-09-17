@@ -44,6 +44,8 @@ const reviewInput = z.object({
   versionId: z.number().int().positive(),
   verdict: z.enum(VERDICTS),
   comment: z.string().max(REVIEW_COMMENT_MAX).optional(),
+  /** Required for changes/rewrite (lib/content/reasons.ts). */
+  reason: z.string().max(40).optional(),
 });
 
 /** ✅ / ✏️ / ♻️ on the current version — for yourself only. */
@@ -55,7 +57,7 @@ export async function submitContentReview(
   const parsed = reviewInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
 
-  const res = await submitReview(actor, parsed.data.versionId, parsed.data.verdict, parsed.data.comment);
+  const res = await submitReview(actor, parsed.data.versionId, parsed.data.verdict, parsed.data.comment, parsed.data.reason);
   if (!res.ok) return { ok: false, error: res.error };
 
   const version = await db.contentVersion.findFirst({
@@ -174,7 +176,7 @@ async function resolveAssets(
     // Content-Type the browser sent — a renamed file keeps a wrong label. Files are
     // served from the Supabase origin via signed URLs, so no XSS on the CRM origin.
     const stat = await statObject(u.path);
-    if (!stat) return { ok: false, error: "A feltöltött fájl nem található — töltsd fel újra" };
+    if (!stat) return { ok: false, error: "A feltöltött fájl nem található: töltsd fel újra" };
     const kind = ALLOWED_MIME[stat.mimeType];
     if (!kind || stat.size > MAX_ASSET_BYTES) return { ok: false, error: "A feltöltött fájl típusa vagy mérete nem megengedett" };
     // A missing/failed thumbnail never blocks the save — generateThumbnail

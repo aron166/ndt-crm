@@ -8,6 +8,7 @@ import { wordDiff } from "@/lib/content/diff";
 import {
   UI, CATEGORY_LABEL, VERDICT_LABEL, VERDICT_ACTION, AUTHOR_LABEL,
 } from "@/lib/content/labels";
+import { REVIEW_REASONS, REVIEW_REASON_LABEL, type ReviewReason } from "@/lib/content/reasons";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/marketing/types";
 import type { ContentCategory, Verdict } from "@/lib/content/types";
 import type { ReviewPageData } from "@/lib/content/queries";
@@ -92,6 +93,7 @@ export function ReviewClient({
   const [actionError, setActionError] = useState<string | null>(null);
   const [reviewPanel, setReviewPanel] = useState<"changes" | "rewrite" | null>(null);
   const [reviewComment, setReviewComment] = useState("");
+  const [reviewReason, setReviewReason] = useState<ReviewReason | "">("");
 
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState("");
@@ -140,11 +142,11 @@ export function ReviewClient({
     });
   }
 
-  function submitVerdict(verdict: Verdict, comment?: string) {
+  function submitVerdict(verdict: Verdict, comment?: string, reason?: string) {
     if (!viewed || viewed.id !== item.currentVersionId) return;
     run(
-      () => submitContentReview({ versionId: viewed.id, verdict, comment }),
-      () => { setReviewPanel(null); setReviewComment(""); },
+      () => submitContentReview({ reason, versionId: viewed.id, verdict, comment }),
+      () => { setReviewPanel(null); setReviewComment(""); setReviewReason(""); },
     );
   }
 
@@ -592,6 +594,17 @@ export function ReviewClient({
               {reviewPanel && (
                 <div className="review-comment-panel">
                   <label className="field-label" htmlFor="review-comment" style={{ display: "block" }}>{UI.commentLabel}</label>
+                  <label className="field-label" htmlFor="review-reason">{UI.reasonLabel}</label>
+                  <select
+                    id="review-reason"
+                    value={reviewReason}
+                    onChange={(e) => setReviewReason(e.target.value as ReviewReason | "")}
+                  >
+                    <option value="">{UI.reasonPick}</option>
+                    {REVIEW_REASONS.map((r) => (
+                      <option key={r} value={r}>{REVIEW_REASON_LABEL[r]}</option>
+                    ))}
+                  </select>
                   <textarea
                     id="review-comment"
                     autoFocus
@@ -606,8 +619,8 @@ export function ReviewClient({
                     <button
                       type="button"
                       className="btn primary"
-                      disabled={isPending || reviewComment.trim().length < 3}
-                      onClick={() => submitVerdict(reviewPanel, reviewComment.trim())}
+                      disabled={isPending || reviewComment.trim().length < 3 || !reviewReason}
+                      onClick={() => submitVerdict(reviewPanel, reviewComment.trim(), reviewReason)}
                     >
                       {reviewPanel === "changes" ? VERDICT_ACTION.changes : VERDICT_ACTION.rewrite}
                     </button>
@@ -641,7 +654,7 @@ export function ReviewClient({
                       {c.answer && (
                         <p className="check-answer">
                           {c.answer}
-                          {c.resolvedBy && <span className="check-resolved-by"> — {c.resolvedBy}</span>}
+                          {c.resolvedBy && <span className="check-resolved-by">{", "}{c.resolvedBy}</span>}
                         </p>
                       )}
                       {isOpen && !acting && (

@@ -2,14 +2,14 @@
 // prose". These run in addition to the imported ⚠ checks (see warnings.ts)
 // when an item is SUBMITTED or a NEW VERSION is posted. A failed rule blocks
 // the item from going live exactly like an open ⚠ check, names the rule, and
-// sends the item back to the AI queue (not a human) — see the pipeline
+// sends the item back to the AI queue (not a human): see the pipeline
 // wiring in service.ts, which this module knows nothing about.
 //
-// PURE, table-driven, no DB/network/Next import — one module so the rule
+// PURE, table-driven, no DB/network/Next import: one module so the rule
 // list can be edited without touching the pipeline.
 //
 // Forbidden-claims source of truth: growth/campaigns/cold-email-v0/
-// FRAMEWORK.md §6 "Állítás-korlátok — ZÁRT LISTA". Only what that list
+// FRAMEWORK.md §6 "Állítás-korlátok: ZÁRT LISTA". Only what that list
 // actually forbids is encoded here; no new product claims invented.
 
 export type RuleSeverity = "block"; // only blocking rules for now
@@ -42,7 +42,7 @@ export interface ContentRule {
   check: (ctx: RuleContext) => { ok: true } | { ok: false; excerpt?: string };
 }
 
-// The claim rules (1-7) apply to any outbound copy category — cold email is
+// The claim rules (1-7) apply to any outbound copy category: cold email is
 // the only one drafted today, script/ad share the same claim discipline.
 const CLAIM_CATEGORIES = new Set(["email", "script", "ad"]);
 const isClaimCategory = (ctx: RuleContext) => CLAIM_CATEGORIES.has(ctx.category);
@@ -63,7 +63,7 @@ function excerptAt(body: string, index: number, len = 40): string {
 
 // NOTE on \b: JS's \b only knows ASCII [A-Za-z0-9_] as "word" characters, so
 // on Hungarian text a plain \b sits in the wrong place next to any accented
-// letter (á/é/í/ó/ö/ő/ú/ü/ű) — e.g. "\bár\b" wrongly matches inside
+// letter (á/é/í/ó/ö/ő/ú/ü/ű): e.g. "\bár\b" wrongly matches inside
 // "felt|ár|ás" because \w treats "á" as a non-word char. Every whole-word
 // pattern below therefore uses a Unicode-aware boundary,
 // (?<!\p{L})…(?!\p{L}) with the /u flag, instead of \b.
@@ -71,35 +71,35 @@ const NOT_LETTER_BEFORE = "(?<!\\p{L})";
 const NOT_LETTER_AFTER = "(?!\\p{L})";
 
 // --- 1. forbidden_price -----------------------------------------------
-// FRAMEWORK §6: "ár bármilyen formában" — price/fee, in any form.
+// FRAMEWORK §6: "ár bármilyen formában": price/fee, in any form.
 const PRICE_CURRENCY_RE = /\d[\d.,\s]*\s?(ft|huf|eur)(?!\p{L})|\d[\d.,\s]*\s?[€$]|[€$]\s?\d/iu;
 // Whole-word only, so "árazniuk"/"felárral" (their pricing, not ours) don't
-// match — "ajánlat" alone is fine, only the price-compound "árajánlat*" is not.
+// match: "ajánlat" alone is fine, only the price-compound "árajánlat*" is not.
 const PRICE_WORD_RE = new RegExp(
   `${NOT_LETTER_BEFORE}(ár|árat|árajánlat\\p{L}*|díj\\p{L}*)${NOT_LETTER_AFTER}`,
   "iu",
 );
 
 // --- 2. forbidden_depth -------------------------------------------------
-// FRAMEWORK §6: "80 cm mélység" — a depth number is not true, never send one.
+// FRAMEWORK §6: "80 cm mélység": a depth number is not true, never send one.
 // cm is unambiguous in this domain; a bare "m" only counts near "mély" so we
 // don't flag every metric mention (e.g. "600 m² két óra alatt" is allowed).
 const DEPTH_UNIT_RE = /\d+([.,]\d+)?\s?(cm|m)(?!²)(?!\p{L})/giu;
 
 // --- 3. forbidden_report_time --------------------------------------------
-// FRAMEWORK §6: "72 órás riport" — no such thing, result is real-time on site.
+// FRAMEWORK §6: "72 órás riport": no such thing, result is real-time on site.
 const REPORT_TIME_RE = /\d+\s?(órán\s?belül|órás?|h)(?!\p{L})/iu;
 
 // --- 4. forbidden_throughput ----------------------------------------------
-// FRAMEWORK §6: "akár 500 m²/óra" — not from a public source.
+// FRAMEWORK §6: "akár 500 m²/óra": not from a public source.
 const THROUGHPUT_RE = /m²\s*\/\s*óra/i;
 
 // --- 5. forbidden_tolerance -------------------------------------------
-// FRAMEWORK §6: "±1-4 mm" — any ± tolerance number.
+// FRAMEWORK §6: "±1-4 mm": any ± tolerance number.
 const TOLERANCE_RE = /±\s?\d|\+\s?\/\s?-\s?\d|plusz-mínusz/i;
 
 // --- 6. forbidden_xray ----------------------------------------------------
-// FRAMEWORK §6: "röntgen / X-ray / betonátvilágítás röntgenként" — we don't
+// FRAMEWORK §6: "röntgen / X-ray / betonátvilágítás röntgenként": we don't
 // use radiation. A sentence that says so explicitly (negated) is fine.
 const XRAY_RE = /röntgen\p{L}*|x-?ray|átvilágítás\p{L}*/iu;
 const NEGATION_RE = new RegExp(
@@ -108,22 +108,22 @@ const NEGATION_RE = new RegExp(
 );
 
 // --- 7. forbidden_reference -------------------------------------------
-// FRAMEWORK §6: vasúti/kikötői/kórházi reference — we have none.
+// FRAMEWORK §6: vasúti/kikötői/kórházi reference: we have none.
 const REFERENCE_RE = new RegExp(`${NOT_LETTER_BEFORE}(vasúti|kikötői|kórházi)${NOT_LETTER_AFTER}`, "iu");
 
 // --- 8. unfilled_placeholder ------------------------------------------
-const PLACEHOLDER_RE = /<[^<>\s]+>|\bTODO\b|⚠/;
+const PLACEHOLDER_RE = /<[^<>\s]+>|\bTODO\b|\u26A0/;
 
 // --- 11. no_personal_hook -----------------------------------------------
 // Conservative on purpose: fires only when the opening has NEITHER a year,
 // NOR a mid-sentence capitalised proper noun, NOR any service/project
-// vocabulary — i.e. a genuinely generic, could-be-sent-to-anyone opener.
+// vocabulary: i.e. a genuinely generic, could-be-sent-to-anyone opener.
 // Checked against the first ~400 chars (roughly the first two paragraphs),
 // not just the literal first paragraph, so a short "nem húzom tovább"
 // breakup opener that gets to the point in its second paragraph still
 // passes (see a-hid touch 4 in the regression block below).
 const YEAR_RE = /(?<!\p{L})(19|20)\d{2}(?!\p{L})/u;
-// Hungarian always capitalises the formal "Ön/Önök" mid-sentence — that is
+// Hungarian always capitalises the formal "Ön/Önök" mid-sentence: that is
 // NOT a proper noun, so it's excluded or the rule would fire on every
 // second formal sentence.
 const MID_SENTENCE_CAP_RE = /[a-záéíóöőúüű][^\s.!?]*\s+(?!Ön\b|Önök\b|Önnek\b|Önöknek\b)[A-ZÁÉÍÓÖŐÚÜŰ]/u;
@@ -142,7 +142,7 @@ function normalizeHook(s: string): string {
   return s.slice(0, 120).toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-// Plain Levenshtein distance — small inputs (<=120 chars), no dependency.
+// Plain Levenshtein distance: small inputs (<=120 chars), no dependency.
 function levenshtein(a: string, b: string): number {
   const dp: number[] = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
@@ -177,7 +177,7 @@ export const CONTENT_RULES: ContentRule[] = [
   {
     id: "forbidden_depth",
     message:
-      "Tilos konkrét mélységszám (pl. „80 cm”, „0,8 m mélyen”) — a FRAMEWORK szerint nem igaz és hideg levélbe nem megy. Vedd ki a mélységszámot, szám nélkül fogalmazz.",
+      "Tilos konkrét mélységszám (pl. „80 cm”, „0,8 m mélyen”): a FRAMEWORK szerint nem igaz és hideg levélbe nem megy. Vedd ki a mélységszámot, szám nélkül fogalmazz.",
     appliesTo: isClaimCategory,
     check: (ctx) => {
       const matches = [...ctx.body.matchAll(DEPTH_UNIT_RE)];
@@ -189,7 +189,7 @@ export const CONTENT_RULES: ContentRule[] = [
   {
     id: "forbidden_report_time",
     message:
-      "Tilos riportidő-ígéret (pl. „72 órán belül”, „72h”) — ilyen nincs, a mérés eredménye valós idejű a helyszínen. Vedd ki az időígéretet.",
+      "Tilos riportidő-ígéret (pl. „72 órán belül”, „72h”): ilyen nincs, a mérés eredménye valós idejű a helyszínen. Vedd ki az időígéretet.",
     appliesTo: isClaimCategory,
     check: (ctx) => {
       const m = ctx.body.match(REPORT_TIME_RE);
@@ -199,7 +199,7 @@ export const CONTENT_RULES: ContentRule[] = [
   {
     id: "forbidden_throughput",
     message:
-      "Tilos m²/óra átereszőképesség-állítás (pl. „500 m²/óra”) — nem publikus forrásból való. Vedd ki, vagy a „600 m² két óra alatt” engedélyezett formát használd, projektfüggő kitétellel.",
+      "Tilos m²/óra átereszőképesség-állítás (pl. „500 m²/óra”): nem publikus forrásból való. Vedd ki, vagy a „600 m² két óra alatt” engedélyezett formát használd, projektfüggő kitétellel.",
     appliesTo: isClaimCategory,
     check: (ctx) => {
       const m = ctx.body.match(THROUGHPUT_RE);
@@ -209,7 +209,7 @@ export const CONTENT_RULES: ContentRule[] = [
   {
     id: "forbidden_tolerance",
     message:
-      "Tilos ± tűrésszám (pl. „±1 mm”, „plusz-mínusz 4 mm”) — a FRAMEWORK csak a „milliméteres pontosság” kifejezést engedi, szám nélkül. Vedd ki a tűrésszámot.",
+      "Tilos ± tűrésszám (pl. „±1 mm”, „plusz-mínusz 4 mm”): a FRAMEWORK csak a „milliméteres pontosság” kifejezést engedi, szám nélkül. Vedd ki a tűrésszámot.",
     appliesTo: isClaimCategory,
     check: (ctx) => {
       const m = ctx.body.match(TOLERANCE_RE);
@@ -219,7 +219,7 @@ export const CONTENT_RULES: ContentRule[] = [
   {
     id: "forbidden_xray",
     message:
-      "Tilos röntgent/X-ray-t/átvilágítást a saját módszerünkként feltüntetni — nem sugárzással dolgozunk. Ha a mondat nem kifejezetten tagadja a sugárzás használatát, vedd ki vagy fogalmazd át tagadó formára.",
+      "Tilos röntgent/X-ray-t/átvilágítást a saját módszerünkként feltüntetni: nem sugárzással dolgozunk. Ha a mondat nem kifejezetten tagadja a sugárzás használatát, vedd ki vagy fogalmazd át tagadó formára.",
     appliesTo: isClaimCategory,
     check: (ctx) => {
       const sentences = ctx.body.split(/(?<=[.!?])\s+|\n+/);
@@ -235,7 +235,7 @@ export const CONTENT_RULES: ContentRule[] = [
   {
     id: "forbidden_reference",
     message:
-      "Tilos vasúti/kikötői/kórházi referenciára hivatkozni — ilyen referenciánk nincs. Vedd ki, vagy csak olyan referenciát használj, amit ténylegesen elvégeztünk.",
+      "Tilos vasúti/kikötői/kórházi referenciára hivatkozni: ilyen referenciánk nincs. Vedd ki, vagy csak olyan referenciát használj, amit ténylegesen elvégeztünk.",
     appliesTo: isClaimCategory,
     check: (ctx) => {
       const m = ctx.body.match(REFERENCE_RE);
@@ -245,7 +245,7 @@ export const CONTENT_RULES: ContentRule[] = [
   {
     id: "unfilled_placeholder",
     message:
-      "Kitöltetlen helykitöltő maradt a szövegben (pl. <LEAD_MAGNET_URL>, TODO, ⚠). Töltsd ki a hiányzó adatot, mielőtt beküldöd.",
+      "Kitöltetlen helykitöltő maradt a szövegben (például <LEAD_MAGNET_URL> vagy TODO). Töltsd ki a hiányzó adatot, mielőtt beküldöd.",
     appliesTo: () => true,
     check: (ctx) => {
       const m = ctx.body.match(PLACEHOLDER_RE);
@@ -266,7 +266,7 @@ export const CONTENT_RULES: ContentRule[] = [
   },
   {
     id: "body_too_long",
-    message: `Az e-mail törzse túl hosszú (max ${BODY_MAX_CHARS_EMAIL} karakter). Rövidítsd — a valós hideg levelek 350-700 karakterek.`,
+    message: `Az e-mail törzse túl hosszú (max ${BODY_MAX_CHARS_EMAIL} karakter). Rövidítsd: a valós hideg levelek 350-700 karakterek.`,
     appliesTo: isEmail,
     check: (ctx) => (ctx.body.length > BODY_MAX_CHARS_EMAIL ? { ok: false } : { ok: true }),
   },

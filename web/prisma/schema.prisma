@@ -1215,6 +1215,12 @@ model ContentReview {
   reviewerUserId Int      @map("reviewer_user_id")
   verdict        String // approve | changes | rewrite
   comment        String? // required unless approve
+  /**
+   * Why it was sent back (lib/content/reasons.ts). Required for changes/rewrite,
+   * null for approve. Structured on purpose: this is the training data for
+   * predicting a verdict later (Áron, 2026-09-17).
+   */
+  reason         String?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
