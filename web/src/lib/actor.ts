@@ -13,21 +13,8 @@ export interface Actor {
   email: string | null;
 }
 
-/**
- * Canonical form for matching a login email against `users.email`: trimmed,
- * lowercased; for Gmail (gmail.com / googlemail.com) dots and +tags in the local
- * part are dropped, because Gmail delivers `balogh.aron16+x@` and `balogharon16@`
- * to the same mailbox and Áron signs in with both spellings.
- */
-export function normalizeEmail(raw: string | null | undefined): string | null {
-  const e = raw?.trim().toLowerCase();
-  if (!e || !e.includes("@")) return null;
-  const [local, domain] = e.split("@");
-  if (domain === "gmail.com" || domain === "googlemail.com") {
-    return `${local.split("+")[0].replace(/\./g, "")}@gmail.com`;
-  }
-  return `${local}@${domain}`;
-}
+export { normalizeEmail } from "./email";
+import { normalizeEmail } from "./email";
 
 export async function getActor(tenantId: number): Promise<Actor> {
   const supabase = await createClient();
@@ -41,7 +28,8 @@ export async function getActor(tenantId: number): Promise<Actor> {
   return { userId: user?.id ?? null, email };
 }
 
-export const NOT_A_CRM_USER = "Ez a fiók nincs felvéve CRM-felhasználóként — kérj hozzáférést Árontól.";
+import { NOT_A_CRM_USER } from "./crm-user-message";
+export { NOT_A_CRM_USER };
 
 /** Ctx for a signed-in user acting through the UI (server actions). */
 export async function userLeadCtx(tenantId: number): Promise<LeadCtx | { error: string }> {

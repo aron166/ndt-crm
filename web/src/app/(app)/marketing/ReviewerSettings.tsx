@@ -4,7 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { UI } from "@/lib/content/labels";
-import { getContentReviewerOptions, saveContentReviewers, type ReviewerOption } from "@/app/actions/content";
+import {
+  getContentReviewerOptions, saveContentReviewers, getMyDigestSetting, setMyDigestEnabled,
+  type ReviewerOption,
+} from "@/app/actions/content";
 
 export function ReviewerSettings() {
   const router = useRouter();
@@ -14,17 +17,29 @@ export function ReviewerSettings() {
   const [options, setOptions] = useState<ReviewerOption[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [digest, setDigest] = useState<{ enabled: boolean; isReviewer: boolean } | null>(null);
+  const [digestSaving, setDigestSaving] = useState(false);
 
   async function toggleOpen() {
     const next = !open;
     setOpen(next);
     if (next && options === null) {
       setLoading(true);
-      const opts = await getContentReviewerOptions();
+      const [opts, digestSetting] = await Promise.all([getContentReviewerOptions(), getMyDigestSetting()]);
       setOptions(opts);
       setSelected(opts.filter((o) => o.selected).map((o) => o.id));
+      setDigest(digestSetting);
       setLoading(false);
     }
+  }
+
+  async function toggleDigest() {
+    if (!digest || digestSaving) return;
+    const nextEnabled = !digest.enabled;
+    setDigestSaving(true);
+    const res = await setMyDigestEnabled(nextEnabled);
+    if (res.ok) setDigest({ ...digest, enabled: nextEnabled });
+    setDigestSaving(false);
   }
 
   function toggleReviewer(id: number) {
@@ -106,6 +121,21 @@ export function ReviewerSettings() {
               >
                 {UI.saveReviewers}
               </button>
+              {digest?.isReviewer && (
+                <label
+                  className="flex items-center gap-2.5"
+                  style={{ minHeight: 44, marginTop: 16, cursor: digestSaving ? "default" : "pointer" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={digest.enabled}
+                    disabled={digestSaving}
+                    onChange={toggleDigest}
+                    style={{ width: 18, height: 18 }}
+                  />
+                  <span style={{ fontSize: 14, color: "var(--fg)" }}>Napi e-mail összefoglaló (hétköznap 8:00)</span>
+                </label>
+              )}
             </>
           )}
         </div>

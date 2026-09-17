@@ -31,3 +31,11 @@ export const CLAIM_TTL_MS = 2 * 60 * 60 * 1000;
 export const CONTENT_BODY_MAX = 50_000;
 export const REVIEW_COMMENT_MAX = 4_000;
 export const CHANGE_NOTE_MAX = 4_000;
+
+/**
+ * Waiting longer than this on a reviewer is highlighted (spec §5). Lives here
+ * (not in queries.ts) so pure modules — digest.ts included — can import it
+ * without dragging in a DB dependency; queries.ts re-exports it for its own
+ * callers.
+ */
+export const STALE_REVIEW_MS = 3 * 24 * 60 * 60 * 1000;

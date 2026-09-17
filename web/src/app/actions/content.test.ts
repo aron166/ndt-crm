@@ -1,16 +1,23 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/actor", () => ({
   getActor: vi.fn(),
   NOT_A_CRM_USER: "Ez a fiók nincs felvéve CRM-felhasználóként — kérj hozzáférést Árontól.",
 }));
+const txExecuteRaw = vi.fn();
+const txTenantFindUnique = vi.fn();
 vi.mock("@/lib/db", () => ({
   db: {
     contentItem: { findFirst: vi.fn(), update: vi.fn() },
     contentVersion: { findFirst: vi.fn() },
     contentAsset: { findMany: vi.fn() },
     user: { findMany: vi.fn(), count: vi.fn() },
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({
+      $executeRaw: (...a: unknown[]) => txExecuteRaw(...a),
+      tenant: { findUnique: (...a: unknown[]) => txTenantFindUnique(...a) },
+    })),
   },
 }));
 vi.mock("@/lib/content/service", () => ({
@@ -44,7 +51,7 @@ import { archiveItem, createVersion, submitReview } from "@/lib/content/service"
 import { statObject } from "@/lib/content/storage";
 import {
   submitContentReview, saveContentVersion, requestAssetUpload, archiveContent,
-  updateContentMeta, getContentReviewerOptions, saveContentReviewers,
+  updateContentMeta, getContentReviewerOptions, saveContentReviewers, setMyDigestEnabled,
 } from "./content";
 
 const mocked = <T extends (...args: never[]) => unknown>(fn: T) => fn as unknown as ReturnType<typeof vi.fn>;
@@ -211,6 +218,31 @@ describe("saveContentVersion", () => {
     const call = mocked(createVersion).mock.calls[0];
     const input = call[2] as { assets?: unknown };
     expect(input.assets).toBeUndefined();
+  });
+});
+
+describe("setMyDigestEnabled", () => {
+  it("rejects a non-boolean value without touching the transaction", async () => {
+    const res = await setMyDigestEnabled("yes" as unknown as boolean);
+    expect(res).toEqual({ ok: false, error: "Érvénytelen adat" });
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("adds only the caller's own id when disabling, leaving other ids untouched", async () => {
+    txTenantFindUnique.mockResolvedValue({ settings: { contentDigestOptOut: [7] } });
+    const res = await setMyDigestEnabled(false);
+    expect(res).toEqual({ ok: true });
+    expect(txExecuteRaw).toHaveBeenCalledTimes(2); // FOR UPDATE lock + jsonb_set write
+    const writeValues = txExecuteRaw.mock.calls[1].slice(1); // interpolated values after the strings array
+    expect(writeValues).toContain(JSON.stringify([7, CALLER_ID]));
+  });
+
+  it("removes only the caller's own id when enabling, leaving other ids untouched", async () => {
+    txTenantFindUnique.mockResolvedValue({ settings: { contentDigestOptOut: [7, CALLER_ID] } });
+    const res = await setMyDigestEnabled(true);
+    expect(res).toEqual({ ok: true });
+    const writeValues = txExecuteRaw.mock.calls[1].slice(1);
+    expect(writeValues).toContain(JSON.stringify([7]));
   });
 });
 
