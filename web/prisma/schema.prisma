@@ -82,13 +82,13 @@ model SavedView {
 // Person = a human being. Persists across employers.
 // Do NOT collapse this into Contact.
 model Person {
-  id          Int       @id @default(autoincrement())
-  tenantId    Int       @map("tenant_id")
-  firstName   String    @map("first_name")
-  lastName    String    @map("last_name")
+  id          Int     @id @default(autoincrement())
+  tenantId    Int     @map("tenant_id")
+  firstName   String  @map("first_name")
+  lastName    String  @map("last_name")
   email       String?
   phone       String?
-  linkedinUrl String?   @map("linkedin_url")
+  linkedinUrl String? @map("linkedin_url")
   notes       String?
 
   // ── Enrichment dossier (written by the research skill via PATCH /api/persons/:id) ──
@@ -96,9 +96,9 @@ model Person {
   closenessScore      Int?      @map("closeness_score") // 0-100, CRM-computed, never written from outside
   enrichmentUpdatedAt DateTime? @map("enrichment_updated_at")
 
-  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   contacts      Contact[] // all company relationships this person has had
@@ -174,13 +174,13 @@ model Company {
   customFields         Json?     @map("custom_fields")
 
   // ── Enrichment dossier (written by the research skill via PATCH /api/companies/:id) ──
-  enrichment           Json?     @map("enrichment") // see lib/enrichment/dossier.ts for the shape
-  closenessScore       Int?      @map("closeness_score") // 0-100, CRM-computed, never written from outside
-  enrichmentUpdatedAt  DateTime? @map("enrichment_updated_at")
+  enrichment          Json?     @map("enrichment") // see lib/enrichment/dossier.ts for the shape
+  closenessScore      Int?      @map("closeness_score") // 0-100, CRM-computed, never written from outside
+  enrichmentUpdatedAt DateTime? @map("enrichment_updated_at")
 
-  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz // hand-run SQL made it timestamptz; keep the schema honest
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   tenant        Tenant             @relation(fields: [tenantId], references: [id])
   contacts      Contact[]
@@ -270,7 +270,8 @@ model User {
   loggedInteractions Interaction[]
   assignedLeads      Lead[]        @relation("LeadAssignee")
   assignedDeals      Deal[]        @relation("DealAssignee")
-  emailDrafts        EmailDraft[]
+  emailDrafts        EmailDraft[]  @relation("DraftCreator")
+  sentEmailDrafts    EmailDraft[]  @relation("DraftSender")
 
   @@map("users")
 }
@@ -649,21 +650,26 @@ model QuoteLineItem {
 // ─────────────────────────────────────────────
 
 model Interaction {
-  id         Int      @id @default(autoincrement())
-  tenantId   Int      @map("tenant_id")
-  companyId  Int?     @map("company_id")
-  personId   Int?     @map("person_id")
-  leadId     Int?     @map("lead_id") // the lead this touch belongs to (exact per-lead history)
-  userId     Int?     @map("user_id") // who logged this
-  type       String? // call, email, meeting, note, site_visit
-  direction  String? // inbound, outbound
-  notes      String?
-  outcome    String? // maps to 0-8 status codes
+  id            Int      @id @default(autoincrement())
+  tenantId      Int      @map("tenant_id")
+  companyId     Int?     @map("company_id")
+  personId      Int?     @map("person_id")
+  leadId        Int?     @map("lead_id") // the lead this touch belongs to (exact per-lead history)
+  userId        Int?     @map("user_id") // who logged this
+  type          String? // call, email, meeting, note, site_visit
+  direction     String? // inbound, outbound
+  notes         String?
+  outcome       String? // maps to 0-8 status codes
   // Which call-script variant this call used — the key only; the definitions
   // live in tenants.settings.scriptVariants (lib/leads/scripts.ts).
   scriptVariant String?  @map("script_variant")
-  occurredAt DateTime @default(now()) @map("occurred_at")
-  createdAt  DateTime @default(now()) @map("created_at")
+  // Campaign tag (campaign tracking, 2026-09-17): the free-string campaign key
+  // shared with email_drafts.campaign / leads.campaign. Stamped from the lead
+  // on lead-linked writes, so a non-email campaign (calls, meetings) counts on
+  // the same dashboard as the email one.
+  campaign      String?
+  occurredAt    DateTime @default(now()) @map("occurred_at")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id])
   company Company? @relation(fields: [companyId], references: [id])
@@ -673,6 +679,7 @@ model Interaction {
 
   @@index([tenantId, leadId])
   @@index([tenantId, scriptVariant])
+  @@index([tenantId, campaign])
   @@map("interactions")
 }
 
@@ -1118,17 +1125,36 @@ model EmailDraft {
   lastError         String?   @map("last_error")
   sentAt            DateTime? @map("sent_at")
   createdById       Int?      @map("created_by")
+  // Campaign tracking (2026-09-17). Round one goes out BY HAND from two
+  // personal Gmail inboxes, which Resend cannot send as:
+  //   senderUserId     — whose inbox this touch leaves from (Áron | Péter).
+  //   wave             — send wave within the campaign (1, 2, …).
+  //   dueAt            — when this touch is due; touch 1 from the wave start,
+  //                      touch N+1 recomputed when touch N is marked sent.
+  //   sentVia          — "resend" | "manual".
+  //   externalThreadId — the Gmail thread id, pasted on a manual send (optional).
+  //   repliedAt / replyType — when and how the prospect answered
+  //                      (lib/outreach/campaign.ts REPLY_TYPES).
+  senderUserId      Int?      @map("sender_user_id")
+  wave              Int?
+  dueAt             DateTime? @map("due_at")
+  sentVia           String?   @map("sent_via")
+  externalThreadId  String?   @map("external_thread_id")
+  repliedAt         DateTime? @map("replied_at")
+  replyType         String?   @map("reply_type")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  sender    User?   @relation("DraftSender", fields: [senderUserId], references: [id], onDelete: SetNull)
   // Restrict, not Cascade: a sent draft records an email that left the building.
   company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
   person    Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
-  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy User?   @relation("DraftCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, companyId, campaign, step])
   @@index([tenantId, campaign, status])
   @@index([tenantId, threadKey])
+  @@index([tenantId, dueAt])
   @@map("email_drafts")
 }

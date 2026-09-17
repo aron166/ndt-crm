@@ -92,6 +92,9 @@ export interface DraftUpsert {
   subject: string;
   body: string;
   toEmail?: string | null;
+  senderUserId?: number | null;
+  wave?: number | null;
+  dueAt?: Date | null;
 }
 
 export const draftUpsertSchema = z.object({
@@ -102,6 +105,10 @@ export const draftUpsertSchema = z.object({
   subject: z.string().trim().min(1).max(300),
   body: z.string().min(1).max(20000),
   toEmail: z.string().email().nullable().optional(),
+  // Campaign tracking (2026-09-17): whose inbox sends it, which wave, when due.
+  senderUserId: z.number().int().positive().nullable().optional(),
+  wave: z.number().int().min(1).max(52).nullable().optional(),
+  dueAt: z.coerce.date().nullable().optional(),
 });
 
 // Bulk drafting requests come from the agent skill in one batch; cap it so a

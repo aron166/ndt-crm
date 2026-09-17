@@ -37,7 +37,7 @@ type Result<T = object> = ({ success: true } & T) | { error: string };
 const LEAD_EVENT_SELECT = {
   status: true, outcome: true, companyId: true, source: true, serviceInterest: true,
   estimatedValue: true, convertedDealId: true, assignedToId: true, lostReason: true,
-  channel: true,
+  channel: true, campaign: true,
   company: { select: { name: true } },
   contact: { select: { personId: true, person: { select: { firstName: true, lastName: true } } } },
 } satisfies Prisma.LeadSelect;
@@ -392,6 +392,7 @@ export async function logLeadCallOutcome(
         tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId, userId: ctx.userId,
         type: "call", direction: "outbound", outcome: input.outcome, notes: input.note, occurredAt: now,
         scriptVariant: input.scriptVariant ?? null,
+        campaign: lead.campaign,
       },
       select: { id: true },
     });

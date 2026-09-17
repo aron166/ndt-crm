@@ -49,6 +49,13 @@ export interface IngestCtx {
   tenantId: number;
   /** App slug from the authenticated key — the canonical source app. */
   appSlug: string;
+  /**
+   * The exact draft a human marked as answered in /outreach. Without it the
+   * reply is attributed to the newest sent touch under `draft_key` — right for
+   * the intake skill, wrong when a person clicked a specific row. Still has to
+   * match `draft_key`, so it cannot point outside the vouched outreach.
+   */
+  draftId?: number;
 }
 
 export interface IngestResult {
@@ -152,7 +159,7 @@ export async function ingestLead(
   // happened to return as "the draft this reply answered". (Vanda, #89.)
   const draft = draftKey && isColdEmailReply
     ? await tx.emailDraft.findFirst({
-        where: { tenantId, threadKey: draftKey },
+        where: { tenantId, threadKey: draftKey, ...(ctx.draftId != null ? { id: ctx.draftId } : {}) },
         orderBy: [{ sentAt: "desc" }, { step: "desc" }],
         select: { id: true, companyId: true, campaign: true },
       })
@@ -264,7 +271,9 @@ export async function ingestLead(
       source: input.source,
       sourceApp,
       channel: input.channel,
-      campaign: input.campaign ?? null,
+      // A reply to our outreach belongs to that outreach's campaign even when
+      // the intake skill forgot to say so — the dashboard counts leads by it.
+      campaign: input.campaign ?? draft?.campaign ?? null,
       threadKey,
       status: statusKey,
       subject: input.service_interest ?? null,
@@ -316,7 +325,7 @@ export async function ingestLead(
   if (draft) {
     await tx.emailDraft.updateMany({
       where: { id: draft.id, tenantId, status: "sent" },
-      data: { status: "replied" },
+      data: { status: "replied", repliedAt: new Date(), replyType: input.reply_type ?? null },
     });
 
     // A reply must STOP the sequence. Marking the answered draft `replied` did
@@ -333,7 +342,8 @@ export async function ingestLead(
         tenantId,
         companyId: draft.companyId,
         campaign: draft.campaign,
-        status: { in: ["draft", "approved"] },
+        // `failed` too: it is sendable by hand (MANUAL_SENDABLE_STATUSES).
+        status: { in: ["draft", "approved", "failed"] },
       },
       data: { status: "cancelled" },
     });

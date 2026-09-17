@@ -25,6 +25,8 @@ export async function deleteLead(
   // recoverable (deletedAt + restore), so this stays non-destructive.
   cascade?: { company?: boolean; person?: boolean },
 ) {
+  const auth = await userLeadCtx(TENANT_ID);
+  if ("error" in auth) return { error: auth.error };
   const lead = await db.lead.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: {
@@ -138,11 +140,14 @@ export async function logLeadCall(leadId: number, input: {
  * always keep a company so it can still be converted, so clearing it is rejected.
  */
 export async function updateLead(id: number, formData: FormData) {
+  const auth = await userLeadCtx(TENANT_ID);
+  if ("error" in auth) return { error: auth.error };
   const before = await db.lead.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: {
       subject: true, serviceInterest: true, source: true,
       estimatedValue: true, message: true, lostReason: true, companyId: true, outcome: true,
+      campaign: true,
     },
   });
   if (!before) return { error: "Lead nem található" };
@@ -160,6 +165,10 @@ export async function updateLead(id: number, formData: FormData) {
   const source = text("source");
   const message = text("message");
   const lostReason = text("lostReason");
+  const campaign = text("campaign");
+  if (campaign !== undefined && campaign !== null && campaign.length > 80) {
+    return { error: "A kampány neve legfeljebb 80 karakter" };
+  }
   // Editing must not be a back door around the mandatory-reason rule: a lost lead
   // keeps a reason (setLeadOutcome enforces it on the way in).
   if (before.outcome === "lost" && lostReason === null) {
@@ -204,6 +213,7 @@ export async function updateLead(id: number, formData: FormData) {
       ...(lostReason !== undefined ? { lostReason } : {}),
       ...(estimatedValue !== undefined ? { estimatedValue } : {}),
       ...(companyId !== undefined ? { companyId } : {}),
+      ...(campaign !== undefined ? { campaign } : {}),
     },
   });
 
@@ -212,7 +222,7 @@ export async function updateLead(id: number, formData: FormData) {
     {
       subject: before.subject, serviceInterest: before.serviceInterest, source: before.source,
       estimatedValue: beforeValue, message: before.message, lostReason: before.lostReason,
-      companyId: before.companyId,
+      companyId: before.companyId, campaign: before.campaign,
     },
     {
       subject: subject !== undefined ? subject : before.subject,
@@ -222,6 +232,7 @@ export async function updateLead(id: number, formData: FormData) {
       message: message !== undefined ? message : before.message,
       lostReason: lostReason !== undefined ? lostReason : before.lostReason,
       companyId: companyId !== undefined ? companyId : before.companyId,
+      campaign: campaign !== undefined ? campaign : before.campaign,
     },
   );
 
@@ -245,6 +256,8 @@ function slugifyStatusKey(s: string): string {
 }
 
 export async function createLeadStatus(formData: FormData) {
+  const auth = await userLeadCtx(TENANT_ID);
+  if ("error" in auth) return { error: auth.error };
   const label = (formData.get("label") as string)?.trim();
   const color = (formData.get("color") as string) || "#6366f1";
   if (!label) return { error: "Név kötelező" };
@@ -276,6 +289,8 @@ export async function createLeadStatus(formData: FormData) {
 }
 
 export async function upsertLeadStatus(formData: FormData) {
+  const auth = await userLeadCtx(TENANT_ID);
+  if ("error" in auth) return { error: auth.error };
   const id = parseInt(formData.get("id") as string);
   const label = (formData.get("label") as string)?.trim();
   const color = (formData.get("color") as string) || "#6366f1";
@@ -326,6 +341,8 @@ export async function upsertLeadStatus(formData: FormData) {
 }
 
 export async function deleteLeadStatus(id: number) {
+  const auth = await userLeadCtx(TENANT_ID);
+  if ("error" in auth) return { error: auth.error };
   const status = await db.leadStatus.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!status) return { error: "Státusz nem található" };
   if (status.isInitial) return { error: "A kezdő státusz nem törölhető — előbb jelölj ki másikat." };
@@ -347,6 +364,8 @@ export async function deleteLeadStatus(id: number) {
 }
 
 export async function seedDefaultLeadStatuses() {
+  const auth = await userLeadCtx(TENANT_ID);
+  if ("error" in auth) return { error: auth.error };
   const count = await db.leadStatus.count({ where: { tenantId: TENANT_ID } });
   if (count > 0) return { error: "Már léteznek státuszok" };
   await db.leadStatus.createMany({
@@ -358,6 +377,8 @@ export async function seedDefaultLeadStatuses() {
 }
 
 export async function reorderLeadStatuses(orderedIds: number[]) {
+  const auth = await userLeadCtx(TENANT_ID);
+  if ("error" in auth) return { error: auth.error };
   // All ids must belong to this tenant (app-level scoping is the only guard).
   const owned = await db.leadStatus.count({
     where: { tenantId: TENANT_ID, id: { in: orderedIds } },

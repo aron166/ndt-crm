@@ -61,6 +61,7 @@ interface Lead {
   customFields: Record<string, unknown> | null;
   tier: string | null;
   companyId: number | null;
+  campaign: string | null;
   company: { id: number; name: string; city: string | null; website: string | null } | null;
   contact: {
     id: number; role: string | null; email: string | null; phone: string | null;
@@ -484,6 +485,7 @@ export function LeadDetailClient({
           lostReason: lead.lostReason,
           companyId: lead.companyId,
           companyName: lead.company?.name ?? null,
+          campaign: lead.campaign,
         }}
       />
     </div>

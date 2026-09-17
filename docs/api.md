@@ -208,6 +208,12 @@ needs.
    company and campaign goes `draft`/`approved` → **`cancelled`**, so nobody can
    later send cold touch 3 to someone who already answered.
 
+5. **Campaign dashboard fields (2026-09-17).** The answered draft also gets
+   `replied_at` (now) and, when sent, `reply_type` — one of `interested`,
+   `question`, `forwarded`, `not_now`, `no`, `unsubscribed`, `auto_reply`
+   (optional; anything else is a `400`). The new lead inherits the draft's
+   `campaign` when the payload has none.
+
 `draftId` in the response names the draft this reply answered (newest sent touch
 first). A payload with no `thread_key` behaves exactly as it always has.
 
@@ -467,6 +473,13 @@ something a human already approved or that already went out. A `companyId`
 outside the key's tenant is skipped as `"unknown_company"`, never a 500 and
 never a cross-tenant write; a per-item failure is skipped as `"error"` rather
 than failing the whole batch.
+
+Campaign tracking fields (optional, 2026-09-17): `senderUserId` (whose inbox
+sends the touch; must be a user of the key's tenant, otherwise stored as `null`),
+`wave` (1-52) and `dueAt` (ISO datetime, when the touch is due). Touch 1's
+`dueAt` is the wave's send morning. Later touches are rescheduled when the
+previous one is marked sent in `/outreach` (cadence day 1/4/8/15 from the real
+send of touch 1). Leave a field out to keep its stored value.
 
 `personId` is accepted but **verified, not trusted**: it is kept only when that
 person holds a `Contact` at that company in the key's tenant, and silently

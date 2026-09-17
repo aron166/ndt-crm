@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
+import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import {
   type DraftStatus,
   isDraftStatus,
@@ -21,6 +23,14 @@ import {
 const TENANT_ID = 1;
 
 const AUDIT_TYPE = "email_draft" as const;
+
+// Every action checks the CRM user itself (2026-09-17): the proxy's login
+// redirect proves a Supabase session, not a CRM user, and server actions are
+// callable by id.
+async function isCrmUser(): Promise<boolean> {
+  return (await getActor(TENANT_ID)).userId != null;
+}
+const DENIED = { ok: false as const, error: NOT_A_CRM_USER };
 
 export interface DraftRow {
   id: number;
@@ -39,6 +49,13 @@ export interface DraftRow {
   lastError: string | null;
   sentAt: string | null;
   createdAt: string;
+  senderUserId: number | null;
+  wave: number | null;
+  dueAt: string | null;
+  sentVia: string | null;
+  externalThreadId: string | null;
+  replyType: string | null;
+  repliedAt: string | null;
 }
 
 export interface DraftFilter {
@@ -60,6 +77,7 @@ const MAX_LIST_ROWS = 200;
 export async function listDrafts(
   filter?: DraftFilter,
 ): Promise<{ drafts: DraftListRow[]; campaigns: string[]; truncated: boolean }> {
+  if (!(await isCrmUser())) return { drafts: [], campaigns: [], truncated: false };
   const where: Prisma.EmailDraftWhereInput = { tenantId: TENANT_ID };
   if (filter?.campaign) where.campaign = filter.campaign;
   if (filter?.step != null && isValidStep(filter.step)) where.step = filter.step;
@@ -74,6 +92,8 @@ export async function listDrafts(
         id: true, companyId: true, personId: true, campaign: true, step: true,
         subject: true, toEmail: true, status: true, threadKey: true,
         providerMessageId: true, lastError: true, sentAt: true, createdAt: true,
+        senderUserId: true, wave: true, dueAt: true, sentVia: true,
+        externalThreadId: true, replyType: true, repliedAt: true,
         company: { select: { name: true } },
         person: { select: { firstName: true, lastName: true } },
       },
@@ -106,6 +126,13 @@ export async function listDrafts(
       lastError: r.lastError,
       sentAt: r.sentAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
+      senderUserId: r.senderUserId,
+      wave: r.wave,
+      dueAt: r.dueAt?.toISOString() ?? null,
+      sentVia: r.sentVia,
+      externalThreadId: r.externalThreadId,
+      replyType: r.replyType,
+      repliedAt: r.repliedAt?.toISOString() ?? null,
     })),
     campaigns: campaignRows.map((c) => c.campaign),
     truncated,
@@ -114,6 +141,7 @@ export async function listDrafts(
 
 /** A single draft's body, fetched only when the editor expands a row — tenant-scoped. */
 export async function getDraftBody(id: number): Promise<{ ok: true; body: string } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID }, select: { body: true } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   return { ok: true, body: row.body };
@@ -126,6 +154,7 @@ export interface OutreachSettings {
 
 /** tenants.settings.outreachReplyTo / outreachFooter. */
 export async function getOutreachSettings(): Promise<OutreachSettings> {
+  if (!(await isCrmUser())) return { replyTo: null, footer: null };
   const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
   const s = (tenant?.settings as Record<string, unknown> | null) ?? {};
   return {
@@ -145,6 +174,7 @@ export async function saveOutreachSettings(input: {
   replyTo: string;
   footer: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const replyTo = input.replyTo.trim();
   if (replyTo && !EMAIL_RE.test(replyTo)) return { ok: false, error: "Érvénytelen válaszcím" };
   const footer = input.footer.trim();
@@ -181,6 +211,7 @@ export async function updateDraft(
   id: number,
   input: { subject: string; body: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!canEdit(row.status as DraftStatus)) {
@@ -199,6 +230,7 @@ export async function updateDraft(
 
 /** Approve a single draft. */
 export async function approveDraft(id: number): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!canApprove(row.status as DraftStatus)) {
@@ -222,6 +254,7 @@ export async function approveAll(
   step?: number,
   opts?: { dryRun?: boolean },
 ): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const where: Prisma.EmailDraftWhereInput = {
     tenantId: TENANT_ID,
     campaign,
@@ -250,6 +283,7 @@ export async function approveAll(
  * POST put the same cold email in front of the same company twice. (Vanda, #88.)
  */
 export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!canSend(row.status as DraftStatus)) {
@@ -325,16 +359,34 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   }
 
   if (result.ok) {
-    await db.emailDraft.update({
-      where: { id },
-      data: {
-        status: "sent",
-        sentAt: new Date(),
-        providerMessageId: result.id,
-        threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
-        lastError: result.warning ?? null,
-      },
-    });
+    const sentAt = new Date();
+    try {
+      await db.$transaction(async (tx) => {
+        await tx.emailDraft.update({
+          where: { id },
+          data: {
+            status: "sent",
+            sentAt,
+            sentVia: "resend",
+            providerMessageId: result.id,
+            threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
+            lastError: result.warning ?? null,
+          },
+        });
+        // Same cadence as a hand-sent touch (campaign tracking).
+        await scheduleNextTouch(tx, row, sentAt);
+      });
+    } catch (err) {
+      // The mail DID go out; only the bookkeeping failed. Leave the row in
+      // `sending` (not re-sendable) with a note, same as the catch above.
+      reportError("outreach.sendDraft.record", err, { draftId: id, companyId: row.companyId });
+      await db.emailDraft.update({
+        where: { id },
+        data: { lastError: `Elküldve (${result.id}), de a rögzítés nem sikerült — ellenőrizd` },
+      }).catch(() => {});
+      revalidatePath("/outreach");
+      return { ok: false, error: "Elküldve, de a rögzítés nem sikerült — ellenőrizd a Resend naplót" };
+    }
     await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sent", providerMessageId: result.id });
     revalidatePath("/outreach");
     return { ok: true };
