@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/actor", () => ({
   getActor: vi.fn(),
   NOT_A_CRM_USER: "Ez a fiók nincs felvéve CRM-felhasználóként — kérj hozzáférést Árontól.",
