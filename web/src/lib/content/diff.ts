@@ -72,7 +72,16 @@ export function wordDiff(before: string, after: string): DiffPart[] {
     // ponytail: O(n*m) LCS is too slow at this size; fall back to line-level diff which
     // has far fewer tokens. Upgrade to a Myers/patience diff if word-level granularity
     // is ever required for huge documents.
-    return diffTokens(tokenizeLines(before), tokenizeLines(after));
+    const beforeLines = tokenizeLines(before);
+    const afterLines = tokenizeLines(after);
+    if (beforeLines.length * afterLines.length > MAX_TOKEN_PRODUCT) {
+      // Still too big to diff in a browser tab: show "all replaced" rather than crash.
+      return [
+        ...(before ? [{ type: "del" as const, text: before }] : []),
+        ...(after ? [{ type: "add" as const, text: after }] : []),
+      ];
+    }
+    return diffTokens(beforeLines, afterLines);
   }
 
   return diffTokens(beforeWords, afterWords);

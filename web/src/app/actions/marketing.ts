@@ -31,8 +31,6 @@ async function loadItem(id: number) {
 function revalidate(id: number) {
   revalidatePath("/marketing");
   revalidatePath(`/marketing/${id}`);
-  revalidatePath("/content");
-  revalidatePath(`/content/${id}`);
 }
 
 /** Edit = a new version (spec decision 3); the title is item metadata. */

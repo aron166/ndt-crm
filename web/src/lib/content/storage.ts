@@ -79,7 +79,7 @@ export async function signedViewUrls(paths: string[]): Promise<Record<string, st
   return out;
 }
 
-/** One-off: create the private bucket (idempotent). Used by the ops script, not by requests. */
+/** Same bucket settings as scripts/ensure-content-bucket.mjs (the ops path). Not called by requests. */
 export async function ensureBucket(): Promise<"created" | "exists"> {
   const s = admin().storage;
   const { data } = await s.getBucket(CONTENT_BUCKET);
