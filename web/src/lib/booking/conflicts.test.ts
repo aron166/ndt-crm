@@ -51,6 +51,12 @@ describe("overlapMinutes", () => {
     expect(overlapMinutes(b, a)).toBe(30);
   });
 
+  it("a 30-second overlap rounds up to 1, never 0", () => {
+    const a = booking({ id: 1, assignedToId: 1, startsAt: at("2026-09-14T09:00:00Z"), minutes: 60 });
+    const b = booking({ id: 2, assignedToId: 1, startsAt: at("2026-09-14T09:59:30Z"), minutes: 60 });
+    expect(overlapMinutes(a, b)).toBe(1);
+  });
+
   it("bookings far enough apart do not conflict", () => {
     const a = booking({ id: 1, assignedToId: 1, startsAt: at("2026-09-14T09:00:00Z"), minutes: 60 });
     const b = booking({ id: 2, assignedToId: 1, startsAt: at("2026-09-14T14:00:00Z"), minutes: 60 });
@@ -141,6 +147,34 @@ describe("findConflicts", () => {
     const b = booking({ id: 2, assignedToId: 2, startsAt: at("2026-09-14T09:00:00Z") });
     expect(findConflicts([a, b])).toEqual([]);
   });
+
+  it("an UNKNOWN-kind booking vs a job is treated as equal rank: the later starter is bump", () => {
+    const unknown = booking({
+      id: 1,
+      kind: null,
+      assignedToId: 1,
+      startsAt: at("2026-09-14T09:00:00Z"),
+      minutes: 60,
+    });
+    const job = booking({
+      id: 2,
+      kind: "job",
+      dealValue: 2_000_000, // JOB_HIGH — would outrank a private/PRIVATE-ish booking, but not here
+      assignedToId: 1,
+      startsAt: at("2026-09-14T09:30:00Z"),
+      minutes: 60,
+    });
+
+    for (const pair of [
+      [unknown, job],
+      [job, unknown],
+    ]) {
+      const conflicts = findConflicts(pair);
+      expect(conflicts).toHaveLength(1);
+      expect(conflicts[0].keep.id).toBe(1);
+      expect(conflicts[0].bump.id).toBe(2);
+    }
+  });
 });
 
 describe("conflictsFor", () => {
@@ -180,5 +214,70 @@ describe("conflictsFor", () => {
 
     expect(result).toHaveLength(1);
     expect([result[0].keep.id, result[0].bump.id].sort()).toEqual([1, 2]);
+  });
+
+  it("equal ranks: the existing promise wins, the candidate is bump", () => {
+    const candidate = booking({
+      id: -1,
+      kind: "job",
+      dealValue: 400_000, // JOB_MID
+      assignedToId: 1,
+      startsAt: at("2026-09-14T09:00:00Z"),
+      minutes: 60,
+    });
+    const existingBooking = booking({
+      id: 7,
+      kind: "job",
+      dealValue: 350_000, // same JOB_MID rung
+      assignedToId: 1,
+      startsAt: at("2026-09-14T09:30:00Z"),
+      minutes: 60,
+    });
+
+    const result = conflictsFor(candidate, [existingBooking]);
+    expect(result).toHaveLength(1);
+    expect(result[0].keep.id).toBe(7);
+    expect(result[0].bump.id).toBe(-1);
+  });
+
+  it("a higher-rank candidate bumps the existing booking", () => {
+    const candidate = booking({
+      id: -1,
+      kind: "multi_unit_demo",
+      assignedToId: 1,
+      startsAt: at("2026-09-14T09:00:00Z"),
+      minutes: 60,
+    });
+    const existingBooking = booking({
+      id: 7,
+      kind: "private",
+      assignedToId: 1,
+      startsAt: at("2026-09-14T09:30:00Z"),
+      minutes: 60,
+    });
+
+    const result = conflictsFor(candidate, [existingBooking]);
+    expect(result).toHaveLength(1);
+    expect(result[0].keep.id).toBe(-1);
+    expect(result[0].bump.id).toBe(7);
+  });
+
+  it("different assignedToId never conflicts", () => {
+    const candidate = booking({
+      id: -1,
+      kind: "job",
+      assignedToId: 1,
+      startsAt: at("2026-09-14T09:00:00Z"),
+      minutes: 60,
+    });
+    const existingBooking = booking({
+      id: 7,
+      kind: "job",
+      assignedToId: 2,
+      startsAt: at("2026-09-14T09:00:00Z"),
+      minutes: 60,
+    });
+
+    expect(conflictsFor(candidate, [existingBooking])).toEqual([]);
   });
 });

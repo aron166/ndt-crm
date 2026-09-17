@@ -1,4 +1,4 @@
-import { bookingRank, type BookingPriorityInput } from "./priority";
+import { bookingRank, BOOKING_RANK, type BookingPriorityInput } from "./priority";
 
 /**
  * Overlap detection + the bumping rule (BACKLOG 2026-09-12 item 2).
@@ -61,7 +61,7 @@ export function overlapMinutes(a: Booking, b: Booking): number {
   const start = Math.max(a.startsAt.getTime(), b.startsAt.getTime());
   const end = Math.min(endOf(a), endOf(b));
   const overlap = end - start;
-  if (overlap > 0) return Math.round(overlap / 60_000);
+  if (overlap > 0) return Math.ceil(overlap / 60_000);
 
   // Disjoint: `-overlap` is the gap between them.
   const gapMinutes = Math.round(-overlap / 60_000);
@@ -69,9 +69,18 @@ export function overlapMinutes(a: Booking, b: Booking): number {
 }
 
 /**
+ * A pre-migration task with no `booking_kind` has no real rank to compare —
+ * UNKNOWN is never automatically the bumpable side, so it counts as EQUAL to
+ * whatever it collides with rather than losing on the numbers.
+ */
+function ranksEqual(ri: number, rj: number): boolean {
+  return ri === rj || ri === BOOKING_RANK.UNKNOWN || rj === BOOKING_RANK.UNKNOWN;
+}
+
+/**
  * Every conflicting pair among these bookings, with the lower-priority one
  * marked as the bumpable side. Equal rank → still reported, but `bump` is the
- * one that was booked LATER: the earlier promise wins, which is the rule a
+ * one that STARTS LATER: the earlier promise wins, which is the rule a
  * customer would expect if they asked.
  */
 export function findConflicts(bookings: Booking[]): BookingConflict[] {
@@ -84,17 +93,30 @@ export function findConflicts(bookings: Booking[]): BookingConflict[] {
       if (minutes <= 0) continue;
       const ri = bookingRank(sorted[i]);
       const rj = bookingRank(sorted[j]);
-      // Equal rank: sorted[] is start-ascending, so j is the later promise.
-      const [keep, bump] = ri <= rj ? [sorted[i], sorted[j]] : [sorted[j], sorted[i]];
+      // Equal (or UNKNOWN) rank: sorted[] is start-ascending, so j starts later.
+      const [keep, bump] = ranksEqual(ri, rj) || ri < rj ? [sorted[i], sorted[j]] : [sorted[j], sorted[i]];
       out.push({ keep, bump, overlapMinutes: minutes });
     }
   }
   return out;
 }
 
-/** The conflicts a single candidate booking would create against what exists. */
+/**
+ * The conflicts a single candidate booking would create against what exists.
+ * Linear pass over `existing`: no all-pairs scan, because only the candidate
+ * side ever changes here. Equal rank (incl. the UNKNOWN rule) → the existing
+ * promise wins and the candidate is bumped; otherwise the lower rank number
+ * wins.
+ */
 export function conflictsFor(candidate: Booking, existing: Booking[]): BookingConflict[] {
-  return findConflicts([candidate, ...existing]).filter(
-    (c) => c.keep.id === candidate.id || c.bump.id === candidate.id,
-  );
+  const out: BookingConflict[] = [];
+  const rc = bookingRank(candidate);
+  for (const e of existing) {
+    const minutes = overlapMinutes(candidate, e);
+    if (minutes <= 0) continue;
+    const re = bookingRank(e);
+    const [keep, bump] = ranksEqual(rc, re) || re < rc ? [e, candidate] : [candidate, e];
+    out.push({ keep, bump, overlapMinutes: minutes });
+  }
+  return out;
 }
