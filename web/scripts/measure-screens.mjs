@@ -10,7 +10,7 @@
 // Query counting needs `log_statement=all` on the local Postgres container:
 //   docker exec <c> psql -U postgres -d ndtcrm -c "ALTER SYSTEM SET log_statement='all'" -c "SELECT pg_reload_conf()"
 import fs from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -34,10 +34,11 @@ const cookie = fs.readFileSync(cookieFile, "utf8").trim();
 /** Queries the app ran, counted from the Postgres statement log. */
 function queriesSince(seconds) {
   if (!pg) return null;
-  const log = execFileSync("docker", ["logs", "--since", `${seconds}s`, pg], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  return log
+  // Postgres logs to stderr, so both streams have to be read.
+  const r = spawnSync("docker", ["logs", "--since", `${seconds}s`, pg], { encoding: "utf8" });
+  return `${r.stdout ?? ""}${r.stderr ?? ""}`
     .split("\n")
-    .filter((l) => /LOG: +(execute [^:]*|statement): *(SELECT|INSERT|UPDATE|DELETE|WITH)/i.test(l))
+    .filter((l) => /LOG: +(execute [^:]*:|statement:) *(SELECT|INSERT|UPDATE|DELETE|WITH|BEGIN)/i.test(l))
     .length;
 }
 
@@ -45,7 +46,7 @@ const rows = [];
 for (const path of paths) {
   // Warm once so the measurement is not a cold compile of the route.
   await fetch(base + path, { headers: { cookie } });
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 4000)); // let the warm-up drop out of the log window
   const t0 = Date.now();
   const res = await fetch(base + path, { headers: { cookie } });
   const html = await res.text();
@@ -57,11 +58,13 @@ for (const path of paths) {
   await new Promise((r) => setTimeout(r, 1200));
   const queries = queriesSince(3);
 
+  // Transfer size, not decompressed size: curl reports what actually crosses
+  // the wire, which is the number that matters for a phone on 4G.
   const scripts = [...new Set([...html.matchAll(/\/_next\/static\/[^"']+?\.js/g)].map((m) => m[0]))];
   let js = 0;
-  for (const s of scripts) {
-    const r = await fetch(base + s, { headers: { "accept-encoding": "br, gzip" } });
-    js += Number(r.headers.get("content-length") ?? (await r.arrayBuffer()).byteLength);
+  for (const file of scripts) {
+    const out = execFileSync("curl", ["-s", "-o", "/dev/null", "-w", "%{size_download}", "--compressed", base + file], { encoding: "utf8" });
+    js += Number(out.trim()) || 0;
   }
   rows.push({ path, htmlKB: +(Buffer.byteLength(html) / 1024).toFixed(1), jsKB: +(js / 1024).toFixed(1), files: scripts.length, queries, ms });
 }
