@@ -12,6 +12,7 @@ import {
   archiveItem, createVersion, submitReview, type UserActor,
 } from "@/lib/content/service";
 import { getContentReviewers, REQUIRED_REVIEWERS } from "@/lib/content/reviewers";
+import { digestOptOutFromSettings } from "@/lib/content/digest";
 import { CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from "@/lib/content/types";
 import {
   ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, stagingPath, statObject,
@@ -262,5 +263,32 @@ export async function saveContentReviewers(userIds: number[]): Promise<{ ok: tru
   const before = await setTenantSettings(TENANT_ID, { contentReviewers: ids });
   audit("tenant", TENANT_ID, "update", before, { contentReviewers: ids }, { tenantId: TENANT_ID });
   revalidateContent();
+  return { ok: true };
+}
+
+/** ReviewerSettings toggle: whether the caller currently gets the daily digest (spec §5). */
+export async function getMyDigestSetting(): Promise<{ enabled: boolean; isReviewer: boolean }> {
+  const actor = await userActor();
+  if ("ok" in actor) return { enabled: false, isReviewer: false };
+  const [reviewers, tenant] = await Promise.all([
+    getContentReviewers(TENANT_ID),
+    db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } }),
+  ]);
+  const isReviewer = reviewers.includes(actor.userId);
+  const optOut = digestOptOutFromSettings(tenant?.settings);
+  return { enabled: isReviewer && !optOut.includes(actor.userId), isReviewer };
+}
+
+/** A user can only change THEIR OWN opt-out — no one else's digest setting. */
+export async function setMyDigestEnabled(enabled: boolean): Promise<{ ok: true } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
+  const before = digestOptOutFromSettings(tenant?.settings);
+  const next = enabled
+    ? before.filter((id) => id !== actor.userId)
+    : before.includes(actor.userId) ? before : [...before, actor.userId];
+  await setTenantSettings(TENANT_ID, { contentDigestOptOut: next });
+  audit("tenant", TENANT_ID, "update", { contentDigestOptOut: before }, { contentDigestOptOut: next }, { tenantId: TENANT_ID });
   return { ok: true };
 }
