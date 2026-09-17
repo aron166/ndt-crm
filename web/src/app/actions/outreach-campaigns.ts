@@ -361,7 +361,9 @@ export async function getCampaignStats(input: {
 
   // Scope leads/interactions to the filtered companies. The ownership fallback
   // (lead assignee / who logged the call) applies ONLY to a campaign with no
-  // drafts at all — the phone-only one — so per-sender views add up to the total.
+  // drafts at all — the phone-only one. ponytail: in an email campaign a lead or
+  // call on a company with no draft counts in the unfiltered total only, so the
+  // filtered views can add up to LESS than the total (never more).
   const phoneOnly = allDrafts.length === 0;
   const scope = !scoped
     ? {}

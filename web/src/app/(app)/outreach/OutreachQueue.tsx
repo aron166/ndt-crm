@@ -497,7 +497,7 @@ export default function OutreachQueue({
                     onClick={() => onCopyBody(row)}
                     disabled={!savedFooter}
                     title={savedFooter ? undefined : "Hiányzik a leiratkozási lábléc — töltsd ki a beállításokban"}
-                    style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}
+                    style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 10px", cursor: savedFooter ? "pointer" : "default", opacity: savedFooter ? 1 : 0.5 }}
                   >
                     {copied?.id === row.id && copied.kind === "body" ? "Másolva" : "Szöveg másolása"}
                   </button>

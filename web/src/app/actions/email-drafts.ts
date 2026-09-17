@@ -360,21 +360,33 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
 
   if (result.ok) {
     const sentAt = new Date();
-    await db.$transaction(async (tx) => {
-      await tx.emailDraft.update({
-        where: { id },
-        data: {
-          status: "sent",
-          sentAt,
-          sentVia: "resend",
-          providerMessageId: result.id,
-          threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
-          lastError: result.warning ?? null,
-        },
+    try {
+      await db.$transaction(async (tx) => {
+        await tx.emailDraft.update({
+          where: { id },
+          data: {
+            status: "sent",
+            sentAt,
+            sentVia: "resend",
+            providerMessageId: result.id,
+            threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
+            lastError: result.warning ?? null,
+          },
+        });
+        // Same cadence as a hand-sent touch (campaign tracking).
+        await scheduleNextTouch(tx, row, sentAt);
       });
-      // Same cadence as a hand-sent touch (campaign tracking).
-      await scheduleNextTouch(tx, row, sentAt);
-    });
+    } catch (err) {
+      // The mail DID go out; only the bookkeeping failed. Leave the row in
+      // `sending` (not re-sendable) with a note, same as the catch above.
+      reportError("outreach.sendDraft.record", err, { draftId: id, companyId: row.companyId });
+      await db.emailDraft.update({
+        where: { id },
+        data: { lastError: `Elküldve (${result.id}), de a rögzítés nem sikerült — ellenőrizd` },
+      }).catch(() => {});
+      revalidatePath("/outreach");
+      return { ok: false, error: "Elküldve, de a rögzítés nem sikerült — ellenőrizd a Resend naplót" };
+    }
     await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sent", providerMessageId: result.id });
     revalidatePath("/outreach");
     return { ok: true };
