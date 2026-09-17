@@ -23,6 +23,9 @@ export interface InboxRow {
   waitingSince: string | null;
   overdue: boolean;
   needsHumanAsset: boolean;
+  /** §6c: open ⚠ questions (blocks live) and whether it may be hard-deleted. */
+  openChecks: number;
+  wasLive: boolean;
   /** Verdict per configured reviewer on the current version. */
   verdicts: { reviewerId: number; reviewerName: string; verdict: string | null }[];
   hasLive: boolean;
@@ -47,8 +50,9 @@ export interface InboxFilter {
 
 const ROW_SELECT = {
   id: true, title: true, category: true, format: true, purpose: true, status: true,
-  needsHumanAsset: true, liveVersionId: true,
+  needsHumanAsset: true, liveVersionId: true, wasLive: true,
   campaign: { select: { id: true, name: true } },
+  _count: { select: { checks: { where: { state: "open" } } } },
   currentVersion: {
     select: {
       number: true, createdAt: true,
@@ -68,6 +72,8 @@ function toRow(r: Row, reviewers: { id: number; name: string }[], now: number): 
     waitingSince: since?.toISOString() ?? null,
     overdue: r.status === "in_review" && since !== null && now - since.getTime() > STALE_REVIEW_MS,
     needsHumanAsset: r.needsHumanAsset,
+    openChecks: r._count.checks,
+    wasLive: r.wasLive,
     verdicts: reviewers.map((u) => ({
       reviewerId: u.id, reviewerName: u.name,
       verdict: reviews.find((x) => x.reviewerUserId === u.id)?.verdict ?? null,
@@ -145,7 +151,7 @@ export interface ReviewPageData {
   item: {
     id: number; title: string; category: string; format: string | null; purpose: string | null;
     channel: string; status: string; internal: boolean; externalRef: string | null;
-    needsHumanAsset: boolean; externalUrl: string | null; publishedAt: string | null;
+    needsHumanAsset: boolean; externalUrl: string | null; publishedAt: string | null; wasLive: boolean;
     campaign: { id: number; name: string } | null;
     currentVersionId: number | null; liveVersionId: number | null;
     claimedBy: string | null;
@@ -159,6 +165,11 @@ export interface ReviewPageData {
   }[];
   reviewers: { id: number; name: string }[];
   isReviewer: boolean;
+  /** §6c: ⚠ questions; an open one blocks going live. */
+  checks: {
+    id: number; question: string; forWhom: string; state: string; answer: string | null;
+    resolvedBy: string | null; source: string; createdAt: string;
+  }[];
 }
 
 export async function getReviewPage(tenantId: number, itemId: number, userId: number): Promise<ReviewPageData | null> {
@@ -167,8 +178,15 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
     select: {
       id: true, title: true, category: true, format: true, purpose: true, channel: true, status: true,
       internal: true, externalRef: true, needsHumanAsset: true, externalUrl: true, publishedAt: true,
-      currentVersionId: true, liveVersionId: true, claimedBy: true, metrics: true,
+      currentVersionId: true, liveVersionId: true, claimedBy: true, metrics: true, wasLive: true,
       campaign: { select: { id: true, name: true } },
+      checks: {
+        orderBy: [{ state: "asc" }, { id: "asc" }],
+        select: {
+          id: true, question: true, forWhom: true, state: true, answer: true, source: true, createdAt: true,
+          resolvedBy: { select: { name: true } },
+        },
+      },
       versions: {
         orderBy: { number: "desc" },
         select: {
@@ -189,13 +207,17 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
   });
   if (!item) return null;
   const reviewers = await reviewerNames(tenantId);
-  const { versions, publishedAt, ...rest } = item;
+  const { versions, publishedAt, checks, ...rest } = item;
   return {
     item: {
       ...rest,
       publishedAt: publishedAt?.toISOString() ?? null,
       metrics: rest.metrics as Record<string, number> | null,
     },
+    checks: checks.map((c) => ({
+      id: c.id, question: c.question, forWhom: c.forWhom, state: c.state, answer: c.answer,
+      resolvedBy: c.resolvedBy?.name ?? null, source: c.source, createdAt: c.createdAt.toISOString(),
+    })),
     versions: versions.map((v) => ({
       id: v.id, number: v.number, body: v.body, authorType: v.authorType,
       authorName: v.authorUser?.name ?? null, authorApp: v.authorApp, changeNote: v.changeNote,
