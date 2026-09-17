@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { StatusBar } from "./StatusBar";
@@ -22,20 +22,23 @@ interface AppShellProps {
   defaultPipeline?: PipelineStub | null;
 }
 
+const NARROW_QUERY = "(max-width: 767px)";
+function subscribeNarrow(onChange: () => void) {
+  const mq = window.matchMedia(NARROW_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+function isNarrow() {
+  return window.matchMedia(NARROW_QUERY).matches;
+}
+
 export function AppShell({ children, email, overdueCount = 0, marketingReviewCount = 0, defaultPipeline }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   // Phones: always the 56 px icon rail — the 240 px sidebar left ~150 px for
   // content at 390 px (content approval spec §4: fully usable on phone).
   // ponytail: rail, not a drawer; add an off-canvas menu if the rail gets crowded.
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const sync = () => setNarrow(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
+  const narrow = useSyncExternalStore(subscribeNarrow, isNarrow, () => false);
   const isCollapsed = collapsed || narrow;
 
   useEffect(() => {
