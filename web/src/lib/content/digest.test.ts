@@ -107,9 +107,13 @@ describe("isDigestTime", () => {
     expect(isDigestTime(new Date("2026-06-01T06:00:00Z"))).toBe(true); // Monday
   });
 
-  it("Monday 06:00Z is 07:00 Budapest in winter (CET, UTC+1) — false; 07:00Z is 08:00 — true", () => {
-    expect(isDigestTime(new Date("2026-01-05T06:00:00Z"))).toBe(false); // Monday
-    expect(isDigestTime(new Date("2026-01-05T07:00:00Z"))).toBe(true);
+  it("Monday 06:00Z is 07:00 Budapest in winter (CET) — still inside the window", () => {
+    expect(isDigestTime(new Date("2026-01-05T06:00:00Z"))).toBe(true); // Monday
+    expect(isDigestTime(new Date("2026-01-05T07:00:00Z"))).toBe(true); // 08:00 Budapest
+  });
+  it("outside 07:00-08:59 Budapest — false", () => {
+    expect(isDigestTime(new Date("2026-06-01T04:00:00Z"))).toBe(false); // 06:00 Budapest
+    expect(isDigestTime(new Date("2026-06-01T07:00:00Z"))).toBe(false); // 09:00 Budapest
   });
 
   it("Saturday at 08:00 Budapest is false", () => {
@@ -134,7 +138,7 @@ describe("sendContentDigests", () => {
 
   it("sends nothing when it isn't digest time, without forcing", async () => {
     getContentReviewers.mockResolvedValue([1, 2]);
-    const res = await sendContentDigests(1, new Date("2026-06-01T05:00:00Z"));
+    const res = await sendContentDigests(1, new Date("2026-06-01T03:00:00Z"));
     expect(res).toEqual({ sent: 0, skipped: 0, reason: "not_digest_time" });
     expect(sendEmail).not.toHaveBeenCalled();
   });

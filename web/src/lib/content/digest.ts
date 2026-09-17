@@ -61,7 +61,15 @@ export function buildDigest(input: DigestInput): { subject: string; text: string
   return { subject, text };
 }
 
-/** Mon–Fri, 08:00 local time in Europe/Budapest — independent of process TZ/DST. */
+/**
+ * Mon–Fri morning in Europe/Budapest, independent of process TZ.
+ *
+ * The Vercel plan is Hobby: a cron may run ONCE A DAY, so the single 06:00 UTC
+ * run lands at 08:00 Budapest in summer and 07:00 in winter, and Hobby crons
+ * may fire late within the hour. So the window is 07:00–08:59 local, and
+ * sendContentDigests' once-per-day claim stops a retry from sending twice.
+ */
+export const DIGEST_HOURS = [7, 8];
 export function isDigestTime(now: Date): boolean {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Budapest",
@@ -72,7 +80,7 @@ export function isDigestTime(now: Date): boolean {
   const hour = Number(parts.find((p) => p.type === "hour")?.value);
   const weekday = parts.find((p) => p.type === "weekday")?.value;
   const isWeekday = weekday !== undefined && weekday !== "Sat" && weekday !== "Sun";
-  return isWeekday && hour === 8;
+  return isWeekday && DIGEST_HOURS.includes(hour);
 }
 
 const optOutSchema = z.array(z.number().int().positive());
