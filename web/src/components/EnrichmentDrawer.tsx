@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { Check, Sparkles } from "lucide-react";
 import { applyProposal } from "@/app/actions/enrichment";
 import type { FieldChange, ChangesMap } from "@/app/actions/enrichment";
 
@@ -58,8 +59,8 @@ function ProposalCard({ proposal, onApplied }: { proposal: Proposal; onApplied: 
   if (done) {
     return (
       <div style={{ padding: "12px 16px", background: "var(--bg-raised)", borderRadius: 6, display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ color: "var(--mint)", fontSize: 14 }}>✓</span>
-        <span style={{ fontSize: 14, color: "var(--fg-mute)" }}>{proposal.entityName} — alkalmazva</span>
+        <Check size={14} aria-hidden="true" style={{ color: "var(--mint)" }} />
+        <span style={{ fontSize: 14, color: "var(--fg-mute)" }}>{proposal.entityName}: alkalmazva</span>
       </div>
     );
   }
@@ -204,7 +205,7 @@ export function EnrichmentDrawer({ proposals, onClose }: Props) {
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--line-soft)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg)", display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: "var(--indigo)" }}>✦</span> Enrichment eredmények
+              <Sparkles size={16} aria-hidden="true" style={{ color: "var(--indigo)" }} /> Enrichment eredmények
             </div>
             <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 2, fontFamily: "var(--font-mono-ndt)" }}>
               {totalWithChanges} javasolt változtatás · {appliedCount} alkalmazva

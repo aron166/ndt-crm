@@ -185,7 +185,7 @@ export default async function PersonsPage({
                       {currentContact.company.name}
                     </Link>
                   ) : (
-                    <span style={{ color: "var(--fg-faint)", fontSize: 14 }}>—</span>
+                    <span style={{ color: "var(--fg-faint)", fontSize: 14 }}>-</span>
                   )}
                 </td>
 
@@ -200,7 +200,7 @@ export default async function PersonsPage({
                       {p.phone}
                     </a>
                   ) : (
-                    <span style={{ color: "var(--fg-faint)", fontSize: 14 }}>—</span>
+                    <span style={{ color: "var(--fg-faint)", fontSize: 14 }}>-</span>
                   )}
                 </td>
               </tr>

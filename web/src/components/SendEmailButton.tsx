@@ -27,7 +27,9 @@ export function SendEmailButton({
           <Mail className="size-4" /> Email
         </Button>
       ) : (
-        <button className="btn" onClick={() => setOpen(true)}>✉ Email</button>
+        <button className="btn inline-flex items-center gap-1.5" onClick={() => setOpen(true)}>
+          <Mail className="size-4" aria-hidden="true" /> Email
+        </button>
       )}
       <SendEmailModal
         open={open}

@@ -34,7 +34,7 @@ export interface ReviewRow {
 
 export type ContentEvent =
   | { type: "version_created"; versionId: number }
-  | { type: "reviews_changed"; reviewers: number[]; reviews: ReviewRow[] }
+  | { type: "reviews_changed"; reviewers: number[]; reviews: ReviewRow[]; openChecks?: number }
   | { type: "claim"; now: Date }
   | { type: "release_stale"; now: Date }
   | { type: "archive" };
@@ -81,6 +81,11 @@ export function applyEvent(state: ItemState, event: ContentEvent): TransitionRes
       if (state.status === "ai_working") return conflict("AI is rewriting this item");
       if (state.currentVersionId === null) return { ok: false, code: "invalid", reason: "no current version" };
       const next = statusFromReviews(event.reviewers, event.reviews);
+      // §6c: an open ⚠ check blocks going live. The approvals are still
+      // recorded; the item goes live when the last check is settled.
+      if (next === "live" && (event.openChecks ?? 0) > 0) {
+        return ok({ ...state, status: "in_review" });
+      }
       if (next === "live") {
         const wentLive = state.liveVersionId !== state.currentVersionId;
         return ok({ ...state, status: "live", liveVersionId: state.currentVersionId }, wentLive);

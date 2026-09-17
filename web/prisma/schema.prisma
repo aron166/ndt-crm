@@ -52,6 +52,7 @@ model Tenant {
   contentAssets          ContentAsset[]
   contentVersions        ContentVersion[]
   contentReviews         ContentReview[]
+  contentChecks          ContentCheck[]
   companyAttributes      CompanyAttribute[]
   quotes                 Quote[]
   quoteLineItems         QuoteLineItem[]
@@ -276,6 +277,7 @@ model User {
   sentEmailDrafts    EmailDraft[]     @relation("DraftSender")
   contentVersions    ContentVersion[]
   contentReviews     ContentReview[]
+  resolvedChecks     ContentCheck[]
 
   @@map("users")
 }
@@ -1082,6 +1084,11 @@ model ContentItem {
   claimedFrom      String?   @map("claimed_from")
   // The AI could not produce the change (image/video) — a human must.
   needsHumanAsset  Boolean   @default(false) @map("needs_human_asset")
+  // §6c: status to restore when un-archiving, and whether this item was EVER
+  // live (a live item may only be archived, never hard-deleted — campaign
+  // history has to stay intact).
+  prevStatus       String?   @map("prev_status")
+  wasLive          Boolean   @default(false) @map("was_live")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
@@ -1089,6 +1096,7 @@ model ContentItem {
   campaign       Campaign?        @relation(fields: [campaignId], references: [id])
   assets         ContentAsset[]
   versions       ContentVersion[] @relation("ItemVersions")
+  checks         ContentCheck[]
   currentVersion ContentVersion?  @relation("ItemCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   liveVersion    ContentVersion?  @relation("ItemLiveVersion", fields: [liveVersionId], references: [id], onDelete: SetNull)
 
@@ -1113,6 +1121,9 @@ model ContentAsset {
   storagePath   String?  @map("storage_path")
   mimeType      String?  @map("mime_type")
   sizeBytes     Int?     @map("size_bytes")
+  // WebP thumbnail path (NATE-STORAGE-1), sibling of storagePath: <storagePath>.thumb.webp.
+  // Null for non-images, oversized originals, or a failed conversion.
+  thumbPath     String?  @map("thumb_path")
   createdAt     DateTime @default(now()) @map("created_at")
 
   tenant      Tenant          @relation(fields: [tenantId], references: [id])
@@ -1156,6 +1167,45 @@ model ContentVersion {
   @@map("content_versions")
 }
 
+/**
+ * §6c: one ⚠ question that must be settled before the item may go live. Imported
+ * drafts are full of "⚠️ Áron dönti el …" markers; each becomes a row here.
+ * An item with an open check can collect approvals but cannot become live.
+ */
+model ContentCheck {
+  id               Int      @id @default(autoincrement())
+  tenantId         Int      @map("tenant_id")
+  itemId           Int      @map("item_id")
+  question         String
+  /**
+   * Who has to answer: aron | peter | either.
+   */
+  forWhom          String   @default("either") @map("for_whom")
+  /**
+   * open | resolved | waived
+   */
+  state            String   @default("open")
+  /**
+   * The answer (resolved) or why it does not apply (waived).
+   */
+  answer           String?
+  resolvedByUserId Int?     @map("resolved_by_user_id")
+  /**
+   * Where it came from: import | manual.
+   */
+  source           String   @default("manual")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  item       ContentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  resolvedBy User?       @relation(fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([itemId, question])
+  @@index([tenantId, state])
+  @@map("content_checks")
+}
+
 // One reviewer's verdict on one version. Changing your mind updates the row;
 // the history is in audit_log.
 model ContentReview {
@@ -1165,6 +1215,12 @@ model ContentReview {
   reviewerUserId Int      @map("reviewer_user_id")
   verdict        String // approve | changes | rewrite
   comment        String? // required unless approve
+  /**
+   * Why it was sent back (lib/content/reasons.ts). Required for changes/rewrite,
+   * null for approve. Structured on purpose: this is the training data for
+   * predicting a verdict later (Áron, 2026-09-17).
+   */
+  reason         String?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

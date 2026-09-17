@@ -112,7 +112,7 @@ export function LeadDetailClient({
 
   function handleDelete() {
     const label = lead.serviceInterest || lead.subject || `Lead #${lead.id}`;
-    if (!confirm(`Biztosan törlöd ezt a leadet: "${label}"?\n\nA cég, a kapcsolattartó és az interakciók megmaradnak — csak a lead-kártya tűnik el.`)) return;
+    if (!confirm(`Biztosan törlöd ezt a leadet: "${label}"?\n\nA cég, a kapcsolattartó és az interakciók megmaradnak: csak a lead-kártya tűnik el.`)) return;
     startDelete(async () => {
       const res = await deleteLead(lead.id);
       if (res?.error) { alert(res.error); return; }
@@ -295,7 +295,7 @@ export function LeadDetailClient({
                   )}
                 </>
               ) : (
-                <div className="field-value">—</div>
+                <div className="field-value">-</div>
               )}
             </div>
           </div>
@@ -334,11 +334,11 @@ export function LeadDetailClient({
             <div className="panel-pad space-y-2">
               <div className="flex justify-between" style={{ fontSize: 12 }}>
                 <span style={{ color: "var(--fg-mute)" }}>App</span>
-                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{lead.sourceApp ?? "—"}</span>
+                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{lead.sourceApp ?? "-"}</span>
               </div>
               <div className="flex justify-between" style={{ fontSize: 12 }}>
                 <span style={{ color: "var(--fg-mute)" }}>Csatorna</span>
-                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{lead.source ?? "—"}</span>
+                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{lead.source ?? "-"}</span>
               </div>
               <div className="flex justify-between" style={{ fontSize: 12 }}>
                 <span style={{ color: "var(--fg-mute)" }}>Státusz</span>
@@ -360,7 +360,7 @@ export function LeadDetailClient({
                   className="font-mono-ndt"
                   style={{ fontSize: 12, padding: "2px 6px", borderRadius: 5, background: "var(--bg-0)", border: "1px solid var(--line-soft)", color: "var(--fg)" }}
                 >
-                  <option value="">— nincs —</option>
+                  <option value="">nincs</option>
                   {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
@@ -401,7 +401,7 @@ export function LeadDetailClient({
                       <Link href="/tasks" className="row-link" style={{ color: "var(--fg)", flex: 1 }}>{t.title}</Link>
                       {t.assignedTo && <span style={{ color: "var(--fg-faint)" }}>{t.assignedTo.name}</span>}
                       <span className="font-mono-ndt" style={{ color: tone === "overdue" ? "var(--coral)" : "var(--fg-mute)", fontSize: 12 }}>
-                        {t.dueDate ? formatDateTime(t.dueDate) : "—"}
+                        {t.dueDate ? formatDateTime(t.dueDate) : "-"}
                       </span>
                     </div>
                   );

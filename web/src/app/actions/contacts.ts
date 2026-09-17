@@ -205,7 +205,7 @@ export async function personLeftCompany(contactId: number, companyId: number, pe
       tenantId: TENANT_ID,
       personId,
       companyId,
-      title: `Utánkövetés: ${personName} — hol dolgozik most?`,
+      title: `Utánkövetés: ${personName}: hol dolgozik most?`,
       description: `${personName} elhagyta a(z) ${contact.company.name} céget. Derítsd ki, hova ment, és tartsd fenn a kapcsolatot.`,
       type: "call",
       status: "created",

@@ -283,7 +283,7 @@ export default async function CompaniesPage({
 
                 {/* City */}
                 <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)", fontSize: 14, whiteSpace: "nowrap" }}>
-                  {c.city ?? "—"}
+                  {c.city ?? "-"}
                   {c.county && (
                     <span style={{ color: "var(--fg-faint)", marginLeft: 6, fontSize: 12 }}>{c.county}</span>
                   )}

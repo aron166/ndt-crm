@@ -172,9 +172,9 @@ export default function CampaignDashboard({
           </Card>
 
           <Card title="Célok">
-            <TargetRow label="Válaszarány — cél: ≥25%" met={stats.targets.replyRate} />
-            <TargetRow label="Hívások — cél: ≥4" met={stats.targets.calls} />
-            <TargetRow label="A/B tier lead — cél: ≥1" met={stats.targets.tierAB} />
+            <TargetRow label="Válaszarány (cél: ≥25%)" met={stats.targets.replyRate} />
+            <TargetRow label="Hívások (cél: ≥4)" met={stats.targets.calls} />
+            <TargetRow label="A/B tier lead (cél: ≥1)" met={stats.targets.tierAB} />
           </Card>
         </div>
       )}

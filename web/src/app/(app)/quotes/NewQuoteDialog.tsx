@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 import {
   Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -74,7 +75,7 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
         <DialogHeader>
           <DialogTitle>Új árajánlat</DialogTitle>
           <DialogDescription>
-            {presetCompany ? presetCompany.name : "Válaszd ki a céget"} — a tételeket a következő lépésben adod meg.
+            {presetCompany ? presetCompany.name : "Válaszd ki a céget"}: a tételeket a következő lépésben adod meg.
           </DialogDescription>
         </DialogHeader>
 
@@ -115,7 +116,11 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
               placeholder="pl. Hegesztési varratok UT vizsgálata" />
           </FormField>
 
-          {error && <span style={{ fontSize: 14, color: "var(--coral)" }}>⚠ {error}</span>}
+          {error && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: "var(--coral)" }}>
+              <AlertTriangle size={14} aria-hidden="true" /> {error}
+            </span>
+          )}
 
           <div className="flex justify-end gap-2 mt-1">
             <button className="btn" onClick={() => setOpen(false)} disabled={pending}>Mégse</button>

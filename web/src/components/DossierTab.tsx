@@ -25,7 +25,7 @@ export function DossierTab({ enrichment, closenessScore, enrichmentUpdatedAt, em
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span className="h-section" style={{ margin: 0 }}>Kapcsolati pontszám</span>
           <span style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--font-mono)", color: "var(--fg)" }}>
-            {closenessScore ?? "—"}
+            {closenessScore ?? "-"}
           </span>
         </div>
         <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>

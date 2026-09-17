@@ -45,13 +45,13 @@ export const scriptVariantSchema = z.object({
 export const DEFAULT_SCRIPT_VARIANTS: ScriptVariant[] = [
   {
     key: "a",
-    label: "TODO — A változat (kérdéssel nyit)",
-    body: "TODO — ide jön az A szkript szövege. Nyitás egy kérdéssel: van-e most futó projekt, ahol meglévő betonba kell fúrni vagy vágni?",
+    label: "TODO: A változat (kérdéssel nyit)",
+    body: "TODO: ide jön az A szkript szövege. Nyitás egy kérdéssel: van-e most futó projekt, ahol meglévő betonba kell fúrni vagy vágni?",
   },
   {
     key: "b",
-    label: "TODO — B változat (esettel nyit)",
-    body: "TODO — ide jön a B szkript szövege. Nyitás egy referenciával, utána ugyanaz a kérdés.",
+    label: "TODO: B változat (esettel nyit)",
+    body: "TODO: ide jön a B szkript szövege. Nyitás egy referenciával, utána ugyanaz a kérdés.",
   },
 ];
 
@@ -105,7 +105,7 @@ export function parseScriptBlocks(text: string): ScriptVariant[] | { error: stri
       return {
         error: `Hiányzik az "azonosító|név" az alábbi sorból: "${head}". `
           + `Ha ez egy szkript szövegén belüli rész, valószínűleg egy önálló "---" sor `
-          + `véletlenül kettévágta a szkriptet — a "---" csak szkriptek KÖZÖTT megengedett.`,
+          + `véletlenül kettévágta a szkriptet: a "---" csak szkriptek KÖZÖTT megengedett.`,
       };
     }
     const label = head.slice(sep + 1).trim();

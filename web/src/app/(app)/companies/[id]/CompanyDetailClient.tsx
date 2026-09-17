@@ -105,7 +105,7 @@ const PRODUCT_AREA_LABEL: Record<string, string> = {
 const MATERIAL_LABEL: Record<string, string> = { Fe: "Acél / Fe", Al: "Alumínium", Cu: "Réz", AM: "Additív" };
 
 function formatRevenue(v: bigint | null): string {
-  if (!v) return "—";
+  if (!v) return "-";
   const n = Number(v);
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} Mrd`;
   if (n >= 1_000_000) return `${Math.round(n / 1_000_000)} M`;
@@ -240,7 +240,7 @@ export function CompanyDetailClient({
           }}
         >
           <span style={{ fontSize: 14, color: "var(--fg)", flex: 1 }}>
-            Ez a cég törölve van — nem jelenik meg a keresésben, és az adatai nem
+            Ez a cég törölve van: nem jelenik meg a keresésben, és az adatai nem
             menthetők, amíg vissza nem állítod.
           </span>
           <button
@@ -328,11 +328,7 @@ export function CompanyDetailClient({
               disabled={enriching}
               style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}
             >
-              <span style={{
-                display: "inline-block",
-                animation: enriching ? "spin 1.2s linear infinite" : "none",
-                fontSize: 14,
-              }}>✦</span>
+              <Loader2 size={14} aria-hidden="true" style={{ animation: enriching ? "spin 1.2s linear infinite" : "none" }} />
               {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
             </button>
             <button
@@ -471,7 +467,7 @@ export function CompanyDetailClient({
                     onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
                     style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
                   >
-                    <option value="">—</option>
+                    <option value="">-</option>
                     <option value="active">Aktív</option>
                     <option value="inactive">Inaktív</option>
                     <option value="fa">F.A.</option>
@@ -484,7 +480,7 @@ export function CompanyDetailClient({
                     onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value }))}
                     style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
                   >
-                    <option value="">—</option>
+                    <option value="">-</option>
                     <option value="Prospect">Prospect</option>
                     <option value="Ügyfél">Ügyfél</option>
                     <option value="Szállító">Szállító</option>
@@ -497,7 +493,7 @@ export function CompanyDetailClient({
                     onChange={(e) => setForm((f) => ({ ...f, pipelineStatus: e.target.value }))}
                     style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
                   >
-                    <option value="">—</option>
+                    <option value="">-</option>
                     <option value="0">0 · KUKA</option>
                     <option value="1">1 · Nem hívtuk</option>
                     <option value="2">2 · Nem válasz</option>
@@ -703,9 +699,9 @@ export function CompanyDetailClient({
                       {c.person.firstName} {c.person.lastName}
                     </Link>
                   </td>
-                  <td>{c.role ?? "—"}</td>
-                  <td className="num">{c.email ?? c.person.email ?? "—"}</td>
-                  <td className="num">{c.phone ?? c.person.phone ?? "—"}</td>
+                  <td>{c.role ?? "-"}</td>
+                  <td className="num">{c.email ?? c.person.email ?? "-"}</td>
+                  <td className="num">{c.phone ?? c.person.phone ?? "-"}</td>
                   <td>
                     {c.endedAt
                       ? <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Volt ({formatDate(c.endedAt)})</span>
@@ -898,7 +894,7 @@ export function CompanyDetailClient({
                 <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <div className="field-label">Székhely</div>
                   <div style={{ fontSize: 14, color: "var(--fg-soft)" }}>
-                    {[company.zipCode, company.city, company.address].filter(Boolean).join(", ") || "—"}
+                    {[company.zipCode, company.city, company.address].filter(Boolean).join(", ") || "-"}
                   </div>
                   {company.siteCity && (
                     <>

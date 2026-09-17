@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { applyProposal } from "@/app/actions/enrichment";
 import { formatRelativeTime } from "@/lib/utils";
 import type { FieldChange, ChangesMap } from "@/app/actions/enrichment";
@@ -147,7 +148,9 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
   if (applied) {
     return (
       <div style={{ padding: "14px 16px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, opacity: 0.5 }}>
-        <span style={{ fontSize: 14, color: "var(--fg-mute)" }}>✓ Alkalmazva — {proposal.entityName}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: "var(--fg-mute)" }}>
+          <Check size={14} aria-hidden="true" /> Alkalmazva: {proposal.entityName}
+        </span>
       </div>
     );
   }
@@ -170,7 +173,7 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
         </div>
         {debug?.facts && (
           <div style={{ padding: "0 16px 12px", borderTop: "1px solid var(--line-soft)" }}>
-            <div style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "10px 0 6px" }}>Debug — források</div>
+            <div style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "10px 0 6px" }}>Debug: források</div>
             {(debug.facts as string[]).map((f: string, i: number) => (
               <div key={i} style={{ fontSize: 12, color: "var(--fg-mute)", fontFamily: "var(--font-mono-ndt)", padding: "2px 0", borderBottom: "1px solid var(--line-soft)" }}>
                 {f}
@@ -302,7 +305,7 @@ function RunRow({ run }: { run: RunWithCount }) {
         {run._count.proposals} javaslat
       </td>
       <td style={{ padding: "10px 12px", fontSize: 14, color: "var(--fg-mute)" }}>
-        {run.triggeredBy ?? "—"}
+        {run.triggeredBy ?? "-"}
       </td>
       <td style={{ padding: "10px 12px", fontSize: 14, color: "var(--fg-faint)" }}>
         {formatRelativeTime(run.createdAt)}
@@ -333,7 +336,7 @@ export function EnrichmentClient({ runs, proposals }: Props) {
             Enrichment Engine
           </h1>
           <p style={{ fontSize: 14, color: "var(--fg-mute)", margin: "4px 0 0" }}>
-            AI-alapú cég és személy adatfeltöltés — emberi jóváhagyással
+            AI-alapú cég és személy adatfeltöltés: emberi jóváhagyással
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

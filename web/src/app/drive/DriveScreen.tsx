@@ -130,7 +130,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
         resetFields();
         setDone((d) => new Set(d).add(lead.id));
       } catch {
-        setError("Mentés sikertelen — próbáld újra");
+        setError("Mentés sikertelen: próbáld újra");
       } finally {
         submitting.current = false;
       }
@@ -154,10 +154,10 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   // drive can be the one that collides.
   const notice = conflictNotice && (
         <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
-          <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve — de ütközik a naptárban:</p>
+          <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve: de ütközik a naptárban:</p>
           {conflictNotice.map((c) => (
             <p key={c.taskId} style={{ margin: 0 }}>
-              {c.title} ({new Date(c.startsAt).toLocaleString("hu-HU")}) —{" "}
+              {c.title} ({new Date(c.startsAt).toLocaleString("hu-HU")}):{" "}
               {c.movable === "existing"
                 ? "a meglévő foglalás az alacsonyabb prioritású, azt lehet áthelyezni."
                 : "ez az új foglalás az alacsonyabb prioritású, ezt lehet áthelyezni."}
@@ -263,13 +263,13 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
             </select>
             {script && (script.body || script.liveMissing) && (
               <button onClick={() => setScriptOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 13, padding: 4, cursor: "pointer" }}>
-                Szkript {scriptOpen ? "▲" : "▼"}
+                {scriptOpen ? "Szkript elrejtése" : "Szkript megjelenítése"}
               </button>
             )}
           </div>
           {scriptOpen && script && (script.body || script.liveMissing) && (
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-              {script.liveMissing ? "Nincs élő változat — a szkript még jóváhagyásra vár." : script.body}
+              {script.liveMissing ? "Nincs élő változat: a szkript még jóváhagyásra vár." : script.body}
             </p>
           )}
         </div>

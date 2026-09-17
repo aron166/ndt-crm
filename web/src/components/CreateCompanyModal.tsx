@@ -66,7 +66,7 @@ export function CreateCompanyModal({ open, onClose }: Props) {
             </FormField>
             <FormField label="Partner kategória">
               <select name="accountType" className="input-ds">
-                <option value="">—</option>
+                <option value="">-</option>
                 <option value="Prospect">Prospect</option>
                 <option value="Customer">Ügyfél</option>
                 <option value="Vendor">Szállító</option>

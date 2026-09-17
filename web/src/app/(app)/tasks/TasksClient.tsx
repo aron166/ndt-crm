@@ -194,13 +194,13 @@ export function TasksClient({ tasks }: TasksClientProps) {
                   </td>
                   <td style={{ padding: "8px 16px" }}>
                     <span className="font-mono-ndt" style={{ fontSize: 12, color: overdue ? "var(--coral)" : today ? "var(--amber)" : "var(--fg-faint)", fontWeight: overdue || today ? 600 : 400 }}>
-                      {t.dueDate ? formatDate(t.dueDate) : "—"}{overdue && " ⚠"}
+                      {t.dueDate ? formatDate(t.dueDate) : "-"}{overdue && " Lejárt"}
                     </span>
                   </td>
                   <td style={{ padding: "8px 16px", fontSize: 14, color: "var(--fg-mute)" }}>
                     {t.company && <Link href={`/companies/${t.company.id}`} style={{ color: "var(--fg-mute)" }} onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")} onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}>{t.company.name}</Link>}
                     {t.person && <span>{t.company && " · "}<Link href={`/persons/${t.person.id}`} style={{ color: "var(--fg-faint)" }} onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")} onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}>{t.person.lastName} {t.person.firstName}</Link></span>}
-                    {!t.company && !t.person && <span style={{ color: "var(--fg-faint)" }}>—</span>}
+                    {!t.company && !t.person && <span style={{ color: "var(--fg-faint)" }}>-</span>}
                   </td>
                   <td style={{ padding: "8px 16px" }}>
                     <TaskStatusBadge status={t.status} />

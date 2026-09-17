@@ -15,6 +15,12 @@ export interface QualificationQuestion {
   /** Stable key stored in leads.qualification. Never re-generated for an existing question. */
   slug: string;
   label: string;
+  /**
+   * Draft Hungarian the spec proposed, not Áron's final wording. The setter UI
+   * shows a muted "javaslat" chip for these (no emoji anywhere — portfolio law
+   * 2026-09-17). A question edited at /leads/setup is never a draft.
+   */
+  draft?: boolean;
 }
 
 export const QUESTION_MAX = 15;
@@ -62,19 +68,19 @@ export function answersErrorMessage(error: z.ZodError): string {
  */
 export const DEFAULT_QUALIFICATION_QUESTIONS: QualificationQuestion[] = [
   // Gate â everyone.
-  { slug: "gate", label: "⚠️ Van most egy konkrét feladat, amihez ez kellene, vagy egyelőre csak érdekel a technológia? (task / curious)" },
+  { slug: "gate", label: "Van most egy konkrét feladat, amihez ez kellene, vagy egyelőre csak érdekel a technológia? (task / curious)" , draft: true },
   // Branch A â `task`, the seven.
-  { slug: "situation",  label: "⚠️ Milyen helyzetben kérdezel: cég/projekt · szakember (villanyszerelő, statikus, kivitelező) · saját ingatlan" },
-  { slug: "concrete",   label: "⚠️ Mibe kellene belenézni: fal · födém/aljzat · híd/műtárgy · más / nem beton" },
-  { slug: "goal",       label: "⚠️ Mit szeretnél tudni: mi van benne fúrás előtt · az állapotát · magát a technológiát értékelem" },
-  { slug: "size",       label: "⚠️ Kb. mekkora felület vagy hány pont?" },
-  { slug: "postcode",   label: "⚠️ Irányítószám (kötelező)" },
-  { slug: "timing",     label: "⚠️ Mikor: ezen a héten · ebben a hónapban · nincs még dátum" },
-  { slug: "own_device", label: "⚠️ Gondolkodtatok már saját műszeren? (igen / talán / nem)" },
+  { slug: "situation",  label: "Milyen helyzetben kérdezel: cég/projekt · szakember (villanyszerelő, statikus, kivitelező) · saját ingatlan" , draft: true },
+  { slug: "concrete",   label: "Mibe kellene belenézni: fal · födém/aljzat · híd/műtárgy · más / nem beton" , draft: true },
+  { slug: "goal",       label: "Mit szeretnél tudni: mi van benne fúrás előtt · az állapotát · magát a technológiát értékelem" , draft: true },
+  { slug: "size",       label: "Kb. mekkora felület vagy hány pont?" , draft: true },
+  { slug: "postcode",   label: "Irányítószám (kötelező)" , draft: true },
+  { slug: "timing",     label: "Mikor: ezen a héten · ebben a hónapban · nincs még dátum" , draft: true },
+  { slug: "own_device", label: "Gondolkodtatok már saját műszeren? (igen / talán / nem)" , draft: true },
   // Branch B â `curious`, the soft three.
-  { slug: "hook",     label: "⚠️ Mi keltette fel az érdeklődésed?" },
-  { slug: "use_case", label: "⚠️ Mire használnád, ha lenne ilyen a kezedben?" },
-  { slug: "work",     label: "⚠️ Milyen munkát végzel / milyen cégnél?" },
+  { slug: "hook",     label: "Mi keltette fel az érdeklődésed?" , draft: true },
+  { slug: "use_case", label: "Mire használnád, ha lenne ilyen a kezedben?" , draft: true },
+  { slug: "work",     label: "Milyen munkát végzel / milyen cégnél?" , draft: true },
 ];
 
 /** Slug for a freshly typed question. Same rules as slugifyStatusKey. */

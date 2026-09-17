@@ -294,7 +294,7 @@ export default async function DashboardPage() {
                   <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>{s.stage_name}</span>
                   <span className="font-mono-ndt" style={{ fontSize: 14, fontWeight: 600, color: s.color }}>{Number(s.cnt)}</span>
                   <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
-                    {s.total_value > 0 ? `${(s.total_value / 1_000_000).toFixed(1)}M` : "—"}
+                    {s.total_value > 0 ? `${(s.total_value / 1_000_000).toFixed(1)}M` : "-"}
                   </span>
                 </div>
               ))}

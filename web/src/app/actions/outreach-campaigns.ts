@@ -98,7 +98,7 @@ export async function markDraftSentManually(
   const row = await db.emailDraft.findFirst({ where: { id: draftId, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!MANUAL_SENDABLE_STATUSES.includes(row.status as DraftStatus)) {
-    return { ok: false, error: "Előbb hagyd jóvá — vagy ez az érintés már elment" };
+    return { ok: false, error: "Előbb hagyd jóvá, vagy ez az érintés már elment" };
   }
 
   // Same rule as the Resend path: no unsubscribe line, no cold email. The copy
@@ -106,7 +106,7 @@ export async function markDraftSentManually(
   const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
   const footer = (tenant?.settings as Record<string, unknown> | null)?.outreachFooter;
   if (typeof footer !== "string" || !footer.trim()) {
-    return { ok: false, error: "Hiányzik a leiratkozási lábléc — töltsd ki a beállításokban" };
+    return { ok: false, error: "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban" };
   }
 
   const now = new Date();

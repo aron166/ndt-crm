@@ -54,12 +54,12 @@ const LEAD_FIELDS = [
   { key: "callOutcome", label: "Hívás eredménye (kulcs)" },
   { key: "idleDays", label: "Tétlen napok (lead_idle)" },
   // Company attributes (auto-merged by the engine for richer targeting):
-  { key: "company_warmth", label: "Cég — hőfok" },
-  { key: "company_pipeline", label: "Cég — pipeline státusz" },
-  { key: "company_county", label: "Cég — megye" },
-  { key: "company_city", label: "Cég — város" },
-  { key: "company_industry", label: "Cég — iparág (TEÁOR betű)" },
-  { key: "company_teaor", label: "Cég — TEÁOR kód" },
+  { key: "company_warmth", label: "Cég: hőfok" },
+  { key: "company_pipeline", label: "Cég: pipeline státusz" },
+  { key: "company_county", label: "Cég: megye" },
+  { key: "company_city", label: "Cég: város" },
+  { key: "company_industry", label: "Cég: iparág (TEÁOR betű)" },
+  { key: "company_teaor", label: "Cég: TEÁOR kód" },
 ];
 const DEAL_FIELDS = [
   { key: "value", label: "Érték" },
@@ -380,11 +380,11 @@ function RuleCard({
 }) {
   const ac = (rule.actionConfig ?? {}) as Record<string, unknown>;
   const actionSummary =
-    rule.actionType === "send_email" ? `email: „${(ac.subjectTemplate as string | undefined) ?? "—"}”`
+    rule.actionType === "send_email" ? `email: „${(ac.subjectTemplate as string | undefined) ?? "-"}”`
     : rule.actionType === "change_lead_status" ? `lead státusz → ${leadStatuses.find((s) => s.key === ac.toStatus)?.label ?? ac.toStatus}`
     : rule.actionType === "assign_lead" ? `felelős → #${ac.assignedToId}`
     : rule.actionType === "webhook_out" ? `webhook → ${ac.url}`
-    : `feladat: „${(ac.titleTemplate as string | undefined) ?? "—"}”`;
+    : `feladat: „${(ac.titleTemplate as string | undefined) ?? "-"}”`;
   const condCount = Array.isArray(rule.conditions) ? rule.conditions.length : 0;
   return (
     <div className="panel" style={{ opacity: rule.isActive ? 1 : 0.6 }}>
@@ -446,7 +446,7 @@ function RuleForm({
 
         {/* Trigger */}
         <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Trigger — amikor…</div>
+          <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Trigger: amikor…</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="field-label">Esemény</label>
@@ -522,7 +522,7 @@ function RuleForm({
             </button>
           </div>
           {form.conditions.length === 0 ? (
-            <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>Nincs feltétel — a szabály minden ilyen eseményre lefut.</p>
+            <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>Nincs feltétel: a szabály minden ilyen eseményre lefut.</p>
           ) : (
             <div className="space-y-2">
               {form.conditions.map((c, i) => {
@@ -536,7 +536,7 @@ function RuleForm({
                       {OPS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
                     </select>
                     <input style={{ ...inputStyle, flex: 1, opacity: noValue ? 0.4 : 1 }} value={c.value} disabled={noValue}
-                      onChange={(e) => updateCondition(i, { value: e.target.value })} placeholder={noValue ? "—" : "érték"} />
+                      onChange={(e) => updateCondition(i, { value: e.target.value })} placeholder={noValue ? "-" : "érték"} />
                     <button type="button" onClick={() => removeCondition(i)} title="Törlés"
                       style={{ background: "transparent", border: "none", color: "var(--fg-faint)", cursor: "pointer", display: "flex", flexShrink: 0 }}>
                       <X style={{ width: 14, height: 14 }} />
@@ -567,7 +567,7 @@ function RuleForm({
               <div>
                 <label className="field-label">Új státusz</label>
                 <select style={inputStyle} value={form.toStatus2} onChange={(e) => set("toStatus2", e.target.value)}>
-                  <option value="">— válassz —</option>
+                  <option value="">válassz</option>
                   {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
                 <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Csak lead-triggerekkel működik. Az így beállított státusz nem indít újabb szabályt (nincs láncolás).</p>
@@ -577,7 +577,7 @@ function RuleForm({
               <div>
                 <label className="field-label">Felelős</label>
                 <select style={inputStyle} value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
-                  <option value="">— válassz —</option>
+                  <option value="">válassz</option>
                   {users.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
                 </select>
               </div>
@@ -586,7 +586,7 @@ function RuleForm({
               <div>
                 <label className="field-label">Webhook URL</label>
                 <input style={inputStyle} value={form.webhookUrl} onChange={(e) => set("webhookUrl", e.target.value)} placeholder="https://n8n.example.com/webhook/…" />
-                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát. Csak <strong>https://</strong> — nincs auth fejléc, a titkot az URL-be tedd.</p>
+                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát. Csak <strong>https://</strong>: nincs auth fejléc, a titkot az URL-be tedd.</p>
               </div>
             )}
 
@@ -594,7 +594,7 @@ function RuleForm({
               <>
                 <div>
                   <label className="field-label">Tárgy</label>
-                  <input style={inputStyle} value={form.subjectTemplate} onChange={(e) => set("subjectTemplate", e.target.value)} placeholder="pl. Ajánlatunk — {company}" />
+                  <input style={inputStyle} value={form.subjectTemplate} onChange={(e) => set("subjectTemplate", e.target.value)} placeholder="pl. Ajánlatunk: {company}" />
                 </div>
                 <div>
                   <label className="field-label">Üzenet</label>

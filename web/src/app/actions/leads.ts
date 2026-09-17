@@ -309,7 +309,7 @@ export async function upsertLeadStatus(formData: FormData) {
   // statuses. Without this, un-checking the flag here silently leaves the board with
   // no entry column, so leads with a null/deleted status stop rendering anywhere.
   if (existing.isInitial && !isInitial) {
-    return { error: "A kezdő státusz jelölése nem vehető le — előbb jelölj ki másikat." };
+    return { error: "A kezdő státusz jelölése nem vehető le: előbb jelölj ki másikat." };
   }
 
   // Exactly one initial status and one commitment status (the megrendelés
@@ -345,7 +345,7 @@ export async function deleteLeadStatus(id: number) {
   if ("error" in auth) return { error: auth.error };
   const status = await db.leadStatus.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!status) return { error: "Státusz nem található" };
-  if (status.isInitial) return { error: "A kezdő státusz nem törölhető — előbb jelölj ki másikat." };
+  if (status.isInitial) return { error: "A kezdő státusz nem törölhető: előbb jelölj ki másikat." };
 
   const remaining = await db.leadStatus.count({ where: { tenantId: TENANT_ID } });
   if (remaining <= 1) return { error: "Legalább egy státusznak maradnia kell." };

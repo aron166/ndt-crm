@@ -87,14 +87,14 @@ function splitName(name: string | undefined, emailFallback?: string): {
   const trimmed = (name ?? "").trim();
   if (trimmed) {
     const parts = trimmed.split(/\s+/);
-    if (parts.length === 1) return { firstName: parts[0], lastName: "—" };
+    if (parts.length === 1) return { firstName: parts[0], lastName: "-" };
     // Hungarian convention elsewhere stores lastName first, but inbound web
     // forms are "First Last". Keep it simple and reversible: first token =
     // first name, remainder = last name.
     return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
   }
   const local = emailFallback?.split("@")[0];
-  return { firstName: local || "Lead", lastName: "—" };
+  return { firstName: local || "Lead", lastName: "-" };
 }
 
 export async function ingestLead(

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Check, AlertTriangle } from "lucide-react";
 import { upsertCostRate, type CostRateEntry } from "@/app/actions/cost-rates";
 import { costCodeLabel, costCodeUnitHint } from "@/lib/tasks/costing";
 
@@ -68,7 +69,7 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
                 <input style={inputStyle} value={r.unit} onChange={(e) => set(r.code, "unit", e.target.value)} placeholder={costCodeUnitHint(r.code)} />
               </td>
               <td style={{ padding: "8px 10px", width: 160 }}>
-                <input type="number" inputMode="decimal" step="any" min={0} style={inputStyle} value={r.unitRate} onChange={(e) => set(r.code, "unitRate", e.target.value)} placeholder="—" />
+                <input type="number" inputMode="decimal" step="any" min={0} style={inputStyle} value={r.unitRate} onChange={(e) => set(r.code, "unitRate", e.target.value)} placeholder="-" />
               </td>
             </tr>
           ))}
@@ -80,8 +81,8 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
           {pending ? "Mentés…" : "Mentés"}
         </button>
         {msg && (
-          <span style={{ fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
-            {msg.ok ? "✓ " : "⚠ "}{msg.text}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
+            {msg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {msg.text}
           </span>
         )}
       </div>

@@ -133,7 +133,7 @@ export function CampaignDetailClient({
             disabled={isPending}
             style={{ padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none", minWidth: 200 }}
           >
-            <option value="">— Nincs célközönség —</option>
+            <option value="">Nincs célközönség</option>
             {companyViews.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
           {campaign.audienceViewId !== null && (
@@ -146,7 +146,7 @@ export function CampaignDetailClient({
         {companyViews.length === 0 && campaign.audienceViewId === null && (
           <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>
             Nincs mentett cégszegmens. A <Link href="/companies" style={{ color: "var(--indigo)" }}>Cégek</Link> oldalon
-            szűrj, majd mentsd el nézetként — itt választhatóvá válik.
+            szűrj, majd mentsd el nézetként: itt választhatóvá válik.
           </p>
         )}
 
@@ -167,9 +167,9 @@ export function CampaignDetailClient({
                   {audience.preview.map((c, i) => (
                     <tr key={i}>
                       <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg)" }}>{c.name}</td>
-                      <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)" }} className="font-mono-ndt">{c.vatNumber ?? "—"}</td>
+                      <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)" }} className="font-mono-ndt">{c.vatNumber ?? "-"}</td>
                       <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)" }}>
-                        {c.city ?? "—"}{c.county && <span style={{ color: "var(--fg-faint)", marginLeft: 6, fontSize: 12 }}>{c.county}</span>}
+                        {c.city ?? "-"}{c.county && <span style={{ color: "var(--fg-faint)", marginLeft: 6, fontSize: 12 }}>{c.county}</span>}
                       </td>
                       <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)" }}><PipelineStatusBadge status={c.pipelineStatus} /></td>
                     </tr>
@@ -178,7 +178,7 @@ export function CampaignDetailClient({
               </table>
               {audience.count > audience.preview.length && (
                 <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--fg-faint)", background: "var(--bg-0)" }} className="font-mono-ndt">
-                  Első {audience.preview.length} a {audience.count.toLocaleString("hu-HU")} cégből — a teljes lista a CSV exportban.
+                  Első {audience.preview.length} a {audience.count.toLocaleString("hu-HU")} cégből; a teljes lista a CSV exportban.
                 </div>
               )}
             </div>

@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { contentIntakeSchema, resolveCampaignSlug, defaultCategory } from "@/lib/marketing/schema";
-import { createItem } from "@/lib/content/service";
+import { createItem, addChecks } from "@/lib/content/service";
+import { extractWarnings } from "@/lib/content/warnings";
 
 // Content-draft intake endpoint (Marketing module). Same per-app-key auth as
 // POST /api/leads — the content factory posts drafts here; the shared
@@ -148,8 +149,31 @@ export async function POST(request: Request) {
     if (result.existed) {
       return json({ ok: true, contentItemId: result.contentItemId, versionId: result.versionId, existed: true }, 200);
     }
+
+    // Extract ⚠ checks AFTER commit — addChecks uses the global db client, not
+    // this tx, and a checklist failure must never lose the item itself.
+    let checksCreated = 0;
+    const shouldExtract = input.extract_warnings ?? input.import;
+    if (shouldExtract) {
+      const warnings = extractWarnings(input.body);
+      if (warnings.length) {
+        try {
+          const res = await addChecks(actor, result.contentItemId, warnings.map((w) => ({ ...w, source: "import" as const })));
+          if (res.ok) checksCreated = res.created;
+        } catch (err) {
+          reportError("api.content.addChecks", err, { tenantId, itemId: result.contentItemId });
+        }
+      }
+    }
+
     return json(
-      { ok: true, contentItemId: result.contentItemId, versionId: result.versionId, status: "in_review" },
+      {
+        ok: true,
+        contentItemId: result.contentItemId,
+        versionId: result.versionId,
+        status: "in_review",
+        checksCreated,
+      },
       201,
     );
   } catch (err) {

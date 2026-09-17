@@ -5,7 +5,7 @@ const ALGO = "aes-256-gcm";
 function getKey(): Buffer {
   const hex = process.env.ENCRYPTION_KEY;
   if (!hex || hex.length !== 64) {
-    throw new Error("ENCRYPTION_KEY missing or invalid — must be 64 hex chars (32 bytes). Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"");
+    throw new Error("ENCRYPTION_KEY missing or invalid: must be 64 hex chars (32 bytes). Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"");
   }
   return Buffer.from(hex, "hex");
 }

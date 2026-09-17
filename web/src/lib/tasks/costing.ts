@@ -11,11 +11,11 @@ export interface CostCode {
 }
 
 export const COST_CODES: CostCode[] = [
-  { value: "KID",       label: "KID — Kiszállási díj",        description: "Kiszállás / utazás", unitHint: "km" },
-  { value: "MRD",       label: "MRD — Rendelkezésre állás",   description: "Minimális rendelkezésre állási díj", unitHint: "alkalom" },
-  { value: "DOD",       label: "DOD — Dokumentáció",          description: "Dokumentációs díj", unitHint: "db" },
-  { value: "SZD",       label: "SZD — Személyzeti díj",       description: "Helyszíni munkaidő", unitHint: "óra" },
-  { value: "VIZSGALAT", label: "VIZSGÁLAT — Vizsgálat",       description: "Vizsgálat / mérés", unitHint: "db" },
+  { value: "KID",       label: "KID: Kiszállási díj",        description: "Kiszállás / utazás", unitHint: "km" },
+  { value: "MRD",       label: "MRD: Rendelkezésre állás",   description: "Minimális rendelkezésre állási díj", unitHint: "alkalom" },
+  { value: "DOD",       label: "DOD: Dokumentáció",          description: "Dokumentációs díj", unitHint: "db" },
+  { value: "SZD",       label: "SZD: Személyzeti díj",       description: "Helyszíni munkaidő", unitHint: "óra" },
+  { value: "VIZSGALAT", label: "VIZSGÁLAT: Vizsgálat",       description: "Vizsgálat / mérés", unitHint: "db" },
 ];
 
 const COST_CODE_BY_VALUE = new Map(COST_CODES.map((c) => [c.value, c]));

@@ -147,14 +147,14 @@ async function aiSynthesiseCompany(
   const fieldsNeeded = missingFields.join(", ");
 
   const systemPrompt = `You are a business intelligence assistant. You receive structured, verified facts about a Hungarian company and must fill only the requested missing fields.
-Return ONLY valid JSON — no markdown, no prose:
+Return ONLY valid JSON: no markdown, no prose:
 {
   ${missingFields.includes("website") ? '"website": string | null,' : ""}
   ${missingFields.includes("sector") ? '"sector": string | null,' : ""}
   ${missingFields.includes("notes") ? '"notes": string | null,' : ""}
   "confidence": { ${missingFields.map(f => `"${f}": 0.0`).join(", ")} }
 }
-Be conservative — return null rather than guessing. Confidence reflects how sure you are.`;
+Be conservative: return null rather than guessing. Confidence reflects how sure you are.`;
 
   const userPrompt = `Company: ${company.name}
 City: ${company.city ?? "unknown"}, Hungary
@@ -342,7 +342,7 @@ async function buildPersonChanges(person: {
   if (currentEmployer) {
     try {
       const groq = getGroq();
-      const systemPrompt = `You are a professional network assistant. Given a person's name and employer in Hungary's NDT inspection industry, provide ONLY a brief, factual context note if you have genuine knowledge — otherwise return null.
+      const systemPrompt = `You are a professional network assistant. Given a person's name and employer in Hungary's NDT inspection industry, provide ONLY a brief, factual context note if you have genuine knowledge: otherwise return null.
 Return ONLY JSON: { "notes": string | null, "confidence": number }`;
 
       const userPrompt = `Person: ${person.firstName} ${person.lastName}

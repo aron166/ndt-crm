@@ -30,7 +30,7 @@ Font.register({
 const HUF = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0 });
 const fmtMoney = (n: number, currency: string) => `${HUF.format(Math.round(n))} ${currency === "HUF" ? "Ft" : currency}`;
 const fmtQty = (n: number | null) => (n == null ? "" : new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 2 }).format(n));
-const fmtDate = (d: Date | null) => (d ? new Intl.DateTimeFormat("hu-HU").format(d) : "—");
+const fmtDate = (d: Date | null) => (d ? new Intl.DateTimeFormat("hu-HU").format(d) : "-");
 
 const styles = StyleSheet.create({
   page: { fontFamily: "Roboto", fontSize: 9, paddingTop: 40, paddingBottom: 56, paddingHorizontal: 44, color: "#1f2937" },
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
 function QuoteDocument({ quote, issuerName }: { quote: QuoteDTO; issuerName: string }) {
   const c = quote.currency;
   return (
-    <Document title={`${quote.quoteNumber} — ${quote.title}`}>
+    <Document title={`${quote.quoteNumber}: ${quote.title}`}>
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View>

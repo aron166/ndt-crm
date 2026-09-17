@@ -42,7 +42,7 @@ Tisztelt Tóth Úr!
 
 2020-ban a Millér-patak hídjának acélszerkezetét vizsgáltuk Önöknek, 2021-ben pedig a Lánchíd-munkán dolgoztunk együtt.
 
-Most egy új mérési képesség miatt keresem: georadarral és lézeres letapogatással megmutatjuk, hol fut a betonvas a meglévő szerkezetben, mekkora a betontakarás és az átmérő — bontás és sugárzás nélkül, egyoldali hozzáféréssel.
+Most egy új mérési képesség miatt keresem: georadarral és lézeres letapogatással megmutatjuk, hol fut a betonvas a meglévő szerkezetben, mekkora a betontakarás és az átmérő: bontás és sugárzás nélkül, egyoldali hozzáféréssel.
 
 Van most olyan műtárgyuk, ahol a meglévő vaskiosztásról nincs meg a megvalósulási terv?
 
@@ -73,7 +73,7 @@ async function item({ title, category, format, purpose, status, versions, review
 }
 
 const main = await item({
-  title: "FX A-Híd — 1. érintés", category: "email", format: "plain_text_email", purpose: "Hideg levél v0, 1. érintés",
+  title: "FX A-Híd: 1. érintés", category: "email", format: "plain_text_email", purpose: "Hideg levél v0, 1. érintés",
   status: "in_review", daysAgo: 4,
   versions: [
     { body: V1, author: "import", note: "Átvéve a growth/campaigns/cold-email-v0/drafts/a-hid.md fájlból" },
@@ -84,18 +84,18 @@ const main = await item({
     { v: 1, who: "peter", verdict: "approve" },
   ],
 });
-await item({ title: "FX Setter szkript — bejövő hívás", category: "script", format: "phone_script", purpose: "Setter szkript", status: "in_review", daysAgo: 1,
+await item({ title: "FX Setter szkript: bejövő hívás", category: "script", format: "phone_script", purpose: "Setter szkript", status: "in_review", daysAgo: 1,
   versions: [{ body: "## Nyitás\n\nJó napot kívánok, Balogh Áron vagyok az Uphill Trade-től…\n\n## Kérdések\n\n1. Van most futó projektjük?\n2. Mikorra kellene a felmérés?", author: "import" }] });
 await item({ title: "FX Demó ajánlat", category: "email", format: "plain_text_email", purpose: "Demó ajánlat", status: "changes_requested", daysAgo: 2,
   versions: [{ body: "Tisztelt Ügyfelünk!\n\nSzívesen bemutatjuk a mérést a helyszínen.", author: "import" }],
   reviews: [{ v: 0, who: "aron", verdict: "changes", comment: "Legyen benne a konkrét időtartam (kb. 2 óra)." }] });
-await item({ title: "FX BirdsView hirdetés — rövid vágás", category: "video", format: "9x16_video", purpose: "Meta hirdetés", status: "ai_working", daysAgo: 1, needsHumanAsset: true,
+await item({ title: "FX BirdsView hirdetés: rövid vágás", category: "video", format: "9x16_video", purpose: "Meta hirdetés", status: "ai_working", daysAgo: 1, needsHumanAsset: true,
   versions: [{ body: "Forgatókönyv: 15 mp, nyitókép a födémről…", author: "import" }],
   reviews: [{ v: 0, who: "aron", verdict: "rewrite", comment: "Rövidebb, 10 mp, és a végén logó." }] });
 await item({ title: "FX Aláírás és jogi lábléc", category: "other", format: null, purpose: "Aláírás", status: "live", live: 0, daysAgo: 6,
   versions: [{ body: "Balogh Áron\nUphill Trade Kft.\n+36 …", author: "user" }],
   reviews: [{ v: 0, who: "aron", verdict: "approve" }, { v: 0, who: "peter", verdict: "approve" }] });
-await q(`UPDATE content_items SET claimed_at = now(), claimed_by = 'content-revise', claimed_from = 'rewrite_requested' WHERE title = 'FX BirdsView hirdetés — rövid vágás'`);
+await q(`UPDATE content_items SET claimed_at = now(), claimed_by = 'content-revise', claimed_from = 'rewrite_requested' WHERE title = 'FX BirdsView hirdetés: rövid vágás'`);
 
 console.log(`fixtures ready: reviewers ${aron}, ${peter}; main item ${main}`);
 await c.end();

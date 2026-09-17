@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import { FormField } from "@/components/ui/FormField";
 import {
   listDrafts,
@@ -30,7 +31,7 @@ type Sender = { id: number; name: string };
 // ⚠️ PLACEHOLDER consent line. Áron owes the real wording — this one is a
 // starting point, not legal text, and it goes out on every send once saved.
 const FOOTER_PLACEHOLDER =
-  "⚠️ Ezt a levelet üzleti ajánlatként küldtük a nyilvánosan elérhető céges elérhetőségre. " +
+  "Ezt a levelet üzleti ajánlatként küldtük a nyilvánosan elérhető céges elérhetőségre. " +
   "Ha nem szeretne több levelet kapni tőlünk, válaszoljon annyit: „leiratkozás”, és töröljük a listánkról.";
 
 const STATUS_LABEL: Record<DraftStatus, string> = {
@@ -310,7 +311,7 @@ export default function OutreachQueue({
               style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px" }}
             />
           </FormField>
-          <FormField label="Lábléc (leiratkozási és jogi közlemény) ⚠️" full>
+          <FormField label="Lábléc (leiratkozási és jogi közlemény)" full>
             <textarea
               className="input-ds"
               value={footer}
@@ -319,6 +320,9 @@ export default function OutreachQueue({
               placeholder={FOOTER_PLACEHOLDER}
               style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical" }}
             />
+            <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--amber)", marginTop: 4 }}>
+              <AlertTriangle size={14} aria-hidden="true" /> Ideiglenes szöveg: Áron még nem hagyta jóvá a végleges láblécet.
+            </p>
           </FormField>
           <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
             <button
@@ -403,7 +407,7 @@ export default function OutreachQueue({
 
       {truncated && (
         <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-mute)", background: "var(--bg-raised)" }}>
-          Csak az első 200 piszkozat látszik ennél a szűrésnél — szűrj tovább (kampány, lépés, állapot) a többi megtekintéséhez.
+          Csak az első 200 piszkozat látszik ennél a szűrésnél: szűrj tovább (kampány, lépés, állapot) a többi megtekintéséhez.
         </div>
       )}
 
@@ -496,7 +500,7 @@ export default function OutreachQueue({
                   <button
                     onClick={() => onCopyBody(row)}
                     disabled={!savedFooter}
-                    title={savedFooter ? undefined : "Hiányzik a leiratkozási lábléc — töltsd ki a beállításokban"}
+                    title={savedFooter ? undefined : "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban"}
                     style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 10px", cursor: savedFooter ? "pointer" : "default", opacity: savedFooter ? 1 : 0.5 }}
                   >
                     {copied?.id === row.id && copied.kind === "body" ? "Másolva" : "Szöveg másolása"}

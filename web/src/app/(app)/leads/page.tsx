@@ -113,7 +113,7 @@ export default async function LeadsPage({
                         {l.company.name}
                       </Link>
                     )}
-                    <span className="truncate" style={{ width: 150, color: "var(--fg-faint)" }}>{personName || "—"}</span>
+                    <span className="truncate" style={{ width: 150, color: "var(--fg-faint)" }}>{personName || "-"}</span>
                     <span className="font-mono-ndt" style={{ width: 90, color: "var(--fg-faint)", fontSize: 12 }}>
                       {formatRelativeTime(l.closedAt ?? l.convertedAt)}
                     </span>

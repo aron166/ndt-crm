@@ -76,7 +76,7 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
 
         {currentCompanyName && (
           <p className="text-xs text-slate-500 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            Jelenlegi: <span className="text-slate-700 font-medium">{currentCompanyName}</span> — ez lezárul, és az új lesz a jelenlegi.
+            Jelenlegi: <span className="text-slate-700 font-medium">{currentCompanyName}</span>: ez lezárul, és az új lesz a jelenlegi.
           </p>
         )}
 

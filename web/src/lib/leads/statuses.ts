@@ -50,6 +50,6 @@ export const DEFAULT_LEAD_STATUSES: LeadStatusDef[] = [
 ];
 
 export function leadStatusLabel(key: string | null, statuses: LeadStatusDef[]): string {
-  if (!key) return "—";
+  if (!key) return "-";
   return statuses.find((s) => s.key === key)?.label ?? key;
 }

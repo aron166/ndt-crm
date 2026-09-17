@@ -17,7 +17,7 @@ import { SetEmployerModal } from "./SetEmployerModal";
 import { DossierTab } from "@/components/DossierTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { Mail, Phone, MapPin, Trash2 } from "lucide-react";
+import { Mail, Phone, MapPin, Trash2, Loader2 } from "lucide-react";
 import { updatePerson, deletePerson, restorePerson } from "@/app/actions/persons";
 
 interface Contact {
@@ -122,9 +122,9 @@ export function PersonDetailClient({
   }
 
   const currentContact = contacts.find((c) => !c.endedAt);
-  const signalLabel = signalLevel >= 5 ? "Aktív — 7 napon belül érintkezés"
-    : signalLevel >= 3 ? "Stabil — negyedéves kapcsolattartás"
-    : "Hideg — 90+ nap inaktivitás";
+  const signalLabel = signalLevel >= 5 ? "Aktív: 7 napon belül érintkezés"
+    : signalLevel >= 3 ? "Stabil: negyedéves kapcsolattartás"
+    : "Hideg: 90+ nap inaktivitás";
 
   const TABS = [
     { key: "activity",      label: "Interakciók",  count: interactions.length },
@@ -167,7 +167,7 @@ export function PersonDetailClient({
           }}
         >
           <span style={{ fontSize: 14, color: "var(--fg)", flex: 1 }}>
-            Ez a személy törölve van — nem jelenik meg a keresésben, és az adatai nem
+            Ez a személy törölve van: nem jelenik meg a keresésben, és az adatai nem
             menthetők, amíg vissza nem állítod.
           </span>
           <button
@@ -272,7 +272,7 @@ export function PersonDetailClient({
               disabled={enriching}
               style={{ display: "flex", alignItems: "center", gap: 6 }}
             >
-              <span style={{ display: "inline-block", animation: enriching ? "spin 1.2s linear infinite" : "none", fontSize: 14 }}>✦</span>
+              <Loader2 size={14} aria-hidden="true" style={{ animation: enriching ? "spin 1.2s linear infinite" : "none" }} />
               {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
             </button>
             <button
@@ -423,7 +423,7 @@ export function PersonDetailClient({
                   </div>
                   <div style={{ marginTop: 18, padding: 14, border: "1px dashed var(--line-soft)", borderRadius: 8, fontSize: 14, color: "var(--fg-mute)", lineHeight: 1.5 }}>
                     <div style={{ color: "var(--fg)", fontWeight: 500, marginBottom: 4 }}>Miért tároljuk a karriertörténetet</div>
-                    Ha a személy céget vált, a teljes kapcsolati történet követi. A kapcsolat az érték — nem az adott munkáltatónál lévő rekord.
+                    Ha a személy céget vált, a teljes kapcsolati történet követi. A kapcsolat az érték: nem az adott munkáltatónál lévő rekord.
                   </div>
                 </div>
               </div>

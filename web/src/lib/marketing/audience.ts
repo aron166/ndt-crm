@@ -45,7 +45,7 @@ export function companiesToCsv(rows: AudienceCompany[]): string {
       r.pipelineStatus, r.warmth, r.teaorCode,
     ].map(csvCell).join(","));
   }
-  // CRLF line breaks — Excel (the user's reality) is happiest with them.
+  // CRLF line breaks. Excel (the user's reality) is happiest with them.
   return lines.join("\r\n");
 }
 

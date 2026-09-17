@@ -34,7 +34,7 @@ export async function getIntroMaterialUrl(tenantId: number): Promise<string | nu
 
 function introEmail(url: string) {
   return {
-    subject: "BetonScan 3D — termékismertető",
+    subject: "BetonScan 3D: termékismertető",
     text: [
       "Kedves Érdeklődő!",
       "",

@@ -24,6 +24,26 @@ jobs:
   check:
     name: tsc + tests
     runs-on: ubuntu-latest
+    # The content service's integration suite talks to a real Postgres (row
+    # locks, the ⚠ check gate, the AI race rule). Without a database it would
+    # skip itself and rot unnoticed, which is exactly how the gate shipped
+    # broken once (Vanda, PR #103).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ndt_crm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ndt_crm
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ndt_crm
+      CONTENT_IT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ndt_crm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,6 +53,8 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npx prisma generate
+      - name: Schema for the integration suite
+        run: npx prisma migrate deploy
       - run: npx tsc --noEmit
       - run: npm test
 
@@ -68,3 +90,59 @@ jobs:
         run: npx prisma migrate deploy
       - name: Nothing left pending
         run: npx prisma migrate status
+
+  style:
+    name: style law (no emoji, no em dashes in UI text)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/check-style.mjs
+
+  eslint:
+    name: eslint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx eslint src --max-warnings 9999
+
+  bundle:
+    name: bundle budget
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ndt_crm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ndt_crm
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ndt_crm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Build the schema so prerendering has something to query
+        run: npx prisma migrate deploy
+      - run: npx next build
+      - run: node scripts/check-bundle.mjs

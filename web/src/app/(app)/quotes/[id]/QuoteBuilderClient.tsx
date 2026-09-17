@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Trash2, Plus, FileText, ArrowLeft } from "lucide-react";
+import { Trash2, Plus, FileText, ArrowLeft, Check, AlertTriangle } from "lucide-react";
 import type { QuoteDTO } from "@/app/actions/quotes";
 import { updateQuote, setQuoteStatus, deleteQuote } from "@/app/actions/quotes";
 import type { CostRateEntry } from "@/app/actions/cost-rates";
@@ -186,7 +186,7 @@ export function QuoteBuilderClient({
           <div>
             <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Címzett (kapcsolattartó)</label>
             <select style={{ ...inputStyle, marginTop: 4 }} value={personId ?? ""} onChange={(e) => setPersonId(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">—</option>
+              <option value="">-</option>
               {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -217,7 +217,7 @@ export function QuoteBuilderClient({
               <tr key={idx} style={{ borderTop: "1px solid var(--line-soft)" }}>
                 <td style={{ padding: "6px 6px", width: 110 }}>
                   <select style={inputStyle} value={l.costCode} onChange={(e) => setCostCode(idx, e.target.value)}>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {COST_CODES.map((c) => <option key={c.value} value={c.value}>{c.value}</option>)}
                   </select>
                 </td>
@@ -244,7 +244,7 @@ export function QuoteBuilderClient({
               </tr>
             ))}
             {lines.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: "16px 6px", textAlign: "center", color: "var(--fg-faint)" }}>Nincs tétel — adj hozzá sort.</td></tr>
+              <tr><td colSpan={7} style={{ padding: "16px 6px", textAlign: "center", color: "var(--fg-faint)" }}>Nincs tétel: adj hozzá sort.</td></tr>
             )}
           </tbody>
         </table>
@@ -284,7 +284,11 @@ export function QuoteBuilderClient({
           Törlés
         </button>
         <div className="flex items-center gap-3">
-          {msg && <span style={{ fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>{msg.ok ? "✓ " : "⚠ "}{msg.text}</span>}
+          {msg && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
+              {msg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {msg.text}
+            </span>
+          )}
           {quote.sentAt && <span style={{ fontSize: 14, color: "var(--fg-faint)" }}>Elküldve: {formatDate(quote.sentAt)}</span>}
           <button className="btn primary" disabled={pending} onClick={handleSave}>{pending ? "Mentés…" : "Mentés"}</button>
         </div>

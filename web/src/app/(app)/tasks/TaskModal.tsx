@@ -286,7 +286,7 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
               <p className="text-xs text-slate-500">
                 Összeg:{" "}
                 <span className="font-mono-ndt text-slate-700">
-                  {liveAmount != null ? formatHUF(liveAmount) : "—"}
+                  {liveAmount != null ? formatHUF(liveAmount) : "-"}
                 </span>
                 <span className="text-slate-400"> · mennyiség × egységár, automatikusan</span>
               </p>

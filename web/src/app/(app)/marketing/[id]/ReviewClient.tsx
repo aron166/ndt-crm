@@ -2,17 +2,19 @@
 
 import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Link2, Upload, X } from "lucide-react";
+import { FileText, Link2, Upload, X, Check, PencilLine, RotateCcw, Pencil } from "lucide-react";
 import { Markdown } from "@/lib/content/markdown";
 import { wordDiff } from "@/lib/content/diff";
 import {
   UI, CATEGORY_LABEL, VERDICT_LABEL, VERDICT_ACTION, AUTHOR_LABEL,
 } from "@/lib/content/labels";
+import { REVIEW_REASONS, REVIEW_REASON_LABEL, type ReviewReason } from "@/lib/content/reasons";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/marketing/types";
 import type { ContentCategory, Verdict } from "@/lib/content/types";
 import type { ReviewPageData } from "@/lib/content/queries";
 import {
   submitContentReview, saveContentVersion, requestAssetUpload, archiveContent,
+  setContentCheck, addContentCheck,
 } from "@/app/actions/content";
 import { publishContent, saveContentMetrics } from "@/app/actions/marketing";
 import { createClient } from "@/lib/supabase/client";
@@ -24,6 +26,13 @@ const CONTENT_BUCKET = "content-assets";
 
 type VersionRow = ReviewPageData["versions"][number];
 type AssetRow = VersionRow["assets"][number];
+
+const CHECK_FOR_LABEL: Record<string, string> = {
+  aron: UI.checkForAron, peter: UI.checkForPeter, either: UI.checkForEither,
+};
+const CHECK_STATE_LABEL: Record<string, string> = {
+  open: UI.checkStateOpen, resolved: UI.checkStateResolved, waived: UI.checkStateWaived,
+};
 
 const METRIC_FIELDS: { key: string; label: string }[] = [
   { key: "impressions", label: "Megjelenések" },
@@ -63,7 +72,7 @@ export function ReviewClient({
   const supabase = useMemo(() => createClient(), []);
   const [isPending, startTransition] = useTransition();
 
-  const { item, versions, reviewers, isReviewer } = data;
+  const { item, versions, reviewers, isReviewer, checks } = data;
 
   const currentVersion = versions.find((v) => v.id === item.currentVersionId) ?? null;
   const liveVersion = item.liveVersionId ? versions.find((v) => v.id === item.liveVersionId) ?? null : null;
@@ -84,6 +93,7 @@ export function ReviewClient({
   const [actionError, setActionError] = useState<string | null>(null);
   const [reviewPanel, setReviewPanel] = useState<"changes" | "rewrite" | null>(null);
   const [reviewComment, setReviewComment] = useState("");
+  const [reviewReason, setReviewReason] = useState<ReviewReason | "">("");
 
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState("");
@@ -95,6 +105,12 @@ export function ReviewClient({
   const [addingLink, setAddingLink] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkCaption, setLinkCaption] = useState("");
+
+  const [checkAction, setCheckAction] = useState<{ id: number; state: "resolved" | "waived" } | null>(null);
+  const [checkText, setCheckText] = useState("");
+  const [addingCheck, setAddingCheck] = useState(false);
+  const [checkQuestion, setCheckQuestion] = useState("");
+  const [checkForWhom, setCheckForWhom] = useState<"aron" | "peter" | "either">("either");
 
   const [publishUrl, setPublishUrl] = useState(item.externalUrl ?? "");
   const [copied, setCopied] = useState(false);
@@ -126,11 +142,11 @@ export function ReviewClient({
     });
   }
 
-  function submitVerdict(verdict: Verdict, comment?: string) {
+  function submitVerdict(verdict: Verdict, comment?: string, reason?: string) {
     if (!viewed || viewed.id !== item.currentVersionId) return;
     run(
-      () => submitContentReview({ versionId: viewed.id, verdict, comment }),
-      () => { setReviewPanel(null); setReviewComment(""); },
+      () => submitContentReview({ reason, versionId: viewed.id, verdict, comment }),
+      () => { setReviewPanel(null); setReviewComment(""); setReviewReason(""); },
     );
   }
 
@@ -207,6 +223,21 @@ export function ReviewClient({
     run(() => saveContentMetrics(item.id, payload));
   }
 
+  function submitCheck(checkId: number, state: "open" | "resolved" | "waived", text?: string) {
+    run(
+      () => setContentCheck({ checkId, state, text }),
+      () => { setCheckAction(null); setCheckText(""); },
+    );
+  }
+
+  function submitAddCheck() {
+    if (checkQuestion.trim().length < 3) return;
+    run(
+      () => addContentCheck({ itemId: item.id, question: checkQuestion.trim(), forWhom: checkForWhom }),
+      () => { setCheckQuestion(""); setAddingCheck(false); },
+    );
+  }
+
   function assetHref(a: AssetRow): string | null {
     if (a.kind === "link") return isHttpUrl(a.url) ? a.url : null;
     if (a.storagePath) return signedUrls[a.storagePath] ?? null;
@@ -217,6 +248,8 @@ export function ReviewClient({
   const categoryLabel = CATEGORY_LABEL[item.category as ContentCategory] ?? item.category;
   const statusColor = STATUS_COLORS[item.status as keyof typeof STATUS_COLORS] ?? "#64748b";
   const myVerdict = userId != null ? currentVersion?.reviews.find((r) => r.reviewerId === userId)?.verdict ?? null : null;
+  const openChecksCount = checks.filter((c) => c.state === "open").length;
+  const hasOpenChecks = openChecksCount > 0;
 
   const pipelineActive: Record<string, number | null> = {
     draft: 1, in_review: 1, changes_requested: 1, rewrite_requested: 1, ai_working: 1, live: 2, archived: null,
@@ -275,6 +308,7 @@ export function ReviewClient({
         )}
         {item.status === "ai_working" && <p className="review-note amber">{UI.aiBusy}</p>}
         {item.needsHumanAsset && <p className="review-note amber">{UI.needsHumanAsset}</p>}
+        {hasOpenChecks && <p className="review-note amber">{UI.checkBlocksLive}</p>}
         {!isReviewer && <p className="review-note">{UI.notReviewer}</p>}
         {reviewers.length < 2 && <p className="review-note">{UI.noReviewers}</p>}
         {actionError && !editing && !reviewPanel && <p className="review-error">{actionError}</p>}
@@ -517,7 +551,7 @@ export function ReviewClient({
                       disabled={isPending}
                       onClick={() => submitVerdict("approve")}
                     >
-                      ✅ {VERDICT_ACTION.approve}
+                      <Check size={16} aria-hidden="true" /> {VERDICT_ACTION.approve}
                     </button>
                     <button
                       type="button"
@@ -526,7 +560,7 @@ export function ReviewClient({
                       disabled={isPending}
                       onClick={() => { setReviewPanel((p) => (p === "changes" ? null : "changes")); setReviewComment(""); setActionError(null); }}
                     >
-                      ✏️ {VERDICT_ACTION.changes}
+                      <PencilLine size={16} aria-hidden="true" /> {VERDICT_ACTION.changes}
                     </button>
                     <button
                       type="button"
@@ -535,7 +569,7 @@ export function ReviewClient({
                       disabled={isPending}
                       onClick={() => { setReviewPanel((p) => (p === "rewrite" ? null : "rewrite")); setReviewComment(""); setActionError(null); }}
                     >
-                      ♻️ {VERDICT_ACTION.rewrite}
+                      <RotateCcw size={16} aria-hidden="true" /> {VERDICT_ACTION.rewrite}
                     </button>
                   </>
                 )}
@@ -550,13 +584,27 @@ export function ReviewClient({
                 )}
                 {canEditButton && (
                   <button type="button" className="actionbar-btn edit" disabled={isPending} onClick={openEditor}>
-                    ✎ {UI.edit}
+                    <Pencil size={16} aria-hidden="true" /> {UI.edit}
                   </button>
                 )}
               </div>
+              {canReviewButtons && hasOpenChecks && (
+                <p className="review-note amber actionbar-note">{UI.checkBlocksLive}</p>
+              )}
               {reviewPanel && (
                 <div className="review-comment-panel">
                   <label className="field-label" htmlFor="review-comment" style={{ display: "block" }}>{UI.commentLabel}</label>
+                  <label className="field-label" htmlFor="review-reason">{UI.reasonLabel}</label>
+                  <select
+                    id="review-reason"
+                    value={reviewReason}
+                    onChange={(e) => setReviewReason(e.target.value as ReviewReason | "")}
+                  >
+                    <option value="">{UI.reasonPick}</option>
+                    {REVIEW_REASONS.map((r) => (
+                      <option key={r} value={r}>{REVIEW_REASON_LABEL[r]}</option>
+                    ))}
+                  </select>
                   <textarea
                     id="review-comment"
                     autoFocus
@@ -571,8 +619,8 @@ export function ReviewClient({
                     <button
                       type="button"
                       className="btn primary"
-                      disabled={isPending || reviewComment.trim().length < 3}
-                      onClick={() => submitVerdict(reviewPanel, reviewComment.trim())}
+                      disabled={isPending || reviewComment.trim().length < 3 || !reviewReason}
+                      onClick={() => submitVerdict(reviewPanel, reviewComment.trim(), reviewReason)}
                     >
                       {reviewPanel === "changes" ? VERDICT_ACTION.changes : VERDICT_ACTION.rewrite}
                     </button>
@@ -581,6 +629,132 @@ export function ReviewClient({
               )}
             </div>
           )}
+
+          <section className="review-panel">
+            <div className="checks-panel-head">
+              <h2 className="review-panel-title">{UI.checks}</h2>
+              {hasOpenChecks && <span className="checks-open-count">{UI.checksOpen(openChecksCount)}</span>}
+            </div>
+            {checks.length > 0 && (
+              <ul className="checks-list">
+                {checks.map((c) => {
+                  const isOpen = c.state === "open";
+                  const settled = !isOpen;
+                  const acting = checkAction?.id === c.id;
+                  return (
+                    <li key={c.id} className="check-item">
+                      <p className="check-question">{c.question}</p>
+                      <div className="check-meta">
+                        <span className={cx("check-chip", `check-${c.state}`)}>
+                          {CHECK_STATE_LABEL[c.state] ?? c.state}
+                        </span>
+                        <span className="check-for">{CHECK_FOR_LABEL[c.forWhom] ?? c.forWhom}</span>
+                        {c.source === "import" && <span className="check-source">{UI.checkAskedBy}</span>}
+                      </div>
+                      {c.answer && (
+                        <p className="check-answer">
+                          {c.answer}
+                          {c.resolvedBy && <span className="check-resolved-by">{", "}{c.resolvedBy}</span>}
+                        </p>
+                      )}
+                      {isOpen && !acting && (
+                        <div className="check-actions">
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            disabled={isPending}
+                            onClick={() => { setCheckAction({ id: c.id, state: "resolved" }); setCheckText(""); setActionError(null); }}
+                          >
+                            {UI.checkResolve}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            disabled={isPending}
+                            onClick={() => { setCheckAction({ id: c.id, state: "waived" }); setCheckText(""); setActionError(null); }}
+                          >
+                            {UI.checkWaive}
+                          </button>
+                        </div>
+                      )}
+                      {settled && (
+                        <div className="check-actions">
+                          <button type="button" className="btn btn-sm" disabled={isPending} onClick={() => submitCheck(c.id, "open")}>
+                            {UI.checkReopen}
+                          </button>
+                        </div>
+                      )}
+                      {acting && checkAction && (
+                        <div className="check-answer-form">
+                          <label className="field-label" htmlFor={`check-text-${c.id}`}>
+                            {checkAction.state === "resolved" ? UI.checkAnswer : UI.checkWaiveReason}
+                          </label>
+                          <textarea
+                            id={`check-text-${c.id}`}
+                            autoFocus
+                            rows={2}
+                            value={checkText}
+                            onChange={(e) => setCheckText(e.target.value)}
+                          />
+                          {actionError && <p className="review-error">{actionError}</p>}
+                          <div className="editor-actions-row">
+                            <button type="button" className="btn btn-sm" disabled={isPending} onClick={() => { setCheckAction(null); setCheckText(""); }}>
+                              {UI.cancel}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn primary btn-sm"
+                              disabled={isPending || checkText.trim().length < 2}
+                              onClick={() => submitCheck(c.id, checkAction.state, checkText.trim())}
+                            >
+                              {checkAction.state === "resolved" ? UI.checkResolve : UI.checkWaive}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <div className="check-add">
+              {addingCheck ? (
+                <>
+                  <input
+                    className="editor-input"
+                    placeholder={UI.checkAddPlaceholder}
+                    value={checkQuestion}
+                    onChange={(e) => setCheckQuestion(e.target.value)}
+                  />
+                  <select
+                    className="editor-input check-for-select"
+                    value={checkForWhom}
+                    onChange={(e) => setCheckForWhom(e.target.value as typeof checkForWhom)}
+                    aria-label={UI.checkFor}
+                  >
+                    <option value="either">{UI.checkForEither}</option>
+                    <option value="aron">{UI.checkForAron}</option>
+                    <option value="peter">{UI.checkForPeter}</option>
+                  </select>
+                  <div className="editor-actions-row">
+                    <button type="button" className="btn btn-sm" disabled={isPending} onClick={() => { setAddingCheck(false); setCheckQuestion(""); }}>
+                      {UI.cancel}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn primary btn-sm"
+                      disabled={isPending || checkQuestion.trim().length < 3}
+                      onClick={submitAddCheck}
+                    >
+                      {UI.checkAdd}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button type="button" className="btn btn-sm" onClick={() => setAddingCheck(true)}>{UI.checkAdd}</button>
+              )}
+            </div>
+          </section>
 
           <section className="review-panel">
             <h2 className="review-panel-title">{UI.versions}</h2>

@@ -27,7 +27,7 @@ function AttrValueInput({ def, val, onVal, lbl, onLbl, autoFocus }: {
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
       {def.options ? (
         <select className="input-ds" value={val} onChange={(e) => onVal(e.target.value)} style={{ width: 200 }} autoFocus={autoFocus}>
-          <option value="">— válassz —</option>
+          <option value="">válassz</option>
           {def.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       ) : (
@@ -47,7 +47,7 @@ export function CompanyMetadataTab({ companyId, attributes }: Props) {
         <span className="h-section" style={{ margin: 0 }}>Metaadatok</span>
       </div>
       <p style={{ fontSize: 14, color: "var(--fg-mute)", marginBottom: 18, lineHeight: 1.5 }}>
-        Minden érték módosítható, és a korábbi érték megmarad előzményként — nincs felülírás.
+        Minden érték módosítható, és a korábbi érték megmarad előzményként: nincs felülírás.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
         {COMPANY_ATTR_TYPES.map((type) => (

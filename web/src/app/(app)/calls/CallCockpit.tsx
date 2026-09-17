@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { Phone, CheckCircle2 } from "lucide-react";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { formatRelativeTime } from "@/lib/utils";
 import { CALL_OUTCOMES } from "@/lib/outreach/queue";
@@ -214,7 +215,7 @@ export default function CallCockpit({
       {loadingQueue ? (
         <Empty>Betöltés…</Empty>
       ) : queue.length === 0 ? (
-        <Empty>Nincs hívandó cég ebben a sorban. 🎉</Empty>
+        <Empty>Nincs hívandó cég ebben a sorban.</Empty>
       ) : mode === "list" ? (
         <CallList
           queue={queue}
@@ -228,7 +229,7 @@ export default function CallCockpit({
       ) : done ? (
         <DoneCard tally={tally} totalDone={totalDone} onRestart={() => changeSegment(viewId)} />
       ) : !current ? (
-        <Empty>Nincs hívandó cég ebben a sorban. 🎉</Empty>
+        <Empty>Nincs hívandó cég ebben a sorban.</Empty>
       ) : (
         <div className="panel mount mount-1" style={{ padding: 0 }}>
           {/* Company head */}
@@ -242,7 +243,7 @@ export default function CallCockpit({
                   <PipelineStatusBadge status={current.pipelineStatus} />
                 </div>
                 <div style={{ fontSize: 14, color: "var(--fg-faint)", marginTop: 4 }}>
-                  {[current.city, current.county].filter(Boolean).join(", ") || "—"}
+                  {[current.city, current.county].filter(Boolean).join(", ") || "-"}
                   {current.website && (
                     <>
                       {" · "}
@@ -294,7 +295,7 @@ export default function CallCockpit({
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>{activeContact.name}</div>
                     <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>
-                      {activeContact.role || "—"}
+                      {activeContact.role || "-"}
                       {activeContact.email && <> · {activeContact.email}</>}
                     </div>
                   </div>
@@ -303,12 +304,13 @@ export default function CallCockpit({
                       href={`tel:${activeContact.phone.replace(/\s+/g, "")}`}
                       className="font-mono-ndt"
                       style={{
+                        display: "inline-flex", alignItems: "center", gap: 6,
                         fontSize: 16, fontWeight: 600, color: "var(--mint)",
                         background: "var(--mint-soft)", border: "1px solid oklch(0.80 0.13 165 / 0.35)",
                         padding: "8px 16px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap",
                       }}
                     >
-                      📞 {activeContact.phone}
+                      <Phone size={16} aria-hidden="true" /> {activeContact.phone}
                     </a>
                   ) : (
                     <span style={{ fontSize: 14, color: "var(--fg-faint)" }}>Nincs telefonszám</span>
@@ -319,27 +321,28 @@ export default function CallCockpit({
                 {callId ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--mint)" }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--mint)" }} />
-                    Hívás folyamatban — válassz kimenetelt a befejezéshez
+                    Hívás folyamatban: válassz kimenetelt a befejezéshez
                   </div>
                 ) : (
                   <button
                     onClick={beginCall}
                     disabled={calling || !activeContact.phone}
                     style={{
-                      alignSelf: "flex-start", fontSize: 14, fontWeight: 600, color: "var(--indigo)",
+                      alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 6,
+                      fontSize: 14, fontWeight: 600, color: "var(--indigo)",
                       background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)",
                       borderRadius: 8, padding: "8px 16px",
                       cursor: calling || !activeContact.phone ? "default" : "pointer",
                       opacity: calling || !activeContact.phone ? 0.5 : 1,
                     }}
                   >
-                    {calling ? "Indítás…" : "📞 Hívás indítása"}
+                    {calling ? "Indítás…" : (<><Phone size={14} aria-hidden="true" /> Hívás indítása</>)}
                   </button>
                 )}
               </div>
             ) : (
               <div style={{ fontSize: 14, color: "var(--fg-faint)" }}>
-                Nincs rögzített kapcsolattartó —{" "}
+                Nincs rögzített kapcsolattartó,{" "}
                 <Link href={`/companies/${current.id}`} style={{ color: "var(--indigo)" }}>adj hozzá egyet</Link>
               </div>
             )}
@@ -366,7 +369,7 @@ export default function CallCockpit({
                     </span>
                     <span style={{ color: "var(--fg-mute)", minWidth: 0 }}>
                       <span style={{ color: "var(--fg-soft)" }}>{INTERACTION_LABEL[h.type ?? "note"] ?? h.type}</span>
-                      {h.notes && <> — {h.notes}</>}
+                      {h.notes && <>: {h.notes}</>}
                     </span>
                   </div>
                 ))}
@@ -486,13 +489,16 @@ function CallList({
                 href={`tel:${ct.phone.replace(/\s+/g, "")}`}
                 onClick={(e) => e.stopPropagation()}
                 className="font-mono-ndt"
+                aria-label={`Hívás: ${ct.phone}`}
+                title={ct.phone}
                 style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
                   fontSize: 14, fontWeight: 600, color: "var(--mint)", background: "var(--mint-soft)",
                   border: "1px solid oklch(0.80 0.13 165 / 0.35)", padding: "5px 10px", borderRadius: 7,
                   textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
                 }}
               >
-                📞
+                <Phone size={14} aria-hidden="true" />
               </a>
             ) : (
               <span style={{ width: 30, flexShrink: 0 }} />
@@ -523,7 +529,9 @@ function DoneCard({
 }) {
   return (
     <div className="panel mount mount-1" style={{ padding: "32px 24px", textAlign: "center" }}>
-      <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+        <CheckCircle2 size={32} aria-hidden="true" style={{ color: "var(--mint)" }} />
+      </div>
       <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--fg)", margin: 0 }}>Hívókör kész</h2>
       <p style={{ fontSize: 14, color: "var(--fg-mute)", marginTop: 6 }}>
         {totalDone} hívás naplózva ebben a körben.
