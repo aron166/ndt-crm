@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { Paperclip } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UI, CATEGORY_LABEL } from "@/lib/content/labels";
 import { CONTENT_CATEGORIES, type ContentCategory } from "@/lib/content/types";
@@ -12,15 +13,6 @@ const selectStyle: React.CSSProperties = {
   background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
-
-function isHttpUrl(u: string): boolean {
-  try {
-    const p = new URL(u);
-    return p.protocol === "http:" || p.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 function plainTextPreview(body: string): string {
   const plain = body
@@ -53,7 +45,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function Card({ row, signedUrls }: { row: LibraryRow; signedUrls: Record<string, string> }) {
+function Card({ row }: { row: LibraryRow }) {
   return (
     <div className="panel">
       <div className="panel-pad">
@@ -82,23 +74,11 @@ function Card({ row, signedUrls }: { row: LibraryRow; signedUrls: Record<string,
         </div>
 
         {row.assets.length > 0 && (
-          <div className="flex gap-2 flex-wrap" style={{ marginBottom: row.usedBy.length > 0 ? 12 : 0 }}>
-            {row.assets.map((a) => {
-              const url = a.storagePath ? signedUrls[a.storagePath] : (isHttpUrl(a.url) ? a.url : null);
-              if (!url) return null;
-              if (a.kind === "image") {
-                return (
-                  <a key={a.id} href={url} target="_blank" rel="noopener noreferrer">
-                    <img src={url} alt={a.caption ?? row.title} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line-soft)" }} />
-                  </a>
-                );
-              }
-              return (
-                <a key={a.id} href={url} target="_blank" rel="noopener noreferrer" className="btn sm" style={{ minHeight: 44 }}>
-                  {UI.download}
-                </a>
-              );
-            })}
+          // Performance golden rule (spec §6c): a LIST never loads media. The
+          // files are counted here and open with the item.
+          <div style={{ fontSize: 13, color: "var(--fg-mute)", display: "flex", alignItems: "center", gap: 6 }}>
+            <Paperclip size={14} aria-hidden="true" />
+            {row.assets.length} fájl
           </div>
         )}
 
@@ -117,10 +97,9 @@ function Card({ row, signedUrls }: { row: LibraryRow; signedUrls: Record<string,
 }
 
 export function LibraryClient({
-  rows, signedUrls, filterOptions,
+  rows, filterOptions,
 }: {
   rows: LibraryRow[];
-  signedUrls: Record<string, string>;
   filterOptions: { campaigns: { id: number; name: string }[]; formats: string[] };
 }) {
   const router = useRouter();
@@ -173,7 +152,7 @@ export function LibraryClient({
                 <span className="font-mono-ndt" style={{ marginLeft: 8, fontSize: 12, color: "var(--fg-faint)" }}>{items.length}</span>
               </h2>
               <div className="space-y-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(320px, 100%), 1fr))", gap: 12 }}>
-                {items.map((row) => <Card key={row.id} row={row} signedUrls={signedUrls} />)}
+                {items.map((row) => <Card key={row.id} row={row} />)}
               </div>
             </section>
           ))}

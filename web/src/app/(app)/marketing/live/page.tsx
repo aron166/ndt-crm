@@ -1,5 +1,4 @@
 import { getLibrary, getFilterOptions } from "@/lib/content/queries";
-import { signedViewUrls } from "@/lib/content/storage";
 import { MarketingTabs } from "../MarketingTabs";
 import { LibraryClient } from "./LibraryClient";
 
@@ -29,13 +28,10 @@ export default async function MarketingLivePage({
     getFilterOptions(TENANT_ID),
   ]);
 
-  const paths = rows.flatMap((r) => r.assets.map((a) => a.storagePath).filter((p): p is string => Boolean(p)));
-  const urls = await signedViewUrls(paths);
-
   return (
     <div className="mount">
       <MarketingTabs active="live" />
-      <LibraryClient rows={rows} signedUrls={urls} filterOptions={filterOptions} />
+      <LibraryClient rows={rows} filterOptions={filterOptions} />
     </div>
   );
 }

@@ -26,12 +26,40 @@ if (APPLY && !(HAS_APPROVAL && process.env.CRM_URL && process.env.CRM_APP_KEY)) 
     "Refusing --apply: needs --i-have-arons-approval AND env CRM_URL + CRM_APP_KEY set. Running dry-run instead.",
   );
 }
+const REFS_ONLY = args.includes("--refs-only");
 const DO_APPLY = APPLY && HAS_APPROVAL && !!process.env.CRM_URL && !!process.env.CRM_APP_KEY;
 
+/**
+ * `external_ref` must match what is ALREADY on prod, or the import creates
+ * duplicates (Kai loaded 14 items by hand on 2026-09-17):
+ *   cold-email touches → `growth/campaigns/cold-email-v0/drafts/<slug>.md#touch-N`
+ *   every other campaigns doc → CAMPAIGNS-RELATIVE, e.g. `sales-kit/setter-script-DRAFT.md`
+ * Anything outside growth/campaigns keeps its projects-relative path.
+ */
+const CAMPAIGNS = `${PROJECTS}/growth/campaigns`;
 const externalRef = (absPath, fragment) => {
-  const rel = absPath.startsWith(PROJECTS + "/") ? absPath.slice(PROJECTS.length + 1) : absPath;
+  let rel;
+  if (absPath.startsWith(`${CAMPAIGNS}/cold-email-v0/drafts/`)) {
+    rel = absPath.slice(PROJECTS.length + 1); // keep the growth/campaigns/... prefix
+  } else if (absPath.startsWith(CAMPAIGNS + "/")) {
+    rel = absPath.slice(CAMPAIGNS.length + 1); // campaigns-relative
+  } else {
+    rel = absPath.startsWith(PROJECTS + "/") ? absPath.slice(PROJECTS.length + 1) : absPath;
+  }
   return fragment ? `${rel}#${fragment}` : rel;
 };
+
+/** The 14 refs Kai already loaded — the dry-run flags these as duplicates. */
+const ALREADY_ON_PROD = new Set([
+  ...["betonszabo", "hidtechnika", "fovarosi-vizmuvek", "fotav", "sgs-hungaria", "bkv", "mkif"]
+    .map((slug) => `growth/campaigns/cold-email-v0/drafts/${slug}.md#touch-1`),
+  "sales-kit/setter-script-DRAFT.md",
+  "sales-kit/demo-ajanlat-DRAFT.md",
+  "sales-kit/alairas-es-jogi-sor-DRAFT.md",
+  "cold-email-v0/lead-magnet/ellenorzolista-fuas-elott-DRAFT.md",
+  "q4-30-devices/market-epito-note-DRAFT.md",
+  "q4-30-devices/birdsview-email-DRAFT.md",
+]);
 
 // ---------- 1. cold-email-v0: 20 files x 4 touches ----------
 
@@ -322,6 +350,10 @@ function markerCount(it) {
 
 // ---------- report ----------
 
+if (REFS_ONLY) {
+  for (const it of items) console.log(it.external_ref);
+  process.exit(0);
+}
 console.log(`Mode: ${DO_APPLY ? "APPLY" : "DRY-RUN"}${ONLY ? ` (only=${ONLY})` : ""}`);
 console.log("");
 
@@ -331,6 +363,15 @@ for (const it of items) {
   byCategory[it.category] = (byCategory[it.category] ?? 0) + 1;
   markersByCategory[it.category] = (markersByCategory[it.category] ?? 0) + markerCount(it);
 }
+const dupes = items.filter((it) => ALREADY_ON_PROD.has(it.external_ref));
+console.log(`Already on prod (would dedupe, not duplicate): ${dupes.length} / ${ALREADY_ON_PROD.size} known refs`);
+for (const d of dupes) console.log(`  = ${d.external_ref}`);
+const missing = [...ALREADY_ON_PROD].filter((ref) => !items.some((it) => it.external_ref === ref));
+if (missing.length) {
+  console.log("Prod refs this run does NOT produce (check the format!):");
+  for (const m of missing) console.log(`  ? ${m}`);
+}
+console.log("");
 console.log("Items per category:");
 for (const [cat, n] of Object.entries(byCategory).sort()) {
   console.log(`  ${cat}: ${n} (⚠ jelölés: ${markersByCategory[cat]})`);
