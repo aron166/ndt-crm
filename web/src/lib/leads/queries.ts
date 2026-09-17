@@ -48,6 +48,17 @@ export async function getQualificationQuestions(tenantId: number): Promise<Quali
 }
 
 /**
+ * The tenant's call-script A/B variants exactly as stored (never live-resolved).
+ * /leads/setup edits THIS — resolving a linked variant's live body here would
+ * overwrite its stored `body`/`contentItemId` with an empty fallback the
+ * moment the linked content item goes missing.
+ */
+export async function getRawScriptVariants(tenantId: number): Promise<ScriptVariant[]> {
+  const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  return scriptVariantsFromSettings(tenant?.settings);
+}
+
+/**
  * The tenant's call-script A/B variants. Falls back to the in-code placeholders
  * when the tenant has never set one (or set a malformed one).
  */
@@ -58,8 +69,7 @@ export async function getQualificationQuestions(tenantId: number): Promise<Quali
  * `liveMissing: true`, never the inline body.
  */
 export async function getScriptVariants(tenantId: number): Promise<ScriptVariant[]> {
-  const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
-  const variants = scriptVariantsFromSettings(tenant?.settings);
+  const variants = await getRawScriptVariants(tenantId);
   const itemIds = variants.map((v) => v.contentItemId).filter((id): id is number => id != null);
   if (itemIds.length === 0) return variants;
 

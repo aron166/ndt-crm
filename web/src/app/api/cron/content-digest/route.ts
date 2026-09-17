@@ -1,6 +1,8 @@
 import { sendContentDigests } from "@/lib/content/digest";
 import { reportError } from "@/lib/report-error";
 
+const TENANT_ID = 1;
+
 // Scheduled daily digest for content reviewers (spec §5). Same auth as
 // /api/cron/automations. Fired twice a day (06:00 and 07:00 UTC, see
 // vercel.json) to cover both sides of the DST switch — sendContentDigests
@@ -13,7 +15,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await sendContentDigests(1);
+    const result = await sendContentDigests(TENANT_ID);
     return Response.json({ ok: true, ...result });
   } catch (err) {
     reportError("cron.contentDigest", err);

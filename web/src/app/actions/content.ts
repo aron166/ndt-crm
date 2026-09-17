@@ -283,16 +283,33 @@ export async function getMyDigestSetting(): Promise<{ enabled: boolean; isReview
   return { enabled: isReviewer && !optOut.includes(actor.userId), isReviewer };
 }
 
-/** A user can only change THEIR OWN opt-out — no one else's digest setting. */
+/**
+ * A user can only change THEIR OWN opt-out — no one else's digest setting.
+ * Read-modify-write happens inside a `FOR UPDATE`-locked transaction so a
+ * concurrent toggle (this user flipping it in two tabs, or racing the digest
+ * setup save) can't read-then-clobber the other's write — setTenantSettings
+ * isn't used here because it runs on the global client, outside the tx.
+ */
 export async function setMyDigestEnabled(enabled: boolean): Promise<{ ok: true } | Fail> {
   const actor = await userActor();
   if ("ok" in actor) return actor;
-  const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  const before = digestOptOutFromSettings(tenant?.settings);
-  const next = enabled
-    ? before.filter((id) => id !== actor.userId)
-    : before.includes(actor.userId) ? before : [...before, actor.userId];
-  await setTenantSettings(TENANT_ID, { contentDigestOptOut: next });
+  const parsed = z.boolean().safeParse(enabled);
+  if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
+
+  const { before, next } = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT "id" FROM "tenants" WHERE "id" = ${TENANT_ID} FOR UPDATE`;
+    const tenant = await tx.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
+    const before = digestOptOutFromSettings(tenant?.settings);
+    const next = parsed.data
+      ? before.filter((id) => id !== actor.userId)
+      : before.includes(actor.userId) ? before : [...before, actor.userId];
+    await tx.$executeRaw`
+      UPDATE "tenants"
+         SET "settings" = jsonb_set(COALESCE("settings", '{}'::jsonb), '{contentDigestOptOut}', ${JSON.stringify(next)}::jsonb, true)
+       WHERE "id" = ${TENANT_ID}`;
+    return { before, next };
+  });
+
   audit("tenant", TENANT_ID, "update", { contentDigestOptOut: before }, { contentDigestOptOut: next }, { tenantId: TENANT_ID });
   return { ok: true };
 }

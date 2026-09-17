@@ -1,14 +1,14 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getContentReviewers } from "./reviewers";
+import { STALE_REVIEW_MS } from "./types";
 
 /**
  * Read models for the review UI (inbox, review page, library, badge). Every
  * query is tenant-scoped. Nothing here writes.
  */
 
-/** Waiting longer than this on a reviewer is highlighted (spec §5). */
-export const STALE_REVIEW_MS = 3 * 24 * 60 * 60 * 1000;
+export { STALE_REVIEW_MS };
 
 export interface InboxRow {
   id: number;
@@ -124,17 +124,21 @@ export async function getInbox(tenantId: number, userId: number, filter: InboxFi
   };
 }
 
+/** The `where` for content items still awaiting this reviewer's verdict. Shared
+ * by countPendingForReviewer (badge/tile) and sendContentDigests (digest email). */
+export function pendingForReviewerWhere(tenantId: number, userId: number): Prisma.ContentItemWhereInput {
+  return {
+    tenantId,
+    status: { in: ["in_review", "draft"] },
+    currentVersion: { reviews: { none: { reviewerUserId: userId } } },
+  };
+}
+
 /** Nav badge + dashboard tile: current versions I have not judged yet. */
 export async function countPendingForReviewer(tenantId: number, userId: number): Promise<number> {
   const reviewers = await getContentReviewers(tenantId);
   if (!reviewers.includes(userId)) return 0;
-  return db.contentItem.count({
-    where: {
-      tenantId,
-      status: { in: ["in_review", "draft"] },
-      currentVersion: { reviews: { none: { reviewerUserId: userId } } },
-    },
-  });
+  return db.contentItem.count({ where: pendingForReviewerWhere(tenantId, userId) });
 }
 
 export interface ReviewPageData {

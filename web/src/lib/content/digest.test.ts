@@ -3,11 +3,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const tenantFindUnique = vi.fn();
 const userFindFirst = vi.fn();
 const contentItemFindMany = vi.fn();
+const executeRaw = vi.fn();
 vi.mock("@/lib/db", () => ({
   db: {
     tenant: { findUnique: (...a: unknown[]) => tenantFindUnique(...a) },
     user: { findFirst: (...a: unknown[]) => userFindFirst(...a) },
     contentItem: { findMany: (...a: unknown[]) => contentItemFindMany(...a) },
+    $executeRaw: (...a: unknown[]) => executeRaw(...a),
   },
 }));
 
@@ -55,6 +57,20 @@ describe("buildDigest", () => {
     })!;
     expect(d.text).toMatch(/Régi \(E-mail\) — 4 napja vár ⚠️ — .*\/marketing\/1/);
     expect(d.text).toMatch(/Friss \(E-mail\) — 3 napja vár — .*\/marketing\/2/);
+  });
+
+  it("uses STALE_REVIEW_MS, not a whole-day threshold: 3.5 days warns, 2.9 days doesn't", () => {
+    const threePointFive = new Date(NOW.getTime() - 3.5 * 24 * 60 * 60 * 1000);
+    const twoPointNine = new Date(NOW.getTime() - 2.9 * 24 * 60 * 60 * 1000);
+    const d = buildDigest({
+      reviewerId: 1, reviewerName: "Nagy Péter", now: NOW, baseUrl: BASE,
+      items: [
+        { id: 1, title: "Régi", category: "email", waitingSince: threePointFive },
+        { id: 2, title: "Friss", category: "email", waitingSince: twoPointNine },
+      ],
+    })!;
+    expect(d.text).toMatch(/Régi \(E-mail\).*⚠️/);
+    expect(d.text).not.toMatch(/Friss \(E-mail\).*⚠️/);
   });
 
   it("subject counts the items", () => {
@@ -109,7 +125,9 @@ describe("sendContentDigests", () => {
     getContentReviewers.mockReset();
     sendEmail.mockReset();
     reportError.mockReset();
+    executeRaw.mockReset();
     tenantFindUnique.mockResolvedValue({ settings: {} });
+    executeRaw.mockResolvedValue(1); // claim succeeds by default
   });
 
   const DIGEST_TIME = new Date("2026-06-01T06:00:00Z"); // Monday 08:00 Budapest
@@ -169,5 +187,27 @@ describe("sendContentDigests", () => {
     sendEmail.mockResolvedValue({ ok: true, id: "abc" });
     const res = await sendContentDigests(1, new Date("2026-06-01T05:00:00Z"), { force: true });
     expect(res.sent).toBe(1);
+  });
+
+  it("a second call the same day finds the day already claimed — already_sent, no email sent", async () => {
+    getContentReviewers.mockResolvedValue([1]);
+    executeRaw.mockResolvedValue(0); // someone already claimed today
+    const res = await sendContentDigests(1, DIGEST_TIME);
+    expect(res).toEqual({ sent: 0, skipped: 0, reason: "already_sent" });
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(userFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("force bypasses the claim, even if today is already marked sent", async () => {
+    getContentReviewers.mockResolvedValue([1]);
+    userFindFirst.mockResolvedValue({ name: "Áron", email: "aron@example.com" });
+    contentItemFindMany.mockResolvedValue([
+      { id: 1, title: "X", category: "email", currentVersion: { createdAt: DIGEST_TIME } },
+    ]);
+    sendEmail.mockResolvedValue({ ok: true, id: "abc" });
+    executeRaw.mockResolvedValue(0); // would report already claimed if consulted
+    const res = await sendContentDigests(1, DIGEST_TIME, { force: true });
+    expect(res.sent).toBe(1);
+    expect(executeRaw).not.toHaveBeenCalled();
   });
 });

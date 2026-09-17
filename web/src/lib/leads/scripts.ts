@@ -34,7 +34,7 @@ export const scriptVariantSchema = z.object({
   key: z.string().trim().min(1).max(SCRIPT_KEY_MAX).regex(/^[a-z0-9_]+$/),
   label: z.string().trim().min(1).max(SCRIPT_LABEL_MAX),
   body: z.string().trim().max(SCRIPT_BODY_MAX),
-  contentItemId: z.number().int().positive().optional(),
+  contentItemId: z.number().int().positive().max(2147483647).optional(),
 });
 
 /**
@@ -115,9 +115,14 @@ export function parseScriptBlocks(text: string): ScriptVariant[] | { error: stri
     // variant to a live content item (spec §6) — its live body replaces `body`.
     let bodyStart = headIndex + 1;
     let contentItemId: number | undefined;
-    const metaMatch = lines[bodyStart]?.trim().match(/^tartalom:\s*(\d+)\s*$/i);
+    const metaMatch = lines[bodyStart]?.trim().match(/^tartalom:\s*(.*)$/i);
     if (metaMatch) {
-      contentItemId = Number(metaMatch[1]);
+      const rawValue = metaMatch[1].trim();
+      const numeric = Number(rawValue);
+      if (!/^\d+$/.test(rawValue) || numeric === 0 || numeric > 2147483647) {
+        return { error: `Érvénytelen tartalom-azonosító: ${rawValue}` };
+      }
+      contentItemId = numeric;
       bodyStart += 1;
     }
     const body = lines.slice(bodyStart).join("\n").trim();

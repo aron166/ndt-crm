@@ -73,6 +73,32 @@ describe("parseScriptBlocks", () => {
     const original = ok(parseScriptBlocks("a|Élő\ntartalom: 7\nteszt"));
     expect(ok(parseScriptBlocks(formatScriptBlocks(original)))).toEqual(original);
   });
+
+  it("rejects tartalom: 0 as an invalid content-item id", () => {
+    const r = parseScriptBlocks("a|Élő\ntartalom: 0\nteszt");
+    expect(r).toHaveProperty("error");
+    if (!("error" in r)) throw new Error("expected an error");
+    expect(r.error).toBe("Érvénytelen tartalom-azonosító: 0");
+  });
+
+  it("rejects a non-numeric tartalom: value", () => {
+    const r = parseScriptBlocks("a|Élő\ntartalom: abc\nteszt");
+    expect(r).toHaveProperty("error");
+    if (!("error" in r)) throw new Error("expected an error");
+    expect(r.error).toBe("Érvénytelen tartalom-azonosító: abc");
+  });
+
+  it("rejects a tartalom: value over 2147483647", () => {
+    const r = parseScriptBlocks("a|Élő\ntartalom: 2147483648\nteszt");
+    expect(r).toHaveProperty("error");
+    if (!("error" in r)) throw new Error("expected an error");
+    expect(r.error).toBe("Érvénytelen tartalom-azonosító: 2147483648");
+  });
+
+  it("accepts a valid tartalom: id up to the int32 max", () => {
+    const v = ok(parseScriptBlocks("a|Élő\ntartalom: 2147483647\nteszt"));
+    expect(v[0].contentItemId).toBe(2147483647);
+  });
 });
 
 describe("scriptVariantsFromSettings", () => {

@@ -3,8 +3,9 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
 import { getContentReviewers } from "./reviewers";
+import { pendingForReviewerWhere } from "./queries";
 import { CATEGORY_LABEL } from "./labels";
-import type { ContentCategory } from "./types";
+import { STALE_REVIEW_MS, type ContentCategory } from "./types";
 
 /**
  * Daily digest email to reviewers (spec §5): "N anyag vár Önre", oldest first,
@@ -14,8 +15,6 @@ import type { ContentCategory } from "./types";
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Matches queries.ts STALE_REVIEW_MS (3 days) expressed in whole days. */
-const OVERDUE_DAYS = 3;
 
 export interface DigestItem {
   id: number;
@@ -46,7 +45,7 @@ export function buildDigest(input: DigestInput): { subject: string; text: string
   const lines = oldestFirst.map((item) => {
     const days = Math.floor((now.getTime() - item.waitingSince.getTime()) / DAY_MS);
     const label = CATEGORY_LABEL[item.category as ContentCategory] ?? item.category;
-    const warn = days > OVERDUE_DAYS ? " ⚠️" : "";
+    const warn = now.getTime() - item.waitingSince.getTime() > STALE_REVIEW_MS ? " ⚠️" : "";
     return `- ${item.title} (${label}) — ${days} napja vár${warn} — ${baseUrl}/marketing/${item.id}`;
   });
 
@@ -99,6 +98,26 @@ export async function sendContentDigests(
     return { sent: 0, skipped: 0, reason: "not_digest_time" };
   }
 
+  // Double-send guard: the cron fires twice a day (06:00 + 07:00 UTC) to cover
+  // both sides of the DST switch, and only one of those lands at 08:00
+  // Budapest — but a retry or a slow first run could still race a second
+  // trigger. Atomically claim today's Budapest date on the tenant row; only
+  // the caller that flips it from "not today" actually sends. `force` (manual
+  // resends) bypasses the claim entirely.
+  if (!opts.force) {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(now);
+    const claimed = await db.$executeRaw`
+      UPDATE "tenants"
+         SET "settings" = jsonb_set(
+               CASE WHEN jsonb_typeof("settings") = 'object' THEN "settings" ELSE '{}'::jsonb END,
+               '{contentDigestLastSentOn}', to_jsonb(${today}::text), true)
+       WHERE "id" = ${tenantId}
+         AND COALESCE("settings"->>'contentDigestLastSentOn', '') <> ${today}`;
+    if (claimed === 0) {
+      return { sent: 0, skipped: 0, reason: "already_sent" };
+    }
+  }
+
   const reviewerIds = await getContentReviewers(tenantId);
   if (reviewerIds.length === 0) return { sent: 0, skipped: 0, reason: "no_reviewers" };
 
@@ -125,11 +144,7 @@ export async function sendContentDigests(
       }
 
       const pending = await db.contentItem.findMany({
-        where: {
-          tenantId,
-          status: { in: ["in_review", "draft"] },
-          currentVersion: { reviews: { none: { reviewerUserId: reviewerId } } },
-        },
+        where: pendingForReviewerWhere(tenantId, reviewerId),
         select: { id: true, title: true, category: true, currentVersion: { select: { createdAt: true } } },
       });
 
