@@ -37,6 +37,7 @@ Empty queue → print "Nothing to revise." and stop.
 1. **Claim it** — `POST $CRM_URL/api/content/{id}/claim`.
    - `200` → continue. (`alreadyClaimed: true` means you claimed it earlier in this run.)
    - `409` → someone else has it, or it is no longer requestable → **skip** (record why).
+   - `429` → rate limited: wait 60 s once, retry; if it happens again, stop the run and report it.
 2. **Build the brief** from the reviews on the current version (`versionNumber ===
    currentVersion.number`). List each comment point as a separate numbered point. If a
    comment has several requests, split them.
@@ -52,7 +53,9 @@ Empty queue → print "Nothing to revise." and stop.
      Hungarian sentence, and write natural Hungarian (no calques).
    - Business register: **magázás** (Ön/Önök, 3rd-person verbs) unless the item says otherwise.
    - Hungarian typography: „ ” quotes, decimal comma, `2026. szeptember 22.` dates.
-   - **Claims: closed list.** Before writing, read §6 of
+   - **Claims: closed list — no list, no rewrite.** If the claim list below cannot be read
+     (file missing, no access), do **not** write or post anything for any item: stop the run
+     and report "claim list unavailable". Before writing, read §6 of
      `/home/aron166/Projects/growth/campaigns/cold-email-v0/FRAMEWORK.md` (or
      `docs/cold-email-framework.md` in ndt-crm once PR #90 is merged). Only the claims listed
      there may appear. Never add a claim, a number, a price, a reference customer, a depth,
@@ -95,7 +98,8 @@ Questions for reviewers: <any claim/facts you could not add>
 ## Rules that never bend
 - One item at a time: claim → write → post. Don't claim items you won't finish in this run
   (a claim you abandon blocks the item for 2 hours).
-- Never send a version based on anything but the `currentVersion.id` you read after claiming.
+- `based_on_version_id` is always the `currentVersion.id` from the queue entry you claimed; if
+  anything changed in between, the CRM answers 409 and you skip the item.
 - Never modify, re-post or "fix" a version written by a human.
 - Never put secrets, API keys or internal notes into a body.
 - If the CRM returns 5xx twice in a row, stop the run and report it.
