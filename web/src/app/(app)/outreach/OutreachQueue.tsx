@@ -6,6 +6,7 @@
 // line a recipient can hold us to. Replace before the first real campaign.
 
 import { useState } from "react";
+import Link from "next/link";
 import { FormField } from "@/components/ui/FormField";
 import {
   listDrafts,
@@ -18,7 +19,13 @@ import {
   type DraftListRow,
   type OutreachSettings,
 } from "@/app/actions/email-drafts";
+import { setCampaignTarget, markDraftReplied } from "@/app/actions/outreach-campaigns";
 import { DRAFT_STATUSES, MAX_STEP, canEdit, canApprove, canSend, type DraftStatus } from "@/lib/outreach/drafts";
+import { canMarkSent, canMarkReplied, REPLY_TYPES, type ReplyType } from "@/lib/outreach/campaign";
+import { REPLY_TYPE_LABEL } from "@/lib/outreach/labels";
+import { MarkSentControl } from "./DueToday";
+
+type Sender = { id: number; name: string };
 
 // ⚠️ PLACEHOLDER consent line. Áron owes the real wording — this one is a
 // starting point, not legal text, and it goes out on every send once saved.
@@ -64,10 +71,12 @@ export default function OutreachQueue({
   initialDrafts,
   campaigns,
   initialSettings,
+  senders,
 }: {
   initialDrafts: DraftListRow[];
   campaigns: string[];
   initialSettings: OutreachSettings;
+  senders: Sender[];
 }) {
   const [drafts, setDrafts] = useState<DraftListRow[]>(initialDrafts);
   const [truncated, setTruncated] = useState(initialDrafts.length >= 200);
@@ -86,6 +95,12 @@ export default function OutreachQueue({
   const [footer, setFooter] = useState(initialSettings.footer ?? "");
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<{ id: number; kind: "subject" | "body" } | null>(null);
+  const [replyOpenId, setReplyOpenId] = useState<number | null>(null);
+  const [replyType, setReplyType] = useState<ReplyType | "">("");
+  const [replyNote, setReplyNote] = useState("");
+  const [replyPending, setReplyPending] = useState(false);
+  const [rowInfo, setRowInfo] = useState<Record<number, { kind: "replied"; leadId: number }>>({});
 
   async function refetch(next: { campaign?: string; step?: string; status?: string }) {
     setLoading(true);
@@ -202,6 +217,63 @@ export default function OutreachQueue({
     const res = await saveOutreachSettings({ replyTo, footer });
     setSettingsSaving(false);
     if (!res.ok) setSettingsError(res.error);
+  }
+
+  async function onSetTarget(row: DraftListRow, patch: { senderUserId?: number | null; wave?: number | null }) {
+    setRowError((e) => ({ ...e, [row.id]: "" }));
+    const res = await setCampaignTarget({ campaign: row.campaign, companyId: row.companyId, ...patch });
+    if (!res.ok) {
+      setRowError((e) => ({ ...e, [row.id]: res.error }));
+      return;
+    }
+    await refetchCurrent();
+  }
+
+  function flashCopied(id: number, kind: "subject" | "body") {
+    setCopied({ id, kind });
+    setTimeout(() => setCopied((c) => (c && c.id === id && c.kind === kind ? null : c)), 2000);
+  }
+
+  async function onCopySubject(row: DraftListRow) {
+    await navigator.clipboard.writeText(row.subject);
+    flashCopied(row.id, "subject");
+  }
+
+  async function onCopyBody(row: DraftListRow) {
+    let body = drafted[row.id]?.body;
+    if (body === undefined) {
+      const res = await getDraftBody(row.id);
+      if (!res.ok) {
+        setRowError((e) => ({ ...e, [row.id]: res.error }));
+        return;
+      }
+      body = res.body;
+      setDrafted((d) => ({ ...d, [row.id]: { subject: d[row.id]?.subject ?? row.subject, body: res.body } }));
+    }
+    await navigator.clipboard.writeText(body);
+    flashCopied(row.id, "body");
+  }
+
+  function openReplyForm(row: DraftListRow) {
+    setReplyOpenId(row.id);
+    setReplyType("");
+    setReplyNote("");
+    setRowError((e) => ({ ...e, [row.id]: "" }));
+  }
+
+  async function onMarkReplied(row: DraftListRow) {
+    if (!replyType) return;
+    setReplyPending(true);
+    setRowError((e) => ({ ...e, [row.id]: "" }));
+    const res = await markDraftReplied({ draftId: row.id, replyType, note: replyNote.trim() || undefined });
+    setReplyPending(false);
+    if (!res.ok) {
+      setRowError((e) => ({ ...e, [row.id]: res.error }));
+      return;
+    }
+    setRowInfo((r) => ({ ...r, [row.id]: { kind: "replied", leadId: res.leadId } }));
+    setReplyOpenId(null);
+    await refetchCurrent();
   }
 
   return (
@@ -347,6 +419,7 @@ export default function OutreachQueue({
             const bodyIsLoading = !!bodyLoading[row.id];
             const editable = canEdit(row.status);
             const busy = busyId === row.id;
+            const targetable = !["sent", "replied", "cancelled"].includes(row.status);
             return (
               <div key={row.id} style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-soft)" }}>
                 <div
@@ -364,11 +437,75 @@ export default function OutreachQueue({
                     </div>
                   </div>
                   <StatusBadge status={row.status} />
+                  {row.status === "replied" && (
+                    <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+                      {REPLY_TYPE_LABEL[(row.replyType as ReplyType) ?? "unknown"]}
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10, padding: "0 16px 10px" }}
+                >
+                  <FormField label="Küldő">
+                    <select
+                      className="input-ds"
+                      value={row.senderUserId ?? ""}
+                      disabled={!targetable || busy}
+                      onChange={(e) => onSetTarget(row, { senderUserId: e.target.value ? parseInt(e.target.value, 10) : null })}
+                      style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 8px" }}
+                    >
+                      <option value="">Nincs kiválasztva</option>
+                      {senders.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField label="Hullám">
+                    <input
+                      key={`wave-${row.id}-${row.wave ?? ""}`}
+                      className="input-ds"
+                      type="number"
+                      min={1}
+                      defaultValue={row.wave ?? ""}
+                      disabled={!targetable || busy}
+                      onBlur={(e) => {
+                        const v = e.target.value ? parseInt(e.target.value, 10) : null;
+                        if (v === row.wave) return;
+                        onSetTarget(row, { wave: v });
+                      }}
+                      style={{ width: 70, fontSize: 13, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 8px" }}
+                    />
+                  </FormField>
+                  {row.dueAt && row.status !== "sent" && (
+                    <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+                      Esedékes: {new Date(row.dueAt).toLocaleString("hu-HU")}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => onCopySubject(row)}
+                    style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}
+                  >
+                    {copied?.id === row.id && copied.kind === "subject" ? "Másolva" : "Tárgy másolása"}
+                  </button>
+                  <button
+                    onClick={() => onCopyBody(row)}
+                    style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}
+                  >
+                    {copied?.id === row.id && copied.kind === "body" ? "Másolva" : "Szöveg másolása"}
+                  </button>
                 </div>
 
                 {row.status === "failed" && row.lastError && (
                   <div style={{ padding: "0 16px 10px", fontSize: 14, color: "var(--coral)" }}>
                     Küldési hiba: {row.lastError}
+                  </div>
+                )}
+
+                {rowInfo[row.id]?.kind === "replied" && (
+                  <div style={{ padding: "0 16px 10px", fontSize: 14, color: "var(--fg-mute)" }}>
+                    <Link href={`/leads/${rowInfo[row.id].leadId}`} style={{ color: "var(--indigo)" }}>Lead létrehozva</Link>
                   </div>
                 )}
 
@@ -451,7 +588,71 @@ export default function OutreachQueue({
                       >
                         Küldés
                       </button>
+                      {canMarkSent(row.status) && (
+                        <MarkSentControl draftId={row.id} onSent={refetchCurrent} />
+                      )}
+                      {canMarkReplied(row.status) && replyOpenId !== row.id && (
+                        <button
+                          onClick={() => openReplyForm(row)}
+                          style={{
+                            fontSize: 14, fontWeight: 500, color: "var(--sky)", background: "var(--bg-raised)",
+                            border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px", cursor: "pointer",
+                          }}
+                        >
+                          Válasz jött
+                        </button>
+                      )}
                     </div>
+
+                    {canMarkReplied(row.status) && replyOpenId === row.id && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 420 }}>
+                        <FormField label="Válasz típusa">
+                          <select
+                            className="input-ds"
+                            value={replyType}
+                            onChange={(e) => setReplyType(e.target.value as ReplyType)}
+                            style={{ fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px" }}
+                          >
+                            <option value="">Válassz…</option>
+                            {REPLY_TYPES.map((t) => (
+                              <option key={t} value={t}>{REPLY_TYPE_LABEL[t]}</option>
+                            ))}
+                          </select>
+                        </FormField>
+                        <FormField label="Megjegyzés (nem kötelező)">
+                          <textarea
+                            className="input-ds"
+                            value={replyNote}
+                            onChange={(e) => setReplyNote(e.target.value)}
+                            rows={2}
+                            style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical" }}
+                          />
+                        </FormField>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            onClick={() => onMarkReplied(row)}
+                            disabled={!replyType || replyPending}
+                            style={{
+                              fontSize: 14, fontWeight: 500, color: "var(--sky)", background: "var(--bg-raised)",
+                              border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px",
+                              cursor: !replyType || replyPending ? "default" : "pointer", opacity: !replyType || replyPending ? 0.5 : 1,
+                            }}
+                          >
+                            Rögzítés
+                          </button>
+                          <button
+                            onClick={() => setReplyOpenId(null)}
+                            disabled={replyPending}
+                            style={{
+                              fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)",
+                              border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px", cursor: "pointer",
+                            }}
+                          >
+                            Mégse
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

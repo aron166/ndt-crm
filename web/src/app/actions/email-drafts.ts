@@ -48,6 +48,13 @@ export interface DraftRow {
   lastError: string | null;
   sentAt: string | null;
   createdAt: string;
+  senderUserId: number | null;
+  wave: number | null;
+  dueAt: string | null;
+  sentVia: string | null;
+  externalThreadId: string | null;
+  replyType: string | null;
+  repliedAt: string | null;
 }
 
 export interface DraftFilter {
@@ -84,6 +91,8 @@ export async function listDrafts(
         id: true, companyId: true, personId: true, campaign: true, step: true,
         subject: true, toEmail: true, status: true, threadKey: true,
         providerMessageId: true, lastError: true, sentAt: true, createdAt: true,
+        senderUserId: true, wave: true, dueAt: true, sentVia: true,
+        externalThreadId: true, replyType: true, repliedAt: true,
         company: { select: { name: true } },
         person: { select: { firstName: true, lastName: true } },
       },
@@ -116,6 +125,13 @@ export async function listDrafts(
       lastError: r.lastError,
       sentAt: r.sentAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
+      senderUserId: r.senderUserId,
+      wave: r.wave,
+      dueAt: r.dueAt?.toISOString() ?? null,
+      sentVia: r.sentVia,
+      externalThreadId: r.externalThreadId,
+      replyType: r.replyType,
+      repliedAt: r.repliedAt?.toISOString() ?? null,
     })),
     campaigns: campaignRows.map((c) => c.campaign),
     truncated,
