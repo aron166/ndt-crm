@@ -1,5 +1,8 @@
 import { CLAIM_TTL_MS, REQUESTABLE_STATUSES, type ContentStatus, type Verdict } from "./types";
 
+/** Dual approval (spec decision 2). Fewer configured reviewers → never live. */
+export const REQUIRED_APPROVALS = 2;
+
 /**
  * THE content status machine (spec §1). Pure: state + event in, new state out.
  * lib/content/service.ts is the only caller that writes the result.
@@ -46,8 +49,9 @@ export function isClaimStale(claimedAt: Date | null, now: Date): boolean {
 
 /**
  * Status implied by the reviews on the CURRENT version. Only configured
- * reviewers count. An empty reviewer list can never produce `live` — a
- * misconfigured tenant must not auto-publish.
+ * reviewers count, and `live` needs REQUIRED_APPROVALS distinct configured
+ * reviewers who all approved — a tenant with one (or zero) reviewers can
+ * never auto-publish.
  */
 export function statusFromReviews(
   reviewers: number[],
@@ -58,7 +62,8 @@ export function statusFromReviews(
   const verdicts = [...byReviewer.values()];
   if (verdicts.includes("rewrite")) return "rewrite_requested";
   if (verdicts.includes("changes")) return "changes_requested";
-  if (reviewers.length > 0 && reviewers.every((id) => byReviewer.get(id) === "approve")) return "live";
+  const distinct = [...new Set(reviewers)];
+  if (distinct.length >= REQUIRED_APPROVALS && distinct.every((id) => byReviewer.get(id) === "approve")) return "live";
   return "in_review";
 }
 

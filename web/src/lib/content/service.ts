@@ -156,7 +156,20 @@ export async function createItem(
     await writeAudit(t, actor, "content_version", version.id, "create", null, { itemId: item.id, number: 1 });
     return { ok: true as const, itemId: item.id, versionId: version.id, existed: false };
   };
-  return tx ? run(tx) : db.$transaction(run);
+  try {
+    return await (tx ? run(tx) : db.$transaction(run));
+  } catch (err) {
+    // Concurrent create with the same externalRef: the unique index wins; hand
+    // back the item the other request created (only possible without an outer tx).
+    if (!tx && input.externalRef && (err as { code?: string }).code === "P2002") {
+      const existing = await db.contentItem.findFirst({
+        where: { tenantId: actor.tenantId, externalRef: input.externalRef },
+        select: { id: true, currentVersionId: true },
+      });
+      if (existing) return { ok: true, itemId: existing.id, versionId: existing.currentVersionId, existed: true };
+    }
+    throw err;
+  }
 }
 
 export interface CreateVersionInput {
@@ -207,6 +220,8 @@ export async function createVersion(
       }
       if (isClaimStale(row.claimedAt, new Date())) return fail(409, "Claim expired");
       // Race rule (spec §1): a human version since the claim wins, always.
+      // Backstop: a human version already clears the claim, so the check above
+      // normally fires first — kept deliberately in case that ever changes.
       const humanSince = await tx.contentVersion.count({
         where: { itemId, authorType: "user", createdAt: { gt: row.claimedAt } },
       });
@@ -286,6 +301,21 @@ export async function submitReview(
     if (row.currentVersionId !== version.id) {
       return fail(409, "Ez már nem az aktuális verzió — frissítsd az oldalt");
     }
+    // Reject BEFORE writing anything: a returned fail() commits the transaction,
+    // so a review saved first would persist without its audit row (Vanda, #99).
+    let state = stateOf(row);
+    const released = applyEvent(state, { type: "release_stale", now: new Date() });
+    if (released.ok && released.state.status !== state.status) {
+      await tx.contentItem.update({
+        where: { id: row.id },
+        data: { status: released.state.status, claimedAt: null, claimedFrom: null, claimedBy: null },
+      });
+      await writeAudit(tx, actor, "content_item", row.id, "update",
+        { status: state.status, claimedBy: row.claimedBy }, { status: released.state.status, reason: "stale_claim" });
+      state = released.state;
+    }
+    if (state.status === "archived") return fail(409, "Archivált anyag nem bírálható");
+    if (state.status === "ai_working") return fail(409, "Az AI éppen átírja ezt az anyagot — várj, vagy szerkeszd te");
 
     const before = await tx.contentReview.findUnique({
       where: { versionId_reviewerUserId: { versionId, reviewerUserId: actor.userId } },
@@ -301,7 +331,6 @@ export async function submitReview(
       where: { versionId }, select: { reviewerUserId: true, verdict: true },
     });
 
-    const state = stateOf(row);
     const next = applyEvent(state, {
       type: "reviews_changed",
       reviewers,
@@ -424,10 +453,11 @@ export async function getQueue(tenantId: number, statuses: ContentStatus[]): Pro
       id: true, title: true, category: true, format: true, purpose: true, channel: true, status: true,
       externalRef: true, needsHumanAsset: true, currentVersionId: true,
       campaign: { select: { slug: true, name: true } },
+      currentVersion: { select: { body: true } },
       versions: {
         orderBy: { number: "desc" },
         select: {
-          id: true, number: true, body: true, changeNote: true, authorType: true, createdAt: true,
+          id: true, number: true, changeNote: true, authorType: true, createdAt: true,
           reviews: {
             orderBy: { updatedAt: "desc" },
             select: { verdict: true, comment: true, updatedAt: true, reviewer: { select: { name: true } } },
@@ -444,7 +474,7 @@ export async function getQueue(tenantId: number, statuses: ContentStatus[]): Pro
       channel: it.channel, status: it.status, externalRef: it.externalRef, needsHumanAsset: it.needsHumanAsset,
       campaign: it.campaign,
       currentVersion: current
-        ? { id: current.id, number: current.number, body: current.body, changeNote: current.changeNote, authorType: current.authorType }
+        ? { id: current.id, number: current.number, body: it.currentVersion?.body ?? "", changeNote: current.changeNote, authorType: current.authorType }
         : null,
       assets: current?.assets ?? [],
       reviews: it.versions.flatMap((v) => v.reviews.map((r) => ({
@@ -467,7 +497,8 @@ export interface LiveItem {
   channel: string;
   campaign: { slug: string; name: string } | null;
   externalRef: string | null;
-  version: { id: number; number: number; body: string; approvedAt: string };
+  /** Latest review time on the live version; null for imported-as-live items. */
+  version: { id: number; number: number; body: string; lastReviewAt: string | null };
 }
 
 /** Dual-approved versions only. Never falls back to a draft (spec §6). */
@@ -503,7 +534,9 @@ export async function getLive(
         id: it.liveVersion!.id,
         number: it.liveVersion!.number,
         body: it.liveVersion!.body,
-        approvedAt: new Date(Math.max(0, ...it.liveVersion!.reviews.map((r) => r.updatedAt.getTime()))).toISOString(),
+        lastReviewAt: it.liveVersion!.reviews.length
+          ? new Date(Math.max(...it.liveVersion!.reviews.map((r) => r.updatedAt.getTime()))).toISOString()
+          : null,
       },
     }));
 }

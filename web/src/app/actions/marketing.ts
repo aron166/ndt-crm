@@ -48,10 +48,7 @@ export async function updateContent(id: number, title: string, body: string) {
   if (!cleanTitle) return { error: "A cím kötelező" };
   if (!cleanBody) return { error: "A szöveg kötelező" };
 
-  if (cleanTitle !== item.title) {
-    await db.contentItem.update({ where: { id }, data: { title: cleanTitle } });
-    audit("content_item", id, "update", { title: item.title }, { title: cleanTitle });
-  }
+  // Version first: if it is refused (stale base, archived) nothing is saved.
   if (cleanBody !== item.body) {
     const res = await createVersion(
       { tenantId: TENANT_ID, kind: "user", userId: me.userId },
@@ -59,6 +56,10 @@ export async function updateContent(id: number, title: string, body: string) {
       { body: cleanBody, basedOnVersionId: item.currentVersionId },
     );
     if (!res.ok) return { error: res.error };
+  }
+  if (cleanTitle !== item.title) {
+    await db.contentItem.update({ where: { id }, data: { title: cleanTitle } });
+    audit("content_item", id, "update", { title: item.title }, { title: cleanTitle });
   }
   revalidate(id);
   return { success: true };

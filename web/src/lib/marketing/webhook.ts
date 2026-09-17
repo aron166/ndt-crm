@@ -5,6 +5,8 @@
 // swallowed.
 
 export interface WebhookContentPayload {
+  /** The live version this delivery is about — part of the idempotency key. */
+  liveVersionId?: number | null;
   event: "content.approved";
   item: {
     id: number;
@@ -68,7 +70,8 @@ export async function dispatchApprovalWebhook(
   const url = process.env.CONTENT_WEBHOOK_URL;
   if (!url) return { attempted: false, ok: false };
 
-  const idempotencyKey = `content.${payload.item.id}.approved`;
+  // Per live version: v1 and v2 going live are two different deliveries.
+  const idempotencyKey = `content.${payload.item.id}.approved${payload.liveVersionId ? `.v${payload.liveVersionId}` : ""}`;
 
   let lastErr = "";
   // Two attempts total (initial + one retry).

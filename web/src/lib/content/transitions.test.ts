@@ -49,6 +49,10 @@ describe("reviews_changed — the table", () => {
       if (status === "live" && r.ok) expect(r.state.liveVersionId).toBe(10);
     });
   }
+  it("a single configured reviewer can never make it live alone", () => {
+    expect(statusFromReviews([2], [{ reviewerUserId: 2, verdict: "approve" }])).toBe("in_review");
+    expect(statusFromReviews([2, 2], [{ reviewerUserId: 2, verdict: "approve" }])).toBe("in_review");
+  });
   it("empty reviewer list is never live", () => {
     expect(statusFromReviews([], [{ reviewerUserId: 2, verdict: "approve" }])).toBe("in_review");
   });

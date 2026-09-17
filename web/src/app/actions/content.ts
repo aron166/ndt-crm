@@ -11,7 +11,7 @@ import { reportError } from "@/lib/report-error";
 import {
   archiveItem, createVersion, submitReview, type UserActor,
 } from "@/lib/content/service";
-import { getContentReviewers, MAX_REVIEWERS } from "@/lib/content/reviewers";
+import { getContentReviewers, REQUIRED_REVIEWERS } from "@/lib/content/reviewers";
 import { CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from "@/lib/content/types";
 import {
   ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, stagingPath, statObject,
@@ -75,6 +75,7 @@ async function fireLiveWebhook(itemId: number) {
     if (!full?.liveVersion) return;
     const result = await dispatchApprovalWebhook({
       event: "content.approved",
+      liveVersionId: full.liveVersion.id,
       item: {
         id: full.id, tenantId: full.tenantId, campaignId: full.campaignId, channel: full.channel,
         contentType: full.contentType, title: full.title, body: full.liveVersion.body, status: full.status,
@@ -244,14 +245,19 @@ export async function getContentReviewerOptions(): Promise<ReviewerOption[]> {
   return users.map((u) => ({ ...u, selected: selected.includes(u.id) }));
 }
 
-/** Tenant config: who the two reviewers are. Any CRM user may set it (same as the other /leads/setup settings). */
+/**
+ * Tenant config: who the two reviewers are. Exactly two distinct, logged-in-able
+ * CRM users; the caller must be one of them (a non-reviewer cannot hand the
+ * approval power to someone else). Audited.
+ */
 export async function saveContentReviewers(userIds: number[]): Promise<{ ok: true } | Fail> {
   const actor = await userActor();
   if ("ok" in actor) return actor;
-  const parsed = z.array(z.number().int().positive()).max(MAX_REVIEWERS).safeParse(userIds);
-  if (!parsed.success) return { ok: false, error: `Legfeljebb ${MAX_REVIEWERS} bíráló adható meg` };
-  const ids = [...new Set(parsed.data)];
-  const found = await db.user.count({ where: { tenantId: TENANT_ID, id: { in: ids } } });
+  const parsed = z.array(z.number().int().positive()).length(REQUIRED_REVIEWERS).safeParse(userIds);
+  const ids = parsed.success ? [...new Set(parsed.data)] : [];
+  if (ids.length !== REQUIRED_REVIEWERS) return { ok: false, error: "Pontosan két különböző bírálót kell megadni" };
+  if (!ids.includes(actor.userId)) return { ok: false, error: "Csak saját magadat és egy társbírálót adhatsz meg" };
+  const found = await db.user.count({ where: { tenantId: TENANT_ID, id: { in: ids }, passwordHash: "supabase-auth" } });
   if (found !== ids.length) return { ok: false, error: "Ismeretlen felhasználó" };
   const before = await setTenantSettings(TENANT_ID, { contentReviewers: ids });
   audit("tenant", TENANT_ID, "update", before, { contentReviewers: ids }, { tenantId: TENANT_ID });
