@@ -32,9 +32,6 @@ async function userActor(): Promise<UserActor | Fail> {
 }
 
 function revalidateContent(itemId?: number) {
-  revalidatePath("/content");
-  revalidatePath("/content/live");
-  if (itemId) revalidatePath(`/content/${itemId}`);
   revalidatePath("/marketing");
   if (itemId) revalidatePath(`/marketing/${itemId}`);
 }
@@ -132,8 +129,12 @@ export async function requestAssetUpload(input: {
   const { itemId, fileName, mimeType, sizeBytes } = parsed.data;
   if (!ALLOWED_MIME[mimeType]) return { ok: false, error: "Ez a fájltípus nem tölthető fel (kép, mp4/webm videó vagy PDF)" };
   if (sizeBytes > MAX_ASSET_BYTES) return { ok: false, error: "A fájl legfeljebb 50 MB lehet" };
-  const item = await db.contentItem.findFirst({ where: { id: itemId, tenantId: TENANT_ID }, select: { id: true } });
+  const item = await db.contentItem.findFirst({ where: { id: itemId, tenantId: TENANT_ID }, select: { id: true, status: true } });
   if (!item) return { ok: false, error: "Nem található" };
+  if (item.status === "archived") return { ok: false, error: "Archivált anyaghoz nem tölthető fel fájl" };
+  // ponytail: staging objects of abandoned edits are never deleted. Add a sweep of
+  // `staging/` objects no content_assets.storage_path references (> 1 day old) when
+  // the bucket grows.
   try {
     const path = stagingPath(TENANT_ID, itemId, fileName);
     const { signedUrl, token } = await createUploadUrl(path);
@@ -165,6 +166,9 @@ async function resolveAssets(
   const out: NewAssetInput[] = keep.map(({ id: _id, ...a }) => a);
   for (const u of uploads ?? []) {
     if (!isPathForItem(u.path, TENANT_ID, itemId)) return { ok: false, error: "Érvénytelen fájl" };
+    // ponytail: size is the stored object's real size, but the MIME type is the
+    // Content-Type the browser sent — a renamed file keeps a wrong label. Files are
+    // served from the Supabase origin via signed URLs, so no XSS on the CRM origin.
     const stat = await statObject(u.path);
     if (!stat) return { ok: false, error: "A feltöltött fájl nem található — töltsd fel újra" };
     const kind = ALLOWED_MIME[stat.mimeType];

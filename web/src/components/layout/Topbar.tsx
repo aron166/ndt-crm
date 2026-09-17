@@ -157,7 +157,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
       >
         {/* Breadcrumbs */}
         <nav className="flex items-center gap-2 text-sm" style={{ color: "var(--fg-mute)" }}>
-          <span style={{ color: "var(--fg-faint)" }}>Helm CRM</span>
+          <span className="hidden md:inline" style={{ color: "var(--fg-faint)" }}>Helm CRM</span>
           {crumbs.map((c, i) => (
             <span key={c.href} className="flex items-center gap-2">
               <span style={{ color: "var(--fg-faint)" }}>/</span>
@@ -189,7 +189,7 @@ export function Topbar({ collapsed, email, defaultPipeline, onSearchOpen }: Topb
           onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--line-soft)")}
         >
           <Search style={{ width: 13, height: 13, opacity: 0.6 }} />
-          <span>Ugrás személyhez, céghez, feladathoz...</span>
+          <span className="hidden md:inline">Ugrás személyhez, céghez, feladathoz...</span>
           <span
             className="ml-auto font-mono-ndt rounded"
             style={{

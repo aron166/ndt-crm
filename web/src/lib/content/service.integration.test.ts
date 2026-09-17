@@ -309,6 +309,51 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     }
   });
 
+  it("createVersion by an app actor carries the base version's assets forward (positions 0..n, no duplicates)", async () => {
+    const r = await newItem();
+    await db.contentAsset.createMany({
+      data: [
+        { tenantId: 1, contentItemId: r.itemId, versionId: r.versionId!, position: 0, kind: "image", url: "a" },
+        { tenantId: 1, contentItemId: r.itemId, versionId: r.versionId!, position: 1, kind: "file", url: "b" },
+      ],
+    });
+    await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite");
+    await service.claimItem(appActor, r.itemId);
+    const v2 = await service.createVersion(appActor, r.itemId, {
+      body: "carried forward", changeNote: "note", basedOnVersionId: r.versionId!,
+    });
+    expect(v2.ok).toBe(true);
+    if (!v2.ok) return;
+    const assets = await db.contentAsset.findMany({
+      where: { versionId: v2.versionId }, orderBy: { position: "asc" },
+    });
+    expect(assets.map((a) => a.url)).toEqual(["a", "b"]);
+    expect(assets.map((a) => a.position)).toEqual([0, 1]);
+  });
+
+  it("createVersion with assets: [] leaves the new version without files", async () => {
+    const r = await newItem();
+    await db.contentAsset.createMany({
+      data: [{ tenantId: 1, contentItemId: r.itemId, versionId: r.versionId!, position: 0, kind: "image", url: "a" }],
+    });
+    const v2 = await service.createVersion(actorA(), r.itemId, {
+      body: "no files", changeNote: null, basedOnVersionId: r.versionId!, assets: [],
+    });
+    expect(v2.ok).toBe(true);
+    if (!v2.ok) return;
+    const assets = await db.contentAsset.findMany({ where: { versionId: v2.versionId } });
+    expect(assets).toHaveLength(0);
+  });
+
+  it("countPendingForReviewer equals the length of getInbox(...).mine for the same reviewer", async () => {
+    const { countPendingForReviewer, getInbox } = await import("./queries");
+    await newItem();
+    await newItem();
+    const count = await countPendingForReviewer(1, userA);
+    const inbox = await getInbox(1, userA);
+    expect(count).toBe(inbox.mine.length);
+  });
+
   it("the same external_ref created concurrently yields one item", async () => {
     const ref = `it-ref-${Date.now()}`;
     const mk = () => service.createItem(appActor, {

@@ -12,7 +12,7 @@ import type { InboxSections, InboxRow } from "@/lib/content/queries";
 import { ReviewerSettings } from "./ReviewerSettings";
 
 const selectStyle: React.CSSProperties = {
-  padding: "6px 10px", fontSize: 14, minHeight: 36,
+  padding: "6px 10px", fontSize: 14, minHeight: 44, maxWidth: "100%",
   background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
@@ -201,7 +201,7 @@ export function InboxClient({
         </select>
         <select style={selectStyle} value={searchParams.get("status") ?? "all"} onChange={(e) => setFilter("status", e.target.value)}>
           <option value="all">{UI.status}: {UI.all}</option>
-          {CONTENT_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+          {CONTENT_STATUSES.filter((s) => s !== "archived").map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
       </div>
 

@@ -92,11 +92,22 @@ export async function getInbox(tenantId: number, userId: number, filter: InboxFi
     ...(filter.format ? { format: filter.format } : {}),
     ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
   };
-  const rows = await db.contentItem.findMany({
-    where, select: ROW_SELECT, orderBy: { updatedAt: "asc" }, take: 500,
-  });
+  // ponytail: capped at 500 newest; the live section is capped separately.
+  // Paginate when a tenant has more than that in flight.
+  const [rows, liveRows] = await Promise.all([
+    db.contentItem.findMany({
+      where: filter.status ? where : { ...where, status: { notIn: ["archived", "live"] } },
+      select: ROW_SELECT, orderBy: { updatedAt: "desc" }, take: 500,
+    }),
+    filter.status && filter.status !== "live"
+      ? Promise.resolve([])
+      : db.contentItem.findMany({
+          where: { ...where, status: "live" }, select: ROW_SELECT, orderBy: { updatedAt: "desc" }, take: 200,
+        }),
+  ]);
   const now = Date.now();
-  const all = rows.map((r) => toRow(r, reviewers, now));
+  const seen = new Set<number>();
+  const all = [...rows, ...liveRows].filter((r) => !seen.has(r.id) && seen.add(r.id)).map((r) => toRow(r, reviewers, now));
   const isReviewer = reviewers.some((r) => r.id === userId);
   const myVerdict = (r: InboxRow) => r.verdicts.find((v) => v.reviewerId === userId)?.verdict ?? null;
   const oldestFirst = (a: InboxRow, b: InboxRow) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "");
@@ -134,6 +145,7 @@ export interface ReviewPageData {
     campaign: { id: number; name: string } | null;
     currentVersionId: number | null; liveVersionId: number | null;
     claimedBy: string | null;
+    metrics: Record<string, number> | null;
   };
   versions: {
     id: number; number: number; body: string; authorType: string; authorName: string | null;
@@ -151,7 +163,7 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
     select: {
       id: true, title: true, category: true, format: true, purpose: true, channel: true, status: true,
       internal: true, externalRef: true, needsHumanAsset: true, externalUrl: true, publishedAt: true,
-      currentVersionId: true, liveVersionId: true, claimedBy: true,
+      currentVersionId: true, liveVersionId: true, claimedBy: true, metrics: true,
       campaign: { select: { id: true, name: true } },
       versions: {
         orderBy: { number: "desc" },
@@ -175,7 +187,11 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
   const reviewers = await reviewerNames(tenantId);
   const { versions, publishedAt, ...rest } = item;
   return {
-    item: { ...rest, publishedAt: publishedAt?.toISOString() ?? null },
+    item: {
+      ...rest,
+      publishedAt: publishedAt?.toISOString() ?? null,
+      metrics: rest.metrics as Record<string, number> | null,
+    },
     versions: versions.map((v) => ({
       id: v.id, number: v.number, body: v.body, authorType: v.authorType,
       authorName: v.authorUser?.name ?? null, authorApp: v.authorApp, changeNote: v.changeNote,
@@ -212,6 +228,7 @@ export async function getLibrary(tenantId: number, filter: InboxFilter = {}): Pr
       ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
     },
     orderBy: [{ category: "asc" }, { title: "asc" }],
+    take: 300, // ponytail: the page signs every asset URL at once — paginate past this
     select: {
       id: true, title: true, category: true, format: true, purpose: true,
       campaign: { select: { id: true, name: true } },
