@@ -528,6 +528,19 @@ returns `200 { "ok": true, "contentItemId", "versionId", "existed": true }`
 and writes **no** new assets, no `content.submitted` app event — the caller
 already has an item, nothing is duplicated.
 
+**Warning-marker checks (spec §6c).** On a newly-created item (not `existed`),
+the body is scanned for `⚠`/`⚠️` markers via `lib/content/warnings.ts`; each
+one becomes a `ContentCheck` (question text, `forWhom: aron|peter|either`,
+`source: "import"`) via `addChecks()`, deduped on exact question text. This
+runs when `extract_warnings` is `true`, or — if `extract_warnings` is omitted —
+when `import` is `true`; a normal AI-authored post (`import` unset) gets no
+checks unless it opts in with `extract_warnings: true`. It happens **after**
+the create transaction commits, so a checklist failure never loses the item —
+it's logged via `reportError` and the response still succeeds. The response
+gains `checksCreated` (number, `0` when nothing was extracted or the write
+failed). **An item with an `open` check cannot go live** — the checklist is
+enforced at the live-transition, not at intake.
+
 ### `GET /api/content/queue?status=changes_requested,rewrite_requested`
 
 Items the `content-revise` skill should pick up: current version body, assets,
