@@ -3,7 +3,7 @@ import { register, SERVER_TZ } from "./instrumentation";
 
 describe("register() — server clock is Budapest", () => {
   const before = process.env.TZ;
-  afterEach(() => { process.env.TZ = before; });
+  afterEach(() => { if (before === undefined) delete process.env.TZ; else process.env.TZ = before; });
 
   it("turns a UTC process into Budapest local time", () => {
     process.env.TZ = "UTC";

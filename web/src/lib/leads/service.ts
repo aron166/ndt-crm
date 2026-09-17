@@ -11,6 +11,7 @@ import {
 } from "./outcomes";
 import { parseAnswers, answersFrom } from "./qualification";
 import { computeTier } from "./tier";
+import { reportError } from "@/lib/report-error";
 import { DEFAULT_BOOKING_MINUTES, conflictsFor } from "@/lib/booking/conflicts";
 import { loadBookings, resolveDemoHost } from "@/lib/booking/queries";
 
@@ -371,7 +372,9 @@ export async function logLeadCallOutcome(
   // The demo lands on the HOST's calendar (finding 3), not the logger's.
   let bookingHostId: number | null = null;
   if (input.bookingAt) {
-    bookingHostId = await resolveDemoHost(ctx.tenantId, input.demoWith ?? "aron");
+    // The schema guarantees demoWith with a booking (meeting_booked requires it).
+    if (!input.demoWith) return { error: "Add meg, kivel lesz a demó (Áron / Péter)" };
+    bookingHostId = await resolveDemoHost(ctx.tenantId, input.demoWith);
     if (bookingHostId == null) {
       return { error: "Nincs beállítva, ki tartja a demót (tenants.settings.demoHosts)" };
     }
@@ -436,7 +439,7 @@ export async function logLeadCallOutcome(
   // Conflict check on the WRITE (finding 5): a hand-typed date is the case that
   // actually happens. After the commit, flag-only — never blocks, never cancels.
   let bookingConflicts: BookingConflictInfo[] = [];
-  if (bookingTask && plan.bookingAt && bookingHostId != null) {
+  if (bookingTask && plan.bookingAt && bookingHostId != null) try {
     const day = 86_400_000;
     const others = await loadBookings(ctx.tenantId, bookingHostId,
       new Date(plan.bookingAt.getTime() - day), new Date(plan.bookingAt.getTime() + day), bookingTask.id);
@@ -456,6 +459,10 @@ export async function logLeadCallOutcome(
         movable: c.bump.id === candidate.id ? "new" : "existing",
       };
     });
+  } catch (err) {
+    // The call and the booking are committed — a failed flag must not turn
+    // into a 500 that makes the setter retry and log the call twice.
+    reportError("leads.bookingConflicts", err, { leadId, bookingTaskId: bookingTask.id });
   }
 
   audit("interaction", interaction.id, "create", null,

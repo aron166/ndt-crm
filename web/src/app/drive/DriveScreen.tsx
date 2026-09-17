@@ -150,9 +150,29 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
     }
   }
 
+  // Rendered on the lead card AND on the empty-queue screen: the last call of a
+  // drive can be the one that collides.
+  const notice = conflictNotice && (
+        <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
+          <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve — de ütközik a naptárban:</p>
+          {conflictNotice.map((c) => (
+            <p key={c.taskId} style={{ margin: 0 }}>
+              {c.title} ({new Date(c.startsAt).toLocaleString("hu-HU")}) —{" "}
+              {c.movable === "existing"
+                ? "a meglévő foglalás az alacsonyabb prioritású, azt lehet áthelyezni."
+                : "ez az új foglalás az alacsonyabb prioritású, ezt lehet áthelyezni."}
+            </p>
+          ))}
+          <button onClick={() => setConflictNotice(null)} style={{ marginTop: 6, background: "none", border: "1px solid var(--amber)", color: "var(--amber)", borderRadius: 6, fontSize: 12, padding: "4px 10px", cursor: "pointer" }}>
+            Rendben
+          </button>
+        </div>
+      );
+
   if (!lead) {
     return (
       <div style={{ maxWidth: 480, margin: "0 auto", padding: 24, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center" }}>
+        {notice}
         <p style={{ fontSize: 16, color: "var(--fg-soft)" }}>Nincs több lead a sorban.</p>
         <button style={outcomeBtnStyle(undefined)} onClick={() => router.refresh()}>Frissítés</button>
       </div>
@@ -177,22 +197,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
         </button>
       </div>
 
-      {conflictNotice && (
-        <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
-          <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve — de ütközik a naptárban:</p>
-          {conflictNotice.map((c) => (
-            <p key={c.taskId} style={{ margin: 0 }}>
-              {c.title} ({new Date(c.startsAt).toLocaleString("hu-HU")}) —{" "}
-              {c.movable === "existing"
-                ? "a meglévő foglalás az alacsonyabb prioritású, azt lehet áthelyezni."
-                : "ez az új foglalás az alacsonyabb prioritású, ezt lehet áthelyezni."}
-            </p>
-          ))}
-          <button onClick={() => setConflictNotice(null)} style={{ marginTop: 6, background: "none", border: "1px solid var(--amber)", color: "var(--amber)", borderRadius: 6, fontSize: 12, padding: "4px 10px", cursor: "pointer" }}>
-            Rendben
-          </button>
-        </div>
-      )}
+      {notice}
 
       <div>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--fg)", margin: 0, lineHeight: 1.25 }}>{lead.companyName}</h1>
