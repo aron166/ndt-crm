@@ -33,6 +33,27 @@ reintroduce something a reviewer already rejected.
 
 Empty queue → print "Nothing to revise." and stop.
 
+### 1b. Read the context before you write
+The queue entry carries, when the CRM knows them:
+- `reviewReason` per comment — the reviewer's structured tag (e.g. `wording`,
+  `translated`, `fact_wrong`, `claim_not_allowed`, `wrong_contact`, `too_long`,
+  `wrong_ask`, `wrong_format`, `other`). The tag says WHAT KIND of problem it is; the
+  comment says the specifics. Answer both.
+- `ruleViolations` — machine checks that already failed (forbidden claim, unfilled
+  placeholder, missing footer, too long, reused hook …). Every one of them must be gone
+  from your new version. They are blocking: an item with an open one cannot go live.
+- `company` — the CRM dossier (`companies.enrichment`), the closeness score and the
+  verified contact. **These are read-only facts.** Use them for the hook and the
+  personalisation; never invent, "improve" or round a fact, and never contradict the
+  dossier. Say in the change note which dossier facts you used.
+- `externalRef` — the source draft's path, so you can read the original and the
+  approver notes around it.
+
+**No dossier, no rewrite (email items):** if an email item's company has no dossier,
+post nothing for it, and report it as `needs enrichment` in the summary. The dossier is
+produced by the enrichment skill; the two are one pipeline, so the fix is to enrich the
+company, not to guess here.
+
 ### 2. For each item, in order
 1. **Claim it** — `POST $CRM_URL/api/content/{id}/claim`.
    - `200` → continue. (`alreadyClaimed: true` means you claimed it earlier in this run.)
