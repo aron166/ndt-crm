@@ -27,8 +27,9 @@ export default async function ContentReviewPage({
   );
   const signedUrls = await signedViewUrls(paths);
 
+  // No `mount` animation here: its transform would break the fixed phone action bar.
   return (
-    <div className="mount">
+    <div>
       <div style={{ marginBottom: 16 }}>
         <Link
           href="/marketing"
