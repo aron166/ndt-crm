@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { restoreContent } from "@/app/actions/content";
 import { UI, CATEGORY_LABEL, VERDICT_LABEL } from "@/lib/content/labels";
 import { CONTENT_CATEGORIES, type ContentCategory, type Verdict } from "@/lib/content/types";
 import { STATUS_LABELS, STATUS_COLORS, CONTENT_STATUSES } from "@/lib/marketing/types";
@@ -124,6 +125,8 @@ function Row({
 }: {
   item: InboxRow; selected: boolean; onToggle: (id: number) => void;
 }) {
+  const router = useRouter();
+  const [restoring, setRestoring] = useState(false);
   return (
     <div className="flex items-start gap-2">
       <input
@@ -169,6 +172,11 @@ function Row({
           {item.openChecks > 0 && (
             <span className="badge-ds amber">{UI.checksOpen(item.openChecks)}</span>
           )}
+          {item.selfScore !== null && (
+            <span className="badge-ds" style={{ color: "var(--fg-mute)" }}>
+              {UI.selfScoreShort(Math.round(item.selfScore * 100))}
+            </span>
+          )}
         </div>
         <div style={{ fontSize: 15, fontWeight: 500, color: "var(--fg)", marginBottom: 3 }}>
           {item.title}
@@ -190,6 +198,22 @@ function Row({
           ))}
         </div>
       </Link>
+      {item.status === "archived" && (
+        <button
+          type="button"
+          className="btn sm"
+          style={{ marginTop: 14, minHeight: 44 }}
+          disabled={restoring}
+          onClick={async () => {
+            setRestoring(true);
+            const res = await restoreContent(item.id);
+            setRestoring(false);
+            if (res.ok) router.refresh();
+          }}
+        >
+          {UI.restore}
+        </button>
+      )}
     </div>
   );
 }

@@ -30,13 +30,14 @@ const COLUMNS: { key: ColumnKey; label: string; color: string; acceptsDrop: bool
   { key: "in_campaign", label: UI.columnInCampaign, color: "var(--fg-faint)", acceptsDrop: false },
 ];
 
-function columnOf(status: string): ColumnKey {
+/** Null = this status has no board column (archived), so the card is not shown. */
+function columnOf(status: string): ColumnKey | null {
   if (status === "draft") return "draft";
   if (status === "in_review") return "in_review";
   if (status === "changes_requested" || status === "rewrite_requested") return "changes";
   if (status === "ai_working") return "ai_working";
   if (status === "live") return "live";
-  return "draft";
+  return null;
 }
 
 function Card({
@@ -129,7 +130,10 @@ export function BoardClient({
   const rows = onlyMine ? allRows.filter((r) => mineIds.has(r.id)) : allRows;
   const byColumn = useMemo(() => {
     const map = new Map<ColumnKey, InboxRow[]>(COLUMNS.map((c) => [c.key, []]));
-    for (const r of rows) map.get(columnOf(r.status))!.push(r);
+    for (const r of rows) {
+      const col = columnOf(r.status);
+      if (col) map.get(col)!.push(r);
+    }
     return map;
   }, [rows]);
 
