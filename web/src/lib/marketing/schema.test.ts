@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { contentIntakeSchema, resolveCampaignSlug } from "./schema";
+import { contentIntakeSchema, resolveCampaignSlug, defaultCategory } from "./schema";
 
 const valid = {
   campaign_slug: "BirdsView Q3",
@@ -61,6 +61,47 @@ describe("contentIntakeSchema", () => {
     expect(r2.success && r2.data.internal).toBe(true);
     const r3 = contentIntakeSchema.safeParse({ ...valid, internal: 0 });
     expect(r3.success && r3.data.internal).toBe(false);
+  });
+});
+
+describe("defaultCategory", () => {
+  it("derives email from content_type=email", () => {
+    expect(defaultCategory("email")).toBe("email");
+  });
+  it("derives video from content_type=video_script", () => {
+    expect(defaultCategory("video_script")).toBe("video");
+  });
+  it("falls back to other for post/article", () => {
+    expect(defaultCategory("post")).toBe("other");
+    expect(defaultCategory("article")).toBe("other");
+  });
+});
+
+describe("contentIntakeSchema — content approval fields", () => {
+  it("accepts the new optional wire fields", () => {
+    const r = contentIntakeSchema.safeParse({
+      ...valid,
+      category: "landing",
+      format: "9x16_video",
+      purpose: "Q4 cold email, step 1",
+      external_ref: "growth/campaigns/cold-email-v0/drafts/a.md#touch-1",
+      change_note: "fixed the CTA",
+      import: true,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.category).toBe("landing");
+      expect(r.data.import).toBe(true);
+    }
+  });
+
+  it("rejects an unknown category", () => {
+    expect(contentIntakeSchema.safeParse({ ...valid, category: "tiktok_reel" }).success).toBe(false);
+  });
+
+  it("category is optional (route derives the default)", () => {
+    const r = contentIntakeSchema.safeParse(valid);
+    expect(r.success && r.data.category).toBeUndefined();
   });
 });
 

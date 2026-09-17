@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CONTENT_CHANNELS, CONTENT_TYPES, ASSET_KINDS } from "./types";
+import { CONTENT_CATEGORIES, type ContentCategory } from "@/lib/content/types";
 
 // Inbound content-draft payload (POST /api/content). The content factory (an
 // external scheduled job) posts this shape; same per-app-key auth as
@@ -44,6 +45,16 @@ export const contentIntakeSchema = z.object({
   title: z.preprocess(emptyToUndef, z.string().trim().min(1).max(300)),
   body: z.preprocess(emptyToUndef, z.string().trim().min(1).max(50000)),
 
+  // Content approval pipeline (2026-09-17) — optional; category defaults from
+  // content_type when omitted (see defaultCategory below).
+  category: z.enum(CONTENT_CATEGORIES).optional(),
+  format: z.preprocess(emptyToUndef, z.string().trim().max(60).optional()),
+  purpose: z.preprocess(emptyToUndef, z.string().trim().max(300).optional()),
+  external_ref: z.preprocess(emptyToUndef, z.string().trim().max(500).optional()),
+  change_note: z.preprocess(emptyToUndef, z.string().trim().max(4000).optional()),
+  // Imported existing material is authored `import`, not `ai` (lib/content/service.ts).
+  import: boolish,
+
   // Generator metadata (hook refs, week, notes) — stored verbatim on sourceMeta.
   source_meta: z.record(z.string(), z.unknown()).optional(),
   scheduled_for: z.preprocess(
@@ -57,6 +68,13 @@ export const contentIntakeSchema = z.object({
 });
 
 export type ContentIntake = z.infer<typeof contentIntakeSchema>;
+
+/** category default when the caller doesn't send one: content_type-derived. */
+export function defaultCategory(contentType: ContentIntake["content_type"]): ContentCategory {
+  if (contentType === "email") return "email";
+  if (contentType === "video_script") return "video";
+  return "other";
+}
 
 function slugify(input: string): string {
   return (
