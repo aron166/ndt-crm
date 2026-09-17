@@ -9,10 +9,10 @@ const TABS = [
 
 export function MarketingTabs({ active }: { active: "inbox" | "live" | "campaigns" }) {
   return (
-    <div style={{ marginBottom: 18 }}>
+    <div style={{ marginBottom: 18, maxWidth: "100%", overflow: "hidden" }}>
       <div
         className="flex gap-1"
-        style={{ overflowX: "auto", borderBottom: "1px solid var(--line-soft)" }}
+        style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0, borderBottom: "1px solid var(--line-soft)" }}
       >
         {TABS.map((t) => {
           const isActive = t.key === active;

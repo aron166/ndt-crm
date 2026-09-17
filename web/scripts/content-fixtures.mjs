@@ -8,7 +8,9 @@
 import pg from "pg";
 
 const url = process.env.DATABASE_URL ?? "";
-if (!/@(127\.0\.0\.1|localhost)(:\d+)?\//.test(url)) {
+let parsedUrl;
+try { parsedUrl = new URL(url); } catch { parsedUrl = null; }
+if (!parsedUrl || !["127.0.0.1", "localhost"].includes(parsedUrl.hostname) || parsedUrl.searchParams.has("host")) {
   console.error("Refusing: DATABASE_URL must point at localhost.");
   process.exit(1);
 }
