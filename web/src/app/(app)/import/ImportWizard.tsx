@@ -267,8 +267,8 @@ export function ImportWizard() {
       )}
 
       {truncated && (
-        <p className="text-xs mb-3" style={{ color: "var(--amber)" }}>
-          ⚠ A fájl több mint 10 000 sort tartalmaz — csak az első 10 000 lesz importálva.
+        <p className="text-xs mb-3 flex items-center gap-1.5" style={{ color: "var(--amber)" }}>
+          <AlertTriangle size={14} aria-hidden="true" /> A fájl több mint 10 000 sort tartalmaz — csak az első 10 000 lesz importálva.
         </p>
       )}
 

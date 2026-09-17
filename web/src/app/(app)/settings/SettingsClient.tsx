@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { saveIntegrationCredential, disconnectIntegration } from "@/app/actions/integrations";
 import { sendResendTest } from "@/app/actions/email";
 import { createAppApiKey, revokeAppApiKey, type AppKeyRow } from "@/app/actions/app-keys";
-import { CheckCircle, Circle, ExternalLink, Zap, KeyRound, Copy, Check, Trash2, Plus } from "lucide-react";
+import { CheckCircle, Circle, ExternalLink, Zap, KeyRound, Copy, Check, Trash2, Plus, AlertTriangle } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 
 interface Integration {
@@ -186,8 +186,8 @@ function IntegrationCard({
       </div>
 
       {testMsg && (
-        <p role="status" aria-live="polite" style={{ marginTop: 10, fontSize: 14, color: testMsg.ok ? "var(--mint)" : "var(--coral)" }}>
-          {testMsg.ok ? "✓ " : "⚠ "}{testMsg.text}
+        <p role="status" aria-live="polite" style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 4, fontSize: 14, color: testMsg.ok ? "var(--mint)" : "var(--coral)" }}>
+          {testMsg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {testMsg.text}
         </p>
       )}
 
@@ -298,8 +298,8 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
 
           {created && (
             <div style={{ marginTop: 4, padding: "12px 14px", borderRadius: 8, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)" }}>
-              <div style={{ fontSize: 12, color: "var(--amber)", marginBottom: 6, fontWeight: 500 }}>
-                ⚠ Másold ki most — ez az érték többé nem jelenik meg.
+              <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--amber)", marginBottom: 6, fontWeight: 500 }}>
+                <AlertTriangle size={13} aria-hidden="true" /> Másold ki most — ez az érték többé nem jelenik meg.
               </div>
               <div className="flex items-center gap-2">
                 <code style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg)", wordBreak: "break-all" }}>{created.plaintext}</code>

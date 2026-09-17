@@ -36,7 +36,7 @@ type Tx = Prisma.TransactionClient;
 
 const STATE_SELECT = {
   id: true, status: true, currentVersionId: true, liveVersionId: true,
-  claimedAt: true, claimedFrom: true, claimedBy: true,
+  claimedAt: true, claimedFrom: true, claimedBy: true, prevStatus: true, wasLive: true,
 } satisfies Prisma.ContentItemSelect;
 type StateRow = Prisma.ContentItemGetPayload<{ select: typeof STATE_SELECT }>;
 
@@ -63,7 +63,7 @@ function actorInfo(actor: ContentActor) {
 async function writeAudit(
   tx: Tx, actor: ContentActor,
   entityType: "content_item" | "content_version" | "content_review",
-  entityId: number, action: "create" | "update",
+  entityId: number, action: "create" | "update" | "delete",
   before: Record<string, unknown> | null, after: Record<string, unknown> | null,
 ) {
   await tx.auditLog.create({
@@ -340,7 +340,11 @@ export async function submitReview(
 
     await tx.contentItem.update({
       where: { id: row.id },
-      data: { status: next.state.status, liveVersionId: next.state.liveVersionId },
+      data: {
+        status: next.state.status,
+        liveVersionId: next.state.liveVersionId,
+        ...(next.wentLive ? { wasLive: true } : {}),
+      },
     });
     await writeAudit(tx, actor, "content_review", review.id, before ? "update" : "create",
       before ? { verdict: before.verdict, comment: before.comment } : null,
@@ -416,10 +420,188 @@ export async function archiveItem(actor: UserActor, itemId: number): Promise<{ o
     if (!next.ok) return fail(409, next.reason);
     await tx.contentItem.update({
       where: { id: itemId },
-      data: { status: "archived", claimedAt: null, claimedFrom: null, claimedBy: null },
+      data: {
+        status: "archived", prevStatus: state.status,
+        claimedAt: null, claimedFrom: null, claimedBy: null,
+      },
     });
     await writeAudit(tx, actor, "content_item", itemId, "update", { status: state.status }, { status: "archived" });
     return { ok: true as const };
+  });
+}
+
+// ── §6c: ⚠ checks, restore, hard delete ─────────────────────────────────────
+
+export const CHECK_QUESTION_MAX = 500;
+export const CHECK_ANSWER_MAX = 2000;
+export const CHECK_STATES = ["open", "resolved", "waived"] as const;
+export type CheckState = (typeof CHECK_STATES)[number];
+export const CHECK_FOR = ["aron", "peter", "either"] as const;
+
+export interface CheckInput {
+  question: string;
+  forWhom?: string;
+  source?: "import" | "manual";
+}
+
+/**
+ * Create checks for an item, skipping ones whose question already exists
+ * (the import is re-runnable). Returns how many were created.
+ */
+export async function addChecks(
+  actor: ContentActor, itemId: number, checks: CheckInput[],
+): Promise<{ ok: true; created: number } | Fail> {
+  const item = await db.contentItem.findFirst({ where: { id: itemId, tenantId: actor.tenantId }, select: { id: true } });
+  if (!item) return fail(404, "Nem található");
+  const clean = checks
+    .map((c) => ({
+      question: c.question.trim().slice(0, CHECK_QUESTION_MAX),
+      forWhom: (CHECK_FOR as readonly string[]).includes(c.forWhom ?? "") ? c.forWhom! : "either",
+      source: c.source ?? "manual",
+    }))
+    .filter((c) => c.question.length > 0);
+  if (clean.length === 0) return { ok: true, created: 0 };
+  const res = await db.contentCheck.createMany({
+    data: clean.map((c) => ({ tenantId: actor.tenantId, itemId, ...c })),
+    skipDuplicates: true,
+  });
+  if (res.count > 0) {
+    await db.auditLog.create({
+      data: {
+        tenantId: actor.tenantId, actorUserId: null,
+        actorAgentId: actor.kind === "app" ? actor.appSlug : null,
+        action: "create", entityType: "content_item", entityId: itemId,
+        changes: { before: null, after: { checksCreated: res.count }, by: actorInfo(actor) } as Prisma.InputJsonValue,
+      },
+    });
+  }
+  return { ok: true, created: res.count };
+}
+
+/**
+ * Settle or re-open a check. Settling the LAST open one re-evaluates the item:
+ * if both reviewers had already approved the current version, it goes live now.
+ */
+export async function setCheckState(
+  actor: UserActor, checkId: number, state: CheckState, text?: string | null,
+): Promise<{ ok: true; itemStatus: ContentStatus; wentLive: boolean } | Fail> {
+  const answer = text?.trim() || null;
+  if (state !== "open" && (!answer || answer.length < 2)) {
+    return fail(400, state === "resolved" ? "Írd le a választ" : "Írd le, miért nem kell ez");
+  }
+  if (answer && answer.length > CHECK_ANSWER_MAX) return fail(400, "A válasz túl hosszú");
+
+  const reviewers = await getContentReviewers(actor.tenantId);
+  return db.$transaction(async (tx) => {
+    const check = await tx.contentCheck.findFirst({
+      where: { id: checkId, tenantId: actor.tenantId },
+      select: { id: true, itemId: true, state: true, question: true },
+    });
+    if (!check) return fail(404, "Nem található");
+    const row = await lockItem(tx, actor.tenantId, check.itemId);
+    if (!row) return fail(404, "Nem található");
+
+    await tx.contentCheck.update({
+      where: { id: checkId },
+      data: {
+        state,
+        answer: state === "open" ? null : answer,
+        resolvedByUserId: state === "open" ? null : actor.userId,
+      },
+    });
+    await writeAudit(tx, actor, "content_item", check.itemId, "update",
+      { check: check.question, state: check.state }, { check: check.question, state, answer });
+
+    // Re-evaluate: reviews unchanged, but the check gate may have opened/closed.
+    const state0 = stateOf(row);
+    if (state0.status === "archived" || state0.currentVersionId === null) {
+      return { ok: true as const, itemStatus: state0.status, wentLive: false };
+    }
+    const reviews = await tx.contentReview.findMany({
+      where: { versionId: state0.currentVersionId }, select: { reviewerUserId: true, verdict: true },
+    });
+    const openChecks = await tx.contentCheck.count({ where: { itemId: check.itemId, state: "open" } });
+    const next = applyEvent(state0, {
+      type: "reviews_changed", reviewers,
+      reviews: reviews.map((r) => ({ reviewerUserId: r.reviewerUserId, verdict: r.verdict as Verdict })),
+      openChecks,
+    });
+    if (!next.ok) return { ok: true as const, itemStatus: state0.status, wentLive: false };
+    await tx.contentItem.update({
+      where: { id: check.itemId },
+      data: {
+        status: next.state.status, liveVersionId: next.state.liveVersionId,
+        ...(next.wentLive ? { wasLive: true } : {}),
+      },
+    });
+    if (next.wentLive) {
+      await writeAudit(tx, actor, "content_item", check.itemId, "update",
+        { status: state0.status }, { status: "live", liveVersionId: next.state.liveVersionId, reason: "last_check_settled" });
+    }
+    return { ok: true as const, itemStatus: next.state.status, wentLive: next.wentLive };
+  });
+}
+
+/** Un-archive: back to the status it had when it was archived. */
+export async function restoreItem(actor: UserActor, itemId: number): Promise<{ ok: true; status: ContentStatus } | Fail> {
+  return db.$transaction(async (tx) => {
+    const row = await lockItem(tx, actor.tenantId, itemId);
+    if (!row) return fail(404, "Nem található");
+    if (row.status !== "archived") return fail(409, "Ez az anyag nincs archiválva");
+    const back = isContentStatus(row.prevStatus) && row.prevStatus !== "archived" ? row.prevStatus : "in_review";
+    await tx.contentItem.update({ where: { id: itemId }, data: { status: back, prevStatus: null } });
+    await writeAudit(tx, actor, "content_item", itemId, "update", { status: "archived" }, { status: back });
+    return { ok: true as const, status: back };
+  });
+}
+
+export interface DeletableCheck { itemId: number; deletable: boolean; reason?: string }
+
+/** Hard delete is only for items that were NEVER live (spec §6c). */
+export async function canHardDelete(tenantId: number, itemIds: number[]): Promise<DeletableCheck[]> {
+  const rows = await db.contentItem.findMany({
+    where: { id: { in: itemIds }, tenantId },
+    select: { id: true, wasLive: true, liveVersionId: true },
+  });
+  return itemIds.map((id) => {
+    const row = rows.find((r) => r.id === id);
+    if (!row) return { itemId: id, deletable: false, reason: "Nem található" };
+    if (row.wasLive || row.liveVersionId !== null) {
+      return { itemId: id, deletable: false, reason: "Volt már élő — csak archiválható" };
+    }
+    return { itemId: id, deletable: true };
+  });
+}
+
+/**
+ * Hard delete: the item, its versions/reviews/checks (FK cascade) and every
+ * uploaded storage object. Refused for anything that has ever been live.
+ * Returns the storage paths the caller must remove (the service is DB-only so
+ * it stays unit-testable; the action deletes the objects).
+ */
+export async function deleteItemHard(
+  actor: UserActor, itemId: number,
+): Promise<{ ok: true; storagePaths: string[]; title: string } | Fail> {
+  const [gate] = await canHardDelete(actor.tenantId, [itemId]);
+  if (!gate.deletable) return fail(gate.reason === "Nem található" ? 404 : 409, gate.reason ?? "Nem törölhető");
+  return db.$transaction(async (tx) => {
+    const row = await lockItem(tx, actor.tenantId, itemId);
+    if (!row) return fail(404, "Nem található");
+    if (row.wasLive || row.liveVersionId !== null) return fail(409, "Volt már élő — csak archiválható");
+    const item = await tx.contentItem.findFirst({ where: { id: itemId, tenantId: actor.tenantId }, select: { title: true } });
+    const assets = await tx.contentAsset.findMany({
+      where: { tenantId: actor.tenantId, contentItemId: itemId, storagePath: { not: null } },
+      select: { storagePath: true },
+    });
+    await writeAudit(tx, actor, "content_item", itemId, "delete",
+      { title: item?.title ?? null, storageObjects: assets.length }, null);
+    await tx.contentItem.update({ where: { id: itemId }, data: { currentVersionId: null, liveVersionId: null } });
+    await tx.contentItem.delete({ where: { id: itemId } });
+    return {
+      ok: true as const,
+      storagePaths: assets.map((a) => a.storagePath!).filter(Boolean),
+      title: item?.title ?? `#${itemId}`,
+    };
   });
 }
 

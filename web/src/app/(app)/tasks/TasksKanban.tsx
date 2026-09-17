@@ -231,7 +231,7 @@ function KanbanCard({
           >
             <Clock style={{ width: 9, height: 9 }} />
             {formatDate(task.dueDate)}
-            {overdue && " ⚠"}
+            {overdue && " Lejárt"}
           </span>
         )}
         {task._count.subTasks > 0 && (
@@ -309,7 +309,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         {[
           { key: "all",     label: "Összes" },
-          { key: "overdue", label: "Lejárt ⚠" },
+          { key: "overdue", label: "Lejárt" },
         ].map(({ key, label }) => (
           <button
             key={key}

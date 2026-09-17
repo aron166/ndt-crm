@@ -96,7 +96,7 @@ export default async function DealsPage({
             </span>
             {staleDeals > 0 && (
               <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--coral)", fontWeight: 500 }}>
-                · {staleDeals} lejárt ⚠
+                · {staleDeals} lejárt
               </span>
             )}
           </h1>

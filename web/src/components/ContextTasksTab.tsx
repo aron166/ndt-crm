@@ -3,7 +3,7 @@
 import { useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, CheckCircle2 } from "lucide-react";
+import { Plus, CheckCircle2, PencilLine } from "lucide-react";
 import { TaskModal } from "@/app/(app)/tasks/TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { reopenTask } from "@/app/actions/tasks";
@@ -175,7 +175,7 @@ export function ContextTasksTab({
                     <td className="px-2 py-2.5 hidden sm:table-cell">
                       <span className={cn("text-xs", overdue ? "text-red-600 font-semibold" : "text-slate-400")}>
                         {t.dueDate ? formatDate(t.dueDate) : ""}
-                        {overdue && " ⚠"}
+                        {overdue && " Lejárt"}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
@@ -186,8 +186,9 @@ export function ContextTasksTab({
                         onClick={() => { setEditTask(t); setModalOpen(true); }}
                         className="text-xs text-slate-400 hover:text-slate-700"
                         title="Szerkesztés"
+                        aria-label="Szerkesztés"
                       >
-                        ✏️
+                        <PencilLine size={14} aria-hidden="true" />
                       </button>
                     </td>
                   </tr>

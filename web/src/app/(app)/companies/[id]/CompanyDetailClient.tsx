@@ -328,11 +328,7 @@ export function CompanyDetailClient({
               disabled={enriching}
               style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}
             >
-              <span style={{
-                display: "inline-block",
-                animation: enriching ? "spin 1.2s linear infinite" : "none",
-                fontSize: 14,
-              }}>✦</span>
+              <Loader2 size={14} aria-hidden="true" style={{ animation: enriching ? "spin 1.2s linear infinite" : "none" }} />
               {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
             </button>
             <button

@@ -194,7 +194,7 @@ export function TasksClient({ tasks }: TasksClientProps) {
                   </td>
                   <td style={{ padding: "8px 16px" }}>
                     <span className="font-mono-ndt" style={{ fontSize: 12, color: overdue ? "var(--coral)" : today ? "var(--amber)" : "var(--fg-faint)", fontWeight: overdue || today ? 600 : 400 }}>
-                      {t.dueDate ? formatDate(t.dueDate) : "—"}{overdue && " ⚠"}
+                      {t.dueDate ? formatDate(t.dueDate) : "—"}{overdue && " Lejárt"}
                     </span>
                   </td>
                   <td style={{ padding: "8px 16px", fontSize: 14, color: "var(--fg-mute)" }}>

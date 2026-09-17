@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 import { saveScriptVariants } from "@/app/actions/leads";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -41,8 +42,8 @@ export function ScriptVariantsClient({
           szövege. A blokkokat egy önálló <code>---</code> sor választja el. Legfeljebb 5
           változat lehet.
         </p>
-        <p style={{ fontSize: 12, color: "var(--coral)" }}>
-          ⚠️ A gyári szkriptek helykitöltők, amíg Péter és Áron meg nem írja a valódi szöveget.
+        <p style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--coral)" }}>
+          <AlertTriangle size={13} aria-hidden="true" /> A gyári szkriptek helykitöltők, amíg Péter és Áron meg nem írja a valódi szöveget.
         </p>
         <Textarea rows={10} value={text} onChange={(e) => setText(e.target.value)} className="font-mono-ndt" />
 

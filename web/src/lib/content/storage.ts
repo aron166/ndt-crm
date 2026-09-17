@@ -79,6 +79,14 @@ export async function signedViewUrls(paths: string[]): Promise<Record<string, st
   return out;
 }
 
+/** Delete uploaded objects (hard delete of an item, §6c). Best effort. */
+export async function removeObjects(paths: string[]): Promise<void> {
+  const unique = [...new Set(paths)].filter(Boolean);
+  if (unique.length === 0) return;
+  const { error } = await admin().storage.from(CONTENT_BUCKET).remove(unique);
+  if (error) throw new Error(`storage remove failed: ${error.message}`);
+}
+
 /** Same bucket settings as scripts/ensure-content-bucket.mjs (the ops path). Not called by requests. */
 export async function ensureBucket(): Promise<"created" | "exists"> {
   const s = admin().storage;

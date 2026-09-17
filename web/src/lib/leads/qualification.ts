@@ -62,19 +62,19 @@ export function answersErrorMessage(error: z.ZodError): string {
  */
 export const DEFAULT_QUALIFICATION_QUESTIONS: QualificationQuestion[] = [
   // Gate â everyone.
-  { slug: "gate", label: "⚠️ Van most egy konkrét feladat, amihez ez kellene, vagy egyelőre csak érdekel a technológia? (task / curious)" },
+  { slug: "gate", label: "Van most egy konkrét feladat, amihez ez kellene, vagy egyelőre csak érdekel a technológia? (task / curious)" },
   // Branch A â `task`, the seven.
-  { slug: "situation",  label: "⚠️ Milyen helyzetben kérdezel: cég/projekt · szakember (villanyszerelő, statikus, kivitelező) · saját ingatlan" },
-  { slug: "concrete",   label: "⚠️ Mibe kellene belenézni: fal · födém/aljzat · híd/műtárgy · más / nem beton" },
-  { slug: "goal",       label: "⚠️ Mit szeretnél tudni: mi van benne fúrás előtt · az állapotát · magát a technológiát értékelem" },
-  { slug: "size",       label: "⚠️ Kb. mekkora felület vagy hány pont?" },
-  { slug: "postcode",   label: "⚠️ Irányítószám (kötelező)" },
-  { slug: "timing",     label: "⚠️ Mikor: ezen a héten · ebben a hónapban · nincs még dátum" },
-  { slug: "own_device", label: "⚠️ Gondolkodtatok már saját műszeren? (igen / talán / nem)" },
+  { slug: "situation",  label: "Milyen helyzetben kérdezel: cég/projekt · szakember (villanyszerelő, statikus, kivitelező) · saját ingatlan" },
+  { slug: "concrete",   label: "Mibe kellene belenézni: fal · födém/aljzat · híd/műtárgy · más / nem beton" },
+  { slug: "goal",       label: "Mit szeretnél tudni: mi van benne fúrás előtt · az állapotát · magát a technológiát értékelem" },
+  { slug: "size",       label: "Kb. mekkora felület vagy hány pont?" },
+  { slug: "postcode",   label: "Irányítószám (kötelező)" },
+  { slug: "timing",     label: "Mikor: ezen a héten · ebben a hónapban · nincs még dátum" },
+  { slug: "own_device", label: "Gondolkodtatok már saját műszeren? (igen / talán / nem)" },
   // Branch B â `curious`, the soft three.
-  { slug: "hook",     label: "⚠️ Mi keltette fel az érdeklődésed?" },
-  { slug: "use_case", label: "⚠️ Mire használnád, ha lenne ilyen a kezedben?" },
-  { slug: "work",     label: "⚠️ Milyen munkát végzel / milyen cégnél?" },
+  { slug: "hook",     label: "Mi keltette fel az érdeklődésed?" },
+  { slug: "use_case", label: "Mire használnád, ha lenne ilyen a kezedben?" },
+  { slug: "work",     label: "Milyen munkát végzel / milyen cégnél?" },
 ];
 
 /** Slug for a freshly typed question. Same rules as slugifyStatusKey. */

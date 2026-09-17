@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Check, AlertTriangle } from "lucide-react";
 import { upsertCostRate, type CostRateEntry } from "@/app/actions/cost-rates";
 import { costCodeLabel, costCodeUnitHint } from "@/lib/tasks/costing";
 
@@ -80,8 +81,8 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
           {pending ? "Mentés…" : "Mentés"}
         </button>
         {msg && (
-          <span style={{ fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
-            {msg.ok ? "✓ " : "⚠ "}{msg.text}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
+            {msg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {msg.text}
           </span>
         )}
       </div>

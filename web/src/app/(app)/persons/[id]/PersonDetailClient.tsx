@@ -17,7 +17,7 @@ import { SetEmployerModal } from "./SetEmployerModal";
 import { DossierTab } from "@/components/DossierTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { Mail, Phone, MapPin, Trash2 } from "lucide-react";
+import { Mail, Phone, MapPin, Trash2, Loader2 } from "lucide-react";
 import { updatePerson, deletePerson, restorePerson } from "@/app/actions/persons";
 
 interface Contact {
@@ -272,7 +272,7 @@ export function PersonDetailClient({
               disabled={enriching}
               style={{ display: "flex", alignItems: "center", gap: 6 }}
             >
-              <span style={{ display: "inline-block", animation: enriching ? "spin 1.2s linear infinite" : "none", fontSize: 14 }}>✦</span>
+              <Loader2 size={14} aria-hidden="true" style={{ animation: enriching ? "spin 1.2s linear infinite" : "none" }} />
               {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
             </button>
             <button

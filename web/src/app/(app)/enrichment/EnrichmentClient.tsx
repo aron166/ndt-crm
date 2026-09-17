@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { applyProposal } from "@/app/actions/enrichment";
 import { formatRelativeTime } from "@/lib/utils";
 import type { FieldChange, ChangesMap } from "@/app/actions/enrichment";
@@ -147,7 +148,9 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
   if (applied) {
     return (
       <div style={{ padding: "14px 16px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, opacity: 0.5 }}>
-        <span style={{ fontSize: 14, color: "var(--fg-mute)" }}>✓ Alkalmazva — {proposal.entityName}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: "var(--fg-mute)" }}>
+          <Check size={14} aria-hidden="true" /> Alkalmazva — {proposal.entityName}
+        </span>
       </div>
     );
   }

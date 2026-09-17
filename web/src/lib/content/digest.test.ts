@@ -45,7 +45,7 @@ describe("buildDigest", () => {
     expect(d.text.indexOf("Régebbi")).toBeLessThan(d.text.indexOf("Újabb"));
   });
 
-  it("marks items waiting more than 3 days with ⚠️, and not items waiting 3 or fewer", () => {
+  it("lists each item with its waited days, oldest wording intact (no emoji, plain text email)", () => {
     const fourDays = new Date(NOW.getTime() - 4 * 24 * 60 * 60 * 1000);
     const threeDays = new Date(NOW.getTime() - 3 * 24 * 60 * 60 * 1000);
     const d = buildDigest({
@@ -55,22 +55,8 @@ describe("buildDigest", () => {
         { id: 2, title: "Friss", category: "email", waitingSince: threeDays },
       ],
     })!;
-    expect(d.text).toMatch(/Régi \(E-mail\) — 4 napja vár ⚠️ — .*\/marketing\/1/);
+    expect(d.text).toMatch(/Régi \(E-mail\) — 4 napja vár — .*\/marketing\/1/);
     expect(d.text).toMatch(/Friss \(E-mail\) — 3 napja vár — .*\/marketing\/2/);
-  });
-
-  it("uses STALE_REVIEW_MS, not a whole-day threshold: 3.5 days warns, 2.9 days doesn't", () => {
-    const threePointFive = new Date(NOW.getTime() - 3.5 * 24 * 60 * 60 * 1000);
-    const twoPointNine = new Date(NOW.getTime() - 2.9 * 24 * 60 * 60 * 1000);
-    const d = buildDigest({
-      reviewerId: 1, reviewerName: "Nagy Péter", now: NOW, baseUrl: BASE,
-      items: [
-        { id: 1, title: "Régi", category: "email", waitingSince: threePointFive },
-        { id: 2, title: "Friss", category: "email", waitingSince: twoPointNine },
-      ],
-    })!;
-    expect(d.text).toMatch(/Régi \(E-mail\).*⚠️/);
-    expect(d.text).not.toMatch(/Friss \(E-mail\).*⚠️/);
   });
 
   it("subject counts the items", () => {

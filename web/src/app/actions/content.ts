@@ -9,13 +9,15 @@ import { setTenantSettings } from "@/lib/tenant-settings";
 import { dispatchApprovalWebhook } from "@/lib/marketing/webhook";
 import { reportError } from "@/lib/report-error";
 import {
-  archiveItem, createVersion, submitReview, type UserActor,
+  addChecks, archiveItem, canHardDelete, createVersion, deleteItemHard, restoreItem,
+  setCheckState, submitReview, CHECK_ANSWER_MAX, CHECK_FOR, CHECK_QUESTION_MAX, CHECK_STATES,
+  type UserActor,
 } from "@/lib/content/service";
 import { getContentReviewers, REQUIRED_REVIEWERS } from "@/lib/content/reviewers";
 import { digestOptOutFromSettings } from "@/lib/content/digest";
 import { CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from "@/lib/content/types";
 import {
-  ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, stagingPath, statObject,
+  ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, removeObjects, stagingPath, statObject,
 } from "@/lib/content/storage";
 import type { NewAssetInput } from "@/lib/content/service";
 
@@ -312,4 +314,121 @@ export async function setMyDigestEnabled(enabled: boolean): Promise<{ ok: true }
 
   audit("tenant", TENANT_ID, "update", { contentDigestOptOut: before }, { contentDigestOptOut: next }, { tenantId: TENANT_ID });
   return { ok: true };
+}
+
+
+// ── §6c: ⚠ checks, archive/restore, hard delete, bulk ───────────────────────
+
+/** Settle (or re-open) one ⚠ check. Settling the last one can flip the item live. */
+export async function setContentCheck(input: {
+  checkId: number; state: string; text?: string;
+}): Promise<{ ok: true; itemStatus: string; wentLive: boolean } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  const parsed = z.object({
+    checkId: z.number().int().positive(),
+    state: z.enum(CHECK_STATES),
+    text: z.string().max(CHECK_ANSWER_MAX).optional(),
+  }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
+  const res = await setCheckState(actor, parsed.data.checkId, parsed.data.state, parsed.data.text);
+  if (!res.ok) return { ok: false, error: res.error };
+  revalidateContent();
+  return { ok: true, itemStatus: res.itemStatus, wentLive: res.wentLive };
+}
+
+/** Add a ⚠ question by hand (the import adds its own). */
+export async function addContentCheck(input: {
+  itemId: number; question: string; forWhom?: string;
+}): Promise<{ ok: true; created: number } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  const parsed = z.object({
+    itemId: z.number().int().positive(),
+    question: z.string().trim().min(3).max(CHECK_QUESTION_MAX),
+    forWhom: z.enum(CHECK_FOR).optional(),
+  }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
+  const res = await addChecks(actor, parsed.data.itemId, [{ question: parsed.data.question, forWhom: parsed.data.forWhom }]);
+  if (!res.ok) return { ok: false, error: res.error };
+  revalidateContent(parsed.data.itemId);
+  return { ok: true, created: res.created };
+}
+
+export async function restoreContent(itemId: number): Promise<{ ok: true; status: string } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  if (!Number.isInteger(itemId) || itemId <= 0) return { ok: false, error: "Érvénytelen adat" };
+  const res = await restoreItem(actor, itemId);
+  if (!res.ok) return { ok: false, error: res.error };
+  revalidateContent(itemId);
+  return { ok: true, status: res.status };
+}
+
+/** Which of these items may be hard-deleted (the rest can only be archived). */
+export async function checkContentDeletable(itemIds: number[]): Promise<{ itemId: number; deletable: boolean; reason?: string }[]> {
+  const actor = await userActor();
+  if ("ok" in actor) return [];
+  const parsed = z.array(z.number().int().positive()).max(200).safeParse(itemIds);
+  if (!parsed.success) return [];
+  return canHardDelete(TENANT_ID, parsed.data);
+}
+
+/**
+ * Hard delete — items that were never live only. Storage objects go too; a
+ * failed object delete is reported, not retried (the row is already gone, and
+ * a stray object is cheaper than a half-deleted item).
+ */
+export async function deleteContent(itemIds: number[]): Promise<{ ok: true; deleted: number[]; refused: { itemId: number; reason: string }[] } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  const parsed = z.array(z.number().int().positive()).min(1).max(50).safeParse(itemIds);
+  if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
+
+  const deleted: number[] = [];
+  const refused: { itemId: number; reason: string }[] = [];
+  const paths: string[] = [];
+  for (const id of parsed.data) {
+    const res = await deleteItemHard(actor, id);
+    if (res.ok) { deleted.push(id); paths.push(...res.storagePaths); }
+    else refused.push({ itemId: id, reason: res.error });
+  }
+  if (paths.length) {
+    try { await removeObjects(paths); }
+    catch (err) { reportError("content.deleteContent.storage", err, { count: paths.length }); }
+  }
+  revalidateContent();
+  return { ok: true, deleted, refused };
+}
+
+/** Bulk archive (the default cleanup action). */
+export async function archiveContentBulk(itemIds: number[]): Promise<{ ok: true; archived: number[]; refused: { itemId: number; reason: string }[] } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  const parsed = z.array(z.number().int().positive()).min(1).max(200).safeParse(itemIds);
+  if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
+  const archived: number[] = [];
+  const refused: { itemId: number; reason: string }[] = [];
+  for (const id of parsed.data) {
+    const res = await archiveItem(actor, id);
+    if (res.ok) archived.push(id);
+    else refused.push({ itemId: id, reason: res.error });
+  }
+  revalidateContent();
+  return { ok: true, archived, refused };
+}
+
+/** Undo of a bulk archive: restore each item to the status it had. */
+export async function restoreContentBulk(itemIds: number[]): Promise<{ ok: true; restored: number[] } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  const parsed = z.array(z.number().int().positive()).min(1).max(200).safeParse(itemIds);
+  if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
+  const restored: number[] = [];
+  for (const id of parsed.data) {
+    const res = await restoreItem(actor, id);
+    if (res.ok) restored.push(id);
+  }
+  revalidateContent();
+  return { ok: true, restored };
 }

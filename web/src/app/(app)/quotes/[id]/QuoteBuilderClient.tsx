@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Trash2, Plus, FileText, ArrowLeft } from "lucide-react";
+import { Trash2, Plus, FileText, ArrowLeft, Check, AlertTriangle } from "lucide-react";
 import type { QuoteDTO } from "@/app/actions/quotes";
 import { updateQuote, setQuoteStatus, deleteQuote } from "@/app/actions/quotes";
 import type { CostRateEntry } from "@/app/actions/cost-rates";
@@ -284,7 +284,11 @@ export function QuoteBuilderClient({
           Törlés
         </button>
         <div className="flex items-center gap-3">
-          {msg && <span style={{ fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>{msg.ok ? "✓ " : "⚠ "}{msg.text}</span>}
+          {msg && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
+              {msg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {msg.text}
+            </span>
+          )}
           {quote.sentAt && <span style={{ fontSize: 14, color: "var(--fg-faint)" }}>Elküldve: {formatDate(quote.sentAt)}</span>}
           <button className="btn primary" disabled={pending} onClick={handleSave}>{pending ? "Mentés…" : "Mentés"}</button>
         </div>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Link2, Upload, X } from "lucide-react";
+import { FileText, Link2, Upload, X, Check, PencilLine, RotateCcw, Pencil } from "lucide-react";
 import { Markdown } from "@/lib/content/markdown";
 import { wordDiff } from "@/lib/content/diff";
 import {
@@ -517,7 +517,7 @@ export function ReviewClient({
                       disabled={isPending}
                       onClick={() => submitVerdict("approve")}
                     >
-                      ✅ {VERDICT_ACTION.approve}
+                      <Check size={16} aria-hidden="true" /> {VERDICT_ACTION.approve}
                     </button>
                     <button
                       type="button"
@@ -526,7 +526,7 @@ export function ReviewClient({
                       disabled={isPending}
                       onClick={() => { setReviewPanel((p) => (p === "changes" ? null : "changes")); setReviewComment(""); setActionError(null); }}
                     >
-                      ✏️ {VERDICT_ACTION.changes}
+                      <PencilLine size={16} aria-hidden="true" /> {VERDICT_ACTION.changes}
                     </button>
                     <button
                       type="button"
@@ -535,7 +535,7 @@ export function ReviewClient({
                       disabled={isPending}
                       onClick={() => { setReviewPanel((p) => (p === "rewrite" ? null : "rewrite")); setReviewComment(""); setActionError(null); }}
                     >
-                      ♻️ {VERDICT_ACTION.rewrite}
+                      <RotateCcw size={16} aria-hidden="true" /> {VERDICT_ACTION.rewrite}
                     </button>
                   </>
                 )}
@@ -550,7 +550,7 @@ export function ReviewClient({
                 )}
                 {canEditButton && (
                   <button type="button" className="actionbar-btn edit" disabled={isPending} onClick={openEditor}>
-                    ✎ {UI.edit}
+                    <Pencil size={16} aria-hidden="true" /> {UI.edit}
                   </button>
                 )}
               </div>
