@@ -22,15 +22,9 @@ export const CONTENT_TYPES = [
 ] as const;
 export type ContentType = (typeof CONTENT_TYPES)[number];
 
-export const CONTENT_STATUSES = [
-  "draft",
-  "in_review",
-  "approved",
-  "scheduled",
-  "published",
-  "rejected",
-] as const;
-export type ContentStatus = (typeof CONTENT_STATUSES)[number];
+// Statuses now belong to the content approval pipeline (lib/content/types.ts).
+export { CONTENT_STATUSES, type ContentStatus } from "@/lib/content/types";
+import type { ContentStatus } from "@/lib/content/types";
 
 export const ASSET_KINDS = ["image", "video", "file", "link"] as const;
 export type AssetKind = (typeof ASSET_KINDS)[number];
@@ -53,29 +47,34 @@ export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
   other: "Egyéb",
 };
 
+// ⚠️ HU proposals (content approval pipeline, 2026-09-17).
 export const STATUS_LABELS: Record<ContentStatus, string> = {
   draft: "Piszkozat",
-  in_review: "Jóváhagyásra vár",
-  approved: "Jóváhagyva",
-  scheduled: "Ütemezve",
-  published: "Megjelent",
-  rejected: "Elutasítva",
+  in_review: "Bírálatra vár",
+  changes_requested: "Javítást kértek",
+  rewrite_requested: "Újraírást kértek",
+  ai_working: "Az AI dolgozik rajta",
+  live: "Élő",
+  archived: "Archiválva",
 };
 
 export const STATUS_COLORS: Record<ContentStatus, string> = {
   draft: "#64748b",
   in_review: "#f59e0b",
-  approved: "#22c55e",
-  scheduled: "#06b6d4",
-  published: "#6366f1",
-  rejected: "#ef4444",
+  changes_requested: "#f97316",
+  rewrite_requested: "#ef4444",
+  ai_working: "#8b5cf6",
+  live: "#22c55e",
+  archived: "#94a3b8",
 };
 
 // Order the review queue renders its status sections in.
 export const QUEUE_SECTION_ORDER: ContentStatus[] = [
   "in_review",
-  "approved",
-  "scheduled",
-  "published",
-  "rejected",
+  "changes_requested",
+  "rewrite_requested",
+  "ai_working",
+  "live",
+  "draft",
+  "archived",
 ];

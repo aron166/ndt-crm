@@ -13,6 +13,10 @@ describe("isServiceApiPath", () => {
     "/api/leads/12",
     "/api/leads/12/interactions",
     "/api/content",
+    "/api/content/queue",
+    "/api/content/live",
+    "/api/content/12/claim",
+    "/api/content/12/versions",
     "/api/calls/result",
     "/api/companies/42",
     "/api/persons/7",
@@ -37,6 +41,12 @@ describe("isServiceApiPath", () => {
     "/api/companies/abc",
     "/companies/42",
     "/leads",
+    "/api/content/12", // no item route for apps
+    "/api/content/12/review", // an app must never reach a verdict route
+    "/api/content/abc/claim",
+    "/api/content/12/claim/x",
+    "/api/content/queue/x",
+    "/content",
   ];
   for (const path of sessionGated) {
     it(`stays behind the session gate: ${path}`, () => {

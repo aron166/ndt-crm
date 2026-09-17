@@ -3,121 +3,65 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { assertTransition, InvalidTransitionError } from "@/lib/marketing/transitions";
-import { dispatchApprovalWebhook } from "@/lib/marketing/webhook";
-import type { ContentStatus } from "@/lib/marketing/types";
+import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { createVersion } from "@/lib/content/service";
+
+// Legacy marketing actions (pre content-approval). Approve / reject / back to
+// edit are GONE — status now only changes through lib/content/service.ts
+// (reviews, versions). What remains: edit (= a new version), and recording a
+// manual publication of a LIVE item, which no longer changes its status.
 
 const TENANT_ID = 1;
+
+async function requireUser(): Promise<{ userId: number } | { error: string }> {
+  const { userId } = await getActor(TENANT_ID);
+  return userId == null ? { error: NOT_A_CRM_USER } : { userId };
+}
 
 async function loadItem(id: number) {
   return db.contentItem.findFirst({
     where: { id, tenantId: TENANT_ID },
-    select: { id: true, status: true, internal: true, title: true, body: true },
+    select: {
+      id: true, status: true, internal: true, title: true, body: true,
+      currentVersionId: true, liveVersionId: true, publishedAt: true,
+    },
   });
 }
 
 function revalidate(id: number) {
   revalidatePath("/marketing");
   revalidatePath(`/marketing/${id}`);
+  revalidatePath("/content");
+  revalidatePath(`/content/${id}`);
 }
 
-/** In-place edit of title/body — the human edit IS the language pass. */
+/** Edit = a new version (spec decision 3); the title is item metadata. */
 export async function updateContent(id: number, title: string, body: string) {
+  const me = await requireUser();
+  if ("error" in me) return me;
   const item = await loadItem(id);
   if (!item) return { error: "Tartalom nem található" };
-  if (item.status === "published") return { error: "Megjelent tartalom nem szerkeszthető" };
+  if (!item.currentVersionId) return { error: "A tartalomnak nincs verziója" };
 
   const cleanTitle = title.trim();
   const cleanBody = body.trim();
   if (!cleanTitle) return { error: "A cím kötelező" };
   if (!cleanBody) return { error: "A szöveg kötelező" };
 
-  await db.contentItem.update({
-    where: { id },
-    data: { title: cleanTitle, body: cleanBody },
-  });
-
-  // Record both fields the human edit can change — the body edit IS the language
-  // pass, so omitting it would leave the most-edited field out of the trail.
-  audit("content_item", id, "update",
-    { title: item.title, body: item.body },
-    { title: cleanTitle, body: cleanBody },
-  );
+  if (cleanTitle !== item.title) {
+    await db.contentItem.update({ where: { id }, data: { title: cleanTitle } });
+    audit("content_item", id, "update", { title: item.title }, { title: cleanTitle });
+  }
+  if (cleanBody !== item.body) {
+    const res = await createVersion(
+      { tenantId: TENANT_ID, kind: "user", userId: me.userId },
+      id,
+      { body: cleanBody, basedOnVersionId: item.currentVersionId },
+    );
+    if (!res.ok) return { error: res.error };
+  }
   revalidate(id);
   return { success: true };
-}
-
-async function transition(id: number, to: ContentStatus, extra: Record<string, unknown> = {}) {
-  const item = await loadItem(id);
-  if (!item) return { error: "Tartalom nem található" as const };
-  try {
-    assertTransition(item.status as ContentStatus, to);
-  } catch (e) {
-    if (e instanceof InvalidTransitionError) return { error: "Érvénytelen státuszváltás" as const };
-    throw e;
-  }
-  await db.contentItem.update({ where: { id }, data: { status: to, ...extra } });
-  audit("content_item", id, "update", { status: item.status }, { status: to });
-  revalidate(id);
-  return { success: true as const, fromStatus: item.status as ContentStatus };
-}
-
-/** Approve → fires the downstream webhook (non-blocking, best-effort). */
-export async function approveContent(id: number) {
-  const res = await transition(id, "approved");
-  if ("error" in res) return res;
-
-  // Fire the approval webhook AFTER the approval is committed. A failure must
-  // never undo the approval — log it (console + audit) and move on.
-  const full = await db.contentItem.findFirst({
-    where: { id, tenantId: TENANT_ID },
-    include: { assets: { orderBy: { position: "asc" } } },
-  });
-  if (full) {
-    const result = await dispatchApprovalWebhook({
-      event: "content.approved",
-      item: {
-        id: full.id,
-        tenantId: full.tenantId,
-        campaignId: full.campaignId,
-        channel: full.channel,
-        contentType: full.contentType,
-        title: full.title,
-        body: full.body,
-        status: full.status,
-        internal: full.internal,
-        scheduledFor: full.scheduledFor?.toISOString() ?? null,
-        source: full.source,
-        sourceMeta: full.sourceMeta,
-        externalUrl: full.externalUrl,
-      },
-      assets: full.assets.map((a) => ({
-        kind: a.kind, url: a.url, caption: a.caption, position: a.position,
-      })),
-    });
-    if (result.attempted && !result.ok) {
-      console.error("[marketing] approval webhook failed", { id, error: result.error });
-    }
-    if (result.attempted) {
-      audit("content_item", id, "update",
-        { webhook: "pending" },
-        { webhook: result.ok ? "delivered" : `failed: ${result.error ?? "unknown"}` },
-      );
-    }
-  }
-  return { success: true };
-}
-
-/** Reject — requires a reason note. */
-export async function rejectContent(id: number, reviewNote: string) {
-  const note = reviewNote?.trim();
-  if (!note) return { error: "Az elutasításhoz indoklás szükséges" };
-  return transition(id, "rejected", { reviewNote: note });
-}
-
-/** Send back to editing (draft). */
-export async function backToEditContent(id: number) {
-  return transition(id, "draft");
 }
 
 /**
@@ -127,9 +71,13 @@ export async function backToEditContent(id: number) {
  * the hidden UI.
  */
 export async function publishContent(id: number, externalUrl: string) {
+  const me = await requireUser();
+  if ("error" in me) return me;
   const item = await loadItem(id);
   if (!item) return { error: "Tartalom nem található" };
   if (item.internal) return { error: "Belső tartalom nem publikálható" };
+  // Only dual-approved content may go out (spec §6).
+  if (!item.liveVersionId) return { error: "Csak élő (mindkét bíráló által jóváhagyott) tartalom tehető közzé" };
 
   const url = externalUrl?.trim();
   if (!url) return { error: "A megjelenés linkje kötelező" };
@@ -145,7 +93,11 @@ export async function publishContent(id: number, externalUrl: string) {
     return { error: "Csak http/https link engedélyezett" };
   }
 
-  return transition(id, "published", { publishedAt: new Date(), externalUrl: url });
+  const publishedAt = new Date();
+  await db.contentItem.update({ where: { id }, data: { publishedAt, externalUrl: url } });
+  audit("content_item", id, "update", { publishedAt: item.publishedAt }, { publishedAt, externalUrl: url });
+  revalidate(id);
+  return { success: true };
 }
 
 /** Manual metrics entry on a published item. */
@@ -153,9 +105,11 @@ export async function saveContentMetrics(
   id: number,
   metrics: { impressions?: number; reactions?: number; comments?: number; clicks?: number; leads?: number },
 ) {
+  const me = await requireUser();
+  if ("error" in me) return me;
   const item = await loadItem(id);
   if (!item) return { error: "Tartalom nem található" };
-  if (item.status !== "published") return { error: "Metrikák csak megjelent tartalmon" };
+  if (!item.publishedAt) return { error: "Metrikák csak megjelent tartalmon" };
 
   await db.contentItem.update({ where: { id }, data: { metrics } });
   audit("content_item", id, "update", null, { metrics });

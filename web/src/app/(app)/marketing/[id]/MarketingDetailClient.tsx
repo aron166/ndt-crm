@@ -2,12 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X, Pencil, Copy, Lock, ExternalLink } from "lucide-react";
+import { Pencil, Copy, Lock, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/utils";
 import {
-  approveContent, rejectContent, backToEditContent, updateContent,
-  publishContent, saveContentMetrics,
+  updateContent, publishContent, saveContentMetrics,
 } from "@/app/actions/marketing";
 import {
   CHANNEL_LABELS, CONTENT_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS,
@@ -57,8 +56,6 @@ export function MarketingDetailClient({
   const [title, setTitle] = useState(item.title);
   const [body, setBody] = useState(item.body);
 
-  const [rejecting, setRejecting] = useState(false);
-  const [rejectNote, setRejectNote] = useState("");
 
   const [publishing, setPublishing] = useState(false);
   const [publishUrl, setPublishUrl] = useState("");
@@ -74,9 +71,10 @@ export function MarketingDetailClient({
   const statusColor = STATUS_COLORS[status] ?? "#64748b";
   const channelLabel = CHANNEL_LABELS[item.channel as ContentChannel] ?? item.channel;
   const typeLabel = CONTENT_TYPE_LABELS[item.contentType as ContentType] ?? item.contentType;
-  const isPublished = status === "published";
-  const canReview = status === "in_review" || status === "draft" || status === "approved" || status === "scheduled";
-  const canPublish = status === "approved" && !item.internal;
+  // Review now happens per version on /content/[id]; this page only records a
+  // manual publication of a LIVE item (status no longer changes on publish).
+  const isPublished = Boolean(item.externalUrl);
+  const canPublish = status === "live" && !item.internal;
 
   function run(fn: () => Promise<{ error?: string; success?: boolean }>, after?: () => void) {
     setError(null);
@@ -211,13 +209,6 @@ export function MarketingDetailClient({
         </div>
       )}
 
-      {/* Rejection note */}
-      {status === "rejected" && item.reviewNote && (
-        <div style={{ fontSize: 14, color: "var(--fg-mute)", background: "#ef44440d", border: "1px solid #ef444433", borderRadius: 6, padding: "10px 12px", marginBottom: 16 }}>
-          <strong style={{ color: "#ef4444" }}>Elutasítva:</strong> {item.reviewNote}
-        </div>
-      )}
-
       {/* Published link — only render as a link for http(s); never href a
           javascript:/data: scheme. */}
       {isPublished && item.externalUrl && (
@@ -237,21 +228,7 @@ export function MarketingDetailClient({
       {!editing && !isPublished && (
         <div className="panel" style={{ marginBottom: 16 }}>
           <div className="panel-pad">
-            {rejecting ? (
-              <div className="space-y-2">
-                <label className="field-label">Elutasítás indoka (kötelező)</label>
-                <textarea value={rejectNote} onChange={(e) => setRejectNote(e.target.value)} rows={2}
-                  style={{ width: "100%", padding: "8px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none", resize: "vertical" }} />
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => { setRejecting(false); setRejectNote(""); }}>Mégse</Button>
-                  <Button type="button" size="sm" disabled={isPending || !rejectNote.trim()}
-                    style={{ background: "#ef4444", color: "white" }}
-                    onClick={() => run(() => rejectContent(item.id, rejectNote), () => setRejecting(false))}>
-                    Elutasítás
-                  </Button>
-                </div>
-              </div>
-            ) : publishing ? (
+            {publishing ? (
               <div className="space-y-2">
                 <label className="field-label">{copied ? "Szöveg vágólapra másolva. " : ""}Megjelent? Illeszd be a linket:</label>
                 <input value={publishUrl} onChange={(e) => setPublishUrl(e.target.value)} placeholder="https://..." autoFocus
@@ -266,28 +243,12 @@ export function MarketingDetailClient({
               </div>
             ) : (
               <div className="flex gap-2 flex-wrap">
-                {canReview && status !== "approved" && (
-                  <Button type="button" size="sm" className="btn primary" disabled={isPending}
-                    onClick={() => run(() => approveContent(item.id))}>
-                    <Check style={{ width: 14, height: 14, marginRight: 4 }} /> Jóváhagy
-                  </Button>
-                )}
                 {canPublish && (
                   <Button type="button" size="sm" className="btn primary" disabled={isPending} onClick={copyAndOpenPublish}>
                     <Copy style={{ width: 14, height: 14, marginRight: 4 }} /> Másolás &amp; megjelent
                   </Button>
                 )}
-                {canReview && (
-                  <Button type="button" variant="outline" size="sm" disabled={isPending} onClick={() => setRejecting(true)}>
-                    <X style={{ width: 14, height: 14, marginRight: 4 }} /> Elutasít
-                  </Button>
-                )}
-                {status !== "draft" && (
-                  <Button type="button" variant="outline" size="sm" disabled={isPending}
-                    onClick={() => run(() => backToEditContent(item.id))}>
-                    Vissza szerkesztésre
-                  </Button>
-                )}
+                <a href={`/content/${item.id}`} className="btn" style={{ fontSize: 14 }}>Bírálat →</a>
               </div>
             )}
           </div>

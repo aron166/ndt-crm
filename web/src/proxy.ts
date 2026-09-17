@@ -17,6 +17,11 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/leads" ||
     pathname.startsWith("/api/leads/") ||
     pathname === "/api/content" ||
+    // Content approval loop (app key): queue, live, claim, versions. Anchored —
+    // a future /api/content/:id/review must NOT inherit the bypass.
+    pathname === "/api/content/queue" ||
+    pathname === "/api/content/live" ||
+    /^\/api\/content\/\d+\/(claim|versions)$/.test(pathname) ||
     pathname === "/api/calls/result" ||
     /^\/api\/(companies|persons)\/\d+$/.test(pathname) ||
     pathname === "/api/outreach/targets" ||
