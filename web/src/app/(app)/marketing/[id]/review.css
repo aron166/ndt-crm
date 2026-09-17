@@ -293,6 +293,79 @@
 .comment-date { color: var(--fg-faint); margin-left: auto; }
 .comment-text { font-size: 13px; color: var(--fg-soft); white-space: pre-wrap; margin: 4px 0 0; }
 
+/* ── ⚠ checks (spec §6c) ────────────────────────────────── */
+.checks-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.checks-panel-head .review-panel-title { margin-bottom: 0; }
+.checks-open-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+  white-space: nowrap;
+}
+.actionbar-note { margin-top: 8px; }
+
+.checks-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.check-item { padding-bottom: 14px; border-bottom: 1px solid var(--line-soft); }
+.check-item:last-child { border-bottom: none; padding-bottom: 0; }
+.check-question {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg);
+  white-space: pre-wrap;
+  margin: 0 0 6px;
+}
+.check-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.check-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 9px;
+  border: 1px solid;
+}
+.check-chip.check-open { color: var(--amber); background: color-mix(in oklch, var(--amber) 12%, transparent); border-color: color-mix(in oklch, var(--amber) 35%, transparent); }
+.check-chip.check-resolved { color: var(--mint); background: var(--mint-soft); border-color: color-mix(in oklch, var(--mint) 35%, transparent); }
+.check-chip.check-waived { color: var(--fg-mute); background: var(--bg-0); border-color: var(--line-soft); }
+.check-for, .check-source { font-size: 12px; color: var(--fg-mute); }
+.check-answer {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg-soft);
+  white-space: pre-wrap;
+  margin: 0 0 6px;
+}
+.check-resolved-by { color: var(--fg-faint); }
+.check-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.check-answer-form { margin-top: 8px; }
+.check-answer-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--bg-0);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+  color: var(--fg);
+  resize: vertical;
+  margin-top: 4px;
+}
+.check-add { display: flex; flex-direction: column; gap: 8px; }
+.check-for-select { width: 100%; }
+
 .archive-link {
   background: none;
   border: none;
