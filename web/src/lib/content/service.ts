@@ -245,14 +245,14 @@ export async function createVersion(
     const assets: NewAssetInput[] = input.assets ?? (await tx.contentAsset.findMany({
       where: { tenantId: actor.tenantId, versionId: input.basedOnVersionId },
       orderBy: { position: "asc" },
-      select: { kind: true, url: true, storagePath: true, mimeType: true, sizeBytes: true, caption: true },
+      select: { kind: true, url: true, storagePath: true, thumbPath: true, mimeType: true, sizeBytes: true, caption: true },
     }));
     if (assets.length) {
       await tx.contentAsset.createMany({
         data: assets.map((a, i) => ({
           tenantId: actor.tenantId, contentItemId: itemId, versionId: version.id, position: i,
-          kind: a.kind, url: a.url, storagePath: a.storagePath ?? null, mimeType: a.mimeType ?? null,
-          sizeBytes: a.sizeBytes ?? null, caption: a.caption ?? null,
+          kind: a.kind, url: a.url, storagePath: a.storagePath ?? null, thumbPath: a.thumbPath ?? null,
+          mimeType: a.mimeType ?? null, sizeBytes: a.sizeBytes ?? null, caption: a.caption ?? null,
         })),
       });
     }
