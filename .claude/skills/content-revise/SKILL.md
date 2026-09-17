@@ -39,11 +39,16 @@ The queue entry carries, when the CRM knows them:
   `translated`, `fact_wrong`, `claim_not_allowed`, `wrong_contact`, `too_long`,
   `wrong_ask`, `wrong_format`, `other`). The tag says WHAT KIND of problem it is; the
   comment says the specifics. Answer both.
-- `ruleViolations` — machine checks that already failed (forbidden claim, unfilled
+- `openChecks` — blocking questions: imported warning markers AND failed machine rules
+  (each rule check's question starts with "Szabály:"). Every one of them must be gone from
+  your new version; the item cannot go live while any is open.
+- `settledChecks` — questions a human already answered. Those answers are FACTS you may
+  use. Never invent an answer to something still open.
+- machine checks that already failed (forbidden claim, unfilled
   placeholder, missing footer, too long, reused hook …). Every one of them must be gone
   from your new version. They are blocking: an item with an open one cannot go live.
-- `company` — the CRM dossier (`companies.enrichment`), the closeness score and the
-  verified contact. **These are read-only facts.** Use them for the hook and the
+- `company` — the CRM dossier (`companies.enrichment`), the closeness score, the city and
+  the verified contact. **These are read-only facts.** Use them for the hook and the
   personalisation; never invent, "improve" or round a fact, and never contradict the
   dossier. Say in the change note which dossier facts you used.
 - `externalRef` — the source draft's path, so you can read the original and the
