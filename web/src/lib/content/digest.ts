@@ -47,8 +47,8 @@ export function buildDigest(input: DigestInput): { subject: string; text: string
     const label = CATEGORY_LABEL[item.category as ContentCategory] ?? item.category;
     // Long waits are called out in WORDS (no glyphs — portfolio law 2026-09-17).
     const stale = now.getTime() - item.waitingSince.getTime() > STALE_REVIEW_MS;
-    const age = stale ? `Régóta várakozik — ${days} napja` : `${days} napja vár`;
-    return `- ${item.title} (${label}) — ${age} — ${baseUrl}/marketing/${item.id}`;
+    const age = stale ? `Régóta várakozik: ${days} napja` : `${days} napja vár`;
+    return `- ${item.title} (${label}): ${age}: ${baseUrl}/marketing/${item.id}`;
   });
 
   const subject = `${items.length} anyag vár Önre`;

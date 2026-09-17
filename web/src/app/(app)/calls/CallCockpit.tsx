@@ -243,7 +243,7 @@ export default function CallCockpit({
                   <PipelineStatusBadge status={current.pipelineStatus} />
                 </div>
                 <div style={{ fontSize: 14, color: "var(--fg-faint)", marginTop: 4 }}>
-                  {[current.city, current.county].filter(Boolean).join(", ") || "—"}
+                  {[current.city, current.county].filter(Boolean).join(", ") || "-"}
                   {current.website && (
                     <>
                       {" · "}
@@ -295,7 +295,7 @@ export default function CallCockpit({
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>{activeContact.name}</div>
                     <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>
-                      {activeContact.role || "—"}
+                      {activeContact.role || "-"}
                       {activeContact.email && <> · {activeContact.email}</>}
                     </div>
                   </div>
@@ -321,7 +321,7 @@ export default function CallCockpit({
                 {callId ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--mint)" }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--mint)" }} />
-                    Hívás folyamatban — válassz kimenetelt a befejezéshez
+                    Hívás folyamatban: válassz kimenetelt a befejezéshez
                   </div>
                 ) : (
                   <button
@@ -342,7 +342,7 @@ export default function CallCockpit({
               </div>
             ) : (
               <div style={{ fontSize: 14, color: "var(--fg-faint)" }}>
-                Nincs rögzített kapcsolattartó —{" "}
+                Nincs rögzített kapcsolattartó,{" "}
                 <Link href={`/companies/${current.id}`} style={{ color: "var(--indigo)" }}>adj hozzá egyet</Link>
               </div>
             )}
@@ -369,7 +369,7 @@ export default function CallCockpit({
                     </span>
                     <span style={{ color: "var(--fg-mute)", minWidth: 0 }}>
                       <span style={{ color: "var(--fg-soft)" }}>{INTERACTION_LABEL[h.type ?? "note"] ?? h.type}</span>
-                      {h.notes && <> — {h.notes}</>}
+                      {h.notes && <>: {h.notes}</>}
                     </span>
                   </div>
                 ))}

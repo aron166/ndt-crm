@@ -34,8 +34,8 @@ export function AnalyticsClient({
     { label: "Összes cég",                href: "/companies",                   count: totalCompanies.toLocaleString("hu-HU") },
     { label: "Soha nem kontaktált",       href: "/companies?never_contacted=1", count: neverContacted.toLocaleString("hu-HU"), accent: "var(--amber)" },
     { label: "Összes személy",            href: "/persons",                     count: totalPersons.toLocaleString("hu-HU") },
-    { label: "Nyitott feladatok",         href: "/tasks?status=open",           count: openTasks > 0 ? openTasks.toLocaleString("hu-HU") : "—" },
-    { label: "Aktív dealek",             href: "/deals",                       count: openDeals > 0 ? openDeals.toLocaleString("hu-HU") : "—" },
+    { label: "Nyitott feladatok",         href: "/tasks?status=open",           count: openTasks > 0 ? openTasks.toLocaleString("hu-HU") : "-" },
+    { label: "Aktív dealek",             href: "/deals",                       count: openDeals > 0 ? openDeals.toLocaleString("hu-HU") : "-" },
     { label: "Összes számla",            href: "/analytics/invoices",          count: "→", accent: "var(--mint)" },
   ];
 
@@ -68,7 +68,7 @@ export function AnalyticsClient({
                   {revenueByMonth.map((r, i) => (
                     <div key={i} style={{ textAlign: "center", flexShrink: 0, minWidth: 36 }}>
                       <div className="font-mono-ndt" style={{ fontSize: 12, color: r.total > 0 ? "var(--mint)" : "var(--fg-faint)" }}>
-                        {r.total > 0 ? (r.total / 1_000_000).toFixed(0) : "—"}
+                        {r.total > 0 ? (r.total / 1_000_000).toFixed(0) : "-"}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{monthLabels[i]}</div>
                     </div>

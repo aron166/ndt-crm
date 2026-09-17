@@ -38,7 +38,7 @@ export function ScriptVariantsClient({
       <div className="panel-head"><div className="panel-title">Hívásszkript változatok (A/B)</div></div>
       <div className="panel-pad space-y-3">
         <p style={{ fontSize: 12, color: "var(--fg-mute)" }}>
-          Egy blokk = egy szkript. A blokk első sora: azonosító|név — a többi sor a szkript
+          Egy blokk = egy szkript. A blokk első sora: azonosító|név: a többi sor a szkript
           szövege. A blokkokat egy önálló <code>---</code> sor választja el. Legfeljebb 5
           változat lehet.
         </p>
@@ -80,14 +80,14 @@ export function ScriptVariantsClient({
                         </td>
                       ))}
                       <td style={{ textAlign: "right", padding: "4px 8px" }}>
-                        {row.reached < 10 ? "—" : `${(row.demoRate * 100).toFixed(1)}%`}
+                        {row.reached < 10 ? "-" : `${(row.demoRate * 100).toFixed(1)}%`}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <p style={{ fontSize: 11, color: "var(--fg-mute)", marginTop: 4 }}>
-                A demó arány csak legalább 10 elért hívás után jelenik meg — kevesebb adatnál a szám nem mond semmit.
+                A demó arány csak legalább 10 elért hívás után jelenik meg: kevesebb adatnál a szám nem mond semmit.
               </p>
             </div>
           )}

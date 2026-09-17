@@ -37,7 +37,7 @@ export function QuotesClient({ quotes }: { quotes: QuoteListItem[] }) {
             Árajánlatok
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            NDT árajánlatok a költségkódok és a díjszabás alapján — küldhető PDF-ként.
+            NDT árajánlatok a költségkódok és a díjszabás alapján: küldhető PDF-ként.
           </p>
         </div>
         <NewQuoteDialog />
@@ -83,7 +83,7 @@ export function QuotesClient({ quotes }: { quotes: QuoteListItem[] }) {
                   <td style={{ padding: "10px 12px", color: "var(--fg-soft)" }}>{q.title}</td>
                   <td style={{ padding: "10px 12px" }}><StatusBadge status={q.status} /></td>
                   <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--fg)" }}>{formatHUF(q.grossAmount)}</td>
-                  <td style={{ padding: "10px 12px", color: "var(--fg-soft)" }}>{q.validUntil ? formatDate(q.validUntil) : "—"}</td>
+                  <td style={{ padding: "10px 12px", color: "var(--fg-soft)" }}>{q.validUntil ? formatDate(q.validUntil) : "-"}</td>
                   <td style={{ padding: "10px 12px", color: "var(--fg-faint)" }}>{formatRelativeTime(q.createdAt)}</td>
                 </tr>
               ))}

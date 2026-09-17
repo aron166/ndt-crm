@@ -20,16 +20,16 @@ interface Props {
 }
 
 const PIPELINE_OPTIONS = [
-  { value: "", label: "—" },
-  { value: "0", label: "0 – KUKA" },
-  { value: "1", label: "1 – Nem hívtuk" },
-  { value: "2", label: "2 – Nem válasz" },
-  { value: "3", label: "3 – Érdekli" },
-  { value: "4", label: "4 – Nem kell" },
-  { value: "5", label: "5 – Kéri" },
-  { value: "6", label: "6 – Függőben" },
-  { value: "7", label: "7 – Elveszett" },
-  { value: "8", label: "8 – Nyert" },
+  { value: "", label: "-" },
+  { value: "0", label: "0: KUKA" },
+  { value: "1", label: "1: Nem hívtuk" },
+  { value: "2", label: "2: Nem válasz" },
+  { value: "3", label: "3: Érdekli" },
+  { value: "4", label: "4: Nem kell" },
+  { value: "5", label: "5: Kéri" },
+  { value: "6", label: "6: Függőben" },
+  { value: "7", label: "7: Elveszett" },
+  { value: "8", label: "8: Nyert" },
 ];
 
 export function EditCompanyModal({ open, onClose, company }: Props) {
@@ -85,7 +85,7 @@ export function EditCompanyModal({ open, onClose, company }: Props) {
             </FormField>
             <FormField label="Partner kategória">
               <select name="accountType" className="input-ds" defaultValue={company.accountType ?? ""}>
-                <option value="">—</option>
+                <option value="">-</option>
                 <option value="Prospect">Prospect</option>
                 <option value="Customer">Ügyfél</option>
                 <option value="Vendor">Szállító</option>

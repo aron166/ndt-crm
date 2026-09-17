@@ -58,7 +58,7 @@ export function LeadQualificationPanel({
 
   return (
     <div className="panel">
-      <div className="panel-head"><div className="panel-title">Setter — minősítő kérdések</div></div>
+      <div className="panel-head"><div className="panel-title">Setter: minősítő kérdések</div></div>
       <div className="panel-pad space-y-3">
         {questions.map((q) => (
           <div key={q.slug}>

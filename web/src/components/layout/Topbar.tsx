@@ -107,7 +107,7 @@ export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen
   // the click path below still latches on its own rather than relying on prep.
   // Mount both modals in a post-hydration effect. This is the half of the fix
   // that matters. `next/dynamic` alone keeps them off the critical hydration
-  // path (the whole INP win: 312 -> 96ms on the worst cold row), but it also
+  // path (the whole INP win: 312 → 96ms on the worst cold row), but it also
   // made the FIRST open wait on the network — measured at 546-624ms on fast-3G,
   // i.e. a button that looks dead. Effects run after the hydration commit, so
   // mounting here costs the hydration window nothing while starting the chunk

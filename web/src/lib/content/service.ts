@@ -2,6 +2,8 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { applyEvent, isClaimStale, type ItemState } from "./transitions";
 import { getContentReviewers } from "./reviewers";
+import { isReviewReason, reasonRequiredFor, type ReviewReason } from "./reasons";
+import { runContentRules, type RuleViolation } from "./rules";
 import {
   CLAIM_TTL_MS, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX,
   isContentStatus, type ContentCategory, type ContentStatus, type Verdict,
@@ -283,6 +285,7 @@ export async function submitReview(
   versionId: number,
   verdict: Verdict,
   rawComment?: string | null,
+  reason?: string | null,
 ): Promise<{ ok: true; status: ContentStatus; wentLive: boolean } | Fail> {
   const reviewers = await getContentReviewers(actor.tenantId);
   if (!reviewers.includes(actor.userId)) return fail(403, "Nem vagy bíráló ennél a cégnél");
@@ -291,6 +294,12 @@ export async function submitReview(
     return fail(400, "Írd le, mit kell változtatni (legalább 3 karakter)");
   }
   if (comment && comment.length > REVIEW_COMMENT_MAX) return fail(400, "A megjegyzés túl hosszú");
+  // A send-back needs a reason TAG as well as the prose (Áron, 2026-09-17).
+  let reasonTag: ReviewReason | null = null;
+  if (reasonRequiredFor(verdict)) {
+    if (!isReviewReason(reason)) return fail(400, "Válaszd ki, miért küldöd vissza");
+    reasonTag = reason;
+  }
 
   return db.$transaction(async (tx) => {
     const version = await tx.contentVersion.findFirst({
@@ -300,7 +309,7 @@ export async function submitReview(
     const row = await lockItem(tx, actor.tenantId, version.itemId);
     if (!row) return fail(404, "Nem található");
     if (row.currentVersionId !== version.id) {
-      return fail(409, "Ez már nem az aktuális verzió — frissítsd az oldalt");
+      return fail(409, "Ez már nem az aktuális verzió: frissítsd az oldalt");
     }
     // Reject BEFORE writing anything: a returned fail() commits the transaction,
     // so a review saved first would persist without its audit row (Vanda, #99).
@@ -316,16 +325,16 @@ export async function submitReview(
       state = released.state;
     }
     if (state.status === "archived") return fail(409, "Archivált anyag nem bírálható");
-    if (state.status === "ai_working") return fail(409, "Az AI éppen átírja ezt az anyagot — várj, vagy szerkeszd te");
+    if (state.status === "ai_working") return fail(409, "Az AI éppen átírja ezt az anyagot: várj, vagy szerkeszd te");
 
     const before = await tx.contentReview.findUnique({
       where: { versionId_reviewerUserId: { versionId, reviewerUserId: actor.userId } },
-      select: { verdict: true, comment: true },
+      select: { verdict: true, comment: true, reason: true },
     });
     const review = await tx.contentReview.upsert({
       where: { versionId_reviewerUserId: { versionId, reviewerUserId: actor.userId } },
-      create: { tenantId: actor.tenantId, versionId, reviewerUserId: actor.userId, verdict, comment },
-      update: { verdict, comment },
+      create: { tenantId: actor.tenantId, versionId, reviewerUserId: actor.userId, verdict, comment, reason: reasonTag },
+      update: { verdict, comment, reason: reasonTag },
       select: { id: true },
     });
     const all = await tx.contentReview.findMany({
@@ -348,8 +357,8 @@ export async function submitReview(
       },
     });
     await writeAudit(tx, actor, "content_review", review.id, before ? "update" : "create",
-      before ? { verdict: before.verdict, comment: before.comment } : null,
-      { itemId: row.id, versionId, versionNumber: version.number, verdict, comment, itemStatus: next.state.status });
+      before ? { verdict: before.verdict, comment: before.comment, reason: before.reason } : null,
+      { itemId: row.id, versionId, versionNumber: version.number, verdict, reason: reasonTag, comment, itemStatus: next.state.status });
     if (next.wentLive) {
       await writeAudit(tx, actor, "content_item", row.id, "update",
         { status: state.status, liveVersionId: state.liveVersionId },
@@ -568,7 +577,7 @@ export async function canHardDelete(tenantId: number, itemIds: number[]): Promis
     const row = rows.find((r) => r.id === id);
     if (!row) return { itemId: id, deletable: false, reason: "Nem található" };
     if (row.wasLive || row.liveVersionId !== null) {
-      return { itemId: id, deletable: false, reason: "Volt már élő — csak archiválható" };
+      return { itemId: id, deletable: false, reason: "Volt már élő: csak archiválható" };
     }
     return { itemId: id, deletable: true };
   });
@@ -588,7 +597,7 @@ export async function deleteItemHard(
   return db.$transaction(async (tx) => {
     const row = await lockItem(tx, actor.tenantId, itemId);
     if (!row) return fail(404, "Nem található");
-    if (row.wasLive || row.liveVersionId !== null) return fail(409, "Volt már élő — csak archiválható");
+    if (row.wasLive || row.liveVersionId !== null) return fail(409, "Volt már élő: csak archiválható");
     const item = await tx.contentItem.findFirst({ where: { id: itemId, tenantId: actor.tenantId }, select: { title: true } });
     const assets = await tx.contentAsset.findMany({
       where: { tenantId: actor.tenantId, contentItemId: itemId, storagePath: { not: null } },

@@ -61,7 +61,7 @@ export async function sendTestEmail(tenantId: number): Promise<SendEmailResult> 
   return sendEmail({
     tenantId,
     to: config.fromEmail,
-    subject: "Helm CRM — teszt email",
+    subject: "Helm CRM: teszt email",
     text: "Ez egy teszt üzenet a Helm CRM-ből. Ha megkaptad, a Resend integráció működik.",
     skipLog: true,
   });

@@ -25,7 +25,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Helm CRM",
-  description: "Controllabor Kft. — Helm CRM",
+  description: "Controllabor Kft.: Helm CRM",
 };
 
 export default function RootLayout({

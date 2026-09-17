@@ -100,7 +100,7 @@ function IntegrationCard({
       const res = await sendResendTest().catch(() => ({ error: "Nem sikerült elküldeni a teszt emailt." }));
       setTestMsg(res && "error" in res && res.error
         ? { ok: false, text: res.error }
-        : { ok: true, text: "Teszt email elküldve a feladó címre — nézd meg a postafiókod." });
+        : { ok: true, text: "Teszt email elküldve a feladó címre: nézd meg a postafiókod." });
     });
   }
 
@@ -262,7 +262,7 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
     <div className="mount space-y-5">
       <div className="flex items-center gap-3" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
         <KeyRound style={{ width: 14, height: 14, color: "var(--indigo)" }} />
-        Per-app kulcsok a <code style={{ fontFamily: "var(--font-mono)", color: "var(--sky)" }}>POST /api/leads</code> végponthoz. A kulcs csak hash-elve tárolódik — a teljes érték egyszer jelenik meg, létrehozáskor.
+        Per-app kulcsok a <code style={{ fontFamily: "var(--font-mono)", color: "var(--sky)" }}>POST /api/leads</code> végponthoz. A kulcs csak hash-elve tárolódik: a teljes érték egyszer jelenik meg, létrehozáskor.
       </div>
 
       {/* Create */}
@@ -299,7 +299,7 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
           {created && (
             <div style={{ marginTop: 4, padding: "12px 14px", borderRadius: 8, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--amber)", marginBottom: 6, fontWeight: 500 }}>
-                <AlertTriangle size={13} aria-hidden="true" /> Másold ki most — ez az érték többé nem jelenik meg.
+                <AlertTriangle size={13} aria-hidden="true" /> Másold ki most: ez az érték többé nem jelenik meg.
               </div>
               <div className="flex items-center gap-2">
                 <code style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg)", wordBreak: "break-all" }}>{created.plaintext}</code>
@@ -382,11 +382,11 @@ export function SettingsClient({ tenant, connectedIntegrations, appKeys }: Setti
           <div className="panel-pad space-y-4">
             <div>
               <div className="field-label">Cégnév</div>
-              <div className="field-value">{tenant?.name ?? "—"}</div>
+              <div className="field-value">{tenant?.name ?? "-"}</div>
             </div>
             <div>
               <div className="field-label">Slug</div>
-              <div className="field-value mono">{tenant?.slug ?? "—"}</div>
+              <div className="field-value mono">{tenant?.slug ?? "-"}</div>
             </div>
             <div style={{ paddingTop: 12, borderTop: "1px solid var(--line-soft)" }}>
               <div className="field-label">Helm CRM verzió</div>
@@ -402,7 +402,7 @@ export function SettingsClient({ tenant, connectedIntegrations, appKeys }: Setti
         <div className="mount space-y-6">
           <div className="flex items-center gap-3" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
             <Zap style={{ width: 14, height: 14, color: "var(--indigo)" }} />
-            API kulcsok titkosítva tárolódnak. Integrációk bővíthetők — minden új integrációhoz csak egy <code style={{ fontFamily: "var(--font-mono)", color: "var(--sky)" }}>/lib/integrations/&lt;slug&gt;.ts</code> fájl kell.
+            API kulcsok titkosítva tárolódnak. Integrációk bővíthetők: minden új integrációhoz csak egy <code style={{ fontFamily: "var(--font-mono)", color: "var(--sky)" }}>/lib/integrations/&lt;slug&gt;.ts</code> fájl kell.
           </div>
 
           {categories.map((cat) => (

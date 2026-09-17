@@ -268,7 +268,7 @@ export function ImportWizard() {
 
       {truncated && (
         <p className="text-xs mb-3 flex items-center gap-1.5" style={{ color: "var(--amber)" }}>
-          <AlertTriangle size={14} aria-hidden="true" /> A fájl több mint 10 000 sort tartalmaz — csak az első 10 000 lesz importálva.
+          <AlertTriangle size={14} aria-hidden="true" /> A fájl több mint 10 000 sort tartalmaz: csak az első 10 000 lesz importálva.
         </p>
       )}
 
@@ -288,7 +288,7 @@ export function ImportWizard() {
                   <Select value={mapping[col] || NONE} onValueChange={(v) => v && setColumnField(col, v)}>
                     <SelectTrigger className="w-full h-8"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={NONE}>— Kihagyás —</SelectItem>
+                      <SelectItem value={NONE}>Kihagyás</SelectItem>
                       {fields.map((f) => (
                         <SelectItem key={f.key} value={f.key}>
                           {f.label}{f.required ? " *" : ""}

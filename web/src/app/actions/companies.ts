@@ -143,7 +143,7 @@ export async function geocodeCompany(companyId: number) {
   if (!addressStr.trim()) return { error: "Nincs megadott cím" };
 
   const result = await geocode(addressStr);
-  if (!result) return { error: "Geocoding sikertelen — ellenőrizd az API kulcsot és a cím adatokat" };
+  if (!result) return { error: "Geocoding sikertelen: ellenőrizd az API kulcsot és a cím adatokat" };
 
   await db.company.update({
     where: { id: companyId },

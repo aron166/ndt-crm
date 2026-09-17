@@ -3,11 +3,11 @@ import { formatDate, formatDateTime, formatHUF, fullName } from "@/lib/utils";
 
 describe("formatDate", () => {
   it("returns — for null", () => {
-    expect(formatDate(null)).toBe("—");
+    expect(formatDate(null)).toBe("-");
   });
 
   it("returns — for undefined", () => {
-    expect(formatDate(undefined)).toBe("—");
+    expect(formatDate(undefined)).toBe("-");
   });
 
   it("formats a date string in Hungarian locale", () => {
@@ -25,7 +25,7 @@ describe("formatDate", () => {
 
 describe("formatHUF", () => {
   it("returns — for null", () => {
-    expect(formatHUF(null)).toBe("—");
+    expect(formatHUF(null)).toBe("-");
   });
 
   it("formats a number as HUF (Hungarian locale uses Ft symbol)", () => {
@@ -46,6 +46,6 @@ describe("fullName", () => {
   });
 
   it("returns — when both are null", () => {
-    expect(fullName(null, null)).toBe("—");
+    expect(fullName(null, null)).toBe("-");
   });
 });

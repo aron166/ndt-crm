@@ -51,7 +51,7 @@ export const LOST_REASON_MAX = 500;
 const CALL_OUTCOME_KEYS = CALL_OUTCOMES.map((o) => o.key) as [CallOutcomeKey, ...CallOutcomeKey[]];
 
 export function callOutcomeLabel(key: string | null): string {
-  return CALL_OUTCOMES.find((o) => o.key === key)?.label ?? key ?? "—";
+  return CALL_OUTCOMES.find((o) => o.key === key)?.label ?? key ?? "-";
 }
 
 export const DEMO_STATUS: Record<"aron" | "peter", string> = {

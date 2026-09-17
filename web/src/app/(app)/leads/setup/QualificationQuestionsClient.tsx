@@ -35,7 +35,7 @@ export function QualificationQuestionsClient({
       <div className="panel-head"><div className="panel-title">Setter kérdések</div></div>
       <div className="panel-pad space-y-3">
         <p style={{ fontSize: 12, color: "var(--fg-mute)" }}>
-          Soronként egy kérdés. Formátum: azonosító|kérdés szövege — vagy csak a kérdés, akkor az
+          Soronként egy kérdés. Formátum: azonosító|kérdés szövege: vagy csak a kérdés, akkor az
           azonosító automatikus. A # sor megjegyzés. Az azonosítót ne írd át később, mert a már
           rögzített válaszok ahhoz tartoznak.
         </p>

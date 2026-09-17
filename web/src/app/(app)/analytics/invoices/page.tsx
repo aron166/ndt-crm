@@ -149,17 +149,17 @@ export default async function InvoicesDrillPage({
                       {inv.company.name}
                     </Link>
                   ) : (
-                    <span style={{ color: "var(--fg-soft)" }}>{inv.companyName ?? "—"}</span>
+                    <span style={{ color: "var(--fg-soft)" }}>{inv.companyName ?? "-"}</span>
                   )}
                 </td>
                 <td>
                   <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
-                    {inv.invoiceNumber ?? "—"}
+                    {inv.invoiceNumber ?? "-"}
                   </span>
                 </td>
                 <td style={{ textAlign: "right" }}>
                   <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--mint)", fontWeight: 500 }}>
-                    {inv.netAmount ? formatHUF(Number(inv.netAmount)) : "—"}
+                    {inv.netAmount ? formatHUF(Number(inv.netAmount)) : "-"}
                   </span>
                 </td>
                 <td style={{ textAlign: "right" }}>

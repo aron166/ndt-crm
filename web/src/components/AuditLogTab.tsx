@@ -23,7 +23,7 @@ function ChangeRow({ field, before, after }: { field: string; before: unknown; a
   const label = FIELD_LABELS[field] ?? field;
   const fmt = (v: unknown) =>
     v === null || v === undefined
-      ? <span className="italic" style={{ color: "var(--fg-faint)" }}>—</span>
+      ? <span className="italic" style={{ color: "var(--fg-faint)" }}>-</span>
       : <span style={{ fontWeight: 500 }}>{String(v)}</span>;
   return (
     <div className="flex items-start gap-2 text-xs" style={{ color: "var(--fg-soft)" }}>

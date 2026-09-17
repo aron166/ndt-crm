@@ -65,7 +65,7 @@ export function DeleteCardDialog({ open, kind, label, company, person, onConfirm
 
           <p style={{ margin: 0, fontSize: 12, color: "var(--fg-faint)" }}>
             Az interakciók megmaradnak (csak hozzáfűzhető napló).
-            {delCompany && " A cég minden más kapcsolatából is eltűnik — később visszaállítható."}
+            {delCompany && " A cég minden más kapcsolatából is eltűnik: később visszaállítható."}
           </p>
 
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

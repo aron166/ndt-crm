@@ -90,7 +90,7 @@ export const UI = {
   columnLive: "Élő",
   columnInCampaign: "Kampányban",
   emptyColumn: "Nincs ilyen anyag.",
-  dragNotAllowed: "Ide nem lehet áthúzni — élesbe csak két jóváhagyás visz.",
+  dragNotAllowed: "Ide nem lehet áthúzni: élesbe csak két jóváhagyás visz.",
   selectAll: "Mind kijelölése",
   selectedCount: (n: number) => `${n} kijelölve`,
   clearSelection: "Kijelölés törlése",

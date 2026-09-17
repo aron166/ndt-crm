@@ -296,7 +296,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   const settings = await getOutreachSettings();
   const footer = settings.footer?.trim();
   if (!footer) {
-    return { ok: false, error: "Hiányzik a leiratkozási lábléc — töltsd ki a beállításokban" };
+    return { ok: false, error: "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban" };
   }
 
   // Recipient resolution: explicit toEmail, else the linked person, else the
@@ -352,10 +352,10 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
     reportError("outreach.sendDraft", err, { draftId: id, companyId: row.companyId });
     await db.emailDraft.update({
       where: { id },
-      data: { lastError: "Ismeretlen hiba küldés közben — ellenőrizd a Resend naplót" },
+      data: { lastError: "Ismeretlen hiba küldés közben: ellenőrizd a Resend naplót" },
     });
     revalidatePath("/outreach");
-    return { ok: false, error: "Ismeretlen hiba küldés közben — ellenőrizd a Resend naplót" };
+    return { ok: false, error: "Ismeretlen hiba küldés közben: ellenőrizd a Resend naplót" };
   }
 
   if (result.ok) {
@@ -382,10 +382,10 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
       reportError("outreach.sendDraft.record", err, { draftId: id, companyId: row.companyId });
       await db.emailDraft.update({
         where: { id },
-        data: { lastError: `Elküldve (${result.id}), de a rögzítés nem sikerült — ellenőrizd` },
+        data: { lastError: `Elküldve (${result.id}), de a rögzítés nem sikerült: ellenőrizd` },
       }).catch(() => {});
       revalidatePath("/outreach");
-      return { ok: false, error: "Elküldve, de a rögzítés nem sikerült — ellenőrizd a Resend naplót" };
+      return { ok: false, error: "Elküldve, de a rögzítés nem sikerült: ellenőrizd a Resend naplót" };
     }
     await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sent", providerMessageId: result.id });
     revalidatePath("/outreach");

@@ -56,8 +56,8 @@ describe("buildDigest", () => {
       ],
     })!;
     // Over the stale threshold the row says so in words, not with a glyph.
-    expect(d.text).toMatch(/Régi \(E-mail\) — Régóta várakozik — 4 napja — .*\/marketing\/1/);
-    expect(d.text).toMatch(/Friss \(E-mail\) — 3 napja vár — .*\/marketing\/2/);
+    expect(d.text).toMatch(/Régi \(E-mail\): Régóta várakozik: 4 napja: .*\/marketing\/1/);
+    expect(d.text).toMatch(/Friss \(E-mail\): 3 napja vár: .*\/marketing\/2/);
     expect(d.text).not.toMatch(/⚠/);
   });
 

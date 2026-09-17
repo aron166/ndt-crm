@@ -69,7 +69,7 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
                 <input style={inputStyle} value={r.unit} onChange={(e) => set(r.code, "unit", e.target.value)} placeholder={costCodeUnitHint(r.code)} />
               </td>
               <td style={{ padding: "8px 10px", width: 160 }}>
-                <input type="number" inputMode="decimal" step="any" min={0} style={inputStyle} value={r.unitRate} onChange={(e) => set(r.code, "unitRate", e.target.value)} placeholder="—" />
+                <input type="number" inputMode="decimal" step="any" min={0} style={inputStyle} value={r.unitRate} onChange={(e) => set(r.code, "unitRate", e.target.value)} placeholder="-" />
               </td>
             </tr>
           ))}

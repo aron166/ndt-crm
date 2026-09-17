@@ -61,7 +61,7 @@ export function extractWarnings(markdown: string): ExtractedWarning[] {
     for (let m = 0; m < markers.length; m++) {
       const start = markers[m].index! + markers[m][0].length;
       const end = m + 1 < markers.length ? markers[m + 1].index! : line.length;
-      let parts = [line.slice(start, end)];
+      const parts = [line.slice(start, end)];
 
       // Only the LAST marker on the line may pull in continuation lines.
       if (m === markers.length - 1) {

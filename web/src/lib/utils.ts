@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: Date | string | null | undefined): string {
-  if (!date) return "—";
+  if (!date) return "-";
   return new Date(date).toLocaleDateString("hu-HU", {
     year: "numeric",
     month: "2-digit",
@@ -15,7 +15,7 @@ export function formatDate(date: Date | string | null | undefined): string {
 }
 
 export function formatDateTime(date: Date | string | null | undefined): string {
-  if (!date) return "—";
+  if (!date) return "-";
   return new Date(date).toLocaleString("hu-HU", {
     year: "numeric",
     month: "2-digit",
@@ -26,7 +26,7 @@ export function formatDateTime(date: Date | string | null | undefined): string {
 }
 
 export function formatHUF(amount: number | null | undefined): string {
-  if (amount == null) return "—";
+  if (amount == null) return "-";
   return new Intl.NumberFormat("hu-HU", {
     style: "currency",
     currency: "HUF",
@@ -38,11 +38,11 @@ export function fullName(
   firstName: string | null,
   lastName: string | null
 ): string {
-  return [firstName, lastName].filter(Boolean).join(" ") || "—";
+  return [firstName, lastName].filter(Boolean).join(" ") || "-";
 }
 
 export function formatRelativeTime(date: Date | string | null | undefined): string {
-  if (!date) return "—";
+  if (!date) return "-";
   const diffMs = Date.now() - new Date(date).getTime();
   const days = Math.floor(diffMs / 86400000);
   if (days <= 0)  return "ma";

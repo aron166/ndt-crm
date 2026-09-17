@@ -186,7 +186,7 @@ export function QuoteBuilderClient({
           <div>
             <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Címzett (kapcsolattartó)</label>
             <select style={{ ...inputStyle, marginTop: 4 }} value={personId ?? ""} onChange={(e) => setPersonId(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">—</option>
+              <option value="">-</option>
               {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -217,7 +217,7 @@ export function QuoteBuilderClient({
               <tr key={idx} style={{ borderTop: "1px solid var(--line-soft)" }}>
                 <td style={{ padding: "6px 6px", width: 110 }}>
                   <select style={inputStyle} value={l.costCode} onChange={(e) => setCostCode(idx, e.target.value)}>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {COST_CODES.map((c) => <option key={c.value} value={c.value}>{c.value}</option>)}
                   </select>
                 </td>
@@ -244,7 +244,7 @@ export function QuoteBuilderClient({
               </tr>
             ))}
             {lines.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: "16px 6px", textAlign: "center", color: "var(--fg-faint)" }}>Nincs tétel — adj hozzá sort.</td></tr>
+              <tr><td colSpan={7} style={{ padding: "16px 6px", textAlign: "center", color: "var(--fg-faint)" }}>Nincs tétel: adj hozzá sort.</td></tr>
             )}
           </tbody>
         </table>

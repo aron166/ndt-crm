@@ -185,7 +185,7 @@ export default async function TaskDetailPage({
       <div className="mt-4">
         <details className="group">
           <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-600 list-none flex items-center gap-1">
-            <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+            <span className="group-open:rotate-90 transition-transform inline-block">{">"}</span>
             Előzmények
           </summary>
           <div className="mt-3">

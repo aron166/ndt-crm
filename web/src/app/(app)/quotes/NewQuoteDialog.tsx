@@ -75,7 +75,7 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
         <DialogHeader>
           <DialogTitle>Új árajánlat</DialogTitle>
           <DialogDescription>
-            {presetCompany ? presetCompany.name : "Válaszd ki a céget"} — a tételeket a következő lépésben adod meg.
+            {presetCompany ? presetCompany.name : "Válaszd ki a céget"}: a tételeket a következő lépésben adod meg.
           </DialogDescription>
         </DialogHeader>
 

@@ -166,7 +166,7 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
                           required={f.required}
                           style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none" }}
                         >
-                          <option value="">—</option>
+                          <option value="">-</option>
                           {opts.map((o) => <option key={o} value={o}>{o}</option>)}
                         </select>
                       )}

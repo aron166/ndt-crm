@@ -60,7 +60,7 @@ function ProposalCard({ proposal, onApplied }: { proposal: Proposal; onApplied: 
     return (
       <div style={{ padding: "12px 16px", background: "var(--bg-raised)", borderRadius: 6, display: "flex", alignItems: "center", gap: 8 }}>
         <Check size={14} aria-hidden="true" style={{ color: "var(--mint)" }} />
-        <span style={{ fontSize: 14, color: "var(--fg-mute)" }}>{proposal.entityName} — alkalmazva</span>
+        <span style={{ fontSize: 14, color: "var(--fg-mute)" }}>{proposal.entityName}: alkalmazva</span>
       </div>
     );
   }

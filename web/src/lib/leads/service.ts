@@ -163,12 +163,12 @@ export async function convertLeadToDeal(leadId: number, ctx: LeadCtx): Promise<R
     orderBy: { position: "asc" },
     include: { stages: { orderBy: { position: "asc" }, take: 1 } },
   });
-  if (!pipeline) return { error: "Nincs pipeline — hozz létre egyet előbb" };
+  if (!pipeline) return { error: "Nincs pipeline: hozz létre egyet előbb" };
   const firstStage = pipeline.stages[0];
-  if (!firstStage) return { error: "A pipeline-nak nincs egyetlen szakasza sem — előbb hozz létre egyet" };
+  if (!firstStage) return { error: "A pipeline-nak nincs egyetlen szakasza sem: előbb hozz létre egyet" };
 
   const companyId = lead.companyId;
-  const title = lead.serviceInterest?.trim() || `${lead.company.name} — érdeklődés`;
+  const title = lead.serviceInterest?.trim() || `${lead.company.name}: érdeklődés`;
   let dealId: number;
   try {
     dealId = await db.$transaction(async (tx) => {
@@ -352,7 +352,7 @@ export async function logLeadCallOutcome(
   const lead = await loadLead(leadId, ctx.tenantId);
   if (!lead) return { error: "Lead nem található" };
   if (lead.outcome !== "open" || lead.convertedDealId) {
-    return { error: "A lead már lezárt — előbb nyisd újra" };
+    return { error: "A lead már lezárt: előbb nyisd újra" };
   }
   if (input.assignedToId != null) {
     const user = await db.user.findFirst({ where: { id: input.assignedToId, tenantId: ctx.tenantId }, select: { id: true } });

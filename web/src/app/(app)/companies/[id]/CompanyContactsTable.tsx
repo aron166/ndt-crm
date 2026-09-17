@@ -91,9 +91,9 @@ export function CompanyContactsTable({ contacts, companyId, companyName }: Compa
                       {c.person.firstName} {c.person.lastName}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{c.role ?? "—"}</td>
-                  <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{c.email ?? c.person.email ?? "—"}</td>
-                  <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">{c.phone ?? c.person.phone ?? "—"}</td>
+                  <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{c.role ?? "-"}</td>
+                  <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{c.email ?? c.person.email ?? "-"}</td>
+                  <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">{c.phone ?? c.person.phone ?? "-"}</td>
                   <td className="px-4 py-3">
                     {c.endedAt ? (
                       <span className="text-xs text-slate-400">Volt ({formatDate(c.endedAt)}-ig)</span>

@@ -312,10 +312,10 @@ export default async function AnalyticsPage({
                   <td className="name">
                     {row.company_id ? (
                       <Link href={`/companies/${row.company_id}`} className="row-link">
-                        {row.company_name ?? "—"}
+                        {row.company_name ?? "-"}
                       </Link>
                     ) : (
-                      <span style={{ color: "var(--fg-soft)" }}>{row.company_name ?? "—"}</span>
+                      <span style={{ color: "var(--fg-soft)" }}>{row.company_name ?? "-"}</span>
                     )}
                   </td>
                   <td className="num" style={{ textAlign: "right", color: "var(--mint)" }}>

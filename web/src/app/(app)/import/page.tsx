@@ -1,6 +1,6 @@
 import { ImportWizard } from "./ImportWizard";
 
-export const metadata = { title: "Importálás — Helm CRM" };
+export const metadata = { title: "Importálás: Helm CRM" };
 
 export default function ImportPage() {
   return (
@@ -11,7 +11,7 @@ export default function ImportPage() {
         </h1>
         <p className="text-sm text-slate-500 mt-1">
           Cégek vagy személyek feltöltése Excel / CSV fájlból. A meglévő rekordokat
-          adószám és név alapján felismeri — nem hoz létre duplikátumot.
+          adószám és név alapján felismeri: nem hoz létre duplikátumot.
         </p>
       </div>
       <ImportWizard />

@@ -134,17 +134,17 @@ export function CallOutcomeModal({
             </select>
             {script && (script.body || script.liveMissing) && (
               <div style={{ marginTop: 8, fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 220, overflowY: "auto" }}>
-                {script.liveMissing ? "Nincs élő változat — a szkript még jóváhagyásra vár." : script.body}
+                {script.liveMissing ? "Nincs élő változat: a szkript még jóváhagyásra vár." : script.body}
               </div>
             )}
           </FormField>
         )}
         {savedConflicts ? (
           <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
-            <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve — de ütközik a naptárban:</p>
+            <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve: de ütközik a naptárban:</p>
             {savedConflicts.map((c) => (
               <p key={c.taskId} style={{ margin: 0 }}>
-                {c.title} ({new Date(c.startsAt).toLocaleString("hu-HU")}) —{" "}
+                {c.title} ({new Date(c.startsAt).toLocaleString("hu-HU")}):{" "}
                 {c.movable === "existing"
                   ? "a meglévő foglalás az alacsonyabb prioritású, azt lehet áthelyezni."
                   : "ez az új foglalás az alacsonyabb prioritású, ezt lehet áthelyezni."}
@@ -210,7 +210,7 @@ export function CallOutcomeModal({
                           key={i} type="button" onClick={() => pickSlot(p)}
                           style={{ ...inputStyle, textAlign: "left", cursor: "pointer" }}
                         >
-                          <strong>{dateLabel} {timeLabel}</strong> — {reasonLine}{kmLine}
+                          <strong>{dateLabel} {timeLabel}</strong>: {reasonLine}{kmLine}
                         </button>
                       );
                     })}

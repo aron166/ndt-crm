@@ -329,7 +329,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
         <div className="ml-auto flex items-center gap-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
           {COLUMNS.map((col) => (
             <span key={col.key} className="flex items-center gap-1">
-              <span style={{ color: col.color }}>●</span>
+              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: col.color }} />
               {colTasks(col.key).length} {col.label.toLowerCase()}
             </span>
           ))}

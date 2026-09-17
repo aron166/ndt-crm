@@ -78,7 +78,7 @@ export async function runCompanyImport(
     const existing = matchCompany(idx, r.vatNumber, r.name);
     if (existing) {
       res.matched++;
-      pushSample(res, rowNum, "meglévő", r.name, "már létezik — kihagyva");
+      pushSample(res, rowNum, "meglévő", r.name, "már létezik: kihagyva");
       continue;
     }
 
