@@ -13,6 +13,10 @@ import {
 } from "@/lib/content/service";
 import { getContentReviewers, REQUIRED_REVIEWERS } from "@/lib/content/reviewers";
 import { CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from "@/lib/content/types";
+import {
+  ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, stagingPath, statObject,
+} from "@/lib/content/storage";
+import type { NewAssetInput } from "@/lib/content/service";
 
 // Content approval — human side (spec 2026-09-17). Every action resolves the
 // CRM user itself; review writes are additionally gated on the configured
@@ -28,9 +32,6 @@ async function userActor(): Promise<UserActor | Fail> {
 }
 
 function revalidateContent(itemId?: number) {
-  revalidatePath("/content");
-  revalidatePath("/content/live");
-  if (itemId) revalidatePath(`/content/${itemId}`);
   revalidatePath("/marketing");
   if (itemId) revalidatePath(`/marketing/${itemId}`);
 }
@@ -97,7 +98,89 @@ const versionInput = z.object({
   basedOnVersionId: z.number().int().positive(),
   body: z.string().min(1).max(CONTENT_BODY_MAX),
   changeNote: z.string().max(CHANGE_NOTE_MAX).optional(),
+  /** Files of the base version to keep (by asset id). Omitted = keep all. */
+  keepAssetIds: z.array(z.number().int().positive()).max(50).optional(),
+  /** Files uploaded via requestAssetUpload for this edit. */
+  uploads: z.array(z.object({
+    path: z.string().min(1).max(500),
+    caption: z.string().trim().max(500).optional(),
+  })).max(20).optional(),
+  /** External links (http/https) added in this edit. */
+  links: z.array(z.object({ url: z.string().url().max(2000), caption: z.string().trim().max(500).optional() })).max(20).optional(),
 });
+
+/**
+ * Step 1 of attaching a file: a signed upload URL for one exact staging path
+ * under this item. The file only becomes part of the content when a version
+ * is saved with it (saveContentVersion) — attaching IS an edit.
+ */
+export async function requestAssetUpload(input: {
+  itemId: number; fileName: string; mimeType: string; sizeBytes: number;
+}): Promise<{ ok: true; path: string; signedUrl: string; token: string } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  const parsed = z.object({
+    itemId: z.number().int().positive(),
+    fileName: z.string().min(1).max(300),
+    mimeType: z.string().max(100),
+    sizeBytes: z.number().int().positive(),
+  }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
+  const { itemId, fileName, mimeType, sizeBytes } = parsed.data;
+  if (!ALLOWED_MIME[mimeType]) return { ok: false, error: "Ez a fájltípus nem tölthető fel (kép, mp4/webm videó vagy PDF)" };
+  if (sizeBytes > MAX_ASSET_BYTES) return { ok: false, error: "A fájl legfeljebb 50 MB lehet" };
+  const item = await db.contentItem.findFirst({ where: { id: itemId, tenantId: TENANT_ID }, select: { id: true, status: true } });
+  if (!item) return { ok: false, error: "Nem található" };
+  if (item.status === "archived") return { ok: false, error: "Archivált anyaghoz nem tölthető fel fájl" };
+  // ponytail: staging objects of abandoned edits are never deleted. Add a sweep of
+  // `staging/` objects no content_assets.storage_path references (> 1 day old) when
+  // the bucket grows.
+  try {
+    const path = stagingPath(TENANT_ID, itemId, fileName);
+    const { signedUrl, token } = await createUploadUrl(path);
+    return { ok: true, path, signedUrl, token };
+  } catch (err) {
+    reportError("content.requestAssetUpload", err, { itemId });
+    return { ok: false, error: "A feltöltés most nem indítható" };
+  }
+}
+
+function isHttpUrl(u: string): boolean {
+  try { const p = new URL(u); return p.protocol === "http:" || p.protocol === "https:"; } catch { return false; }
+}
+
+async function resolveAssets(
+  itemId: number,
+  basedOnVersionId: number,
+  keepAssetIds: number[] | undefined,
+  uploads: { path: string; caption?: string }[] | undefined,
+  links: { url: string; caption?: string }[] | undefined,
+): Promise<NewAssetInput[] | undefined | Fail> {
+  if (keepAssetIds === undefined && !uploads?.length && !links?.length) return undefined; // carry forward all
+  const base = await db.contentAsset.findMany({
+    where: { tenantId: TENANT_ID, contentItemId: itemId, versionId: basedOnVersionId },
+    orderBy: { position: "asc" },
+    select: { id: true, kind: true, url: true, storagePath: true, mimeType: true, sizeBytes: true, caption: true },
+  });
+  const keep = keepAssetIds === undefined ? base : base.filter((a) => keepAssetIds.includes(a.id));
+  const out: NewAssetInput[] = keep.map(({ id: _id, ...a }) => a);
+  for (const u of uploads ?? []) {
+    if (!isPathForItem(u.path, TENANT_ID, itemId)) return { ok: false, error: "Érvénytelen fájl" };
+    // ponytail: size is the stored object's real size, but the MIME type is the
+    // Content-Type the browser sent — a renamed file keeps a wrong label. Files are
+    // served from the Supabase origin via signed URLs, so no XSS on the CRM origin.
+    const stat = await statObject(u.path);
+    if (!stat) return { ok: false, error: "A feltöltött fájl nem található — töltsd fel újra" };
+    const kind = ALLOWED_MIME[stat.mimeType];
+    if (!kind || stat.size > MAX_ASSET_BYTES) return { ok: false, error: "A feltöltött fájl típusa vagy mérete nem megengedett" };
+    out.push({ kind, url: u.path, storagePath: u.path, mimeType: stat.mimeType, sizeBytes: stat.size, caption: u.caption ?? null });
+  }
+  for (const l of links ?? []) {
+    if (!isHttpUrl(l.url)) return { ok: false, error: "Csak http/https link adható meg" };
+    out.push({ kind: "link", url: l.url, caption: l.caption ?? null });
+  }
+  return out;
+}
 
 /** ✎ Szerkesztés — always a new version; both approvals reset (spec decision 3). */
 export async function saveContentVersion(
@@ -107,10 +190,12 @@ export async function saveContentVersion(
   if ("ok" in actor) return actor;
   const parsed = versionInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
-  const { itemId, ...rest } = parsed.data;
+  const { itemId, keepAssetIds, uploads, links, ...rest } = parsed.data;
   if (!rest.body.trim()) return { ok: false, error: "A szöveg nem lehet üres" };
 
-  const res = await createVersion(actor, itemId, rest);
+  const assets = await resolveAssets(itemId, rest.basedOnVersionId, keepAssetIds, uploads, links);
+  if (assets && !Array.isArray(assets)) return assets;
+  const res = await createVersion(actor, itemId, { ...rest, assets });
   if (!res.ok) return { ok: false, error: res.error };
   revalidateContent(itemId);
   return res;

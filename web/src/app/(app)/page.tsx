@@ -2,6 +2,9 @@ import { db } from "@/lib/db";
 import Link from "next/link";
 import { formatRelativeTime, contactFreshness } from "@/lib/utils";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
+import { getActor } from "@/lib/actor";
+import { countPendingForReviewer } from "@/lib/content/queries";
+import { UI } from "@/lib/content/labels";
 
 const TENANT_ID = 1;
 
@@ -21,6 +24,9 @@ export default async function DashboardPage() {
   const todayStart = new Date(now.toDateString());
   const weekStart = new Date(todayStart.getTime() - now.getDay() * 86400000);
   const weekEnd = new Date(todayStart.getTime() + 7 * 86400000);
+
+  const { userId } = await getActor(TENANT_ID);
+  const contentPending = userId == null ? 0 : await countPendingForReviewer(TENANT_ID, userId);
 
   const [
     overdueTasks,
@@ -93,6 +99,7 @@ export default async function DashboardPage() {
     { label: "Nyitott deal",     value: statOpenDeals.toLocaleString("hu-HU"),     href: "/deals",     color: "var(--indigo)" },
     { label: "Nyitott feladat",  value: statOpenTasks.toLocaleString("hu-HU"),     href: "/tasks",     color: overdueTasks.length > 0 ? "var(--coral)" : "var(--mint)" },
     { label: "Interakció / hét", value: statInteractionsWeek.toLocaleString("hu-HU"), href: "/companies", color: "var(--amber)" },
+    { label: UI.inboxTitle,      value: contentPending.toLocaleString("hu-HU"),    href: "/marketing", color: contentPending > 0 ? "var(--coral)" : "var(--mint)", sub: UI.mine },
   ];
 
   const pipeline = pipelineStats as { stage_name: string; color: string; cnt: bigint; total_value: number }[];
@@ -126,7 +133,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stat strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
         {stats.map((s) => (
           <Link
             key={s.label}
@@ -140,6 +147,9 @@ export default async function DashboardPage() {
             <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 5, textTransform: "uppercase", letterSpacing: "0.08em" }}>
               {s.label}
             </div>
+            {"sub" in s && s.sub && (
+              <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 2 }}>{s.sub}</div>
+            )}
           </Link>
         ))}
       </div>
