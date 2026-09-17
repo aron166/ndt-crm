@@ -86,7 +86,7 @@ describe("markDraftSentManually", () => {
   it("a draft still in status 'draft' is refused, no transaction runs", async () => {
     mockDb.emailDraft.findFirst.mockResolvedValue({ ...ROW, status: "draft" });
     const res = await markDraftSentManually({ draftId: 1 });
-    expect(res).toEqual({ ok: false, error: "Előbb hagyd jóvá: vagy ez az érintés már elment" });
+    expect(res).toEqual({ ok: false, error: "Előbb hagyd jóvá, vagy ez az érintés már elment" });
     expect(mockDb.$transaction).not.toHaveBeenCalled();
   });
 
