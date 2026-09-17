@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await db.$queryRaw`SELECT 1`;
-    return NextResponse.json({ ok: true });
+    // tz: proves the instrumentation TZ pin is live on this deploy (no secret in it).
+    return NextResponse.json({ ok: true, tz: Intl.DateTimeFormat().resolvedOptions().timeZone });
   } catch (err) {
     console.error("[/api/health] db check failed:", err);
     return NextResponse.json({ ok: false }, { status: 503 });

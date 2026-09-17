@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { callOutcomeSchema, planCallOutcome, callbackTone, daysSince } from "./outcomes";
+import { callOutcomeSchema, planCallOutcome, callbackTone, daysSince, bookingIssue } from "./outcomes";
 import { DEFAULT_LEAD_STATUSES } from "./statuses";
 
 const KEYS = DEFAULT_LEAD_STATUSES.map((s) => s.key);
@@ -15,9 +15,13 @@ describe("callOutcomeSchema — the shared rules", () => {
     expect(parse({ outcome: "callback_requested", note: "hívj", callbackAt: "not-a-date" }).success).toBe(false);
     expect(parse({ outcome: "callback_requested", note: "hívj", callbackAt: "2026-09-10T10:00:00Z" }).success).toBe(true);
   });
-  it("meeting_booked needs demoWith, bookingAt and bookingKind", () => {
+  it("meeting_booked needs demoWith; booking fields are optional but come as a pair", () => {
     expect(parse({ outcome: "meeting_booked", note: "ok" }).success).toBe(false);
-    expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter" }).success).toBe(false);
+    // The pre-2026-09-12 API payload still parses (Kai ruling 2026-09-17).
+    expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter" }).success).toBe(true);
+    expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter", bookingAt: "2026-09-10T10:00:00Z" }).success).toBe(false);
+    expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter", bookingKind: "job" }).success).toBe(false);
+    expect(parse({ outcome: "no_answer", note: "ok", bookingAt: "2026-09-10T10:00:00Z", bookingKind: "job" }).success).toBe(false);
     expect(parse({
       outcome: "meeting_booked", note: "ok", demoWith: "peter",
       bookingAt: "2026-09-10T10:00:00Z", bookingKind: "single_machine_demo",
@@ -34,6 +38,26 @@ describe("callOutcomeSchema — the shared rules", () => {
   });
   it("rejects unknown outcomes", () => {
     expect(parse({ outcome: "interested", note: "x" }).success).toBe(false);
+  });
+});
+
+describe("bookingIssue — who must book a date", () => {
+  const now = new Date("2026-09-17T10:00:00Z");
+  const future = new Date("2026-09-18T08:00:00Z");
+  it("a UI user must give a date for meeting_booked", () => {
+    expect(bookingIssue({ outcome: "meeting_booked" }, "user", now)?.path).toBe("bookingAt");
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: future }, "user", now)).toBeNull();
+  });
+  it("an API caller keeps the old contract — no date is fine", () => {
+    expect(bookingIssue({ outcome: "meeting_booked" }, "agent", now)).toBeNull();
+  });
+  it("nobody may book into the past", () => {
+    const past = new Date("2026-09-17T09:59:00Z");
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: past }, "user", now)).not.toBeNull();
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: past }, "agent", now)).not.toBeNull();
+  });
+  it("ignores other outcomes", () => {
+    expect(bookingIssue({ outcome: "no_answer" }, "user", now)).toBeNull();
   });
 });
 

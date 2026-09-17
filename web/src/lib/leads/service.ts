@@ -7,11 +7,12 @@ import { getLeadStatuses, getQualificationQuestions, getScriptVariants } from ".
 import { leadStatusLabel } from "./statuses";
 import {
   callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
-  RECALL_STATUS, type LeadOutcome,
+  RECALL_STATUS, bookingIssue, type LeadOutcome,
 } from "./outcomes";
 import { parseAnswers, answersFrom } from "./qualification";
 import { computeTier } from "./tier";
-import { DEFAULT_BOOKING_MINUTES } from "@/lib/booking/conflicts";
+import { DEFAULT_BOOKING_MINUTES, conflictsFor } from "@/lib/booking/conflicts";
+import { loadBookings, resolveDemoHost } from "@/lib/booking/queries";
 
 // The ONE write path for lead process changes — used by the server actions (UI)
 // and the public /api/leads routes alike, so the rules can't drift between the
@@ -308,6 +309,20 @@ export interface LogCallResult {
   outcome: LeadOutcome;
   taskId: number | null;
   bookingTaskId: number | null;
+  /**
+   * Collisions the new booking makes in its host's calendar. FLAGGED only —
+   * the booking is written either way; a human decides what moves (Péter's rule).
+   * `movable` names the lower-priority side.
+   */
+  bookingConflicts: BookingConflictInfo[];
+}
+
+export interface BookingConflictInfo {
+  taskId: number;
+  title: string;
+  startsAt: string;
+  overlapMinutes: number;
+  movable: "new" | "existing";
 }
 
 /**
@@ -329,6 +344,9 @@ export async function logLeadCallOutcome(
     return { error: first ?? "Érvénytelen adat", issues: flat.fieldErrors };
   }
   const input = parsed.data;
+  const now = new Date();
+  const bIssue = bookingIssue(input, ctx.actor, now);
+  if (bIssue) return { error: bIssue.message, issues: { [bIssue.path]: [bIssue.message] } };
 
   const lead = await loadLead(leadId, ctx.tenantId);
   if (!lead) return { error: "Lead nem található" };
@@ -350,10 +368,18 @@ export async function logLeadCallOutcome(
     }
   }
 
+  // The demo lands on the HOST's calendar (finding 3), not the logger's.
+  let bookingHostId: number | null = null;
+  if (input.bookingAt) {
+    bookingHostId = await resolveDemoHost(ctx.tenantId, input.demoWith ?? "aron");
+    if (bookingHostId == null) {
+      return { error: "Nincs beállítva, ki tartja a demót (tenants.settings.demoHosts)" };
+    }
+  }
+
   const statuses = await getLeadStatuses(ctx.tenantId);
   const plan = planCallOutcome(input, lead.status, statuses.map((s) => s.key));
   const personId = lead.contact?.personId ?? null;
-  const now = new Date();
   const p = lead.contact?.person;
   const who = p ? `${p.lastName} ${p.firstName}`.trim() : lead.company?.name ?? `Lead #${leadId}`;
 
@@ -385,7 +411,7 @@ export async function logLeadCallOutcome(
       ? await tx.task.create({
           data: {
             tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId,
-            assignedToId: input.assignedToId ?? ctx.userId,
+            assignedToId: bookingHostId,
             title: `Demó: ${who}`, type: "meeting", category: "revenue_generating",
             status: "created", startsAt: plan.bookingAt, dueDate: plan.bookingAt,
             bookingKind: plan.bookingKind, estimatedMinutes: DEFAULT_BOOKING_MINUTES,
@@ -406,6 +432,31 @@ export async function logLeadCallOutcome(
     return { interaction, task, bookingTask };
   });
   await recomputeCloseness({ tenantId: ctx.tenantId, companyId: lead.companyId, personId });
+
+  // Conflict check on the WRITE (finding 5): a hand-typed date is the case that
+  // actually happens. After the commit, flag-only — never blocks, never cancels.
+  let bookingConflicts: BookingConflictInfo[] = [];
+  if (bookingTask && plan.bookingAt && bookingHostId != null) {
+    const day = 86_400_000;
+    const others = await loadBookings(ctx.tenantId, bookingHostId,
+      new Date(plan.bookingAt.getTime() - day), new Date(plan.bookingAt.getTime() + day), bookingTask.id);
+    const candidate = {
+      id: bookingTask.id, startsAt: plan.bookingAt, minutes: DEFAULT_BOOKING_MINUTES, assignedToId: bookingHostId,
+      kind: plan.bookingKind, dealValue: null,
+      estimatedValue: lead.estimatedValue != null ? Number(lead.estimatedValue) : null,
+    };
+    const titles = new Map(others.map((o) => [o.id, o.title]));
+    bookingConflicts = conflictsFor(candidate, others).map((c) => {
+      const other = c.keep.id === candidate.id ? c.bump : c.keep;
+      return {
+        taskId: other.id,
+        title: titles.get(other.id) ?? `Foglalás #${other.id}`,
+        startsAt: other.startsAt.toISOString(),
+        overlapMinutes: c.overlapMinutes,
+        movable: c.bump.id === candidate.id ? "new" : "existing",
+      };
+    });
+  }
 
   audit("interaction", interaction.id, "create", null,
     { type: "call", outcome: input.outcome, leadId, companyId: lead.companyId, personId }, auditOpts(ctx));
@@ -439,5 +490,6 @@ export async function logLeadCallOutcome(
     outcome: plan.lost ? "lost" : "open",
     taskId: task?.id ?? null,
     bookingTaskId: bookingTask?.id ?? null,
+    bookingConflicts,
   };
 }

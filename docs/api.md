@@ -287,29 +287,39 @@ curl -X POST $CRM/api/leads/12/interactions \
 # → 201 { "ok": true, "interactionId": 91, "status": "recall", "outcome": "open", "taskId": 40 }
 ```
 
-#### ⚠️ BREAKING (2026-09-12): `meeting_booked` now needs a date
+#### Booking a demo (2026-09-17) — optional for API callers, NOT a breaking change
 
-Until now a booked demo recorded **no date anywhere** — the lead moved to
-`demo_aron`/`demo_peter` and nothing was scheduled. It now creates a real
-booking (a `meeting` task with `starts_at`), so `outcome: "meeting_booked"`
-requires two more fields and a payload without them is a `400`:
+`outcome: "meeting_booked"` can now also schedule the demo. **For app-key
+callers the two fields are optional**: a payload without them behaves exactly
+as before (lead moves to `demo_aron`/`demo_peter`, no booking task). The CRM's
+own UI (call modal, `/drive`) always sends them — only human users are required
+to give a date.
 
 | field | notes |
 |---|---|
-| `booking_at` | ISO datetime — when the visit starts |
+| `booking_at` | ISO datetime — when the visit starts. Must not be in the past. |
 | `booking_kind` | `multi_unit_demo` \| `single_machine_demo` \| `job` \| `private` — the rung of the booking priority ladder (multi-unit demo > single machine > 1M+ job > 300k+ job > private). The money rungs are derived from the deal value or the lead estimate; the demo rungs cannot be, hence this field |
+
+Rules: the two fields come **as a pair** (one without the other is a `400`),
+and only with `outcome: "meeting_booked"`. The booking task is assigned to the
+demo host named by `demo_with` (tenant config `settings.demoHosts`), not to the
+caller.
 
 ```bash
 curl -X POST $CRM/api/leads/12/interactions \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{ "outcome": "meeting_booked", "note": "Kedden 10-kor demó", "demo_with": "peter",
         "booking_at": "2026-09-22T08:00:00Z", "booking_kind": "single_machine_demo" }'
-# → 201 { "ok": true, "interactionId": 92, "status": "demo_peter", "bookingTaskId": 41 }
+# → 201 { "ok": true, "interactionId": 92, "status": "demo_peter", "taskId": null,
+#         "bookingTaskId": 41, "bookingConflicts": [] }
 ```
 
-The response gains `bookingTaskId` (the scheduled task). Overlapping bookings
-for one person are **flagged**, never auto-cancelled: the CRM tells a human
-which of the two is the lower-priority one and lets them move it.
+The response always carries `bookingTaskId` (null when nothing was booked) and
+`bookingConflicts`: other bookings of the same host that collide with this one
+(overlap, or less than 30 min travel gap). They are **flagged, never
+auto-cancelled** — each entry is `{ taskId, title, startsAt, overlapMinutes,
+movable }`, where `movable` is `"new"` or `"existing"`: the lower-priority side a
+human may move. The booking is written either way.
 
 `script_variant` (optional) records which call-script A/B variant was used. It
 must be one of the tenant's keys (`tenants.settings.scriptVariants`, edited at
@@ -323,7 +333,7 @@ interaction row, so re-wording or deleting a script never rewrites history.
 | `wrong_number` | logged only |
 | `not_interested`, `disqualified` | **requires `lost_reason`**; lead `outcome = lost`, `lost_reason` = that free text (the outcome key stays on the interaction row); leaves the board |
 | `callback_requested` | creates a `call` task due at `callback_at` (assigned to `assigned_to_id`), moves to `recall` |
-| `meeting_booked` | moves to `demo_aron` / `demo_peter` per `demo_with` (`aron|peter`), **and now also requires `booking_at` + `booking_kind`** — see below |
+| `meeting_booked` | moves to `demo_aron` / `demo_peter` per `demo_with` (`aron|peter`); optional `booking_at` + `booking_kind` schedule the demo — see below |
 
 Any earlier open callback task for the lead is marked done (the call happened).
 A closed lead (`won`/`lost`) rejects with `400` — re-open it first via PATCH.
