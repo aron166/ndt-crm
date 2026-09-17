@@ -1,0 +1,279 @@
+// @vitest-environment node
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import type { ContentActor } from "./service";
+
+/**
+ * Integration tests against a real local Postgres (the throwaway fixture DB,
+ * never `web/.env`'s production database). Skipped unless
+ * CONTENT_IT_DATABASE_URL is set and obviously local — see the guard below.
+ *
+ * Run: CONTENT_IT_DATABASE_URL=postgresql://postgres:fixture@127.0.0.1:5439/ndtcrm \
+ *   npx vitest run src/lib/content/service.integration.test.ts
+ */
+const CONNECTION = process.env.CONTENT_IT_DATABASE_URL;
+const enabled = Boolean(CONNECTION && (CONNECTION.includes("127.0.0.1") || CONNECTION.includes("localhost")));
+
+describe.skipIf(!enabled)("content service (integration)", () => {
+  let db: typeof import("@/lib/db")["db"];
+  let service: typeof import("./service");
+
+  let userA: number; // reviewer
+  let userB: number; // reviewer
+  let userC: number; // not a reviewer
+  const createdItemIds: number[] = [];
+  let prevSettings: unknown = null;
+
+  const appActor: ContentActor = { tenantId: 1, kind: "app", appSlug: "it" };
+  const actorA = () => ({ tenantId: 1, kind: "user" as const, userId: userA });
+  const actorB = () => ({ tenantId: 1, kind: "user" as const, userId: userB });
+
+  let seq = 0;
+  const title = () => `IT-${Date.now()}-${(seq += 1)}`;
+
+  async function newItem(body = "body") {
+    const r = await service.createItem(appActor, {
+      title: title(), body, category: "other", channel: "other", contentType: "other", source: "it",
+    });
+    if (!r.ok) throw new Error(`setup: createItem failed: ${r.error}`);
+    createdItemIds.push(r.itemId);
+    return r;
+  }
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL = CONNECTION;
+    ({ db } = await import("@/lib/db"));
+    service = await import("./service");
+
+    // Clean up any leftovers from a previously-aborted run before creating fresh rows.
+    await db.user.deleteMany({ where: { email: { in: ["it-aron@example.test", "it-peter@example.test", "it-nonreviewer@example.test"] } } });
+
+    const a = await db.user.create({ data: { tenantId: 1, name: "IT Aron", email: "it-aron@example.test", passwordHash: "x" } });
+    const b = await db.user.create({ data: { tenantId: 1, name: "IT Peter", email: "it-peter@example.test", passwordHash: "x" } });
+    const c = await db.user.create({ data: { tenantId: 1, name: "IT Nonreviewer", email: "it-nonreviewer@example.test", passwordHash: "x" } });
+    userA = a.id; userB = b.id; userC = c.id;
+
+    const tenant = await db.tenant.findUniqueOrThrow({ where: { id: 1 }, select: { settings: true } });
+    prevSettings = tenant.settings;
+    const merged = { ...(tenant.settings as Record<string, unknown> | null), contentReviewers: [userA, userB] };
+    await db.tenant.update({ where: { id: 1 }, data: { settings: merged } });
+  });
+
+  afterAll(async () => {
+    if (!db) return;
+    if (createdItemIds.length) {
+      // Cascades to content_versions then content_reviews (real DB FK ON DELETE CASCADE).
+      await db.contentItem.deleteMany({ where: { id: { in: createdItemIds } } });
+    }
+    await db.user.deleteMany({ where: { id: { in: [userA, userB, userC].filter((x) => x != null) } } });
+    await db.tenant.update({ where: { id: 1 }, data: { settings: prevSettings as never } });
+    await db.$disconnect();
+  });
+
+  it("creates an item in_review with an audit trail, idempotent on externalRef", async () => {
+    const ref = `IT-ref-${Date.now()}`;
+    const r1 = await service.createItem(appActor, {
+      title: title(), body: "hello", category: "other", channel: "other", contentType: "other", source: "it", externalRef: ref,
+    });
+    expect(r1.ok).toBe(true);
+    if (!r1.ok) return;
+    createdItemIds.push(r1.itemId);
+
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r1.itemId } });
+    expect(item.status).toBe("in_review");
+    expect(item.currentVersionId).toBe(r1.versionId);
+
+    const version = await db.contentVersion.findUniqueOrThrow({ where: { id: r1.versionId! } });
+    expect(version.number).toBe(1);
+
+    const itemAudits = await db.auditLog.findMany({ where: { entityType: "content_item", entityId: r1.itemId } });
+    expect(itemAudits.length).toBeGreaterThan(0);
+    const versionAudits = await db.auditLog.findMany({ where: { entityType: "content_version", entityId: r1.versionId! } });
+    expect(versionAudits.length).toBeGreaterThan(0);
+
+    const r2 = await service.createItem(appActor, {
+      title: title(), body: "hello again", category: "other", channel: "other", contentType: "other", source: "it", externalRef: ref,
+    });
+    expect(r2).toMatchObject({ ok: true, existed: true, itemId: r1.itemId });
+    const count = await db.contentItem.count({ where: { tenantId: 1, externalRef: ref } });
+    expect(count).toBe(1);
+  });
+
+  it("review flow: non-reviewer 403, changes needs a comment, dual approve goes live", async () => {
+    const r = await newItem();
+    const versionId = r.versionId!;
+    const nonReviewer = { tenantId: 1, kind: "user" as const, userId: userC };
+
+    const forbidden = await service.submitReview(nonReviewer, versionId, "approve");
+    expect(forbidden).toMatchObject({ ok: false, status: 403 });
+
+    const noComment = await service.submitReview(actorA(), versionId, "changes");
+    expect(noComment).toMatchObject({ ok: false, status: 400 });
+
+    const first = await service.submitReview(actorA(), versionId, "approve");
+    expect(first).toMatchObject({ ok: true, status: "in_review", wentLive: false });
+
+    const second = await service.submitReview(actorB(), versionId, "approve");
+    expect(second).toMatchObject({ ok: true, status: "live", wentLive: true });
+
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } });
+    expect(item.liveVersionId).toBe(versionId);
+
+    const audits = await db.auditLog.findMany({ where: { entityType: "content_item", entityId: r.itemId } });
+    const liveAudit = audits.some((a) => (a.changes as { after?: { status?: string } }).after?.status === "live");
+    expect(liveAudit).toBe(true);
+  });
+
+  it("reviewing a version that is no longer current conflicts", async () => {
+    const r = await newItem();
+    const v2 = await service.createVersion(actorA(), r.itemId, { body: "v2", changeNote: null, basedOnVersionId: r.versionId! });
+    expect(v2.ok).toBe(true);
+
+    const stale = await service.submitReview(actorA(), r.versionId!, "approve");
+    expect(stale).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("rewrite request → claim → app version cycle", async () => {
+    const r = await newItem();
+    const rewrite = await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite");
+    expect(rewrite).toMatchObject({ ok: true, status: "rewrite_requested" });
+
+    const claim1 = await service.claimItem(appActor, r.itemId);
+    expect(claim1).toMatchObject({ ok: true, alreadyClaimed: false });
+    expect((await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } })).status).toBe("ai_working");
+
+    const claim2 = await service.claimItem(appActor, r.itemId);
+    expect(claim2).toMatchObject({ ok: true, alreadyClaimed: true });
+
+    const otherApp: ContentActor = { tenantId: 1, kind: "app", appSlug: "it-other" };
+    const claim3 = await service.claimItem(otherApp, r.itemId);
+    expect(claim3).toMatchObject({ ok: false, status: 409 });
+
+    const noNote = await service.createVersion(appActor, r.itemId, { body: "rewritten", basedOnVersionId: r.versionId! });
+    expect(noNote).toMatchObject({ ok: false, status: 400 });
+
+    const wrongBase = await service.createVersion(appActor, r.itemId, {
+      body: "rewritten", changeNote: "fixed per feedback", basedOnVersionId: r.versionId! + 999_999,
+    });
+    expect(wrongBase).toMatchObject({ ok: false, status: 409 });
+
+    const valid = await service.createVersion(appActor, r.itemId, {
+      body: "rewritten body", changeNote: "fixed per feedback", basedOnVersionId: r.versionId!,
+    });
+    expect(valid.ok).toBe(true);
+    if (!valid.ok) return;
+    expect(valid.number).toBe(2);
+
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } });
+    expect(item.status).toBe("in_review");
+    expect(item.claimedBy).toBeNull();
+    expect(item.claimedAt).toBeNull();
+
+    const version = await db.contentVersion.findUniqueOrThrow({ where: { id: valid.versionId } });
+    expect(version.authorType).toBe("ai");
+
+    const reviews = await db.contentReview.findMany({ where: { versionId: valid.versionId } });
+    expect(reviews).toHaveLength(0);
+  });
+
+  it("a human edit after a claim beats the app's pending version (race rule)", async () => {
+    const r = await newItem();
+    await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite");
+    await service.claimItem(appActor, r.itemId);
+
+    const humanVersion = await service.createVersion(actorA(), r.itemId, {
+      body: "human fix", changeNote: null, basedOnVersionId: r.versionId!,
+    });
+    expect(humanVersion.ok).toBe(true);
+    if (!humanVersion.ok) return;
+
+    const appVersion = await service.createVersion(appActor, r.itemId, {
+      body: "ai fix", changeNote: "note", basedOnVersionId: r.versionId!,
+    });
+    expect(appVersion).toMatchObject({ ok: false, status: 409 });
+
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } });
+    expect(item.status).toBe("in_review");
+    expect(item.currentVersionId).toBe(humanVersion.versionId);
+  });
+
+  it("releases a stale claim and rejects a version built on it", async () => {
+    const r = await newItem();
+    await service.submitReview(actorA(), r.versionId!, "changes", "fix typo");
+    const claim = await service.claimItem(appActor, r.itemId);
+    expect(claim.ok).toBe(true);
+
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    await db.contentItem.update({ where: { id: r.itemId }, data: { claimedAt: threeHoursAgo } });
+
+    const released = await service.releaseStaleClaims(1);
+    expect(released).toBeGreaterThanOrEqual(1);
+
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } });
+    expect(item.status).toBe("changes_requested"); // pre-claim status restored
+
+    const staleClaim = await service.createVersion(appActor, r.itemId, {
+      body: "too late", changeNote: "note", basedOnVersionId: r.versionId!,
+    });
+    expect(staleClaim).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("a live item keeps serving its old live version while a new one is in review", async () => {
+    const r = await newItem("original live body");
+    await service.submitReview(actorA(), r.versionId!, "approve");
+    await service.submitReview(actorB(), r.versionId!, "approve");
+    expect((await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } })).status).toBe("live");
+
+    const v2 = await service.createVersion(actorA(), r.itemId, {
+      body: "new body v2", changeNote: null, basedOnVersionId: r.versionId!,
+    });
+    expect(v2.ok).toBe(true);
+
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } });
+    expect(item.status).toBe("in_review");
+    expect(item.liveVersionId).toBe(r.versionId);
+
+    const live = await service.getLive(1, { itemIds: [r.itemId] });
+    expect(live).toHaveLength(1);
+    expect(live[0].version.id).toBe(r.versionId);
+    expect(live[0].version.body).toBe("original live body");
+  });
+
+  it("getQueue surfaces reviews with reviewer names and comments", async () => {
+    const r = await newItem();
+    await service.submitReview(actorA(), r.versionId!, "changes", "fix the CTA");
+
+    const queue = await service.getQueue(1, ["changes_requested", "rewrite_requested"]);
+    const entry = queue.find((q) => q.id === r.itemId);
+    expect(entry).toBeTruthy();
+    expect(entry!.status).toBe("changes_requested");
+    const review = entry!.reviews.find((rv) => rv.comment === "fix the CTA");
+    expect(review).toBeTruthy();
+    expect(review!.reviewer).toBe("IT Aron");
+  });
+
+  it("concurrent createVersion calls: exactly one wins", async () => {
+    const r = await newItem();
+    await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite");
+    await service.claimItem(appActor, r.itemId);
+
+    const [userResult, appResult] = await Promise.all([
+      service.createVersion(actorA(), r.itemId, { body: "human concurrent", changeNote: null, basedOnVersionId: r.versionId! }),
+      service.createVersion(appActor, r.itemId, { body: "ai concurrent", changeNote: "note", basedOnVersionId: r.versionId! }),
+    ]);
+    const results = [userResult, appResult];
+    expect(results.filter((x) => x.ok)).toHaveLength(1);
+    const failed = results.filter((x) => !x.ok);
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({ status: 409 });
+  });
+
+  it("archived items reject new versions", async () => {
+    const r = await newItem();
+    const archived = await service.archiveItem(actorA(), r.itemId);
+    expect(archived).toMatchObject({ ok: true });
+    expect((await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } })).status).toBe("archived");
+
+    const attempt = await service.createVersion(actorA(), r.itemId, { body: "too late", changeNote: null, basedOnVersionId: r.versionId! });
+    expect(attempt).toMatchObject({ ok: false, status: 409 });
+  });
+});
