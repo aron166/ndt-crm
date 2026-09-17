@@ -59,6 +59,7 @@ const ALREADY_ON_PROD = new Set([
   "cold-email-v0/lead-magnet/ellenorzolista-fuas-elott-DRAFT.md",
   "q4-30-devices/market-epito-note-DRAFT.md",
   "q4-30-devices/birdsview-email-DRAFT.md",
+  "cold-email-v0/FRAMEWORK.md",
 ]);
 
 // ---------- 1. cold-email-v0: 20 files x 4 touches ----------
@@ -148,6 +149,30 @@ const singles = [];
       format: "phone_script",
       purpose: "Setter telefonscript v0",
       title: "Setter telefonscript v0",
+      body,
+      change_note: `Átvéve: ${externalRef(p)}`,
+      import: true,
+    });
+  }
+}
+
+// cold-email framework — Kai loaded it by hand on 2026-09-17 (ref
+// `cold-email-v0/FRAMEWORK.md`), so the script must produce the same ref. It is
+// the closed claim list the content-revise skill works from: Péter edits it.
+{
+  const p = join(GROWTH, "campaigns/cold-email-v0/FRAMEWORK.md");
+  const body = readOrMissing(p);
+  if (body != null) {
+    singles.push({
+      external_ref: externalRef(p),
+      campaign_slug: "cold-email-v0",
+      campaign_name: "Hideg levél v0",
+      project: "birdsview",
+      channel: "other",
+      content_type: "other",
+      category: "other",
+      purpose: "Hideg levél keretrendszer (állítás-korlátok)",
+      title: "Hideg levél keretrendszer v0",
       body,
       change_note: `Átvéve: ${externalRef(p)}`,
       import: true,
