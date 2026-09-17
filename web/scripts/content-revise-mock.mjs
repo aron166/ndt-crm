@@ -43,9 +43,9 @@ Van most olyan műtárgyuk, ahol a meglévő vaskiosztásról nincs meg a megval
 
 Üdvözlettel,
 Balogh Áron
-Uphill Trade`;
+BetonScan`;
 
-const SCRIPT_V1 = `1. Szia, itt X vagyok az Uphill Trade-től, van két perced?
+const SCRIPT_V1 = `1. Szia, itt X vagyok az BetonScan-től, van két perced?
 2. Azért hívlak, mert betonvizsgálást csináltok, nem?
 3. Nálunk georadaros felmérés van, simán 15000 Ft-tól indul egy helyszín.
 4. Szoktatok fúrni vagy vésni meglévő szerkezetbe?
@@ -72,7 +72,7 @@ Van most olyan helyszínük, ahol fúrás vagy vésés előtt ezt tudni kellene?
 
 Üdvözlettel,
 Balogh Áron
-Uphill Trade`;
+BetonScan`;
 
 const EMAIL_105_V1 = `**Tárgy:** meglévő vasalat felmérése
 
@@ -84,7 +84,7 @@ Van most olyan helyszínük, ahol fúrás vagy vésés előtt ezt tudni kellene?
 
 Üdvözlettel,
 Balogh Áron
-Uphill Trade`;
+BetonScan`;
 
 const EMAIL_106_V1 = `**Tárgy:** Re: meglévő vasalat felmérése
 
@@ -94,7 +94,7 @@ Megér tíz percet telefonon? Szerdán 9 és 10 között, vagy csütörtökön 1
 
 Üdvözlettel,
 Balogh Áron
-Uphill Trade`;
+BetonScan`;
 
 function mkVersion(id, number, body, { changeNote = null, authorType = "user", basedOnVersionId = null, reviews = [] } = {}) {
   return {
