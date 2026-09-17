@@ -198,6 +198,7 @@ model Company {
   attributes    CompanyAttribute[]
   emailDrafts   EmailDraft[]
   quotes        Quote[]
+  contentItems  ContentItem[]
 
   @@unique([tenantId, vatNumber])
   @@map("companies")
@@ -1052,6 +1053,12 @@ model ContentItem {
   id               Int       @id @default(autoincrement())
   tenantId         Int       @map("tenant_id")
   campaignId       Int?      @map("campaign_id")
+  /**
+   * The company this piece is FOR (one cold-email touch per company). The
+   * rewrite loop reads that company's dossier, so it never loses what the
+   * drafting agent knew (Áron, 2026-09-17).
+   */
+  companyId        Int?      @map("company_id")
   channel          String // linkedin_personal | linkedin_company | facebook | blog | email | other
   contentType      String    @map("content_type") // post | article | email | video_script | other
   title            String
@@ -1094,6 +1101,7 @@ model ContentItem {
 
   tenant         Tenant           @relation(fields: [tenantId], references: [id])
   campaign       Campaign?        @relation(fields: [campaignId], references: [id])
+  company        Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
   assets         ContentAsset[]
   versions       ContentVersion[] @relation("ItemVersions")
   checks         ContentCheck[]
@@ -1103,6 +1111,7 @@ model ContentItem {
   @@unique([tenantId, externalRef])
   @@index([tenantId, status])
   @@index([tenantId, category])
+  @@index([tenantId, companyId])
   @@index([tenantId, campaignId])
   @@map("content_items")
 }
@@ -1150,6 +1159,14 @@ model ContentVersion {
   authorApp        String?  @map("author_app") // app-key slug for ai/import
   changeNote       String?  @map("change_note") // what changed and which comment it answers
   basedOnVersionId Int?     @map("based_on_version_id")
+  /**
+   * The SUBMITTING AGENT's own judgement of this version (trust ladder, Áron
+   * 2026-09-17): `selfScore` 0..1 confidence and a short note. Recorded and
+   * displayed only: nothing acts on it yet. It exists so low-confidence work can
+   * be force-sampled and so agent-vs-human agreement can be measured over time.
+   */
+  selfScore        Float?   @map("self_score")
+  selfNote         String?  @map("self_note")
   createdAt        DateTime @default(now()) @map("created_at")
 
   tenant        Tenant           @relation(fields: [tenantId], references: [id])

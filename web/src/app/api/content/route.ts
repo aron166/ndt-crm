@@ -91,6 +91,14 @@ export async function POST(request: Request) {
         }
       }
 
+      // A company_id is verified against the tenant before it is stored: it
+      // arrives from an app-key payload like personId does.
+      const ownedCompanyId = input.company_id
+        ? (await tx.company.findFirst({
+            where: { id: input.company_id, tenantId, deletedAt: null }, select: { id: true },
+          }))?.id ?? null
+        : null;
+
       // 2. Create the item (+ version 1) through the one write path.
       const created = await createItem(
         actor,
@@ -103,6 +111,9 @@ export async function POST(request: Request) {
           format: input.format ?? null,
           purpose: input.purpose ?? null,
           campaignId,
+          companyId: ownedCompanyId,
+          selfScore: input.self_score ?? null,
+          selfNote: input.self_note ?? null,
           externalRef: input.external_ref ?? null,
           changeNote: input.change_note ?? null,
           internal: input.internal,

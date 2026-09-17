@@ -71,6 +71,11 @@ function Card({
             </span>
             {item.format && <span className="badge-ds slate">{item.format}</span>}
             {item.openChecks > 0 && <span className="badge-ds amber">{UI.checksOpen(item.openChecks)}</span>}
+            {item.selfScore !== null && (
+              <span className="badge-ds" style={{ color: "var(--fg-mute)" }}>
+                {UI.selfScoreShort(Math.round(item.selfScore * 100))}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)", marginBottom: 6, lineHeight: 1.3 }}>
             {item.title}

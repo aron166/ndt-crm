@@ -131,6 +131,8 @@ export const UI = {
   approvalsPerCategory: "Kategóriánként",
   approvalsDefault: "Alapértelmezés",
   saveApprovals: "Mentés",
+  selfScore: (pct: number) => `Az ügynök magabiztossága: ${pct}%`,
+  selfScoreShort: (pct: number) => `${pct}% magabiztos`,
   reasonLabel: "Miért küldöd vissza?",
   reasonPick: "Válassz okot",
   pagePrev: "Előző",

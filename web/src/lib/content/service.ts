@@ -96,6 +96,8 @@ export interface CreateItemInput {
   format?: string | null;
   purpose?: string | null;
   campaignId?: number | null;
+  /** The company this piece is for (its dossier feeds the rewrite loop). */
+  companyId?: number | null;
   externalRef?: string | null;
   changeNote?: string | null;
   internal?: boolean;
@@ -104,6 +106,9 @@ export interface CreateItemInput {
   scheduledFor?: Date | null;
   /** App-key imports of existing material are `import`, not `ai`. */
   importing?: boolean;
+  /** Submitting agent's own confidence 0..1 and a short note (display only). */
+  selfScore?: number | null;
+  selfNote?: string | null;
 }
 
 /**
@@ -128,6 +133,7 @@ export async function createItem(
       data: {
         tenantId: actor.tenantId,
         campaignId: input.campaignId ?? null,
+        companyId: input.companyId ?? null,
         channel: input.channel,
         contentType: input.contentType,
         category: input.category,
@@ -148,6 +154,8 @@ export async function createItem(
       data: {
         tenantId: actor.tenantId, itemId: item.id, number: 1, body: input.body,
         changeNote: input.changeNote ?? null,
+        selfScore: clampSelfScore(input.selfScore),
+        selfNote: input.selfNote?.trim()?.slice(0, SELF_NOTE_MAX) ?? null,
         ...authorFields(actor, input.importing),
       },
       select: { id: true },
@@ -193,6 +201,9 @@ export interface CreateVersionInput {
   basedOnVersionId: number;
   /** AI only: the change needs an image/video a human must produce. */
   needsHumanAsset?: boolean;
+  /** Submitting agent's own confidence 0..1 and a short note (display only). */
+  selfScore?: number | null;
+  selfNote?: string | null;
   /**
    * The files of the new version. Omitted → the base version's files are
    * carried forward (always the case for AI versions, which cannot upload).
@@ -252,6 +263,8 @@ export async function createVersion(
       data: {
         tenantId: actor.tenantId, itemId, number, body: input.body, changeNote,
         basedOnVersionId: input.basedOnVersionId,
+        selfScore: clampSelfScore(input.selfScore),
+        selfNote: input.selfNote?.trim()?.slice(0, SELF_NOTE_MAX) ?? null,
         ...authorFields(actor),
       },
       select: { id: true },
@@ -557,6 +570,12 @@ async function ruleContextFor(
 
 // ── §6c: ⚠ checks, restore, hard delete ─────────────────────────────────────
 
+export const SELF_NOTE_MAX = 500;
+/** A confidence outside 0..1 (or not a number) is stored as null, never clamped silently into a lie. */
+export function clampSelfScore(v: number | null | undefined): number | null {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1 ? v : null;
+}
+
 export const CHECK_QUESTION_MAX = 500;
 export const CHECK_ANSWER_MAX = 2000;
 export const CHECK_STATES = ["open", "resolved", "waived"] as const;
@@ -738,11 +757,34 @@ export interface QueueItem {
   externalRef: string | null;
   needsHumanAsset: boolean;
   campaign: { slug: string; name: string } | null;
-  currentVersion: { id: number; number: number; body: string; changeNote: string | null; authorType: string } | null;
+  currentVersion: {
+    id: number; number: number; body: string; changeNote: string | null; authorType: string;
+    selfScore: number | null; selfNote: string | null;
+  } | null;
   assets: { kind: string; mimeType: string | null; caption: string | null }[];
-  /** Every review on every version, newest first — why earlier versions failed. */
-  reviews: { versionNumber: number; reviewer: string; verdict: string; comment: string | null; at: string }[];
-  versions: { id: number; number: number; changeNote: string | null; authorType: string; createdAt: string }[];
+  /**
+   * Every review on every version, newest first: why earlier versions failed.
+   * `reason` is the structured tag (lib/content/reasons.ts) the reviewer picked.
+   */
+  reviews: { versionNumber: number; reviewer: string; verdict: string; reason: string | null; comment: string | null; at: string }[];
+  versions: { id: number; number: number; changeNote: string | null; authorType: string; createdAt: string; selfScore: number | null }[];
+  /** Blocking machine checks and imported warning questions that are still open. */
+  openChecks: { id: number; question: string; forWhom: string; source: string }[];
+  /** Answers a human gave: facts the rewrite may rely on. */
+  settledChecks: { question: string; state: string; answer: string | null }[];
+  /**
+   * What the CRM knows about the company (Áron: a rewrite must never lose what
+   * the drafting agent knew). READ-ONLY input: the skill may use these facts and
+   * must never invent or alter one. Null when the item has no company.
+   */
+  company: {
+    id: number;
+    name: string;
+    city: string | null;
+    dossier: unknown;
+    closenessScore: number | null;
+    contact: { name: string; email: string | null; phone: string | null } | null;
+  } | null;
 }
 
 export async function getQueue(tenantId: number, statuses: ContentStatus[]): Promise<QueueItem[]> {
@@ -753,16 +795,34 @@ export async function getQueue(tenantId: number, statuses: ContentStatus[]): Pro
     take: 100,
     select: {
       id: true, title: true, category: true, format: true, purpose: true, channel: true, status: true,
-      externalRef: true, needsHumanAsset: true, currentVersionId: true,
+      externalRef: true, needsHumanAsset: true, currentVersionId: true, companyId: true,
       campaign: { select: { slug: true, name: true } },
       currentVersion: { select: { body: true } },
+      checks: { select: { id: true, question: true, forWhom: true, state: true, answer: true, source: true } },
+      // Read-only facts for the rewrite: the dossier the enrichment skill wrote,
+      // the closeness score and the verified contact.
+      company: {
+        select: {
+          id: true, name: true, city: true, enrichment: true, closenessScore: true,
+          contacts: {
+            where: { endedAt: null },
+            orderBy: [{ isPrimary: "desc" }, { startedAt: "desc" }],
+            take: 1,
+            select: {
+              email: true, phone: true,
+              person: { select: { firstName: true, lastName: true, email: true, phone: true } },
+            },
+          },
+        },
+      },
       versions: {
         orderBy: { number: "desc" },
         select: {
           id: true, number: true, changeNote: true, authorType: true, createdAt: true,
+          selfScore: true, selfNote: true,
           reviews: {
             orderBy: { updatedAt: "desc" },
-            select: { verdict: true, comment: true, updatedAt: true, reviewer: { select: { name: true } } },
+            select: { verdict: true, reason: true, comment: true, updatedAt: true, reviewer: { select: { name: true } } },
           },
           assets: { select: { kind: true, mimeType: true, caption: true } },
         },
@@ -776,15 +836,42 @@ export async function getQueue(tenantId: number, statuses: ContentStatus[]): Pro
       channel: it.channel, status: it.status, externalRef: it.externalRef, needsHumanAsset: it.needsHumanAsset,
       campaign: it.campaign,
       currentVersion: current
-        ? { id: current.id, number: current.number, body: it.currentVersion?.body ?? "", changeNote: current.changeNote, authorType: current.authorType }
+        ? {
+            id: current.id, number: current.number, body: it.currentVersion?.body ?? "",
+            changeNote: current.changeNote, authorType: current.authorType,
+            selfScore: current.selfScore ?? null, selfNote: current.selfNote ?? null,
+          }
         : null,
       assets: current?.assets ?? [],
       reviews: it.versions.flatMap((v) => v.reviews.map((r) => ({
-        versionNumber: v.number, reviewer: r.reviewer.name, verdict: r.verdict, comment: r.comment,
-        at: r.updatedAt.toISOString(),
+        versionNumber: v.number, reviewer: r.reviewer.name, verdict: r.verdict, reason: r.reason,
+        comment: r.comment, at: r.updatedAt.toISOString(),
       }))),
+      openChecks: it.checks
+        .filter((c) => c.state === "open")
+        .map((c) => ({ id: c.id, question: c.question, forWhom: c.forWhom, source: c.source })),
+      settledChecks: it.checks
+        .filter((c) => c.state !== "open")
+        .map((c) => ({ question: c.question, state: c.state, answer: c.answer })),
+      company: it.company
+        ? {
+            id: it.company.id,
+            name: it.company.name,
+            city: it.company.city,
+            dossier: it.company.enrichment ?? null,
+            closenessScore: it.company.closenessScore ?? null,
+            contact: it.company.contacts[0]
+              ? {
+                  name: `${it.company.contacts[0].person.lastName} ${it.company.contacts[0].person.firstName}`.trim(),
+                  email: it.company.contacts[0].email ?? it.company.contacts[0].person.email ?? null,
+                  phone: it.company.contacts[0].phone ?? it.company.contacts[0].person.phone ?? null,
+                }
+              : null,
+          }
+        : null,
       versions: it.versions.map((v) => ({
-        id: v.id, number: v.number, changeNote: v.changeNote, authorType: v.authorType, createdAt: v.createdAt.toISOString(),
+        id: v.id, number: v.number, changeNote: v.changeNote, authorType: v.authorType,
+        createdAt: v.createdAt.toISOString(), selfScore: v.selfScore ?? null,
       })),
     };
   });

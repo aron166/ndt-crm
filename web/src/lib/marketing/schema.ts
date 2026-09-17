@@ -67,6 +67,12 @@ export const contentIntakeSchema = z.object({
   // INTERNAL angles are never postable; the publish flow is hidden for them.
   internal: boolish,
 
+  /** The company this piece is for: its dossier feeds the rewrite loop. */
+  company_id: z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional()),
+  /** Submitting agent's own judgement: confidence 0..1 and a short note. */
+  self_score: z.preprocess(emptyToUndef, z.coerce.number().min(0).max(1).optional()),
+  self_note: z.preprocess(emptyToUndef, z.string().trim().max(500).optional()),
+
   assets: z.array(assetSchema).max(20).optional(),
 });
 

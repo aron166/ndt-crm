@@ -474,6 +474,26 @@ outside the key's tenant is skipped as `"unknown_company"`, never a 500 and
 never a cross-tenant write; a per-item failure is skipped as `"error"` rather
 than failing the whole batch.
 
+Content fields (optional, 2026-09-17, trust ladder): `company_id` (the company
+this piece is for; verified against the key's tenant, stored as null otherwise)
+feeds that company's dossier to the rewrite loop, and `self_score` (0..1) plus
+`self_note` record the SUBMITTING AGENT's own confidence in the version. The
+score is stored and displayed only: nothing in the pipeline acts on it. Both are
+also accepted on `POST /api/content/:id/versions`.
+
+`GET /api/content/queue` returns, per item: `openChecks` (blocking warning
+questions and failed rules), `settledChecks` (answers a human gave, usable as
+facts), every review with its structured `reason` tag, `currentVersion.selfScore`
+/ `selfNote`, and `company` (name, city, `dossier` = companies.enrichment,
+`closenessScore`, the verified `contact`). Company facts are READ-ONLY inputs:
+the rewrite must never invent or alter one, and an email item with no dossier is
+flagged for enrichment instead of rewritten.
+
+A version that breaks a blocking rule (closed claim list, unfilled placeholder,
+missing consent footer, oversized body, reused hook, unverified recipient) is
+accepted but the item goes to `rewrite_requested` with one open check per
+violated rule, so it returns to the AI queue and cannot go live.
+
 Campaign tracking fields (optional, 2026-09-17): `senderUserId` (whose inbox
 sends the touch; must be a user of the key's tenant, otherwise stored as `null`),
 `wave` (1-52) and `dueAt` (ISO datetime, when the touch is due). Touch 1's

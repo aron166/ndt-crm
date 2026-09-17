@@ -699,42 +699,15 @@ async function coldClickByText(cdp, sessionId, tag, text) {
   return { ...summarize(inp, loaf), clickAtMs: found.elapsedMs };
 }
 
-// A focused, closed <select> changes value on ArrowDown without opening an
-// OS-level picker (which headless Chrome cannot render anyway) — this is the
-// real key path Event Timing attributes a select change to, so it is measured
-// the same way typeAndMeasure() measures a text input, via a trusted CDP key
-// event rather than a page-script-dispatched (untrusted) 'change' event.
-async function selectAndMeasure(cdp, sessionId, selector) {
-  const rect = await getCenter(cdp, sessionId, selector);
-  if (!rect || rect.w === 0 || rect.h === 0) return { skip: selector };
-  await trustedMouseMove(cdp, sessionId, rect.x, rect.y);
-  await trustedPressRelease(cdp, sessionId, rect.x, rect.y);
-  await sleep(150);
-  const active = await evalExpr(cdp, sessionId, `document.activeElement === document.querySelector(${JSON.stringify(selector)})`);
-  if (!active.value) return { skip: `${selector} (click did not focus it)` };
-  await resetPerf(cdp, sessionId);
-  await cdp.send("Input.dispatchKeyEvent", { type: "rawKeyDown", windowsVirtualKeyCode: 40, code: "ArrowDown", key: "ArrowDown" }, sessionId);
-  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 40, code: "ArrowDown", key: "ArrowDown" }, sessionId);
-  await sleep(2200); // ponytail: fixed 2.2s buffer; poll for the route commit instead if this run gets slow
-  const { inp, loaf } = await readPerf(cdp, sessionId);
-  log("DEBUG select inp:", JSON.stringify(inp));
-  const keyEntries = inp.filter((e) => e.name === "keydown" || e.name === "keypress" || e.name === "keyup");
-  return summarize(keyEntries.length ? keyEntries : inp, loaf, keyEntries.length ? null : "no keydown/keypress/keyup entries; falling back to full entry set");
-}
-
-async function coldSelect(cdp, sessionId, selector) {
-  const found = await pollUntilHitTestable(cdp, sessionId, selector);
-  if (!found) return { skip: `${selector} (never hit-testable within 3s of load)` };
-  await trustedMouseMove(cdp, sessionId, found.rect.x, found.rect.y);
-  await trustedPressRelease(cdp, sessionId, found.rect.x, found.rect.y);
-  await sleep(50);
-  await cdp.send("Input.dispatchKeyEvent", { type: "rawKeyDown", windowsVirtualKeyCode: 40, code: "ArrowDown", key: "ArrowDown" }, sessionId);
-  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 40, code: "ArrowDown", key: "ArrowDown" }, sessionId);
-  await sleep(2200); // ponytail: fixed 2.2s buffer; poll for the route commit instead if this run gets slow
-  const { inp, loaf } = await readPerf(cdp, sessionId);
-  const keyEntries = inp.filter((e) => e.name === "keydown" || e.name === "keypress" || e.name === "keyup");
-  return { ...summarize(keyEntries.length ? keyEntries : inp, loaf, keyEntries.length ? null : "no keydown/keypress/keyup entries; falling back to full entry set"), clickAtMs: found.elapsedMs };
-}
+// A native <select>'s own picker is OS-level chrome that headless Chrome
+// cannot render (confirmed empirically: a trusted ArrowDown key event on a
+// focused, closed select changes nothing — value in, value out, zero Event
+// Timing entries). The only part of a select interaction Event Timing ever
+// attributes INP to is the click that focuses/opens it — same as any other
+// control — so a select is measured with the plain click helpers, not a
+// dedicated one.
+const selectAndMeasure = clickAndMeasure;
+const coldSelect = coldClick;
 
 // ---------- review page action bar + comment sheet (interaction l) ----------
 // Three chained warm rows on the SAME page load: opening "Javítást kérek"

@@ -787,6 +787,10 @@ export function ReviewClient({
                       <div className="version-meta">
                         {authorLabel}{authorName ? ` · ${authorName}` : ""} · {new Date(v.createdAt).toLocaleDateString("hu-HU")}
                       </div>
+                      {v.selfScore !== null && (
+                        <div className="version-meta">{UI.selfScore(Math.round(v.selfScore * 100))}</div>
+                      )}
+                      {v.selfNote && <div className="version-note">{v.selfNote}</div>}
                       {v.changeNote && <div className="version-note">{v.changeNote}</div>}
                     </button>
                   </li>
