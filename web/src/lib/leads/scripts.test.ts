@@ -63,6 +63,16 @@ describe("parseScriptBlocks", () => {
     const original = ok(parseScriptBlocks("a|Első\nsor egy\nsor kettő\n---\nb|Második\nmás"));
     expect(ok(parseScriptBlocks(formatScriptBlocks(original)))).toEqual(original);
   });
+
+  it("reads an optional `tartalom: <id>` header line and links the variant to a content item", () => {
+    const v = ok(parseScriptBlocks("a|Élő szkript\ntartalom: 42\ninline szöveg, csak tartalék"));
+    expect(v[0]).toEqual({ key: "a", label: "Élő szkript", contentItemId: 42, body: "inline szöveg, csak tartalék" });
+  });
+
+  it("round-trips contentItemId through formatScriptBlocks", () => {
+    const original = ok(parseScriptBlocks("a|Élő\ntartalom: 7\nteszt"));
+    expect(ok(parseScriptBlocks(formatScriptBlocks(original)))).toEqual(original);
+  });
 });
 
 describe("scriptVariantsFromSettings", () => {

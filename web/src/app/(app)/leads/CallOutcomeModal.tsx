@@ -132,9 +132,9 @@ export function CallOutcomeModal({
               <option value="">Nincs szkript</option>
               {scriptVariants.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
             </select>
-            {script && script.body && (
+            {script && (script.body || script.liveMissing) && (
               <div style={{ marginTop: 8, fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 220, overflowY: "auto" }}>
-                {script.body}
+                {script.liveMissing ? "Nincs élő változat — a szkript még jóváhagyásra vár." : script.body}
               </div>
             )}
           </FormField>

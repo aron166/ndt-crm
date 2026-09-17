@@ -261,15 +261,15 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
               <option value="">Nincs szkript</option>
               {scriptVariants.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
             </select>
-            {script?.body && (
+            {script && (script.body || script.liveMissing) && (
               <button onClick={() => setScriptOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 13, padding: 4, cursor: "pointer" }}>
                 Szkript {scriptOpen ? "▲" : "▼"}
               </button>
             )}
           </div>
-          {scriptOpen && script?.body && (
+          {scriptOpen && script && (script.body || script.liveMissing) && (
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-              {script.body}
+              {script.liveMissing ? "Nincs élő változat — a szkript még jóváhagyásra vár." : script.body}
             </p>
           )}
         </div>

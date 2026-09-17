@@ -24,12 +24,17 @@ export interface ScriptVariant {
   key: string;
   label: string;
   body: string;
+  /** Links this variant to a content-approval item; its LIVE body replaces `body` (spec §6). */
+  contentItemId?: number;
+  /** Set by getScriptVariants (not stored) when contentItemId has no live version. */
+  liveMissing?: boolean;
 }
 
 export const scriptVariantSchema = z.object({
   key: z.string().trim().min(1).max(SCRIPT_KEY_MAX).regex(/^[a-z0-9_]+$/),
   label: z.string().trim().min(1).max(SCRIPT_LABEL_MAX),
   body: z.string().trim().max(SCRIPT_BODY_MAX),
+  contentItemId: z.number().int().positive().optional(),
 });
 
 /**
@@ -105,7 +110,17 @@ export function parseScriptBlocks(text: string): ScriptVariant[] | { error: stri
     }
     const label = head.slice(sep + 1).trim();
     const key = slugifyScriptKey(head.slice(0, sep));
-    const body = lines.slice(headIndex + 1).join("\n").trim();
+
+    // Optional `tartalom: <id>` header line, right after key|label, links the
+    // variant to a live content item (spec §6) — its live body replaces `body`.
+    let bodyStart = headIndex + 1;
+    let contentItemId: number | undefined;
+    const metaMatch = lines[bodyStart]?.trim().match(/^tartalom:\s*(\d+)\s*$/i);
+    if (metaMatch) {
+      contentItemId = Number(metaMatch[1]);
+      bodyStart += 1;
+    }
+    const body = lines.slice(bodyStart).join("\n").trim();
 
     if (!label) return { error: "Üres szkriptnév" };
     if (!key) return { error: `A szkript azonosítója üres lenne: "${label}"` };
@@ -113,7 +128,7 @@ export function parseScriptBlocks(text: string): ScriptVariant[] | { error: stri
     if (body.length > SCRIPT_BODY_MAX) return { error: `A(z) "${label}" szkript szövege túl hosszú (max ${SCRIPT_BODY_MAX} karakter)` };
     if (seen.has(key)) return { error: `Két szkript azonos azonosítót kapna: ${key}` };
     seen.add(key);
-    out.push({ key, label, body });
+    out.push(contentItemId ? { key, label, body, contentItemId } : { key, label, body });
   }
 
   if (out.length === 0) return { error: "Legalább egy szkriptváltozat kell" };
@@ -123,5 +138,7 @@ export function parseScriptBlocks(text: string): ScriptVariant[] | { error: stri
 
 /** Render the variants back into the editor's block format. */
 export function formatScriptBlocks(variants: ScriptVariant[]): string {
-  return variants.map((v) => `${v.key}|${v.label}\n${v.body}`).join("\n---\n");
+  return variants
+    .map((v) => `${v.key}|${v.label}${v.contentItemId ? `\ntartalom: ${v.contentItemId}` : ""}\n${v.body}`)
+    .join("\n---\n");
 }
