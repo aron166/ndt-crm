@@ -28,6 +28,7 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/outreach/targets" ||
     pathname === "/api/outreach/drafts" ||
     pathname === "/api/cron/automations" ||
+    pathname === "/api/cron/content-digest" ||
     pathname === "/api/health"
   );
 }

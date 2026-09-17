@@ -23,6 +23,7 @@ describe("isServiceApiPath", () => {
     "/api/outreach/targets",
     "/api/outreach/drafts",
     "/api/cron/automations",
+    "/api/cron/content-digest",
     "/api/health",
   ];
   for (const path of bypassed) {

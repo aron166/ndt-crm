@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { LeadStatusSetupClient } from "./LeadStatusSetupClient";
 import { QualificationQuestionsClient } from "./QualificationQuestionsClient";
 import { ScriptVariantsClient } from "./ScriptVariantsClient";
-import { getQualificationQuestions, getScriptVariants } from "@/lib/leads/queries";
+import { getQualificationQuestions, getRawScriptVariants } from "@/lib/leads/queries";
 import { getIntroMaterialUrl } from "@/lib/leads/intro";
 import { getScriptStats } from "@/lib/leads/script-stats";
 
@@ -18,10 +18,13 @@ export default async function LeadStatusSetupPage() {
     }),
     getQualificationQuestions(TENANT_ID),
     getIntroMaterialUrl(TENANT_ID),
-    getScriptVariants(TENANT_ID),
+    // RAW (unresolved) variants — this page edits stored scripts, not the
+    // live-resolved ones (that would overwrite a linked variant's stored body
+    // with an empty fallback the moment its content item goes missing).
+    getRawScriptVariants(TENANT_ID),
   ]);
-  // getScriptStats takes the already-fetched variants instead of reading the
-  // tenant a second time (see lib/leads/script-stats.ts).
+  // Stats only key off `key`, so the raw list is fine here too — no need for
+  // the live-resolved bodies just to look up call outcomes.
   const scriptStats = await getScriptStats(TENANT_ID, scriptVariants);
 
   return (

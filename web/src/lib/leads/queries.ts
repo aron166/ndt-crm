@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_LEAD_STATUSES, type LeadStatusDef } from "./statuses";
 import { questionsFromSettings, type QualificationQuestion } from "./qualification";
 import { scriptVariantsFromSettings, type ScriptVariant } from "./scripts";
+import { getLive } from "@/lib/content/service";
 
 /**
  * The tenant's lead-pipeline columns, ordered. Falls back to the default set if
@@ -47,10 +48,36 @@ export async function getQualificationQuestions(tenantId: number): Promise<Quali
 }
 
 /**
+ * The tenant's call-script A/B variants exactly as stored (never live-resolved).
+ * /leads/setup edits THIS — resolving a linked variant's live body here would
+ * overwrite its stored `body`/`contentItemId` with an empty fallback the
+ * moment the linked content item goes missing.
+ */
+export async function getRawScriptVariants(tenantId: number): Promise<ScriptVariant[]> {
+  const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  return scriptVariantsFromSettings(tenant?.settings);
+}
+
+/**
  * The tenant's call-script A/B variants. Falls back to the in-code placeholders
  * when the tenant has never set one (or set a malformed one).
  */
+/**
+ * A variant with `contentItemId` reads its body from the LIVE content version
+ * (spec §6) — the inline body stored in settings is only ever a fallback
+ * source for the editor, never shown or used. No live version → empty body +
+ * `liveMissing: true`, never the inline body.
+ */
 export async function getScriptVariants(tenantId: number): Promise<ScriptVariant[]> {
-  const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
-  return scriptVariantsFromSettings(tenant?.settings);
+  const variants = await getRawScriptVariants(tenantId);
+  const itemIds = variants.map((v) => v.contentItemId).filter((id): id is number => id != null);
+  if (itemIds.length === 0) return variants;
+
+  const live = await getLive(tenantId, { itemIds });
+  const liveBodyById = new Map(live.map((item) => [item.id, item.version.body]));
+  return variants.map((v) => {
+    if (v.contentItemId == null) return v;
+    const body = liveBodyById.get(v.contentItemId);
+    return body !== undefined ? { ...v, body } : { ...v, body: "", liveMissing: true };
+  });
 }
