@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { answersRecordSchema } from "./qualification";
 import { TIERS } from "./tier";
+import { REPLY_TYPES } from "@/lib/outreach/campaign";
 
 // Public lead-intake payload (POST /api/leads).
 // Landing pages (BetonScan/BirdsView) and automations (n8n) post this shape.
@@ -53,6 +54,9 @@ export const leadIntakeSchema = z
     // for one answered thread. (Vanda, #89.)
     thread_key: z.preprocess(emptyToUndef, z.string().trim().toLowerCase().max(200).optional()),
     draft_key: z.preprocess(emptyToUndef, z.string().trim().toLowerCase().max(200).optional()),
+    // How the prospect answered (lib/outreach/campaign.ts REPLY_TYPES) —
+    // stamped on the replied draft for the campaign dashboard. Optional.
+    reply_type: z.preprocess(emptyToUndef, z.enum(REPLY_TYPES).optional()),
 
     // Marketing passthrough — stored on lead.customFields.
     utm_source: optStr,

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
+import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import {
   type DraftStatus,
   isDraftStatus,
@@ -21,6 +22,14 @@ import {
 const TENANT_ID = 1;
 
 const AUDIT_TYPE = "email_draft" as const;
+
+// Every action checks the CRM user itself (2026-09-17): the proxy's login
+// redirect proves a Supabase session, not a CRM user, and server actions are
+// callable by id.
+async function isCrmUser(): Promise<boolean> {
+  return (await getActor(TENANT_ID)).userId != null;
+}
+const DENIED = { ok: false as const, error: NOT_A_CRM_USER };
 
 export interface DraftRow {
   id: number;
@@ -60,6 +69,7 @@ const MAX_LIST_ROWS = 200;
 export async function listDrafts(
   filter?: DraftFilter,
 ): Promise<{ drafts: DraftListRow[]; campaigns: string[]; truncated: boolean }> {
+  if (!(await isCrmUser())) return { drafts: [], campaigns: [], truncated: false };
   const where: Prisma.EmailDraftWhereInput = { tenantId: TENANT_ID };
   if (filter?.campaign) where.campaign = filter.campaign;
   if (filter?.step != null && isValidStep(filter.step)) where.step = filter.step;
@@ -114,6 +124,7 @@ export async function listDrafts(
 
 /** A single draft's body, fetched only when the editor expands a row — tenant-scoped. */
 export async function getDraftBody(id: number): Promise<{ ok: true; body: string } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID }, select: { body: true } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   return { ok: true, body: row.body };
@@ -126,6 +137,7 @@ export interface OutreachSettings {
 
 /** tenants.settings.outreachReplyTo / outreachFooter. */
 export async function getOutreachSettings(): Promise<OutreachSettings> {
+  if (!(await isCrmUser())) return { replyTo: null, footer: null };
   const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
   const s = (tenant?.settings as Record<string, unknown> | null) ?? {};
   return {
@@ -145,6 +157,7 @@ export async function saveOutreachSettings(input: {
   replyTo: string;
   footer: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const replyTo = input.replyTo.trim();
   if (replyTo && !EMAIL_RE.test(replyTo)) return { ok: false, error: "Érvénytelen válaszcím" };
   const footer = input.footer.trim();
@@ -181,6 +194,7 @@ export async function updateDraft(
   id: number,
   input: { subject: string; body: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!canEdit(row.status as DraftStatus)) {
@@ -199,6 +213,7 @@ export async function updateDraft(
 
 /** Approve a single draft. */
 export async function approveDraft(id: number): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!canApprove(row.status as DraftStatus)) {
@@ -222,6 +237,7 @@ export async function approveAll(
   step?: number,
   opts?: { dryRun?: boolean },
 ): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const where: Prisma.EmailDraftWhereInput = {
     tenantId: TENANT_ID,
     campaign,
@@ -250,6 +266,7 @@ export async function approveAll(
  * POST put the same cold email in front of the same company twice. (Vanda, #88.)
  */
 export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!canSend(row.status as DraftStatus)) {

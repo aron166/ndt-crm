@@ -5,8 +5,11 @@ import { revalidatePath } from "next/cache";
 import { validateInteractionInput } from "@/lib/interactions";
 import { audit } from "@/lib/audit";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
+import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 
 export async function logInteraction(formData: FormData) {
+  const { userId } = await getActor(1);
+  if (userId == null) return { error: NOT_A_CRM_USER };
   const type = formData.get("type") as string;
   const direction = (formData.get("direction") as string) || "outbound";
   const notes = formData.get("notes") as string;
@@ -31,6 +34,7 @@ export async function logInteraction(formData: FormData) {
       occurredAt: new Date(occurredAt),
       companyId,
       personId,
+      userId,
     },
   });
   await audit("interaction", interaction.id, "create", null,

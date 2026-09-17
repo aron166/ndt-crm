@@ -264,7 +264,9 @@ export async function ingestLead(
       source: input.source,
       sourceApp,
       channel: input.channel,
-      campaign: input.campaign ?? null,
+      // A reply to our outreach belongs to that outreach's campaign even when
+      // the intake skill forgot to say so — the dashboard counts leads by it.
+      campaign: input.campaign ?? draft?.campaign ?? null,
       threadKey,
       status: statusKey,
       subject: input.service_interest ?? null,
@@ -316,7 +318,7 @@ export async function ingestLead(
   if (draft) {
     await tx.emailDraft.updateMany({
       where: { id: draft.id, tenantId, status: "sent" },
-      data: { status: "replied" },
+      data: { status: "replied", repliedAt: new Date(), replyType: input.reply_type ?? null },
     });
 
     // A reply must STOP the sequence. Marking the answered draft `replied` did
