@@ -206,7 +206,8 @@ export function ReviewClient({
   function assetHref(a: AssetRow): string | null {
     if (a.kind === "link") return isHttpUrl(a.url) ? a.url : null;
     if (a.storagePath) return signedUrls[a.storagePath] ?? null;
-    return null;
+    // Assets posted by URL through POST /api/content (no upload).
+    return isHttpUrl(a.url) ? a.url : null;
   }
 
   const categoryLabel = CATEGORY_LABEL[item.category as ContentCategory] ?? item.category;
