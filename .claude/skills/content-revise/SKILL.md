@@ -76,9 +76,9 @@ company, not to guess here.
    - Hungarian typography: „ ” quotes, decimal comma, `2026. szeptember 22.` dates.
    - **Claims: closed list — no list, no rewrite.** If the claim list below cannot be read
      (file missing, no access), do **not** write or post anything for any item: stop the run
-     and report "claim list unavailable". Before writing, read §6 of
-     `/home/aron166/Projects/growth/campaigns/cold-email-v0/FRAMEWORK.md` (or
-     `docs/cold-email-framework.md` in ndt-crm once PR #90 is merged). Only the claims listed
+     and report "claim list unavailable". Before writing, read the claim
+     list in `docs/cold-email-framework.md` (in THIS repo, merged 2026-09-17; the
+     original lives in growth/campaigns/cold-email-v0/FRAMEWORK.md §6). Only the claims listed
      there may appear. Never add a claim, a number, a price, a reference customer, a depth,
      a tolerance, or "röntgen". If a reviewer asks for something that would need a claim
      outside the list, do **not** invent it — write the version without it and say so in the
