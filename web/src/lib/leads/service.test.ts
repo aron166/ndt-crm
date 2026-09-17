@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { db } from "@/lib/db";
 import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, setLeadQualification, type LeadCtx } from "./service";
+import { resolveDemoHost, loadBookings } from "@/lib/booking/queries";
 
 // The task ↔ kanban sync (Péter, BRIEFING addendum 2026-09-07 P0 #4). Both
 // directions, plus the "duplication structurally impossible" claim.
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/booking/queries", () => ({
+  resolveDemoHost: vi.fn().mockResolvedValue(null),
+  loadBookings: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("./queries", () => ({
   getLeadStatuses: vi.fn().mockResolvedValue(
     ["new", "call_1", "call_2", "call_3", "call_3_plus", "recall", "demo_aron", "demo_peter"]
@@ -38,6 +43,9 @@ const mockDb = db as unknown as {
   $transaction: M;
 };
 const ctx: LeadCtx = { tenantId: 1, userId: 2, actor: "user" };
+const agentCtx: LeadCtx = { tenantId: 1, userId: null, actor: "agent" };
+const mockResolveDemoHost = resolveDemoHost as unknown as M;
+const mockLoadBookings = loadBookings as unknown as M;
 
 const LEAD = {
   status: "call_1", outcome: "open", companyId: 7, source: null, serviceInterest: null,
@@ -155,5 +163,90 @@ describe("completeOpenLeadCallTasks is the single shared query", () => {
       where: { tenantId: 1, leadId: 42, type: "call", status: { in: ["created", "in_progress"] } },
       data: { status: "done", completedAt: now },
     });
+  });
+});
+
+describe("logLeadCallOutcome — bookings", () => {
+  const inDays = (n: number) => new Date(Date.now() + n * 86_400_000);
+
+  it("user ctx, meeting_booked without bookingAt: rejected with issues.bookingAt, no task created", async () => {
+    const res = await logLeadCallOutcome(10, {
+      outcome: "meeting_booked", note: "demo egyeztetve", demoWith: "aron",
+    }, ctx);
+    expect(res).toMatchObject({ issues: { bookingAt: expect.any(Array) } });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+    expect(txTaskCreate).not.toHaveBeenCalled();
+  });
+
+  it("agent ctx, meeting_booked with demoWith only (old API payload): succeeds, no booking task, host never resolved", async () => {
+    const res = await logLeadCallOutcome(10, {
+      outcome: "meeting_booked", note: "demo egyeztetve", demoWith: "aron",
+    }, agentCtx);
+    expect(res).toMatchObject({ success: true, bookingTaskId: null, bookingConflicts: [] });
+    expect(mockResolveDemoHost).not.toHaveBeenCalled();
+    expect(txTaskCreate).not.toHaveBeenCalled();
+  });
+
+  it("agent ctx, bookingAt in the past: rejected", async () => {
+    const res = await logLeadCallOutcome(10, {
+      outcome: "meeting_booked", note: "demo egyeztetve", demoWith: "aron",
+      bookingAt: inDays(-3).toISOString(), bookingKind: "single_machine_demo",
+    }, agentCtx);
+    expect(res).toMatchObject({ issues: { bookingAt: expect.any(Array) } });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("user ctx, valid future booking: booking task goes to the resolved host, not ctx.userId", async () => {
+    mockResolveDemoHost.mockResolvedValueOnce(3);
+    const bookingAt = inDays(3);
+    const res = await logLeadCallOutcome(10, {
+      outcome: "meeting_booked", note: "demo egyeztetve", demoWith: "aron",
+      bookingAt: bookingAt.toISOString(), bookingKind: "single_machine_demo",
+    }, ctx);
+    expect(txTaskCreate).toHaveBeenCalledTimes(1);
+    expect(txTaskCreate.mock.calls[0][0]).toMatchObject({
+      data: expect.objectContaining({
+        assignedToId: 3,
+        startsAt: bookingAt,
+        bookingKind: "single_machine_demo",
+      }),
+    });
+    expect(res).toMatchObject({ success: true, bookingTaskId: 99 });
+  });
+
+  it("resolveDemoHost returns null: rejected mentioning demoHosts, no transaction run", async () => {
+    mockResolveDemoHost.mockResolvedValueOnce(null);
+    const res = await logLeadCallOutcome(10, {
+      outcome: "meeting_booked", note: "demo egyeztetve", demoWith: "peter",
+      bookingAt: inDays(3).toISOString(), bookingKind: "single_machine_demo",
+    }, ctx);
+    expect(res).toMatchObject({ error: expect.stringContaining("demoHosts") });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("an overlapping existing booking is flagged as a conflict with the existing side movable", async () => {
+    mockResolveDemoHost.mockResolvedValueOnce(3);
+    const bookingAt = inDays(3);
+    mockLoadBookings.mockResolvedValueOnce([
+      { id: 501, title: "Magánszemély látogatás", startsAt: bookingAt, minutes: 90, assignedToId: 3, kind: "private", dealValue: null, estimatedValue: null, point: null },
+    ]);
+    const res = await logLeadCallOutcome(10, {
+      outcome: "meeting_booked", note: "demo egyeztetve", demoWith: "aron",
+      bookingAt: bookingAt.toISOString(), bookingKind: "multi_unit_demo",
+    }, ctx);
+    expect(res).toMatchObject({ success: true });
+    if (!("success" in res)) throw new Error("expected success");
+    expect(res.bookingConflicts).toHaveLength(1);
+    expect(res.bookingConflicts[0]).toMatchObject({ taskId: 501, movable: "existing" });
+  });
+
+  it("loadBookings throwing still leaves the call saved, with no conflicts reported", async () => {
+    mockResolveDemoHost.mockResolvedValueOnce(3);
+    mockLoadBookings.mockRejectedValueOnce(new Error("db down"));
+    const res = await logLeadCallOutcome(10, {
+      outcome: "meeting_booked", note: "demo egyeztetve", demoWith: "aron",
+      bookingAt: inDays(3).toISOString(), bookingKind: "single_machine_demo",
+    }, ctx);
+    expect(res).toMatchObject({ success: true, bookingConflicts: [] });
   });
 });

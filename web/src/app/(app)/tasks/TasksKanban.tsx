@@ -9,6 +9,7 @@ import { useTaskCompletion } from "@/components/useTaskCompletion";
 import { TaskModal } from "./TaskModal";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { BOOKING_KIND_LABEL, isBookingKind } from "@/lib/booking/priority";
 
 const COLUMNS = [
   { key: "created",     label: "Kiírva",      color: "var(--fg-mute)",  glow: "oklch(0.62 0.012 255 / 0.4)" },
@@ -40,6 +41,8 @@ interface Task {
   category: string | null;
   status: string;
   dueDate: Date | null;
+  startsAt: Date | null;
+  bookingKind: string | null;
   estimatedMinutes: number | null;
   description: string | null;
   companyId: number | null;
@@ -160,6 +163,24 @@ function KanbanCard({
       >
         {task.title}
       </Link>
+
+      {/* Booking: start time + priority-rung chip (task with startsAt IS a booking) */}
+      {task.startsAt && (
+        <div className="flex items-center gap-2 font-mono-ndt" style={{ marginBottom: 8 }}>
+          <span className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--sky)", fontWeight: 600 }}>
+            <Clock style={{ width: 9, height: 9 }} />
+            {new Date(task.startsAt).toLocaleString("hu-HU", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+          </span>
+          {isBookingKind(task.bookingKind) && (
+            <span
+              className="font-mono-ndt rounded"
+              style={{ fontSize: 11, padding: "1px 6px", background: "var(--sky-soft)", color: "var(--sky)", border: "1px solid var(--sky)40" }}
+            >
+              {BOOKING_KIND_LABEL[task.bookingKind]}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Person + company */}
       {(personName || task.company) && (

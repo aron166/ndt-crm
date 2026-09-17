@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SCRIPT_KEY_MAX } from "./scripts";
+import { BOOKING_KINDS } from "@/lib/booking/priority";
 
 // Lead call-outcome logging — PURE module (no DB), shared by the UI modal, the
 // server action and the public API. The note-required / callback rules live in
@@ -75,6 +76,10 @@ export const callOutcomeSchema = z
     callbackAt: z.coerce.date().optional(),
     /** Required when outcome = meeting_booked. */
     demoWith: z.enum(["aron", "peter"]).optional(),
+    /** meeting_booked: when the demo/visit starts. Required for UI users only (bookingIssue). */
+    bookingAt: z.coerce.date().optional(),
+    /** Goes with bookingAt — the priority rung (lib/booking/priority.ts). */
+    bookingKind: z.enum(BOOKING_KINDS).optional(),
     /** Required when the outcome is lost/disqualified — a short free text WHY. */
     lostReason: z.string().trim().max(LOST_REASON_MAX).optional(),
     /** Optional: who the callback task is assigned to (defaults to the actor). */
@@ -96,11 +101,49 @@ export const callOutcomeSchema = z
     if (d.outcome === "meeting_booked" && !d.demoWith) {
       ctx.addIssue({ code: "custom", path: ["demoWith"], message: "Add meg, kivel lesz a demó (Áron / Péter)" });
     }
+    // The booking fields come as a PAIR (a date without a rung cannot be ranked).
+    // Whether they are required at all depends on WHO is calling — see
+    // bookingIssue() below; the schema is shared with API callers.
+    if (d.bookingAt && !d.bookingKind) {
+      ctx.addIssue({ code: "custom", path: ["bookingKind"], message: "Add meg a foglalás típusát" });
+    }
+    if (d.bookingKind && !d.bookingAt) {
+      ctx.addIssue({ code: "custom", path: ["bookingAt"], message: "Foglaláshoz dátum és óra kötelező" });
+    }
+    if (d.bookingAt && d.outcome !== "meeting_booked") {
+      ctx.addIssue({ code: "custom", path: ["bookingAt"], message: "Foglalás csak demó-egyeztetésnél adható meg" });
+    }
     if (isLostCallOutcome(d.outcome) && (d.lostReason ?? "").length < LOST_REASON_MIN) {
       ctx.addIssue({ code: "custom", path: ["lostReason"], message: "Az elvesztés oka kötelező (min. 3 karakter)" });
     }
   });
 export type CallOutcomeInput = z.infer<typeof callOutcomeSchema>;
+
+/**
+ * The actor-dependent booking rules (Kai ruling 2026-09-17, PR #97 finding 1).
+ *
+ * - UI users (modal, /drive) MUST give a date + rung for `meeting_booked`.
+ * - API/agent callers keep the pre-booking contract: the fields are optional,
+ *   and without them no booking task is created. Making them mandatory would
+ *   turn every existing caller's working payload into a 400.
+ * - Whoever sends a date: it cannot be in the past.
+ *
+ * Returns the first problem as a Zod-style issue, or null.
+ */
+export function bookingIssue(
+  input: Pick<CallOutcomeInput, "outcome" | "bookingAt">,
+  actor: "user" | "agent",
+  now: Date,
+): { path: "bookingAt"; message: string } | null {
+  if (input.outcome !== "meeting_booked") return null;
+  if (!input.bookingAt) {
+    return actor === "user" ? { path: "bookingAt", message: "Foglaláshoz dátum és óra kötelező" } : null;
+  }
+  if (input.bookingAt.getTime() < now.getTime()) {
+    return { path: "bookingAt", message: "A foglalás időpontja nem lehet a múltban" };
+  }
+  return null;
+}
 
 export interface CallOutcomePlan {
   /** New lead status, or null = unchanged. */
@@ -109,6 +152,9 @@ export interface CallOutcomePlan {
   lost: { lostReason: string } | null;
   /** A callback task to create (callback_requested only). */
   callbackAt: Date | null;
+  /** A booking task to create (meeting_booked only). */
+  bookingAt: Date | null;
+  bookingKind: (typeof BOOKING_KINDS)[number] | null;
 }
 
 /**
@@ -121,7 +167,7 @@ export function planCallOutcome(
   knownStatuses: readonly string[],
 ): CallOutcomePlan {
   const known = (s: string) => knownStatuses.includes(s);
-  const plan: CallOutcomePlan = { status: null, lost: null, callbackAt: null };
+  const plan: CallOutcomePlan = { status: null, lost: null, callbackAt: null, bookingAt: null, bookingKind: null };
 
   switch (input.outcome) {
     case "no_answer": {
@@ -138,6 +184,8 @@ export function planCallOutcome(
     case "meeting_booked": {
       const target = DEMO_STATUS[input.demoWith ?? "aron"];
       if (known(target)) plan.status = target;
+      plan.bookingAt = input.bookingAt ?? null;
+      plan.bookingKind = input.bookingKind ?? null;
       break;
     }
     case "not_interested":

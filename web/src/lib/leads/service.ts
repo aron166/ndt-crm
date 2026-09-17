@@ -7,10 +7,13 @@ import { getLeadStatuses, getQualificationQuestions, getScriptVariants } from ".
 import { leadStatusLabel } from "./statuses";
 import {
   callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
-  RECALL_STATUS, type LeadOutcome,
+  RECALL_STATUS, bookingIssue, type LeadOutcome,
 } from "./outcomes";
 import { parseAnswers, answersFrom } from "./qualification";
 import { computeTier } from "./tier";
+import { reportError } from "@/lib/report-error";
+import { DEFAULT_BOOKING_MINUTES, conflictsFor } from "@/lib/booking/conflicts";
+import { loadBookings, resolveDemoHost } from "@/lib/booking/queries";
 
 // The ONE write path for lead process changes — used by the server actions (UI)
 // and the public /api/leads routes alike, so the rules can't drift between the
@@ -306,6 +309,21 @@ export interface LogCallResult {
   status: string | null;
   outcome: LeadOutcome;
   taskId: number | null;
+  bookingTaskId: number | null;
+  /**
+   * Collisions the new booking makes in its host's calendar. FLAGGED only —
+   * the booking is written either way; a human decides what moves (Péter's rule).
+   * `movable` names the lower-priority side.
+   */
+  bookingConflicts: BookingConflictInfo[];
+}
+
+export interface BookingConflictInfo {
+  taskId: number;
+  title: string;
+  startsAt: string;
+  overlapMinutes: number;
+  movable: "new" | "existing";
 }
 
 /**
@@ -327,6 +345,9 @@ export async function logLeadCallOutcome(
     return { error: first ?? "Érvénytelen adat", issues: flat.fieldErrors };
   }
   const input = parsed.data;
+  const now = new Date();
+  const bIssue = bookingIssue(input, ctx.actor, now);
+  if (bIssue) return { error: bIssue.message, issues: { [bIssue.path]: [bIssue.message] } };
 
   const lead = await loadLead(leadId, ctx.tenantId);
   if (!lead) return { error: "Lead nem található" };
@@ -348,14 +369,24 @@ export async function logLeadCallOutcome(
     }
   }
 
+  // The demo lands on the HOST's calendar (finding 3), not the logger's.
+  let bookingHostId: number | null = null;
+  if (input.bookingAt) {
+    // The schema guarantees demoWith with a booking (meeting_booked requires it).
+    if (!input.demoWith) return { error: "Add meg, kivel lesz a demó (Áron / Péter)" };
+    bookingHostId = await resolveDemoHost(ctx.tenantId, input.demoWith);
+    if (bookingHostId == null) {
+      return { error: "Nincs beállítva, ki tartja a demót (tenants.settings.demoHosts)" };
+    }
+  }
+
   const statuses = await getLeadStatuses(ctx.tenantId);
   const plan = planCallOutcome(input, lead.status, statuses.map((s) => s.key));
   const personId = lead.contact?.personId ?? null;
-  const now = new Date();
   const p = lead.contact?.person;
   const who = p ? `${p.lastName} ${p.firstName}`.trim() : lead.company?.name ?? `Lead #${leadId}`;
 
-  const { interaction, task } = await db.$transaction(async (tx) => {
+  const { interaction, task, bookingTask } = await db.$transaction(async (tx) => {
     const interaction = await tx.interaction.create({
       data: {
         tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId, userId: ctx.userId,
@@ -379,6 +410,18 @@ export async function logLeadCallOutcome(
           select: { id: true },
         })
       : null;
+    const bookingTask = plan.bookingAt
+      ? await tx.task.create({
+          data: {
+            tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId,
+            assignedToId: bookingHostId,
+            title: `Demó: ${who}`, type: "meeting", category: "revenue_generating",
+            status: "created", startsAt: plan.bookingAt, dueDate: plan.bookingAt,
+            bookingKind: plan.bookingKind, estimatedMinutes: DEFAULT_BOOKING_MINUTES,
+          },
+          select: { id: true },
+        })
+      : null;
     await tx.lead.updateMany({
       where: { id: leadId, tenantId: ctx.tenantId },
       data: {
@@ -389,14 +432,46 @@ export async function logLeadCallOutcome(
     if (lead.companyId) {
       await tx.company.updateMany({ where: { id: lead.companyId, tenantId: ctx.tenantId }, data: { lastInteractionDate: now } });
     }
-    return { interaction, task };
+    return { interaction, task, bookingTask };
   });
   await recomputeCloseness({ tenantId: ctx.tenantId, companyId: lead.companyId, personId });
+
+  // Conflict check on the WRITE (finding 5): a hand-typed date is the case that
+  // actually happens. After the commit, flag-only — never blocks, never cancels.
+  let bookingConflicts: BookingConflictInfo[] = [];
+  if (bookingTask && plan.bookingAt && bookingHostId != null) try {
+    const day = 86_400_000;
+    const others = await loadBookings(ctx.tenantId, bookingHostId,
+      new Date(plan.bookingAt.getTime() - day), new Date(plan.bookingAt.getTime() + day), bookingTask.id);
+    const candidate = {
+      id: bookingTask.id, startsAt: plan.bookingAt, minutes: DEFAULT_BOOKING_MINUTES, assignedToId: bookingHostId,
+      kind: plan.bookingKind, dealValue: null,
+      estimatedValue: lead.estimatedValue != null ? Number(lead.estimatedValue) : null,
+    };
+    const titles = new Map(others.map((o) => [o.id, o.title]));
+    bookingConflicts = conflictsFor(candidate, others).map((c) => {
+      const other = c.keep.id === candidate.id ? c.bump : c.keep;
+      return {
+        taskId: other.id,
+        title: titles.get(other.id) ?? `Foglalás #${other.id}`,
+        startsAt: other.startsAt.toISOString(),
+        overlapMinutes: c.overlapMinutes,
+        movable: c.bump.id === candidate.id ? "new" : "existing",
+      };
+    });
+  } catch (err) {
+    // The call and the booking are committed — a failed flag must not turn
+    // into a 500 that makes the setter retry and log the call twice.
+    reportError("leads.bookingConflicts", err, { leadId, bookingTaskId: bookingTask.id });
+  }
 
   audit("interaction", interaction.id, "create", null,
     { type: "call", outcome: input.outcome, leadId, companyId: lead.companyId, personId }, auditOpts(ctx));
   if (task) {
     audit("task", task.id, "create", null, { title: `Visszahívás: ${who}`, dueDate: plan.callbackAt?.toISOString() ?? null, leadId }, auditOpts(ctx));
+  }
+  if (bookingTask) {
+    audit("task", bookingTask.id, "create", null, { title: `Demó: ${who}`, startsAt: plan.bookingAt?.toISOString() ?? null, bookingKind: plan.bookingKind, leadId }, auditOpts(ctx));
   }
   if (plan.status || plan.lost) {
     audit("lead", leadId, "update",
@@ -421,5 +496,7 @@ export async function logLeadCallOutcome(
     status: plan.status ?? lead.status,
     outcome: plan.lost ? "lost" : "open",
     taskId: task?.id ?? null,
+    bookingTaskId: bookingTask?.id ?? null,
+    bookingConflicts,
   };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { callOutcomeSchema, planCallOutcome, callbackTone, daysSince } from "./outcomes";
+import { callOutcomeSchema, planCallOutcome, callbackTone, daysSince, bookingIssue } from "./outcomes";
 import { DEFAULT_LEAD_STATUSES } from "./statuses";
 
 const KEYS = DEFAULT_LEAD_STATUSES.map((s) => s.key);
@@ -15,9 +15,17 @@ describe("callOutcomeSchema — the shared rules", () => {
     expect(parse({ outcome: "callback_requested", note: "hívj", callbackAt: "not-a-date" }).success).toBe(false);
     expect(parse({ outcome: "callback_requested", note: "hívj", callbackAt: "2026-09-10T10:00:00Z" }).success).toBe(true);
   });
-  it("meeting_booked needs demoWith", () => {
+  it("meeting_booked needs demoWith; booking fields are optional but come as a pair", () => {
     expect(parse({ outcome: "meeting_booked", note: "ok" }).success).toBe(false);
+    // The pre-2026-09-12 API payload still parses (Kai ruling 2026-09-17).
     expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter" }).success).toBe(true);
+    expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter", bookingAt: "2026-09-10T10:00:00Z" }).success).toBe(false);
+    expect(parse({ outcome: "meeting_booked", note: "ok", demoWith: "peter", bookingKind: "job" }).success).toBe(false);
+    expect(parse({ outcome: "no_answer", note: "ok", bookingAt: "2026-09-10T10:00:00Z", bookingKind: "job" }).success).toBe(false);
+    expect(parse({
+      outcome: "meeting_booked", note: "ok", demoWith: "peter",
+      bookingAt: "2026-09-10T10:00:00Z", bookingKind: "single_machine_demo",
+    }).success).toBe(true);
   });
   it("not_interested / disqualified need a real lost reason, not just the key", () => {
     expect(parse({ outcome: "not_interested", note: "n" }).success).toBe(false);
@@ -30,6 +38,26 @@ describe("callOutcomeSchema — the shared rules", () => {
   });
   it("rejects unknown outcomes", () => {
     expect(parse({ outcome: "interested", note: "x" }).success).toBe(false);
+  });
+});
+
+describe("bookingIssue — who must book a date", () => {
+  const now = new Date("2026-09-17T10:00:00Z");
+  const future = new Date("2026-09-18T08:00:00Z");
+  it("a UI user must give a date for meeting_booked", () => {
+    expect(bookingIssue({ outcome: "meeting_booked" }, "user", now)?.path).toBe("bookingAt");
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: future }, "user", now)).toBeNull();
+  });
+  it("an API caller keeps the old contract — no date is fine", () => {
+    expect(bookingIssue({ outcome: "meeting_booked" }, "agent", now)).toBeNull();
+  });
+  it("nobody may book into the past", () => {
+    const past = new Date("2026-09-17T09:59:00Z");
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: past }, "user", now)).not.toBeNull();
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: past }, "agent", now)).not.toBeNull();
+  });
+  it("ignores other outcomes", () => {
+    expect(bookingIssue({ outcome: "no_answer" }, "user", now)).toBeNull();
   });
 });
 
@@ -49,16 +77,20 @@ describe("planCallOutcome", () => {
     expect(plan.status).toBe("recall");
     expect(plan.callbackAt?.toISOString()).toBe("2026-09-10T10:00:00.000Z");
   });
-  it("meeting_booked → demo column of the chosen person", () => {
-    expect(p("meeting_booked", "call_2", { demoWith: "peter" }).status).toBe("demo_peter");
-    expect(p("meeting_booked", "demo_aron", { demoWith: "aron" }).status).toBeNull();
+  it("meeting_booked → demo column of the chosen person, carrying the booking", () => {
+    const bookingExtra = { bookingAt: "2026-09-10T10:00:00Z", bookingKind: "single_machine_demo" };
+    const plan = p("meeting_booked", "call_2", { demoWith: "peter", ...bookingExtra });
+    expect(plan.status).toBe("demo_peter");
+    expect(plan.bookingAt?.toISOString()).toBe("2026-09-10T10:00:00.000Z");
+    expect(plan.bookingKind).toBe("single_machine_demo");
+    expect(p("meeting_booked", "demo_aron", { demoWith: "aron", ...bookingExtra }).status).toBeNull();
   });
   it("not_interested / disqualified close as lost carrying the typed reason", () => {
     expect(p("not_interested", "call_1", { lostReason: "Van saját szkennerük" }).lost)
       .toEqual({ lostReason: "Van saját szkennerük" });
     expect(p("disqualified", "new", { lostReason: "Nincs betonszerkezetük" }).lost)
       .toEqual({ lostReason: "Nincs betonszerkezetük" });
-    expect(p("wrong_number", "new")).toEqual({ status: null, lost: null, callbackAt: null });
+    expect(p("wrong_number", "new")).toEqual({ status: null, lost: null, callbackAt: null, bookingAt: null, bookingKind: null });
   });
   it("never moves into a column the tenant removed", () => {
     const plan = planCallOutcome(

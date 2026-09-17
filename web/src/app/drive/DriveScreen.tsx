@@ -4,9 +4,17 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { logLeadCall } from "@/app/actions/leads";
 import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
+import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
 import type { ScriptVariant } from "@/lib/leads/scripts";
+import type { BookingConflictInfo } from "@/lib/leads/service";
+
+// datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
+function toDatetimeLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 // /drive — one column, thumb-reachable, phone-at-arm's-length in a car.
 // Outcome rules (which extra field, min lengths) live server-side in
@@ -48,9 +56,12 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   const [selectedOutcome, setSelectedOutcome] = useState<CallOutcomeKey | null>(null);
   const [callbackAt, setCallbackAt] = useState("");
   const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
+  const [bookingAt, setBookingAt] = useState("");
+  const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflictNotice, setConflictNotice] = useState<BookingConflictInfo[] | null>(null);
   const [pending, startTransition] = useTransition();
   const submitting = useRef(false);
   const [scriptKey, setScriptKey] = useState("");
@@ -84,7 +95,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
 
   function resetFields() {
     setNote(""); setSelectedOutcome(null); setCallbackAt("");
-    setDemoWith("aron"); setLostReason(""); setExpanded(false); setError(null);
+    setDemoWith("aron"); setBookingAt(""); setBookingKind(""); setLostReason(""); setExpanded(false); setError(null);
     // scriptKey is NOT reset here: `lead` still points at the OLD lead in this
     // closure, so defaultScriptKey would be the old lead's default. The
     // useEffect above recomputes it once the new `lead` is rendered.
@@ -101,6 +112,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
     if (!lead || submitting.current) return;
     submitting.current = true;
     setError(null);
+    setConflictNotice(null);
     startTransition(async () => {
       try {
         const res = await logLeadCall(lead.id, {
@@ -108,10 +120,13 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           note,
           callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
           demoWith: outcome === "meeting_booked" ? demoWith : null,
+          bookingAt: outcome === "meeting_booked" && bookingAt ? new Date(bookingAt).toISOString() : null,
+          bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
           lostReason: isLostCallOutcome(outcome) ? lostReason : null,
           scriptVariant: scriptKey || undefined,
         });
         if ("error" in res) { setError(res.error); return; }
+        if (res.bookingConflicts?.length > 0) setConflictNotice(res.bookingConflicts);
         resetFields();
         setDone((d) => new Set(d).add(lead.id));
       } catch {
@@ -135,9 +150,29 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
     }
   }
 
+  // Rendered on the lead card AND on the empty-queue screen: the last call of a
+  // drive can be the one that collides.
+  const notice = conflictNotice && (
+        <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
+          <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve — de ütközik a naptárban:</p>
+          {conflictNotice.map((c) => (
+            <p key={c.taskId} style={{ margin: 0 }}>
+              {c.title} ({new Date(c.startsAt).toLocaleString("hu-HU")}) —{" "}
+              {c.movable === "existing"
+                ? "a meglévő foglalás az alacsonyabb prioritású, azt lehet áthelyezni."
+                : "ez az új foglalás az alacsonyabb prioritású, ezt lehet áthelyezni."}
+            </p>
+          ))}
+          <button onClick={() => setConflictNotice(null)} style={{ marginTop: 6, background: "none", border: "1px solid var(--amber)", color: "var(--amber)", borderRadius: 6, fontSize: 12, padding: "4px 10px", cursor: "pointer" }}>
+            Rendben
+          </button>
+        </div>
+      );
+
   if (!lead) {
     return (
       <div style={{ maxWidth: 480, margin: "0 auto", padding: 24, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center" }}>
+        {notice}
         <p style={{ fontSize: 16, color: "var(--fg-soft)" }}>Nincs több lead a sorban.</p>
         <button style={outcomeBtnStyle(undefined)} onClick={() => router.refresh()}>Frissítés</button>
       </div>
@@ -161,6 +196,8 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           Kihagyom
         </button>
       </div>
+
+      {notice}
 
       <div>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--fg)", margin: 0, lineHeight: 1.25 }}>{lead.companyName}</h1>
@@ -267,14 +304,21 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
             <input type="datetime-local" style={inputStyle} value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} />
           )}
           {selectedOutcome === "meeting_booked" && (
-            <div style={{ display: "flex", gap: 16, fontSize: 15, color: "var(--fg)" }}>
-              {(["aron", "peter"] as const).map((w) => (
-                <label key={w} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
-                  {w === "aron" ? "Áron" : "Péter"}
-                </label>
-              ))}
-            </div>
+            <>
+              <div style={{ display: "flex", gap: 16, fontSize: 15, color: "var(--fg)" }}>
+                {(["aron", "peter"] as const).map((w) => (
+                  <label key={w} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
+                    {w === "aron" ? "Áron" : "Péter"}
+                  </label>
+                ))}
+              </div>
+              <input type="datetime-local" style={inputStyle} value={bookingAt} min={toDatetimeLocal(new Date())} onChange={(e) => setBookingAt(e.target.value)} />
+              <select style={inputStyle} value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
+                <option value="">Foglalás típusa…</option>
+                {BOOKING_KINDS.map((k) => <option key={k} value={k}>{BOOKING_KIND_LABEL[k]}</option>)}
+              </select>
+            </>
           )}
           {(selectedOutcome === "not_interested" || selectedOutcome === "disqualified") && (
             <input
