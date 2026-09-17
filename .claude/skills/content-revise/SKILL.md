@@ -93,7 +93,7 @@ company, not to guess here.
    visual): you do not generate media. Post a version whose body is the updated brief for the
    human/agent who will produce it, set `needs_human_asset: true`, and say exactly what must be
    produced in the change note.
-6. **Write the change note** (Hungarian, plain text): one line per comment point —
+6. **Write the change note and your own verdict** (Hungarian, plain text): one line per comment point —
    `1. <the request, briefly> → <what you changed>` — then anything you deliberately did not do
    and why. Every comment point must be answered. Start with `v{new} a v{current} alapján.`
 7. **Post the version** —
@@ -103,7 +103,10 @@ company, not to guess here.
      -d @version.json
    ```
    with `{ "body": "...", "change_note": "...", "based_on_version_id": <currentVersion.id>,
-   "needs_human_asset": false }` (build the JSON with a tool like `jq` or a script — never by
+   "needs_human_asset": false, "self_score": 0.0-1.0, "self_note": "..." }`
+   — `self_score` is YOUR OWN confidence that this version is ready for a human, and
+   `self_note` one line on what you were unsure about. Be honest: a low score gets your work
+   sampled, not punished, and the score is only recorded and displayed, nothing acts on it (build the JSON with a tool like `jq` or a script — never by
    hand-escaping).
    - `201` → done.
    - `409` → **a human edited the item after your claim** (or your claim expired). Their version
