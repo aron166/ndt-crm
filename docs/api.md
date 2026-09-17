@@ -524,7 +524,10 @@ exists), `import` (boolean — `true` authors the version as `import` instead
 of `ai`, for migrating existing material).
 
 Idempotent on `external_ref`: an item with the same ref already existing
-returns `200 { "ok": true, "contentItemId", "versionId", "existed": true }`
+returns `200 { "ok": true, "contentItemId", "versionId", "existed": true, "bodyHash" }`
+(`bodyHash` is a sha256 of the item's CURRENT version body, so an importer can
+tell a changed source file from an unchanged one and post a new version instead
+of skipping it: that is what `scripts/import-content.mjs --refresh` does)
 and writes **no** new assets, no `content.submitted` app event — the caller
 already has an item, nothing is duplicated.
 
