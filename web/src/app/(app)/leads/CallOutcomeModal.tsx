@@ -73,7 +73,9 @@ export function CallOutcomeModal({
     setBookingAt(""); setBookingKind(""); setSlotProposals([]); setSlotError(null); setSavedConflicts(null);
     setScriptKey(defaultScriptKey);
   }
-  function handleClose() { reset(); onClose(); }
+  // The call is already saved while the conflict notice shows — closing then
+  // must still refresh the parent, same as "Rendben".
+  function handleClose() { const saved = savedConflicts !== null; reset(); onClose(); if (saved) onLogged?.(); }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
