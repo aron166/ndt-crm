@@ -10,6 +10,8 @@ import { ANSWER_MAX } from "@/lib/leads/qualification";
 interface Question {
   slug: string;
   label: string;
+  /** Spec draft wording, not Áron's final — shown as a muted "javaslat" chip. */
+  draft?: boolean;
 }
 
 export function LeadQualificationPanel({
@@ -60,7 +62,18 @@ export function LeadQualificationPanel({
       <div className="panel-pad space-y-3">
         {questions.map((q) => (
           <div key={q.slug}>
-            <label className="field-label">{q.label}</label>
+            <label className="field-label">
+              {q.label}
+              {q.draft && (
+                <span
+                  className="badge-ds"
+                  style={{ marginLeft: 6, color: "var(--fg-faint)", borderColor: "var(--line-soft)", fontWeight: 500 }}
+                  title="A kérdés szövege még javaslat, Áron véglegesíti"
+                >
+                  javaslat
+                </span>
+              )}
+            </label>
             <Textarea
               rows={2}
               maxLength={ANSWER_MAX}

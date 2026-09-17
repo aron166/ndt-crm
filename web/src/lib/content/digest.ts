@@ -5,7 +5,7 @@ import { sendEmail } from "@/lib/integrations/resend";
 import { getContentReviewers } from "./reviewers";
 import { pendingForReviewerWhere } from "./queries";
 import { CATEGORY_LABEL } from "./labels";
-import type { ContentCategory } from "./types";
+import { STALE_REVIEW_MS, type ContentCategory } from "./types";
 
 /**
  * Daily digest email to reviewers (spec §5): "N anyag vár Önre", oldest first,
@@ -45,7 +45,10 @@ export function buildDigest(input: DigestInput): { subject: string; text: string
   const lines = oldestFirst.map((item) => {
     const days = Math.floor((now.getTime() - item.waitingSince.getTime()) / DAY_MS);
     const label = CATEGORY_LABEL[item.category as ContentCategory] ?? item.category;
-    return `- ${item.title} (${label}) — ${days} napja vár — ${baseUrl}/marketing/${item.id}`;
+    // Long waits are called out in WORDS (no glyphs — portfolio law 2026-09-17).
+    const stale = now.getTime() - item.waitingSince.getTime() > STALE_REVIEW_MS;
+    const age = stale ? `Régóta várakozik — ${days} napja` : `${days} napja vár`;
+    return `- ${item.title} (${label}) — ${age} — ${baseUrl}/marketing/${item.id}`;
   });
 
   const subject = `${items.length} anyag vár Önre`;

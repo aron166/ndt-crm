@@ -55,8 +55,10 @@ describe("buildDigest", () => {
         { id: 2, title: "Friss", category: "email", waitingSince: threeDays },
       ],
     })!;
-    expect(d.text).toMatch(/Régi \(E-mail\) — 4 napja vár — .*\/marketing\/1/);
+    // Over the stale threshold the row says so in words, not with a glyph.
+    expect(d.text).toMatch(/Régi \(E-mail\) — Régóta várakozik — 4 napja — .*\/marketing\/1/);
     expect(d.text).toMatch(/Friss \(E-mail\) — 3 napja vár — .*\/marketing\/2/);
+    expect(d.text).not.toMatch(/⚠/);
   });
 
   it("subject counts the items", () => {
