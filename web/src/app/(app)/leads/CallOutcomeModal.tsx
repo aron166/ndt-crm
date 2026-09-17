@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { logLeadCall } from "@/app/actions/leads";
 import { proposeBookingSlots } from "@/app/actions/bookings";
+import type { BookingConflictInfo } from "@/lib/leads/service";
 import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX } from "@/lib/leads/outcomes";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { FormField } from "@/components/ui/FormField";
@@ -59,7 +60,7 @@ export function CallOutcomeModal({
   const [slotsPending, startSlotsTransition] = useTransition();
   const [slotError, setSlotError] = useState<string | null>(null);
   const [slotProposals, setSlotProposals] = useState<SlotProposal[]>([]);
-  const [pickedConflicts, setPickedConflicts] = useState<SlotProposal["conflicts"] | null>(null);
+  const [savedConflicts, setSavedConflicts] = useState<BookingConflictInfo[] | null>(null);
   // A/B: deterministic per-lead assignment (leadId % length), not random or
   // "always A" — every variant needs data, and a re-render must not switch
   // the script mid-call. Empty ("Nincs szkript") when the tenant has none.
@@ -69,7 +70,7 @@ export function CallOutcomeModal({
 
   function reset() {
     setOutcome("no_answer"); setNote(""); setCallbackAt(""); setDemoWith("aron"); setLostReason(""); setError(null);
-    setBookingAt(""); setBookingKind(""); setSlotProposals([]); setSlotError(null); setPickedConflicts(null);
+    setBookingAt(""); setBookingKind(""); setSlotProposals([]); setSlotError(null); setSavedConflicts(null);
     setScriptKey(defaultScriptKey);
   }
   function handleClose() { reset(); onClose(); }
@@ -89,15 +90,15 @@ export function CallOutcomeModal({
         scriptVariant: scriptKey || undefined,
       });
       if ("error" in res) { setError(res.error); return; }
+      if (res.bookingConflicts?.length > 0) { setSavedConflicts(res.bookingConflicts); return; }
       reset(); onClose(); onLogged?.();
     });
   }
 
   function suggestSlots() {
-    if (!bookingKind) { setSlotError("Előbb válaszd ki a foglalás típusát"); return; }
     setSlotError(null);
     startSlotsTransition(async () => {
-      const res = await proposeBookingSlots(leadId, bookingKind);
+      const res = await proposeBookingSlots(leadId, demoWith);
       if ("error" in res) { setSlotError(res.error); setSlotProposals([]); return; }
       setSlotProposals(res.proposals);
     });
@@ -105,7 +106,10 @@ export function CallOutcomeModal({
 
   function pickSlot(p: SlotProposal) {
     setBookingAt(toDatetimeLocal(new Date(p.startsAt)));
-    setPickedConflicts(p.conflicts.length > 0 ? p.conflicts : null);
+  }
+
+  function acknowledgeConflicts() {
+    reset(); onClose(); onLogged?.();
   }
 
   return (
@@ -133,6 +137,19 @@ export function CallOutcomeModal({
             )}
           </FormField>
         )}
+        {savedConflicts ? (
+          <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
+            <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve — de ütközik a naptárban:</p>
+            {savedConflicts.map((c) => (
+              <p key={c.taskId} style={{ margin: 0 }}>
+                {c.title} ({new Date(c.startsAt).toLocaleString("hu-HU")}) —{" "}
+                {c.movable === "existing"
+                  ? "a meglévő foglalás az alacsonyabb prioritású, azt lehet áthelyezni."
+                  : "ez az új foglalás az alacsonyabb prioritású, ezt lehet áthelyezni."}
+              </p>
+            ))}
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField label="Eredmény" required>
             <select style={inputStyle} value={outcome} onChange={(e) => setOutcome(e.target.value)} autoFocus>
@@ -169,7 +186,8 @@ export function CallOutcomeModal({
               <FormField label="Foglalás időpontja (dátum + óra)" required>
                 <input
                   type="datetime-local" style={inputStyle} value={bookingAt} required
-                  onChange={(e) => { setBookingAt(e.target.value); setPickedConflicts(null); }}
+                  min={toDatetimeLocal(new Date())}
+                  onChange={(e) => setBookingAt(e.target.value)}
                 />
                 <div style={{ marginTop: 6 }}>
                   <Button type="button" variant="outline" onClick={suggestSlots} disabled={slotsPending}>
@@ -191,24 +209,9 @@ export function CallOutcomeModal({
                           style={{ ...inputStyle, textAlign: "left", cursor: "pointer" }}
                         >
                           <strong>{dateLabel} {timeLabel}</strong> — {reasonLine}{kmLine}
-                          {p.conflicts.length > 0 && (
-                            <span style={{ color: "var(--amber)" }}> · ütközik</span>
-                          )}
                         </button>
                       );
                     })}
-                  </div>
-                )}
-                {pickedConflicts && pickedConflicts.length > 0 && (
-                  <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 6, background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13 }}>
-                    {pickedConflicts.map((c, i) => (
-                      <p key={i} style={{ margin: 0 }}>
-                        Ütközik: {c.otherTitle} ({new Date(c.otherStartsAt).toLocaleString("hu-HU")}) —{" "}
-                        {c.movable === "other"
-                          ? "ez az alacsonyabb prioritású, áthelyezhető."
-                          : "ez az új foglalás az alacsonyabb prioritású, áthelyezhető."}
-                      </p>
-                    ))}
                   </div>
                 )}
               </FormField>
@@ -243,6 +246,14 @@ export function CallOutcomeModal({
             </Button>
           </DialogFooter>
         </form>
+        )}
+        {savedConflicts && (
+          <DialogFooter>
+            <Button type="button" onClick={acknowledgeConflicts} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              Rendben
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

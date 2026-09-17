@@ -8,6 +8,13 @@ import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booki
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
 import type { ScriptVariant } from "@/lib/leads/scripts";
+import type { BookingConflictInfo } from "@/lib/leads/service";
+
+// datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
+function toDatetimeLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 // /drive — one column, thumb-reachable, phone-at-arm's-length in a car.
 // Outcome rules (which extra field, min lengths) live server-side in
@@ -54,6 +61,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   const [lostReason, setLostReason] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflictNotice, setConflictNotice] = useState<BookingConflictInfo[] | null>(null);
   const [pending, startTransition] = useTransition();
   const submitting = useRef(false);
   const [scriptKey, setScriptKey] = useState("");
@@ -104,6 +112,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
     if (!lead || submitting.current) return;
     submitting.current = true;
     setError(null);
+    setConflictNotice(null);
     startTransition(async () => {
       try {
         const res = await logLeadCall(lead.id, {
@@ -117,6 +126,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           scriptVariant: scriptKey || undefined,
         });
         if ("error" in res) { setError(res.error); return; }
+        if (res.bookingConflicts?.length > 0) setConflictNotice(res.bookingConflicts);
         resetFields();
         setDone((d) => new Set(d).add(lead.id));
       } catch {
@@ -166,6 +176,23 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           Kihagyom
         </button>
       </div>
+
+      {conflictNotice && (
+        <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
+          <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve — de ütközik a naptárban:</p>
+          {conflictNotice.map((c) => (
+            <p key={c.taskId} style={{ margin: 0 }}>
+              {c.title} ({new Date(c.startsAt).toLocaleString("hu-HU")}) —{" "}
+              {c.movable === "existing"
+                ? "a meglévő foglalás az alacsonyabb prioritású, azt lehet áthelyezni."
+                : "ez az új foglalás az alacsonyabb prioritású, ezt lehet áthelyezni."}
+            </p>
+          ))}
+          <button onClick={() => setConflictNotice(null)} style={{ marginTop: 6, background: "none", border: "1px solid var(--amber)", color: "var(--amber)", borderRadius: 6, fontSize: 12, padding: "4px 10px", cursor: "pointer" }}>
+            Rendben
+          </button>
+        </div>
+      )}
 
       <div>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--fg)", margin: 0, lineHeight: 1.25 }}>{lead.companyName}</h1>
@@ -281,7 +308,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
                   </label>
                 ))}
               </div>
-              <input type="datetime-local" style={inputStyle} value={bookingAt} onChange={(e) => setBookingAt(e.target.value)} />
+              <input type="datetime-local" style={inputStyle} value={bookingAt} min={toDatetimeLocal(new Date())} onChange={(e) => setBookingAt(e.target.value)} />
               <select style={inputStyle} value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
                 <option value="">Foglalás típusa…</option>
                 {BOOKING_KINDS.map((k) => <option key={k} value={k}>{BOOKING_KIND_LABEL[k]}</option>)}
