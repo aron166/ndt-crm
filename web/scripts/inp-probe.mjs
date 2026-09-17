@@ -559,6 +559,15 @@ async function getCenter(cdp, sessionId, selector) {
         el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         res = hit(el.getBoundingClientRect());
       }
+      // 'nearest' is a no-op when the element is already within the layout
+      // viewport — which is true even when a FIXED-position bar (e.g. the
+      // bottom status bar) is painted on top of it, since fixed elements
+      // don't affect scroll-into-view's notion of "in view". Re-centering
+      // moves the element away from the fixed band at top or bottom.
+      if (!res.ok) {
+        el.scrollIntoView({ block: 'center', inline: 'nearest' });
+        res = hit(el.getBoundingClientRect());
+      }
       return res;
     })()
   `);
@@ -708,6 +717,7 @@ async function selectAndMeasure(cdp, sessionId, selector) {
   await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 40, code: "ArrowDown", key: "ArrowDown" }, sessionId);
   await sleep(2200); // ponytail: fixed 2.2s buffer; poll for the route commit instead if this run gets slow
   const { inp, loaf } = await readPerf(cdp, sessionId);
+  log("DEBUG select inp:", JSON.stringify(inp));
   const keyEntries = inp.filter((e) => e.name === "keydown" || e.name === "keypress" || e.name === "keyup");
   return summarize(keyEntries.length ? keyEntries : inp, loaf, keyEntries.length ? null : "no keydown/keypress/keyup entries; falling back to full entry set");
 }

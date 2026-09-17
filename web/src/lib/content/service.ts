@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { applyEvent, isClaimStale, type ItemState } from "./transitions";
 import { getApprovalRule, getContentReviewers } from "./reviewers";
+import { runContentRules } from "./rules";
 import { isReviewReason, reasonRequiredFor, type ReviewReason } from "./reasons";
 import {
   CLAIM_TTL_MS, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX,
@@ -151,7 +152,20 @@ export async function createItem(
       },
       select: { id: true },
     });
-    await t.contentItem.update({ where: { id: item.id }, data: { currentVersionId: version.id } });
+    const violations = await reconcileRuleChecks(t, actor.tenantId, item.id, {
+      category: input.category,
+      format: input.format ?? null,
+      body: input.body,
+      requiresFooter: input.category === "email",
+    });
+    await t.contentItem.update({
+      where: { id: item.id },
+      data: {
+        currentVersionId: version.id,
+        // A submission that already breaks a rule goes to the AI queue.
+        ...(violations.length > 0 ? { status: "rewrite_requested" } : {}),
+      },
+    });
     await writeAudit(t, actor, "content_item", item.id, "create", null,
       { title: input.title, category: input.category, status: "in_review", externalRef: input.externalRef ?? null });
     await writeAudit(t, actor, "content_version", version.id, "create", null, { itemId: item.id, number: 1 });
@@ -201,7 +215,7 @@ export async function createVersion(
   actor: ContentActor,
   itemId: number,
   input: CreateVersionInput,
-): Promise<{ ok: true; versionId: number; number: number } | Fail> {
+): Promise<{ ok: true; versionId: number; number: number; violations: { rule: string; message: string }[] } | Fail> {
   if (!input.body.trim() || input.body.length > CONTENT_BODY_MAX) return fail(400, "Invalid body");
   const changeNote = input.changeNote?.trim() || null;
   if (changeNote && changeNote.length > CHANGE_NOTE_MAX) return fail(400, "Change note too long");
@@ -260,10 +274,22 @@ export async function createVersion(
 
     const next = applyEvent(state, { type: "version_created", versionId: version.id });
     if (!next.ok) return fail(409, next.reason);
+
+    // Hard checks: a violated version goes BACK TO THE AI QUEUE, not to a human,
+    // and each violation is an open check so the live gate blocks it.
+    const itemRow = await tx.contentItem.findFirst({
+      where: { id: itemId, tenantId: actor.tenantId },
+      select: { id: true, category: true, format: true, campaignId: true },
+    });
+    const violations = itemRow
+      ? await reconcileRuleChecks(tx, actor.tenantId, itemId, await ruleContextFor(tx, actor.tenantId, itemRow, input.body))
+      : [];
+    const statusAfterRules = violations.length > 0 ? "rewrite_requested" : next.state.status;
+
     await tx.contentItem.update({
       where: { id: itemId },
       data: {
-        status: next.state.status,
+        status: statusAfterRules,
         currentVersionId: next.state.currentVersionId,
         claimedAt: null, claimedFrom: null, claimedBy: null,
         body: input.body,
@@ -272,8 +298,11 @@ export async function createVersion(
     });
     await writeAudit(tx, actor, "content_version", version.id, "create",
       { itemId, status: state.status, currentVersionId: state.currentVersionId },
-      { itemId, number, status: next.state.status, basedOnVersionId: input.basedOnVersionId });
-    return { ok: true as const, versionId: version.id, number };
+      {
+        itemId, number, status: statusAfterRules, basedOnVersionId: input.basedOnVersionId,
+        ...(violations.length ? { ruleViolations: violations.map((v) => v.rule) } : {}),
+      });
+    return { ok: true as const, versionId: version.id, number, violations };
   });
 }
 
@@ -449,6 +478,81 @@ export async function archiveItem(actor: UserActor, itemId: number): Promise<{ o
     await writeAudit(tx, actor, "content_item", itemId, "update", { status: state.status }, { status: "archived" });
     return { ok: true as const };
   });
+}
+
+/** Rule-check questions are prefixed so they can be told apart from ⚠ imports. */
+const RULE_CHECK_PREFIX = "Szabály:";
+
+/**
+ * Run the blocking content rules against a body and reconcile them with the
+ * item's rule checks (Áron 2026-09-17, "hard checks, code not prose"):
+ *  - a new violation becomes an OPEN check, so the live gate blocks the item
+ *    exactly like an imported ⚠ question;
+ *  - a violation that the new version fixed is auto-resolved, with a note;
+ *  - the caller decides the status (a violated item goes back to the AI queue).
+ * Returns the violations found.
+ */
+async function reconcileRuleChecks(
+  tx: Tx,
+  tenantId: number,
+  itemId: number,
+  ctx: { category: string; format?: string | null; body: string; footer?: string | null; requiresFooter?: boolean; otherHooks?: string[]; recipientVerified?: boolean | null },
+): Promise<{ rule: string; message: string }[]> {
+  const violations = runContentRules(ctx);
+  const open = violations.map((v) => `${RULE_CHECK_PREFIX} ${v.message}`);
+
+  if (open.length > 0) {
+    await tx.contentCheck.createMany({
+      data: open.map((question) => ({
+        tenantId, itemId, question: question.slice(0, CHECK_QUESTION_MAX),
+        forWhom: "either", state: "open", source: "rule",
+      })),
+      skipDuplicates: true,
+    });
+    // A rule that fires again must be OPEN even if a human had waived it before.
+    await tx.contentCheck.updateMany({
+      where: { itemId, source: "rule", question: { in: open.map((q) => q.slice(0, CHECK_QUESTION_MAX)) } },
+      data: { state: "open", answer: null, resolvedByUserId: null },
+    });
+  }
+
+  // Everything else that came from a rule is fixed now.
+  await tx.contentCheck.updateMany({
+    where: {
+      itemId, source: "rule", state: "open",
+      ...(open.length ? { question: { notIn: open.map((q) => q.slice(0, CHECK_QUESTION_MAX)) } } : {}),
+    },
+    data: { state: "resolved", answer: "A szabály már nem sérül ebben a verzióban." },
+  });
+
+  return violations.map((v) => ({ rule: v.rule, message: v.message }));
+}
+
+/** Context the rules need that lives in other rows (footer, sibling hooks). */
+async function ruleContextFor(
+  tx: Tx,
+  tenantId: number,
+  item: { id: number; category: string; format?: string | null; campaignId?: number | null },
+  body: string,
+): Promise<Parameters<typeof reconcileRuleChecks>[3]> {
+  const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  const footer = (tenant?.settings as Record<string, unknown> | null)?.outreachFooter;
+  const siblings = item.campaignId
+    ? await tx.contentItem.findMany({
+        where: { tenantId, campaignId: item.campaignId, id: { not: item.id }, status: { not: "archived" } },
+        select: { currentVersion: { select: { body: true } } },
+        take: 100,
+      })
+    : [];
+  return {
+    category: item.category,
+    format: item.format ?? null,
+    body,
+    footer: typeof footer === "string" ? footer : null,
+    // Cold outreach email copy must carry the consent line.
+    requiresFooter: item.category === "email",
+    otherHooks: siblings.map((s) => s.currentVersion?.body?.slice(0, 200) ?? "").filter(Boolean),
+  };
 }
 
 // ── §6c: ⚠ checks, restore, hard delete ─────────────────────────────────────

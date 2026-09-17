@@ -30,9 +30,10 @@ describe.skipIf(!enabled)("content service (integration)", () => {
   let seq = 0;
   const title = () => `IT-${Date.now()}-${(seq += 1)}`;
 
-  async function newItem(body = "body") {
+  async function newItem(body = "body", category: "other" | "email" = "other") {
     const r = await service.createItem(appActor, {
-      title: title(), body, category: "other", channel: "other", contentType: "other", source: "it",
+      title: title(), body, category, channel: category === "email" ? "email" : "other",
+      contentType: category === "email" ? "email" : "other", source: "it",
     });
     if (!r.ok) throw new Error(`setup: createItem failed: ${r.error}`);
     createdItemIds.push(r.itemId);
@@ -457,5 +458,63 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     } finally {
       await db.tenant.update({ where: { id: 1 }, data: { settings: saved as never } });
     }
+  });
+
+  it("a version that breaks a rule goes back to the AI queue with an open rule check", async () => {
+    const r = await newItem("Tisztelt Tóth Úr! 2021-ben együtt dolgoztunk a Lánchídon.", "email");
+    const bad = await service.createVersion(actorA(), r.itemId, {
+      body: "Tisztelt Uram!\n\nAz ár 250 000 Ft, és 72 órán belül kész a riport.\n\nÜdv",
+      changeNote: null,
+      basedOnVersionId: r.versionId!,
+    });
+    expect(bad.ok).toBe(true);
+    if (!bad.ok) return;
+    expect(bad.violations.map((v) => v.rule).sort()).toEqual(
+      expect.arrayContaining(["forbidden_price", "forbidden_report_time"]),
+    );
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId }, select: { status: true } });
+    expect(item.status).toBe("rewrite_requested");
+    const checks = await db.contentCheck.findMany({ where: { itemId: r.itemId, source: "rule" } });
+    expect(checks.length).toBeGreaterThanOrEqual(2);
+    expect(checks.every((c) => c.state === "open")).toBe(true);
+  });
+
+  it("a rule violation blocks live even with every approval in place", async () => {
+    const r = await newItem("Tisztelt Tóth Úr! 2021-ben együtt dolgoztunk a Lánchídon.", "email");
+    const bad = await service.createVersion(actorA(), r.itemId, {
+      body: "Az ár 250 000 Ft.", changeNote: null, basedOnVersionId: r.versionId!,
+    });
+    if (!bad.ok) throw new Error("setup");
+    await service.submitReview(actorA(), bad.versionId, "approve");
+    const second = await service.submitReview(actorB(), bad.versionId, "approve");
+    expect(second).toMatchObject({ ok: true, wentLive: false });
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId }, select: { liveVersionId: true } });
+    expect(item.liveVersionId).toBeNull();
+  });
+
+  it("the next version auto-resolves the rule checks it fixed", async () => {
+    // An email needs the tenant consent line, otherwise missing_footer fires (correctly).
+    const tenant = await db.tenant.findUniqueOrThrow({ where: { id: 1 }, select: { settings: true } });
+    const saved = tenant.settings;
+    const FOOTER = "Ha nem szeretne tobb levelet kapni, valaszoljon annyit: leiratkozas.";
+    await db.tenant.update({ where: { id: 1 }, data: { settings: { ...(saved as Record<string, unknown>), outreachFooter: FOOTER } } });
+    const r = await newItem(`Tisztelt Tóth Úr! 2021-ben együtt dolgoztunk a Lánchídon.\n\n${FOOTER}`, "email");
+    const bad = await service.createVersion(actorA(), r.itemId, {
+      body: "Az ár 250 000 Ft.", changeNote: null, basedOnVersionId: r.versionId!,
+    });
+    if (!bad.ok) throw new Error("setup");
+    const good = await service.createVersion(actorA(), r.itemId, {
+      body: `Tisztelt Tóth Úr!\n\n2021-ben a Lánchíd-munkán dolgoztunk együtt. Van most olyan hídjuk, ahol nincs meg a vaskiosztás terve?\n\nÜdvözlettel\n\n${FOOTER}`,
+      changeNote: null,
+      basedOnVersionId: bad.versionId,
+    });
+    expect(good.ok).toBe(true);
+    if (!good.ok) return;
+    expect(good.violations).toEqual([]);
+    const open = await db.contentCheck.count({ where: { itemId: r.itemId, source: "rule", state: "open" } });
+    expect(open).toBe(0);
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId }, select: { status: true } });
+    expect(item.status).toBe("in_review");
+    await db.tenant.update({ where: { id: 1 }, data: { settings: saved as never } });
   });
 });
