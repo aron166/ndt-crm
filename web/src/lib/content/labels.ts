@@ -78,4 +78,5 @@ export const UI = {
   all: "Összes",
   pipeline: ["Vázlat", "Jóváhagyás", "Élő", "Kampányban használva"],
   publishedLink: "Megjelenés linkje",
+  noLiveMatch: "Nincs élő anyag ezekkel a szűrőkkel.",
 };

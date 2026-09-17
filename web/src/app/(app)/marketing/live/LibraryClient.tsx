@@ -153,7 +153,7 @@ export function LibraryClient({
 
       {rows.length === 0 ? (
         <div className="panel">
-          <div className="panel-pad" style={{ textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }} />
+          <div className="panel-pad" style={{ textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }}>{UI.noLiveMatch}</div>
         </div>
       ) : (
         <div className="space-y-8">
