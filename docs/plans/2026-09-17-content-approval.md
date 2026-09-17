@@ -33,8 +33,9 @@
 |---|---|---|
 | **(a)** | schema + transitions + service + app-key API + proxy + server actions + reviewer settings | `20260917200000_content_versions` |
 | **(b)** | `/content` inbox, review page (diff, history, action bar, editor), library, nav badge, `/` tile, storage uploads + signed URLs, `/marketing` → `/content` | — (bucket created on prod) |
-| **(c)** | `content-revise` skill + mock-API e2e, daily digest cron, live-content wiring (outreach drafts, script panel) | `20260918090000_content_links` |
+| **(c)** | `content-revise` skill + mock-API e2e, daily digest cron, script-panel live-content wiring | — |
 | **(d)** | import script (dry-run only) | — |
+| **(e)** | spec §6b: `/marketing` hub (Anyagok · Kampányok), `Campaign.kind`, `email_drafts` → `Campaign` (by slug, incl. prod `TESZT`), create-campaign UI (cold_email), item → campaign slot from the review page, outreach consumes the LIVE step template only; `/outreach` + `/marketing/campaigns` redirect | `…_campaign_unify` |
 
 ---
 
@@ -156,7 +157,15 @@ Header (category, purpose, campaign, format, status chip, per-reviewer verdict o
 ## PR (c) — loop, digest, consumers
 ### Task C1: `.claude/skills/content-revise/SKILL.md` + `scripts/content-revise-mock.mjs` (local mock of queue/claim/versions with fixture items + asserts) + e2e run by a subagent following the skill against the mock.
 ### Task C2: digest — `web/src/lib/content/digest.ts` (pure: build per-reviewer list, oldest first, > 3 days flagged, empty → skip), `web/src/app/api/cron/content-digest/route.ts` (CRON_SECRET; sends only when Budapest hour is 8 and weekday), `vercel.json` cron `0 6,7 * * 1-5`, proxy allowlist, per-reviewer opt-out `settings.contentDigestOptOut: number[]` toggle on `/content`.
-### Task C3: consumers — migration `email_drafts.content_item_id` (FK SetNull); outreach copy/mark-sent use the live version body when linked and refuse when the item is not live; script variants accept `contentItemId`, the panel shows the live body or "nincs élő változat" (never the draft text).
+### Task C3: script panel — script variants accept `contentItemId`; the panel shows the live body or "nincs élő változat" (never the draft text). (Outreach consumption moved to PR (e), where campaign slots exist.)
+
+## PR (e) — marketing hub + campaign unification (spec §6b, addendum 2026-09-17)
+- Migration: `campaigns.kind` (`cold_email | ads | content`, default `content`); `email_drafts.campaign_id` FK; data step creates one `cold_email` Campaign per distinct `email_drafts.campaign` string (slug = `threadKeyFor` slug of the string; existing slug reused) and back-fills `campaign_id` — prod `TESZT` included. The string column stays until every consumer reads `campaign_id`.
+- `content_items.campaign_slot` (e.g. `cold_email:step:1`, `setter_script`): an item assigned to a campaign + slot; `getLive` by campaign + slot is how consumers read it.
+- `/marketing` hub: tabs **Anyagok** (`/marketing` = inbox, `/marketing/live`) and **Kampányok** (`/marketing/campaigns`, filter by kind; cold_email detail = today's `/outreach` queue + dashboard). `/content*`, `/outreach*` redirect.
+- Create campaign (cold_email): name → companies or saved view → sender + wave per company → attach live step items (slots 1–4).
+- Review page: "Kampányba" picker (campaign + slot, inline create).
+- Outreach: a draft whose campaign has a live step-N item uses that live body; copy / "Kézzel elküldve" disabled with a reason when the slot's item is not live. Pipeline strip in the UI: Vázlat → Jóváhagyás → Élő → Kampányban használva.
 
 ## PR (d) — import
 `web/scripts/import-content.mjs`: dry-run default, `--apply` refuses without `--i-have-arons-approval` + `CRM_URL`/`CRM_APP_KEY`; posts through `POST /api/content` with `external_ref`; idempotent by `external_ref` (the route returns the existing item when the ref exists — add that to A4). Sources: 20 cold-email sequences (one item per touch), setter script, demo offer, signature/legal line, lead magnet, Market Építő note, BirdsView email, BirdsView ad rough cut mp4s (asset upload in apply mode only).
