@@ -341,7 +341,12 @@ async function main() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CRM_APP_KEY}` },
         body: JSON.stringify({ drafts: batch }),
       });
-      console.log(`POST batch ${i / 200 + 1}: ${res.status}`);
+      const text = await res.text();
+      console.log(`POST batch ${i / 200 + 1}: ${res.status} ${text}`);
+      if (!res.ok) {
+        console.error("Stopping: batch failed.");
+        process.exit(1);
+      }
     }
   }
 }

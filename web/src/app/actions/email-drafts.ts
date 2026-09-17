@@ -7,6 +7,7 @@ import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import {
   type DraftStatus,
   isDraftStatus,
@@ -358,15 +359,21 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   }
 
   if (result.ok) {
-    await db.emailDraft.update({
-      where: { id },
-      data: {
-        status: "sent",
-        sentAt: new Date(),
-        providerMessageId: result.id,
-        threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
-        lastError: result.warning ?? null,
-      },
+    const sentAt = new Date();
+    await db.$transaction(async (tx) => {
+      await tx.emailDraft.update({
+        where: { id },
+        data: {
+          status: "sent",
+          sentAt,
+          sentVia: "resend",
+          providerMessageId: result.id,
+          threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
+          lastError: result.warning ?? null,
+        },
+      });
+      // Same cadence as a hand-sent touch (campaign tracking).
+      await scheduleNextTouch(tx, row, sentAt);
     });
     await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sent", providerMessageId: result.id });
     revalidatePath("/outreach");

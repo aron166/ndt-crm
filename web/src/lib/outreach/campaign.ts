@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DraftStatus } from "./drafts";
-import { MAX_STEP } from "./drafts";
+import { MAX_STEP, CLAIMABLE_STATUSES } from "./drafts";
 
 /**
  * Campaign tracking (Kai/Áron P0, 2026-09-17) — PURE module, no DB.
@@ -32,11 +32,10 @@ export function dueAtForStep(firstSentAt: Date, nextStep: number): Date | null {
 }
 
 /**
- * "Kézzel elküldve" is allowed from the same states the Resend path may send
- * from — a human still approves the copy first. Kept separate from canSend()
- * so the two paths can diverge deliberately, not by accident.
+ * "Kézzel elküldve" is allowed from exactly the states the Resend path may send
+ * from — a human still approves the copy first.
  */
-export const MANUAL_SENDABLE_STATUSES: DraftStatus[] = ["approved", "failed"];
+export const MANUAL_SENDABLE_STATUSES: DraftStatus[] = CLAIMABLE_STATUSES;
 export function canMarkSent(status: DraftStatus): boolean {
   return MANUAL_SENDABLE_STATUSES.includes(status);
 }
@@ -57,9 +56,6 @@ export const REPLY_TYPES = [
   "auto_reply", // automatikus válasz (szabadság, „nem én vagyok az illetékes”)
 ] as const;
 export type ReplyType = (typeof REPLY_TYPES)[number];
-export function isReplyType(v: unknown): v is ReplyType {
-  return typeof v === "string" && (REPLY_TYPES as readonly string[]).includes(v);
-}
 
 export const markSentSchema = z.object({
   draftId: z.number().int().positive(),

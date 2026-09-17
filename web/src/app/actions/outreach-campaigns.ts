@@ -7,9 +7,11 @@ import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
-import { threadKeyFor, isValidStep, type DraftStatus } from "@/lib/outreach/drafts";
+import { threadKeyFor, type DraftStatus } from "@/lib/outreach/drafts";
+import { scheduleNextTouch } from "@/lib/outreach/schedule";
+import { runAutomations } from "@/lib/automations/engine";
 import {
-  canMarkReplied, dueAtForStep, markRepliedSchema, markSentSchema, MANUAL_SENDABLE_STATUSES,
+  canMarkReplied, markRepliedSchema, markSentSchema, MANUAL_SENDABLE_STATUSES,
   buildFunnel, type CampaignFunnel, type ReplyType,
 } from "@/lib/outreach/campaign";
 import { ingestLead } from "@/lib/leads/ingest";
@@ -99,6 +101,14 @@ export async function markDraftSentManually(
     return { ok: false, error: "Előbb hagyd jóvá — vagy ez az érintés már elment" };
   }
 
+  // Same rule as the Resend path: no unsubscribe line, no cold email. The copy
+  // button appends it; this refuses to book a send while none is configured.
+  const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
+  const footer = (tenant?.settings as Record<string, unknown> | null)?.outreachFooter;
+  if (typeof footer !== "string" || !footer.trim()) {
+    return { ok: false, error: "Hiányzik a leiratkozási lábléc — töltsd ki a beállításokban" };
+  }
+
   const now = new Date();
   const lead = await db.lead.findFirst({
     where: { tenantId: TENANT_ID, companyId: row.companyId, campaign: row.campaign },
@@ -132,25 +142,7 @@ export async function markDraftSentManually(
       data: { lastInteractionDate: now },
     });
 
-    // Cadence is anchored on touch 1's real send time, not on the plan.
-    const first = row.step === 1
-      ? now
-      : (await tx.emailDraft.findFirst({
-          where: { tenantId: TENANT_ID, companyId: row.companyId, campaign: row.campaign, step: 1 },
-          select: { sentAt: true },
-        }))?.sentAt ?? now;
-    const nextStep = row.step + 1;
-    const due = isValidStep(nextStep) ? dueAtForStep(first, nextStep) : null;
-    if (due) {
-      await tx.emailDraft.updateMany({
-        where: {
-          tenantId: TENANT_ID, companyId: row.companyId, campaign: row.campaign, step: nextStep,
-          status: { in: ["draft", "approved", "failed"] },
-        },
-        data: { dueAt: due },
-      });
-    }
-    return due;
+    return scheduleNextTouch(tx, row, now);
   });
   if (nextDueAt === undefined) {
     revalidatePath("/outreach");
@@ -193,12 +185,18 @@ export async function markDraftReplied(
   const phone = row.person?.phone ?? null;
   if (!email && !phone) return { ok: false, error: "Nincs email cím vagy telefonszám a címzetthez" };
 
+  const already = await db.emailDraft.findFirst({
+    where: { tenantId: TENANT_ID, companyId: row.companyId, campaign: row.campaign, status: "replied" },
+    select: { id: true },
+  });
+  if (already) return { ok: false, error: "Erre a megkeresésre már rögzítettünk választ" };
+
   const draftKey = row.threadKey ?? threadKeyFor(row.campaign, row.companyId);
-  // One lead per CONVERSATION: the Gmail thread id when it was pasted, else a
-  // manual key per draft. ponytail: if the reply-intake skill later reads the
+  // One lead per CONVERSATION: the Gmail thread id when it was pasted, else one
+  // manual key per outreach (campaign + company), so a second click dedupes. ponytail: if the reply-intake skill later reads the
   // same Gmail thread and no id was pasted, it creates a second lead — paste
   // the thread id on send to avoid it.
-  const threadKey = (row.externalThreadId ?? `manual:${row.id}`).toLowerCase();
+  const threadKey = (row.externalThreadId ?? `manual:${draftKey}`).toLowerCase();
 
   const intake = leadIntakeSchema.safeParse({
     company_name: row.company.name,
@@ -217,9 +215,25 @@ export async function markDraftReplied(
 
   try {
     const res = await db.$transaction((tx) =>
-      ingestLead(intake.data, { tenantId: TENANT_ID, appSlug: "crm-ui" }, tx),
+      ingestLead(intake.data, { tenantId: TENANT_ID, appSlug: "crm-ui", draftId }, tx),
     );
-    audit("email_draft", draftId, "update", { status: row.status }, { status: "replied", replyType, leadId: res.leadId }, auditOpts);
+    if (!res.deduped) {
+      audit("email_draft", draftId, "update", { status: row.status }, { status: "replied", replyType, leadId: res.leadId }, auditOpts);
+      // Same post-commit step as POST /api/leads: the follow-up task rules.
+      await runAutomations({
+        type: "lead_created",
+        tenantId: TENANT_ID,
+        leadId: res.leadId,
+        companyId: res.companyId,
+        personId: res.personId,
+        companyName: row.company.name,
+        fields: {
+          company: row.company.name, source: "cold_email_reply", channel: "cold_email",
+          campaign: row.campaign, serviceInterest: null, message: note ?? null,
+          sourceApp: "crm-ui", tier: res.tier, replyType,
+        },
+      });
+    }
     revalidatePath("/outreach");
     revalidatePath("/leads");
     return { ok: true, leadId: res.leadId, deduped: res.deduped };
@@ -345,16 +359,26 @@ export async function getCampaignStats(input: {
   const scoped = senderUserId != null || wave != null;
   const companyIds = [...new Set(drafts.map((d) => d.companyId))];
 
-  // Scope leads/interactions: by the filtered companies, and — for sender only
-  // — by ownership, so the phone-only campaign still filters by person.
-  const companyOr = { companyId: { in: companyIds } };
+  // Scope leads/interactions to the filtered companies. The ownership fallback
+  // (lead assignee / who logged the call) applies ONLY to a campaign with no
+  // drafts at all — the phone-only one — so per-sender views add up to the total.
+  const phoneOnly = allDrafts.length === 0;
+  const scope = !scoped
+    ? {}
+    : phoneOnly
+      ? (senderUserId != null && wave == null ? { owner: senderUserId } : { none: true })
+      : { companies: companyIds };
   const leadWhere: Prisma.LeadWhereInput = {
     tenantId: TENANT_ID, campaign,
-    ...(scoped ? { OR: [companyOr, ...(senderUserId != null && wave == null ? [{ assignedToId: senderUserId }] : [])] } : {}),
+    ...("companies" in scope ? { companyId: { in: scope.companies } } : {}),
+    ...("owner" in scope ? { assignedToId: scope.owner } : {}),
+    ...("none" in scope ? { id: -1 } : {}),
   };
   const interactionWhere: Prisma.InteractionWhereInput = {
     tenantId: TENANT_ID, campaign, type: { not: "email" },
-    ...(scoped ? { OR: [companyOr, ...(senderUserId != null && wave == null ? [{ userId: senderUserId }] : [])] } : {}),
+    ...("companies" in scope ? { companyId: { in: scope.companies } } : {}),
+    ...("owner" in scope ? { userId: scope.owner } : {}),
+    ...("none" in scope ? { id: -1 } : {}),
   };
   const [leads, interactions] = await Promise.all([
     db.lead.findMany({ where: leadWhere, select: { tier: true, outcome: true } }),
@@ -364,7 +388,7 @@ export async function getCampaignStats(input: {
   return {
     campaign,
     waves,
-    targetsTotal: new Set(allDrafts.map((d) => d.companyId)).size,
+    targetsTotal: companyIds.length,
     ...buildFunnel(drafts, leads, interactions),
   };
 }

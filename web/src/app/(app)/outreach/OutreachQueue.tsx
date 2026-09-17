@@ -20,7 +20,7 @@ import {
   type OutreachSettings,
 } from "@/app/actions/email-drafts";
 import { setCampaignTarget, markDraftReplied } from "@/app/actions/outreach-campaigns";
-import { DRAFT_STATUSES, MAX_STEP, canEdit, canApprove, canSend, type DraftStatus } from "@/lib/outreach/drafts";
+import { DRAFT_STATUSES, MAX_STEP, canEdit, canApprove, canSend, withFooter, type DraftStatus } from "@/lib/outreach/drafts";
 import { canMarkSent, canMarkReplied, REPLY_TYPES, type ReplyType } from "@/lib/outreach/campaign";
 import { REPLY_TYPE_LABEL } from "@/lib/outreach/labels";
 import { MarkSentControl } from "./DueToday";
@@ -93,6 +93,8 @@ export default function OutreachQueue({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [replyTo, setReplyTo] = useState(initialSettings.replyTo ?? "");
   const [footer, setFooter] = useState(initialSettings.footer ?? "");
+  // The SAVED footer — what a hand-sent email must carry (the field above may be unsaved).
+  const [savedFooter, setSavedFooter] = useState(initialSettings.footer?.trim() ?? "");
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [copied, setCopied] = useState<{ id: number; kind: "subject" | "body" } | null>(null);
@@ -217,6 +219,7 @@ export default function OutreachQueue({
     const res = await saveOutreachSettings({ replyTo, footer });
     setSettingsSaving(false);
     if (!res.ok) setSettingsError(res.error);
+    else setSavedFooter(footer.trim());
   }
 
   async function onSetTarget(row: DraftListRow, patch: { senderUserId?: number | null; wave?: number | null }) {
@@ -250,7 +253,8 @@ export default function OutreachQueue({
       body = res.body;
       setDrafted((d) => ({ ...d, [row.id]: { subject: d[row.id]?.subject ?? row.subject, body: res.body } }));
     }
-    await navigator.clipboard.writeText(body);
+    // The unsubscribe line is not optional on a hand-sent email either.
+    await navigator.clipboard.writeText(withFooter(body, savedFooter));
     flashCopied(row.id, "body");
   }
 
@@ -491,6 +495,8 @@ export default function OutreachQueue({
                   </button>
                   <button
                     onClick={() => onCopyBody(row)}
+                    disabled={!savedFooter}
+                    title={savedFooter ? undefined : "Hiányzik a leiratkozási lábléc — töltsd ki a beállításokban"}
                     style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}
                   >
                     {copied?.id === row.id && copied.kind === "body" ? "Másolva" : "Szöveg másolása"}
