@@ -40,6 +40,7 @@ export function FilterBar({
     const params = new URLSearchParams(searchParams.toString());
     if (value === "all") params.delete(key);
     else params.set(key, value);
+    params.delete("page"); // a new filter starts on page 1
     router.push(`/marketing?${params.toString()}`);
   }
 
@@ -61,6 +62,43 @@ export function FilterBar({
         <option value="all">{UI.status}: {UI.all}</option>
         {CONTENT_STATUSES.filter((s) => s !== "archived").map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
       </select>
+    </div>
+  );
+}
+
+/** Shared by board + list — prev/next over the pipeline page, preserving every other param. */
+export function Pager({
+  page, hasMore, onNavigate,
+}: {
+  page: number; hasMore: boolean; onNavigate?: () => void;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  if (page <= 1 && !hasMore) return null;
+
+  function go(next: number) {
+    onNavigate?.();
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", String(next));
+    router.push(`/marketing?${params.toString()}`);
+  }
+
+  return (
+    <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
+      <button
+        type="button" className="btn sm" style={{ minHeight: 44, opacity: page > 1 ? 1 : 0.5 }}
+        disabled={page <= 1} onClick={() => go(page - 1)}
+      >
+        {UI.pagePrev}
+      </button>
+      <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>{UI.pageLabel(page)}</span>
+      <button
+        type="button" className="btn sm" style={{ minHeight: 44, opacity: hasMore ? 1 : 0.5 }}
+        disabled={!hasMore} onClick={() => go(page + 1)}
+      >
+        {UI.pageNext}
+      </button>
     </div>
   );
 }
@@ -353,6 +391,8 @@ export function InboxClient({
           </Section>
         )}
       </div>
+
+      <Pager page={sections.page} hasMore={sections.hasMore} onNavigate={() => setSelected(new Set())} />
 
       <ReviewerSettings />
 

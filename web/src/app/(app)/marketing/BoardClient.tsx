@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { UI, CATEGORY_LABEL, VERDICT_LABEL } from "@/lib/content/labels";
 import type { ContentCategory, Verdict } from "@/lib/content/types";
 import type { InboxSections, InboxRow } from "@/lib/content/queries";
-import { FilterBar } from "./InboxClient";
+import { FilterBar, Pager } from "./InboxClient";
 import { BulkBar } from "./BulkBar";
 
 const VERDICT_COLOR: Record<Verdict, string> = {
@@ -244,6 +244,8 @@ export function BoardClient({
           );
         })}
       </div>
+
+      <Pager page={sections.page} hasMore={sections.hasMore} onNavigate={() => setSelected(new Set())} />
 
       <BulkBar
         selectedIds={[...selected]}
