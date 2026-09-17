@@ -72,6 +72,19 @@ export async function POST(request: Request) {
       })
     : [];
   const validPairs = new Set(validContacts.map((c) => `${c.personId}:${c.companyId}`));
+  // senderUserId must be a user of THIS tenant; anything else is dropped to null.
+  const wantedSenders = [...new Set(items.map((d) => d.senderUserId).filter((u): u is number => typeof u === "number"))];
+  const validSenders = new Set(
+    wantedSenders.length
+      ? (await db.user.findMany({ where: { tenantId: key.tenantId, id: { in: wantedSenders } }, select: { id: true } })).map((u) => u.id)
+      : [],
+  );
+  const trackingFor = (item: { senderUserId?: number | null; wave?: number | null; dueAt?: Date | null }) => ({
+    ...(item.senderUserId !== undefined ? { senderUserId: item.senderUserId != null && validSenders.has(item.senderUserId) ? item.senderUserId : null } : {}),
+    ...(item.wave !== undefined ? { wave: item.wave } : {}),
+    ...(item.dueAt !== undefined ? { dueAt: item.dueAt } : {}),
+  });
+
   const personFor = (item: { personId?: number | null; companyId: number }) =>
     item.personId != null && validPairs.has(`${item.personId}:${item.companyId}`) ? item.personId : null;
 
@@ -114,6 +127,7 @@ export async function POST(request: Request) {
             body: item.body,
             toEmail: item.toEmail ?? null,
             status: "draft",
+            ...trackingFor(item),
           },
         });
         audit(
@@ -147,6 +161,7 @@ export async function POST(request: Request) {
           subject: item.subject,
           body: item.body,
           toEmail: item.toEmail ?? null,
+          ...trackingFor(item),
         },
       });
       audit(
