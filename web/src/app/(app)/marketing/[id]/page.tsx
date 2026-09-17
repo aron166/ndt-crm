@@ -1,16 +1,16 @@
-import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getEntityHistory } from "@/app/actions/audit";
-import { serializeDates } from "@/lib/serialize";
-import { MarketingDetailClient } from "./MarketingDetailClient";
+import { getActor } from "@/lib/actor";
+import { getReviewPage } from "@/lib/content/queries";
+import { signedViewUrls } from "@/lib/content/storage";
+import { ReviewClient } from "./ReviewClient";
 
 const TENANT_ID = 1;
 
 export const dynamic = "force-dynamic";
 
-export default async function ContentDetailPage({
+export default async function ContentReviewPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -19,18 +19,14 @@ export default async function ContentDetailPage({
   if (!/^\d+$/.test(id)) notFound();
   const itemId = parseInt(id, 10);
 
-  const item = await db.contentItem.findFirst({
-    where: { id: itemId, tenantId: TENANT_ID },
-    include: {
-      campaign: { select: { id: true, name: true } },
-      assets: { orderBy: { position: "asc" } },
-    },
-  });
-  if (!item) notFound();
+  const { userId } = await getActor(TENANT_ID);
+  const data = await getReviewPage(TENANT_ID, itemId, userId ?? -1);
+  if (!data) notFound();
 
-  const auditEntries = await getEntityHistory("content_item", itemId);
-
-  const metrics = (item.metrics ?? null) as Record<string, number> | null;
+  const paths = data.versions.flatMap((v) =>
+    v.assets.map((a) => a.storagePath).filter((p): p is string => Boolean(p))
+  );
+  const signedUrls = await signedViewUrls(paths);
 
   return (
     <div className="mount">
@@ -41,32 +37,11 @@ export default async function ContentDetailPage({
           className="row-link"
         >
           <ArrowLeft style={{ width: 14, height: 14 }} />
-          Vissza a sorhoz
+          ← Anyagok
         </Link>
       </div>
 
-      <MarketingDetailClient
-        item={{
-          id: item.id,
-          title: item.title,
-          body: item.body,
-          channel: item.channel,
-          contentType: item.contentType,
-          status: item.status,
-          internal: item.internal,
-          source: item.source,
-          externalUrl: item.externalUrl,
-          reviewNote: item.reviewNote,
-          campaignName: item.campaign?.name ?? null,
-          metrics,
-          createdAt: item.createdAt.toISOString(),
-          updatedAt: item.updatedAt.toISOString(),
-        }}
-        assets={item.assets.map((a) => ({
-          id: a.id, kind: a.kind, url: a.url, caption: a.caption,
-        }))}
-        auditEntries={serializeDates(auditEntries)}
-      />
+      <ReviewClient data={data} userId={userId} signedUrls={signedUrls} />
     </div>
   );
 }
