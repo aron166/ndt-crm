@@ -310,6 +310,13 @@ async function main() {
     );
   }
 
+  // Kai 2026-09-17: wave 1 goes out Tue 09-22, wave 2 Tue 09-29, 08:00 Budapest (CEST = UTC+2).
+  const WAVE_START = { 1: "2026-09-22T06:00:00Z", 2: "2026-09-29T06:00:00Z" };
+  // users.id on prod (tenant 1): 2 = Áron, 3 = Nagy Péter.
+  const SENDER_USER_ID = { aron: 2, peter: 3 };
+  console.log("");
+  console.log(`Apply would set: senderUserId ${JSON.stringify(SENDER_USER_ID)}, touch-1 dueAt ${JSON.stringify(WAVE_START)} (BOTH/NONE waves left unset)`);
+
   if (DO_APPLY) {
     // Not exercised by this task (dry-run only), kept for completeness per spec.
     const drafts = [];
@@ -318,7 +325,13 @@ async function main() {
       const draft = parseDraft(r.slug);
       if (!draft.ok) continue;
       for (const t of draft.touches) {
-        drafts.push({ companyId: r.companyId, campaign: CAMPAIGN, step: t.touch, subject: t.subject, body: t.body, toEmail: r.toEmail });
+        drafts.push({
+          companyId: r.companyId, campaign: CAMPAIGN, step: t.touch, subject: t.subject, body: t.body, toEmail: r.toEmail,
+          // Tracking (API since 2026-09-17). BOTH/NONE waves stay unset for Áron to decide.
+          senderUserId: SENDER_USER_ID[r.sender] ?? null,
+          ...(typeof r.wave === "number" ? { wave: r.wave } : {}),
+          ...(typeof r.wave === "number" && t.touch === 1 ? { dueAt: WAVE_START[r.wave] } : {}),
+        });
       }
     }
     for (let i = 0; i < drafts.length; i += 200) {

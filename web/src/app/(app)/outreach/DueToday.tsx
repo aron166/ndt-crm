@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { getDueTouches, markDraftSentManually, type DueTouch } from "@/app/actions/outreach-campaigns";
+import { canMarkSent } from "@/lib/outreach/campaign";
+import type { DraftStatus } from "@/lib/outreach/drafts";
 
 type Sender = { id: number; name: string };
 
@@ -11,7 +13,6 @@ export function MarkSentControl({ draftId, onSent }: { draftId: number; onSent: 
   const [threadId, setThreadId] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nextDueAt, setNextDueAt] = useState<string | null | undefined>(undefined);
 
   if (!open) {
     return (
@@ -36,7 +37,7 @@ export function MarkSentControl({ draftId, onSent }: { draftId: number; onSent: 
       setError(res.error);
       return;
     }
-    setNextDueAt(res.nextDueAt);
+    // The next touch's date shows on its own row ("Esedékes") after the reload.
     setOpen(false);
     onSent();
   }
@@ -75,11 +76,6 @@ export function MarkSentControl({ draftId, onSent }: { draftId: number; onSent: 
         </button>
       </div>
       {error && <div style={{ fontSize: 13, color: "var(--coral)" }}>{error}</div>}
-      {nextDueAt && (
-        <div style={{ fontSize: 13, color: "var(--fg-mute)" }}>
-          Következő érintés: {new Date(nextDueAt).toLocaleString("hu-HU")}
-        </div>
-      )}
     </div>
   );
 }
@@ -143,7 +139,11 @@ export default function DueToday({ touches: initialTouches, senders }: { touches
                       Lejárt
                     </span>
                   )}
-                  <MarkSentControl draftId={t.draftId} onSent={reload} />
+                  {canMarkSent(t.status as DraftStatus) ? (
+                    <MarkSentControl draftId={t.draftId} onSent={reload} />
+                  ) : (
+                    <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>Jóváhagyásra vár</span>
+                  )}
                 </div>
               );
             })}
