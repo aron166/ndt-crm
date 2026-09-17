@@ -2,13 +2,17 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 
 /**
- * Who reviews content: `tenants.settings.contentReviewers` = [users.id, …]
- * (spec §1 — configured, never hard-coded). Max 2 (spec: out of scope beyond two).
- * An invalid or missing value means NO reviewers, which means nothing can go live.
+ * Who reviews content: `tenants.settings.contentReviewers` = [users.id, users.id]
+ * (spec §1 — configured, never hard-coded). EXACTLY two: dual approval is the
+ * point (spec decision 2). Anything else — missing, one id, a duplicate, an id
+ * whose user row is gone — yields a list shorter than two, and
+ * transitions.statusFromReviews never goes live on that (Vanda, PR #99).
  */
-export const MAX_REVIEWERS = 2;
+export const REQUIRED_REVIEWERS = 2;
+/** @deprecated kept for callers; equals REQUIRED_REVIEWERS. */
+export const MAX_REVIEWERS = REQUIRED_REVIEWERS;
 
-const reviewersSchema = z.array(z.number().int().positive()).max(MAX_REVIEWERS);
+const reviewersSchema = z.array(z.number().int().positive()).max(REQUIRED_REVIEWERS);
 
 export function reviewersFromSettings(settings: unknown): number[] {
   const parsed = reviewersSchema.safeParse((settings as { contentReviewers?: unknown } | null)?.contentReviewers);

@@ -276,4 +276,48 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     const attempt = await service.createVersion(actorA(), r.itemId, { body: "too late", changeNote: null, basedOnVersionId: r.versionId! });
     expect(attempt).toMatchObject({ ok: false, status: 409 });
   });
+
+  it("a review refused because the AI holds the claim leaves no review row", async () => {
+    const r = await newItem();
+    await service.submitReview(actorA(), r.versionId!, "rewrite", "írd újra");
+    expect((await service.claimItem(appActor, r.itemId)).ok).toBe(true);
+    const refused = await service.submitReview(actorB(), r.versionId!, "approve");
+    expect(refused).toMatchObject({ ok: false, status: 409 });
+    const rows = await db.contentReview.count({ where: { versionId: r.versionId!, reviewerUserId: userB } });
+    expect(rows).toBe(0);
+  });
+
+  it("a review on an item whose claim went stale releases the claim first", async () => {
+    const r = await newItem();
+    await service.submitReview(actorA(), r.versionId!, "changes", "javítsd");
+    await service.claimItem(appActor, r.itemId);
+    await db.contentItem.update({ where: { id: r.itemId }, data: { claimedAt: new Date(Date.now() - 3 * 3600_000) } });
+    const res = await service.submitReview(actorB(), r.versionId!, "approve");
+    expect(res).toMatchObject({ ok: true, status: "changes_requested" });
+  });
+
+  it("with only one configured reviewer nothing goes live", async () => {
+    const tenant = await db.tenant.findUniqueOrThrow({ where: { id: 1 }, select: { settings: true } });
+    const saved = tenant.settings;
+    try {
+      await db.tenant.update({ where: { id: 1 }, data: { settings: { ...(saved as Record<string, unknown>), contentReviewers: [userA] } } });
+      const r = await newItem();
+      const res = await service.submitReview(actorA(), r.versionId!, "approve");
+      expect(res).toMatchObject({ ok: true, status: "in_review", wentLive: false });
+    } finally {
+      await db.tenant.update({ where: { id: 1 }, data: { settings: saved as never } });
+    }
+  });
+
+  it("the same external_ref created concurrently yields one item", async () => {
+    const ref = `it-ref-${Date.now()}`;
+    const mk = () => service.createItem(appActor, {
+      title: title(), body: "b", category: "other", channel: "other", contentType: "other", source: "it", externalRef: ref,
+    });
+    const [x, y] = await Promise.all([mk(), mk()]);
+    if (x.ok) createdItemIds.push(x.itemId);
+    if (y.ok) createdItemIds.push(y.itemId);
+    expect(x.ok && y.ok).toBe(true);
+    if (x.ok && y.ok) expect(x.itemId).toBe(y.itemId);
+  });
 });
