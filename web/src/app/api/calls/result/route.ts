@@ -185,11 +185,18 @@ async function handleLeadOutcome(
       ? `${lead.contact.person.lastName} ${lead.contact.person.firstName}`.trim()
       : lead.company?.name ?? `Lead #${leadId}`;
 
-    // Idempotency: call_id is unique per tenant (and required whenever `parsed`
-    // is present — the schema enforces it). A repeat post of the same call must
-    // be a no-op, not a duplicate interaction/task.
+    // Idempotency: call_id is unique per tenant. The schema requires it
+    // whenever `parsed` is present; this guard is here because an undefined
+    // value would be DROPPED from the where clause below and dedupe against an
+    // arbitrary interaction, which is the same class of bug as the company_id
+    // one above.
+    const callId = input.call_id;
+    if (!callId) return json({ error: "call_id is required with parsed" }, 400);
+
+    // A repeat post of the same call must be a no-op, not a duplicate
+    // interaction/task.
     const existing = await db.interaction.findFirst({
-      where: { tenantId, callId: input.call_id },
+      where: { tenantId, callId },
       select: { id: true },
     });
     if (existing) return json({ ok: true, deduped: true, interactionId: existing.id }, 200);
@@ -233,7 +240,7 @@ async function handleLeadOutcome(
             // put the same text on the lead twice.
             transcript: pending ? undefined : input.transcript,
             autoConfidence: parsed.confidence,
-            callId: input.call_id,
+            callId,
             supersedesInteractionId: pending?.id,
             // A parse of yesterday's queued transcript belongs on the timeline
             // at the time of the CALL, not of the parse.
@@ -244,7 +251,7 @@ async function handleLeadOutcome(
       } catch (err) {
         if (isUniqueViolation(err)) {
           // callId is unique per tenant; the transaction committed nothing.
-          const dup = await db.interaction.findFirst({ where: { tenantId, callId: input.call_id }, select: { id: true } });
+          const dup = await db.interaction.findFirst({ where: { tenantId, callId }, select: { id: true } });
           return json({ ok: true, deduped: true, interactionId: dup?.id ?? null }, 200);
         }
         throw err;
