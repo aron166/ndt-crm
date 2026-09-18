@@ -17,6 +17,29 @@ describe("callResultSchema", () => {
     expect(callResultSchema.safeParse({ transcript: "x" }).success).toBe(false);
     expect(callResultSchema.safeParse({ company_id: -1, transcript: "x" }).success).toBe(false);
   });
+
+  const parsedPayload = { outcome: "no_answer", confidence: 0.9, note: "Nem vette fel" };
+
+  it("accepts lead_id + parsed and coerces lead_id", () => {
+    const r = callResultSchema.safeParse({ lead_id: "9", transcript: "Hello", parsed: parsedPayload });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.lead_id).toBe(9);
+  });
+
+  it("rejects parsed without lead_id", () => {
+    const r = callResultSchema.safeParse({ company_id: 5, transcript: "Hello", parsed: parsedPayload });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects when neither company_id nor lead_id is present", () => {
+    const r = callResultSchema.safeParse({ transcript: "Hello" });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects when both company_id and lead_id are present", () => {
+    const r = callResultSchema.safeParse({ company_id: 5, lead_id: 9, transcript: "Hello" });
+    expect(r.success).toBe(false);
+  });
 });
 
 describe("composeCallNotes", () => {
