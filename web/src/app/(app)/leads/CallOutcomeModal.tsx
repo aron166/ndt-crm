@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { logLeadCall } from "@/app/actions/leads";
+import { correctCallOutcome } from "@/app/actions/calls";
 import { proposeBookingSlots } from "@/app/actions/bookings";
 import type { BookingConflictInfo } from "@/lib/leads/service";
 import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX } from "@/lib/leads/outcomes";
@@ -38,11 +39,18 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function CallOutcomeModal({
-  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [],
+  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null,
 }: {
   open: boolean;
   onClose: () => void;
   leadId: number;
+  /**
+   * Set when this modal was opened to CORRECT an auto-derived outcome. The log
+   * then goes through correctCallOutcome, which links the new interaction back
+   * at the one it replaces — that link is what makes the agreement rate between
+   * parsed and corrected outcomes measurable. Null = an ordinary call log.
+   */
+  correctsInteractionId?: number | null;
   title?: string | null;
   stageDescription?: string | null;
   onLogged?: () => void;
@@ -81,7 +89,7 @@ export function CallOutcomeModal({
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const res = await logLeadCall(leadId, {
+      const payload = {
         outcome, note,
         // datetime-local is wall-clock; Date parses it as local time → ISO for the wire.
         callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
@@ -90,7 +98,10 @@ export function CallOutcomeModal({
         bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
         lostReason: isLostCallOutcome(outcome) ? lostReason : null,
         scriptVariant: scriptKey || undefined,
-      });
+      };
+      const res = correctsInteractionId
+        ? await correctCallOutcome(correctsInteractionId, payload)
+        : await logLeadCall(leadId, payload);
       if ("error" in res) { setError(res.error); return; }
       if (res.bookingConflicts?.length > 0) { setSavedConflicts(res.bookingConflicts); return; }
       reset(); onClose(); onLogged?.();

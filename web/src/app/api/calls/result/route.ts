@@ -218,13 +218,16 @@ async function handleLeadOutcome(
       // same confirm task a low-confidence parse would get, with the reason why.
       result = await createConfirmTask(
         tenantId, input, lead, personId, who, parsed,
-        "apply_failed", `Alkalmazás sikertelen: ${outcomeResult.error}`, now,
+        "apply_failed", `Alkalmazás sikertelen: ${outcomeResult.error}`, now, pending,
       );
     } else {
       try {
         await db.interaction.update({
           where: { id: outcomeResult.interactionId },
-          data: { transcript: input.transcript ?? null, autoConfidence: parsed.confidence, callId: input.call_id ?? null, parsedAt: now },
+          // When the transcript came from the queue it already lives on the
+          // pending row, which stays on the timeline — copying it here would
+          // put the same text on the lead twice.
+          data: { transcript: pending ? null : input.transcript ?? null, autoConfidence: parsed.confidence, callId: input.call_id ?? null, parsedAt: now },
         });
       } catch (err) {
         if (isUniqueViolation(err)) return json({ ok: true, deduped: true, interactionId: outcomeResult.interactionId }, 200);
@@ -247,11 +250,12 @@ async function handleLeadOutcome(
   } else {
     result = await createConfirmTask(
       tenantId, input, lead, personId, who, parsed,
-      decision.reason, AUTO_OUTCOME_REASON_LABEL[decision.reason], now,
+      decision.reason, AUTO_OUTCOME_REASON_LABEL[decision.reason], now, pending,
     );
   }
 
-  if (pending) {
+  // Applied path only: the confirm path already stamped the row it reused.
+  if (pending && result.interactionId !== pending.id) {
     await db.interaction.update({
       where: { id: pending.id },
       data: { parsedAt: now, autoConfidence: parsed.confidence },
@@ -284,6 +288,9 @@ async function handleLeadOutcome(
   if (personId) revalidatePath(`/persons/${personId}`);
   revalidatePath("/calls");
   revalidatePath("/drive");
+  revalidatePath("/leads");
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/tasks");
 
   if (result.applied) {
     return json(
@@ -323,6 +330,8 @@ async function createConfirmTask(
   reasonKey: string,
   reasonLabel: string,
   now: Date,
+  /** The queued row this answers, when there is one — reused instead of duplicated. */
+  pending: { id: number } | null,
 ) {
   const notes = composeCallNotes({
     analysis: parsed.note,
@@ -333,7 +342,16 @@ async function createConfirmTask(
   const occurredAt = input.occurred_at ? new Date(input.occurred_at) : now;
 
   const { interaction, task } = await db.$transaction(async (tx) => {
-    const interaction = await tx.interaction.create({
+    // A dictated transcript is ALREADY an interaction on this lead's timeline.
+    // Answering it with a second transcribed row would show the setter the same
+    // call twice, so the queued row is updated in place instead.
+    const interaction = pending
+      ? await tx.interaction.update({
+          where: { id: pending.id },
+          data: { notes, autoConfidence: parsed.confidence, callId: input.call_id ?? null, parsedAt: now },
+          select: { id: true },
+        })
+      : await tx.interaction.create({
       data: {
         tenantId,
         leadId: lead.id,

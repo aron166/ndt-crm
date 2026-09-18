@@ -41,7 +41,7 @@ export const callResultSchema = z
     message: "exactly one of company_id or lead_id is required",
   })
   .refine((d) => !d.parsed || Boolean(d.lead_id), {
-    message: "parsed requires lead_id — an outcome lives on a lead",
+    message: "parsed requires lead_id: an outcome lives on a lead",
   });
 
 export type CallResultInput = z.infer<typeof callResultSchema>;

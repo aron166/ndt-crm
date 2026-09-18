@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { reportError } from "@/lib/report-error";
+import { getQualificationQuestions } from "@/lib/leads/queries";
 
 // GET /api/calls/pending — transcripts the auto-outcome skill has not yet
 // parsed. Read-only queue, mirrors /api/content/queue. App-key auth, same
@@ -77,7 +78,16 @@ export async function GET(request: Request) {
       campaign: r.campaign,
     }));
 
-    return json({ ok: true, items }, 200);
+    // The tenant's CURRENT qualification slugs ride along: the skill may only
+    // call this route and /result, so without them it would emit answer slugs
+    // from a hard-coded default list that a tenant can rename at /leads/setup —
+    // and a wrong slug moves the lead's A-E tier.
+    const questions = (await getQualificationQuestions(key.tenantId)).map((q) => ({
+      slug: q.slug,
+      label: q.label,
+    }));
+
+    return json({ ok: true, items, questions }, 200);
   } catch (err) {
     reportError("api.calls.pending", err, { tenantId: key.tenantId });
     return json({ error: "Internal error" }, 500);

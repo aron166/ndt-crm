@@ -106,6 +106,8 @@ export function LeadDetailClient({
   const [converted, setConverted] = useState<number | null>(lead.convertedDealId ?? null);
   const [editing, setEditing] = useState(false);
   const [logging, setLogging] = useState(false);
+  // Non-null while the modal is open to correct THAT auto-derived interaction.
+  const [correcting, setCorrecting] = useState<number | null>(null);
   const [deleting, startDelete] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
   const [assignedTo, setAssignedTo] = useState(String(lead.assignedToId ?? ""));
@@ -451,7 +453,7 @@ export function LeadDetailClient({
                               {AUTO_OUTCOME_LABELS.autoBadgeHint.replace("{pct}", String(confidencePct))}
                             </span>
                             <button
-                              onClick={() => setLogging(true)}
+                              onClick={() => { setCorrecting(r.id); setLogging(true); }}
                               disabled={closed}
                               style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 11, fontWeight: 600, padding: 0, cursor: "pointer" }}
                             >
@@ -489,12 +491,13 @@ export function LeadDetailClient({
 
       <CallOutcomeModal
         open={logging}
-        onClose={() => setLogging(false)}
+        onClose={() => { setLogging(false); setCorrecting(null); }}
         leadId={lead.id}
         title={[personName, lead.company?.name].filter(Boolean).join(" · ") || null}
         stageDescription={statuses.find((s) => s.key === status)?.description ?? null}
-        onLogged={() => router.refresh()}
+        onLogged={() => { setCorrecting(null); router.refresh(); }}
         scriptVariants={scriptVariants}
+        correctsInteractionId={correcting}
       />
 
       <LeadEditModal
