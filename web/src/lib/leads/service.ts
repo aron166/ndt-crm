@@ -354,6 +354,17 @@ export async function logLeadCallOutcome(
   if (lead.outcome !== "open" || lead.convertedDealId) {
     return { error: "A lead már lezárt: előbb nyisd újra" };
   }
+  // The row this one supersedes must be THIS lead's, in THIS tenant. Both
+  // current callers check it too, but the guard belongs here: the FK only
+  // proves the id exists somewhere, so without this a caller could point a
+  // correction at another tenant's interaction and read its id back.
+  if (input.supersedesInteractionId != null) {
+    const target = await db.interaction.findFirst({
+      where: { id: input.supersedesInteractionId, tenantId: ctx.tenantId, leadId },
+      select: { id: true },
+    });
+    if (!target) return { error: "A felülírt interakció nem ehhez a leadhez tartozik" };
+  }
   if (input.assignedToId != null) {
     const user = await db.user.findFirst({ where: { id: input.assignedToId, tenantId: ctx.tenantId }, select: { id: true } });
     if (!user) return { error: "Felhasználó nem található" };
