@@ -97,5 +97,30 @@ await item({ title: "FX Aláírás és jogi lábléc", category: "other", format
   reviews: [{ v: 0, who: "aron", verdict: "approve" }, { v: 0, who: "peter", verdict: "approve" }] });
 await q(`UPDATE content_items SET claimed_at = now(), claimed_by = 'content-revise', claimed_from = 'rewrite_requested' WHERE title = 'FX BirdsView hirdetés: rövid vágás'`);
 
-console.log(`fixtures ready: reviewers ${aron}, ${peter}; main item ${main}`);
+// Optional bulk rows for pager UI checks: --pipeline=N adds N non-live pipeline
+// items (paged by /marketing), --live=N adds N live items (paged by /marketing/live).
+// Titles still start with "FX " so the idempotent cleanup above covers them.
+const argCount = (flag) => {
+  const a = process.argv.find((x) => x.startsWith(`--${flag}=`));
+  return a ? Number(a.split("=")[1]) : 0;
+};
+const pipelineCount = argCount("pipeline");
+const liveCount = argCount("live");
+const pad = (n) => String(n).padStart(4, "0");
+for (let i = 0; i < pipelineCount; i++) {
+  await item({
+    title: `FX Bulk Pipeline ${pad(i)}`, category: "email", format: "plain_text_email", purpose: "Bulk fixture",
+    status: "in_review", daysAgo: String(1 + i * 0.001), // distinct updated_at so pager ordering is deterministic
+    versions: [{ body: `Bulk fixture item ${pad(i)}.`, author: "import" }],
+  });
+}
+for (let i = 0; i < liveCount; i++) {
+  await item({
+    title: `FX Bulk Live ${pad(i)}`, category: "email", format: "plain_text_email", purpose: "Bulk fixture",
+    status: "live", live: 0, daysAgo: String(1 + i * 0.001),
+    versions: [{ body: `Bulk live fixture item ${pad(i)}.`, author: "import" }],
+  });
+}
+
+console.log(`fixtures ready: reviewers ${aron}, ${peter}; main item ${main}; bulk pipeline=${pipelineCount} live=${liveCount}`);
 await c.end();
