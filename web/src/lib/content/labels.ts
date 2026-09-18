@@ -139,4 +139,15 @@ export const UI = {
   pagePrev: "Előző",
   pageNext: "Következő",
   pageLabel: (n: number) => `${n}. oldal`,
+  // §6b: kampánylépés (outreach slot) picker on the review page. ⚠ HU PROPOSALS.
+  outreachSlot: "Kampánylépés",
+  outreachSlotCurrent: (campaign: string, step: number) => `Jelenleg: ${campaign} · ${step}. érintés`,
+  outreachSlotNone: "Nincs kampánylépéshez rendelve",
+  outreachSlotCampaign: "Kampány",
+  outreachSlotCampaignNew: "Új kampány neve",
+  outreachSlotCampaignPick: "Válassz kampányt",
+  outreachSlotCampaignNewOption: "+ Új kampány",
+  outreachSlotStep: "Érintés sorszáma",
+  outreachSlotSave: "Beállítás",
+  outreachSlotClear: "Törlés",
 };

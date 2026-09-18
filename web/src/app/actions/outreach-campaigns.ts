@@ -4,11 +4,11 @@ import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { gateDraft } from "@/lib/outreach/template";
+import { gateDraft, templatesForCampaign, templateIsStale } from "@/lib/outreach/template";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
-import { threadKeyFor, type DraftStatus } from "@/lib/outreach/drafts";
+import { threadKeyFor, MAX_STEP, type DraftStatus } from "@/lib/outreach/drafts";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import { runAutomations } from "@/lib/automations/engine";
 import {
@@ -399,4 +399,47 @@ export async function getCampaignStats(input: {
     targetsTotal: companyIds.length,
     ...buildFunnel(drafts, leads, interactions),
   };
+}
+
+export interface CampaignStepTemplate {
+  step: number;
+  /** null when no content item sits in this campaign+step slot. */
+  template: { itemId: number; title: string; status: string; live: boolean } | null;
+  /** Unsent drafts of this step built from a template version older than the current live one. */
+  staleCount: number;
+}
+
+/**
+ * §6b: per-step template state for the campaign screen. ONE query for the
+ * slots (templatesForCampaign) and one for the drafts — never one per step.
+ * Rows cover 1..MAX_STEP plus any step actually used by a template or a draft.
+ */
+export async function getCampaignStepTemplates(campaign: string): Promise<CampaignStepTemplate[]> {
+  const me = await requireUser();
+  if ("ok" in me) return [];
+  const parsed = z.string().trim().min(1).max(80).safeParse(campaign);
+  if (!parsed.success) return [];
+  const key = parsed.data;
+
+  const [templates, drafts] = await Promise.all([
+    templatesForCampaign(TENANT_ID, key),
+    db.emailDraft.findMany({
+      where: { tenantId: TENANT_ID, campaign: key },
+      select: { step: true, templateVersionId: true, sentAt: true },
+    }),
+  ]);
+
+  const steps = new Set<number>(Array.from({ length: MAX_STEP }, (_, i) => i + 1));
+  for (const s of templates.keys()) steps.add(s);
+  for (const d of drafts) steps.add(d.step);
+
+  return [...steps].sort((a, b) => a - b).map((step) => {
+    const t = templates.get(step) ?? null;
+    const staleCount = drafts.filter((d) => d.step === step && templateIsStale(d, t)).length;
+    return {
+      step,
+      template: t ? { itemId: t.itemId, title: t.title, status: t.status, live: t.liveVersionId !== null } : null,
+      staleCount,
+    };
+  });
 }

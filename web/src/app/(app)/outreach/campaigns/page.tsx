@@ -1,4 +1,4 @@
-import { listCampaignKeys, listSenders, getCampaignStats } from "@/app/actions/outreach-campaigns";
+import { listCampaignKeys, listSenders, getCampaignStats, getCampaignStepTemplates } from "@/app/actions/outreach-campaigns";
 import CampaignDashboard from "./CampaignDashboard";
 
 // Numbers computed from rows on every request — no cached counter to go stale.
@@ -29,7 +29,10 @@ export default async function CampaignsPage({
     );
   }
 
-  const result = await getCampaignStats({ campaign, senderUserId, wave });
+  const [result, stepTemplates] = await Promise.all([
+    getCampaignStats({ campaign, senderUserId, wave }),
+    getCampaignStepTemplates(campaign),
+  ]);
   const stats = result && !("ok" in result) ? result : null;
 
   return (
@@ -40,6 +43,7 @@ export default async function CampaignsPage({
       senderUserId={senderUserId}
       wave={wave}
       stats={stats}
+      stepTemplates={stepTemplates}
     />
   );
 }

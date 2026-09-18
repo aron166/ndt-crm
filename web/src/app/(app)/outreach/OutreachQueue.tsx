@@ -493,19 +493,36 @@ export default function OutreachQueue({
                   )}
                   <button
                     onClick={() => onCopySubject(row)}
-                    style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}
+                    disabled={!!row.templateBlockedReason}
+                    title={row.templateBlockedReason ?? undefined}
+                    style={{
+                      fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
+                      borderRadius: 8, padding: "6px 10px", cursor: row.templateBlockedReason ? "default" : "pointer",
+                      opacity: row.templateBlockedReason ? 0.5 : 1,
+                    }}
                   >
                     {copied?.id === row.id && copied.kind === "subject" ? "Másolva" : "Tárgy másolása"}
                   </button>
                   <button
                     onClick={() => onCopyBody(row)}
-                    disabled={!savedFooter}
-                    title={savedFooter ? undefined : "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban"}
-                    style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 10px", cursor: savedFooter ? "pointer" : "default", opacity: savedFooter ? 1 : 0.5 }}
+                    disabled={!savedFooter || !!row.templateBlockedReason}
+                    title={row.templateBlockedReason ?? (savedFooter ? undefined : "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban")}
+                    style={{
+                      fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
+                      borderRadius: 8, padding: "6px 10px",
+                      cursor: savedFooter && !row.templateBlockedReason ? "pointer" : "default",
+                      opacity: savedFooter && !row.templateBlockedReason ? 1 : 0.5,
+                    }}
                   >
                     {copied?.id === row.id && copied.kind === "body" ? "Másolva" : "Szöveg másolása"}
                   </button>
                 </div>
+
+                {row.templateBlockedReason && (
+                  <div style={{ padding: "0 16px 10px", fontSize: 13, color: "var(--amber)" }}>
+                    {row.templateBlockedReason}
+                  </div>
+                )}
 
                 {row.status === "failed" && row.lastError && (
                   <div style={{ padding: "0 16px 10px", fontSize: 14, color: "var(--coral)" }}>
@@ -599,7 +616,7 @@ export default function OutreachQueue({
                         Küldés
                       </button>
                       {canMarkSent(row.status) && (
-                        <MarkSentControl draftId={row.id} onSent={refetchCurrent} />
+                        <MarkSentControl draftId={row.id} onSent={refetchCurrent} disabledReason={row.templateBlockedReason} />
                       )}
                       {canMarkReplied(row.status) && replyOpenId !== row.id && (
                         <button
