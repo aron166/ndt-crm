@@ -4,20 +4,9 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { userLeadCtx } from "@/lib/actor";
 import { logLeadCallOutcome } from "@/lib/leads/service";
+import { NOTE_PREVIEW_LEN, validateTranscript } from "@/lib/calls/transcript";
 
 const TENANT_ID = 1;
-
-/** Kept short: this is a list-preview, the full transcript stays in `transcript`. */
-const NOTE_PREVIEW_LEN = 200;
-export const TRANSCRIPT_MAX = 100_000;
-
-/** Pure — shared by the action and its test. */
-export function validateTranscript(transcript: string): { text: string } | { error: string } {
-  const text = transcript.trim();
-  if (!text) return { error: "Az átirat nem lehet üres" };
-  if (text.length > TRANSCRIPT_MAX) return { error: "Az átirat túl hosszú" };
-  return { text };
-}
 
 /**
  * Store a dictated call transcript as ONE append-only Interaction. This is a

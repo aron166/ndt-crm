@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { validateTranscript, TRANSCRIPT_MAX } from "./calls";
+import { validateTranscript, TRANSCRIPT_MAX } from "@/lib/calls/transcript";
 
 describe("validateTranscript", () => {
   it("rejects empty / whitespace-only transcripts", () => {
