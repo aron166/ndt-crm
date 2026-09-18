@@ -175,7 +175,12 @@ export async function createItem(
       },
     });
     await writeAudit(t, actor, "content_item", item.id, "create", null,
-      { title: input.title, category: input.category, status: "in_review", externalRef: input.externalRef ?? null });
+      {
+        title: input.title, category: input.category,
+        status: violations.length > 0 ? "rewrite_requested" : "in_review",
+        ...(violations.length ? { ruleViolations: violations.map((v) => v.rule) } : {}),
+        externalRef: input.externalRef ?? null,
+      });
     await writeAudit(t, actor, "content_version", version.id, "create", null, { itemId: item.id, number: 1 });
     return { ok: true as const, itemId: item.id, versionId: version.id, existed: false };
   };
@@ -204,6 +209,13 @@ export interface CreateVersionInput {
   /** Submitting agent's own confidence 0..1 and a short note (display only). */
   selfScore?: number | null;
   selfNote?: string | null;
+  /**
+   * Import refresh: the SOURCE FILE changed, so this version restates the
+   * source rather than being an AI rewrite. It needs no claim (the importer is
+   * not the rewrite loop) but every other rule still applies: stale base is a
+   * 409, the content rules run, reviews reset. Ignored for user actors.
+   */
+  fromSource?: boolean;
   /**
    * The files of the new version. Omitted → the base version's files are
    * carried forward (always the case for AI versions, which cannot upload).
@@ -242,17 +254,24 @@ export async function createVersion(
     }
 
     if (actor.kind === "app") {
-      if (state.status !== "ai_working" || row.claimedBy !== actor.appSlug || !row.claimedAt) {
-        return fail(409, "Not claimed by this app");
+      if (!input.fromSource) {
+        if (state.status !== "ai_working" || row.claimedBy !== actor.appSlug || !row.claimedAt) {
+          return fail(409, "Not claimed by this app");
+        }
+        if (isClaimStale(row.claimedAt, new Date())) return fail(409, "Claim expired");
+      } else if (state.status === "ai_working") {
+        // Never overwrite a rewrite the AI is in the middle of.
+        return fail(409, "The AI is rewriting this item");
       }
-      if (isClaimStale(row.claimedAt, new Date())) return fail(409, "Claim expired");
       // Race rule (spec §1): a human version since the claim wins, always.
       // Backstop: a human version already clears the claim, so the check above
       // normally fires first — kept deliberately in case that ever changes.
-      const humanSince = await tx.contentVersion.count({
-        where: { itemId, authorType: "user", createdAt: { gt: row.claimedAt } },
-      });
-      if (humanSince > 0) return fail(409, "A human edited this item after the claim");
+      if (row.claimedAt) {
+        const humanSince = await tx.contentVersion.count({
+          where: { itemId, authorType: "user", createdAt: { gt: row.claimedAt } },
+        });
+        if (humanSince > 0) return fail(409, "A human edited this item after the claim");
+      }
     }
 
     const last = await tx.contentVersion.findFirst({
@@ -386,7 +405,7 @@ export async function submitReview(
     // item live while a ⚠ check is open (Vanda, #103 finding 1).
     const openChecks = await tx.contentCheck.count({ where: { itemId: row.id, state: "open" } });
     // How many approvals THIS item needs (per-category setting, default 2).
-    const rule = await getApprovalRule(actor.tenantId, row.category);
+    const rule = await getApprovalRule(actor.tenantId, row.category, tx);
     const next = applyEvent(state, {
       type: "reviews_changed",
       reviewers: rule.reviewers,
@@ -550,12 +569,18 @@ async function ruleContextFor(
 ): Promise<Parameters<typeof reconcileRuleChecks>[3]> {
   const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
   const footer = (tenant?.settings as Record<string, unknown> | null)?.outreachFooter;
+  // Only the opening of each sibling is needed (duplicate-hook detection), so
+  // the bodies are truncated in SQL instead of loaded whole (Vanda, #104).
   const siblings = item.campaignId
-    ? await tx.contentItem.findMany({
-        where: { tenantId, campaignId: item.campaignId, id: { not: item.id }, status: { not: "archived" } },
-        select: { currentVersion: { select: { body: true } } },
-        take: 100,
-      })
+    ? await tx.$queryRaw<{ hook: string }[]>`
+        SELECT left(v."body", 200) AS hook
+        FROM "content_items" i
+        JOIN "content_versions" v ON v."id" = i."current_version_id"
+        WHERE i."tenant_id" = ${tenantId}
+          AND i."campaign_id" = ${item.campaignId}
+          AND i."id" <> ${item.id}
+          AND i."status" <> 'archived'
+        LIMIT 100`
     : [];
   return {
     category: item.category,
@@ -564,7 +589,7 @@ async function ruleContextFor(
     footer: typeof footer === "string" ? footer : null,
     // Cold outreach email copy must carry the consent line.
     requiresFooter: item.category === "email",
-    otherHooks: siblings.map((s) => s.currentVersion?.body?.slice(0, 200) ?? "").filter(Boolean),
+    otherHooks: siblings.map((s) => s.hook ?? "").filter(Boolean),
   };
 }
 
@@ -658,7 +683,7 @@ export async function setCheckState(
       where: { versionId: state0.currentVersionId }, select: { reviewerUserId: true, verdict: true },
     });
     const openChecks = await tx.contentCheck.count({ where: { itemId: check.itemId, state: "open" } });
-    const rule = await getApprovalRule(actor.tenantId, row.category);
+    const rule = await getApprovalRule(actor.tenantId, row.category, tx);
     const next = applyEvent(state0, {
       type: "reviews_changed", reviewers: rule.reviewers,
       reviews: reviews.map((r) => ({ reviewerUserId: r.reviewerUserId, verdict: r.verdict as Verdict })),

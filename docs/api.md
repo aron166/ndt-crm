@@ -609,6 +609,14 @@ version was created after the claim, or a newer version exists, the post is
 rejected with `409` and the app must re-claim and re-read the (now current)
 version before retrying. The AI never overwrites a human edit.
 
+**`from_source` (importer only):** the import script sets `"from_source": true`
+when the source file behind an item changed and the new version merely restates
+it. Such a post needs no claim, because the importer is not the rewrite loop.
+Everything else still holds: `based_on_version_id` must be the current version,
+the content rules run, reviews reset, and a post is rejected with `409` while
+the AI holds a claim (status `ai_working`) so a refresh can never overwrite a
+rewrite in flight.
+
 ## Ecosystem hub
 
 ### `POST /api/events` — append an app event

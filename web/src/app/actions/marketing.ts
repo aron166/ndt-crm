@@ -46,6 +46,7 @@ export async function updateContent(id: number, title: string, body: string) {
   if (!cleanTitle) return { error: "A cím kötelező" };
   if (!cleanBody) return { error: "A szöveg kötelező" };
 
+  let violations: { rule: string; message: string }[] = [];
   // Version first: if it is refused (stale base, archived) nothing is saved.
   if (cleanBody !== item.body) {
     const res = await createVersion(
@@ -54,13 +55,17 @@ export async function updateContent(id: number, title: string, body: string) {
       { body: cleanBody, basedOnVersionId: item.currentVersionId },
     );
     if (!res.ok) return { error: res.error };
+    // Surface a blocking-rule violation: the item just went back to the AI queue.
+    if (res.violations.length > 0) {
+      violations = res.violations;
+    }
   }
   if (cleanTitle !== item.title) {
     await db.contentItem.update({ where: { id }, data: { title: cleanTitle } });
     audit("content_item", id, "update", { title: item.title }, { title: cleanTitle });
   }
   revalidate(id);
-  return { success: true };
+  return { success: true, violations };
 }
 
 /**

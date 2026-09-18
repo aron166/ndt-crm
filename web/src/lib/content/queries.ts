@@ -118,8 +118,10 @@ export async function getInbox(tenantId: number, userId: number, filter: InboxFi
       where: filter.status ? where : { ...where, status: { notIn: ["archived", "live"] } },
       select: ROW_SELECT, orderBy: { updatedAt: "desc" }, skip, take: PAGE_SIZE + 1,
     }),
-    filter.status && filter.status !== "live"
-      ? Promise.resolve([])
+    (filter.status && filter.status !== "live") || page > 1
+      ? // The live preview belongs to page 1 only: it is not paged, so repeating
+        // it under every page would be the same 50 rows over and over.
+        Promise.resolve([])
       : // The live section is a preview only (browse them on /marketing/live), so
         // it is not paged with the pipeline rows.
         db.contentItem.findMany({

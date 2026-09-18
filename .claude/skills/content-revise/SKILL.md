@@ -44,9 +44,6 @@ The queue entry carries, when the CRM knows them:
   your new version; the item cannot go live while any is open.
 - `settledChecks` — questions a human already answered. Those answers are FACTS you may
   use. Never invent an answer to something still open.
-- machine checks that already failed (forbidden claim, unfilled
-  placeholder, missing footer, too long, reused hook …). Every one of them must be gone
-  from your new version. They are blocking: an item with an open one cannot go live.
 - `company` — the CRM dossier (`companies.enrichment`), the closeness score, the city and
   the verified contact. **These are read-only facts.** Use them for the hook and the
   personalisation; never invent, "improve" or round a fact, and never contradict the
@@ -104,10 +101,10 @@ company, not to guess here.
    ```
    with `{ "body": "...", "change_note": "...", "based_on_version_id": <currentVersion.id>,
    "needs_human_asset": false, "self_score": 0.0-1.0, "self_note": "..." }`
-   — `self_score` is YOUR OWN confidence that this version is ready for a human, and
+   Build that JSON with a tool (`jq` or a script), never by hand-escaping.
+   `self_score` is YOUR OWN confidence that this version is ready for a human, and
    `self_note` one line on what you were unsure about. Be honest: a low score gets your work
-   sampled, not punished, and the score is only recorded and displayed, nothing acts on it (build the JSON with a tool like `jq` or a script — never by
-   hand-escaping).
+   sampled, not punished, and the score is only recorded and displayed, nothing acts on it.
    - `201` → done.
    - `409` → **a human edited the item after your claim** (or your claim expired). Their version
      wins. Do **not** retry, do not re-claim, do not post again. Record it as skipped.

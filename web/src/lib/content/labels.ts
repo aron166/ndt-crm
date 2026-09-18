@@ -131,6 +131,7 @@ export const UI = {
   approvalsPerCategory: "Kategóriánként",
   approvalsDefault: "Alapértelmezés",
   saveApprovals: "Mentés",
+  ruleViolations: "A mentett verzió szabályt sért, ezért visszakerült az AI sorába:",
   selfScore: (pct: number) => `Az ügynök magabiztossága: ${pct}%`,
   selfScoreShort: (pct: number) => `${pct}% magabiztos`,
   reasonLabel: "Miért küldöd vissza?",

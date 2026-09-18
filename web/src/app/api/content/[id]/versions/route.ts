@@ -32,6 +32,8 @@ const versionSchema = z.object({
   /** The agent's own judgement of this rewrite (display only for now). */
   self_score: z.number().min(0).max(1).optional(),
   self_note: z.string().trim().max(500).optional(),
+  /** The source file changed: restate it as a new version (importer --refresh). */
+  from_source: z.boolean().optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -68,6 +70,7 @@ export async function POST(request: Request, { params }: Params) {
         needsHumanAsset: input.needs_human_asset,
         selfScore: input.self_score ?? null,
         selfNote: input.self_note ?? null,
+        fromSource: input.from_source ?? false,
       },
     );
     if (!result.ok) return json({ error: result.error }, result.status);

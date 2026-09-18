@@ -136,6 +136,39 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     expect(stale).toMatchObject({ ok: false, status: 409 });
   });
 
+  it("fromSource: importer posts a version without a claim, but never over an AI rewrite", async () => {
+    const r = await newItem();
+
+    // No claim, no rewrite request: a plain app version is refused...
+    const unclaimed = await service.createVersion(appActor, r.itemId, {
+      body: "restated", changeNote: "source changed", basedOnVersionId: r.versionId!,
+    });
+    expect(unclaimed).toMatchObject({ ok: false, status: 409 });
+
+    // ...but the importer path goes through, with the stale-base rule intact.
+    const staleBase = await service.createVersion(appActor, r.itemId, {
+      body: "restated", changeNote: "source changed", basedOnVersionId: r.versionId! + 999_999,
+      fromSource: true,
+    });
+    expect(staleBase).toMatchObject({ ok: false, status: 409 });
+
+    const ok = await service.createVersion(appActor, r.itemId, {
+      body: "restated from the source file", changeNote: "source changed", basedOnVersionId: r.versionId!,
+      fromSource: true,
+    });
+    expect(ok).toMatchObject({ ok: true, number: 2 });
+    if (!ok.ok) return;
+
+    // While the AI holds a claim, the importer must not overwrite it.
+    await service.submitReview(actorA(), ok.versionId, "rewrite", "please rewrite", "wording");
+    await service.claimItem(appActor, r.itemId);
+    const duringRewrite = await service.createVersion(appActor, r.itemId, {
+      body: "restated again", changeNote: "source changed again", basedOnVersionId: ok.versionId,
+      fromSource: true,
+    });
+    expect(duringRewrite).toMatchObject({ ok: false, status: 409 });
+  });
+
   it("rewrite request → claim → app version cycle", async () => {
     const r = await newItem();
     const rewrite = await service.submitReview(actorA(), r.versionId!, "rewrite", "please rewrite", "wording");

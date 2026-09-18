@@ -24,8 +24,7 @@ export function reviewersFromSettings(settings: unknown): number[] {
 }
 
 /** Configured reviewers that are still users of this tenant. */
-const APPROVAL_VALUES = [1, 2] as const;
-export type ApprovalCount = (typeof APPROVAL_VALUES)[number];
+export type ApprovalCount = 1 | 2;
 export const DEFAULT_APPROVALS: ApprovalCount = 2;
 
 const approvalsSchema = z.object({
@@ -46,14 +45,22 @@ export function requiredApprovalsFor(settings: unknown, category: string): Appro
 }
 
 /** Reviewers + the approvals this item's category needs, in one read. */
+/**
+ * Pass the transaction client when calling this inside a transaction: reading
+ * on the global client while a row lock is held burns a second pool connection
+ * and can deadlock under load (Vanda, #104).
+ */
+type ReaderClient = Pick<typeof db, "tenant" | "user">;
+
 export async function getApprovalRule(
   tenantId: number,
   category: string,
+  client: ReaderClient = db,
 ): Promise<{ reviewers: number[]; required: ApprovalCount; enoughReviewers: boolean }> {
-  const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  const tenant = await client.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
   const ids = reviewersFromSettings(tenant?.settings);
   const users = ids.length
-    ? await db.user.findMany({ where: { tenantId, id: { in: ids } }, select: { id: true } })
+    ? await client.user.findMany({ where: { tenantId, id: { in: ids } }, select: { id: true } })
     : [];
   const valid = new Set(users.map((u) => u.id));
   const reviewers = ids.filter((id) => valid.has(id));

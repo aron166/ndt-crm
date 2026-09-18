@@ -495,6 +495,7 @@ if (DO_APPLY) {
             body: it.body,
             change_note: `Frissítve a forrásfájlból: ${it.external_ref}`,
             based_on_version_id: parsed.versionId,
+            from_source: true,
           }),
         });
         const vt = await vr.text();

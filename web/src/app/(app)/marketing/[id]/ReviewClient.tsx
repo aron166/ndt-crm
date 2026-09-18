@@ -164,8 +164,9 @@ export function ReviewClient({
   function saveEdit() {
     if (!item.currentVersionId) return;
     if (!confirm(UI.resetWarning)) return;
-    run(
-      () => saveContentVersion({
+    setActionError(null);
+    startTransition(async () => {
+      const res = await saveContentVersion({
         itemId: item.id,
         basedOnVersionId: item.currentVersionId!,
         body: editBody,
@@ -173,9 +174,16 @@ export function ReviewClient({
         keepAssetIds: Array.from(editKeep),
         uploads: newUploads.map(({ path, caption }) => ({ path, caption: caption.trim() || undefined })),
         links: newLinks.map((l) => ({ url: l.url, caption: l.caption.trim() || undefined })),
-      }),
-      () => setEditing(false),
-    );
+      });
+      if (!res.ok) { setActionError(res.error); return; }
+      setEditing(false);
+      // A saved version that breaks a blocking rule goes back to the AI queue;
+      // say so instead of reporting a plain save (Vanda, #104).
+      if (res.violations.length > 0) {
+        setActionError(`${UI.ruleViolations} ${res.violations.map((v) => v.message).join(" ")}`);
+      }
+      router.refresh();
+    });
   }
 
   async function handleFiles(files: FileList) {
