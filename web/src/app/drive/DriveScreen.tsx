@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { logLeadCall } from "@/app/actions/leads";
+import { queueCallTranscript } from "@/app/actions/calls";
+import { AUTO_OUTCOME_LABELS } from "@/lib/calls/auto-outcome";
 import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
@@ -62,6 +64,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conflictNotice, setConflictNotice] = useState<BookingConflictInfo[] | null>(null);
+  const [queuedMessage, setQueuedMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const submitting = useRef(false);
   const [scriptKey, setScriptKey] = useState("");
@@ -86,6 +89,11 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   // default itself. Adjusting state during render (React's documented pattern
   // for this) instead of an effect: correct on the SAME render as the new
   // lead, no extra commit.
+  // queuedMessage is NOT reset here: it confirms the PREVIOUS lead's dictation
+  // saved, and this block fires the moment the queue advances to the next
+  // lead — clearing it here would null it out before it ever paints. It is
+  // cleared only by an explicit next action (resetFields, called from skip /
+  // submit / queueTranscript).
   const [trackedLeadId, setTrackedLeadId] = useState(lead?.id);
   if (lead?.id !== trackedLeadId) {
     setTrackedLeadId(lead?.id);
@@ -96,6 +104,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   function resetFields() {
     setNote(""); setSelectedOutcome(null); setCallbackAt("");
     setDemoWith("aron"); setBookingAt(""); setBookingKind(""); setLostReason(""); setExpanded(false); setError(null);
+    setQueuedMessage(null);
     // scriptKey is NOT reset here: `lead` still points at the OLD lead in this
     // closure, so defaultScriptKey would be the old lead's default. The
     // useEffect above recomputes it once the new `lead` is rendered.
@@ -128,6 +137,29 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
         if ("error" in res) { setError(res.error); return; }
         if (res.bookingConflicts?.length > 0) setConflictNotice(res.bookingConflicts);
         resetFields();
+        setDone((d) => new Set(d).add(lead.id));
+      } catch {
+        setError("Mentés sikertelen: próbáld újra");
+      } finally {
+        submitting.current = false;
+      }
+    });
+  }
+
+  // Dictate-and-save: the note IS the transcript. Stores it as a fact (no
+  // outcome applied here — see queueCallTranscript) and advances the queue
+  // exactly like a submitted outcome, same double-tap guard.
+  function queueTranscript() {
+    if (!lead || submitting.current || note.trim() === "") return;
+    submitting.current = true;
+    setError(null);
+    setConflictNotice(null);
+    startTransition(async () => {
+      try {
+        const res = await queueCallTranscript(lead.id, note);
+        if ("error" in res) { setError(res.error); return; }
+        resetFields();
+        setQueuedMessage(AUTO_OUTCOME_LABELS.analyzeQueued);
         setDone((d) => new Set(d).add(lead.id));
       } catch {
         setError("Mentés sikertelen: próbáld újra");
@@ -284,6 +316,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
       />
 
       {error && <p style={{ margin: 0, fontSize: 14, color: "var(--coral)" }}>{error}</p>}
+      {queuedMessage && <p style={{ margin: 0, fontSize: 14, color: "var(--mint)" }}>{queuedMessage}</p>}
 
       {/* Once an outcome needs a detail, the other five buttons go away: in a
           car the screen must hold one decision at a time, not seven. */}
@@ -294,6 +327,23 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           </button>
         ))}
       </div>
+
+      {/* Dictate-and-save: an additional path, not a replacement for the six
+          outcome buttons above — the outcome itself gets parsed out-of-band. */}
+      {!selectedOutcome && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <button
+            disabled={pending || note.trim() === ""}
+            onClick={queueTranscript}
+            style={outcomeBtnStyle(undefined)}
+          >
+            {AUTO_OUTCOME_LABELS.analyze}
+          </button>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--fg-mute)", textAlign: "center" }}>
+            {AUTO_OUTCOME_LABELS.analyzeHint}
+          </p>
+        </div>
+      )}
 
       {selectedOutcome && (NEEDS_FIELD.has(selectedOutcome) || note.trim() === "") && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

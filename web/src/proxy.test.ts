@@ -18,6 +18,7 @@ describe("isServiceApiPath", () => {
     "/api/content/12/claim",
     "/api/content/12/versions",
     "/api/calls/result",
+    "/api/calls/pending",
     "/api/companies/42",
     "/api/persons/7",
     "/api/outreach/targets",
@@ -47,6 +48,7 @@ describe("isServiceApiPath", () => {
     "/api/content/abc/claim",
     "/api/content/12/claim/x",
     "/api/content/queue/x",
+    "/api/calls/pending/x", // no item route for apps
     "/content",
   ];
   for (const path of sessionGated) {

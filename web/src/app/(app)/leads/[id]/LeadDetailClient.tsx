@@ -12,6 +12,7 @@ import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import type { QualificationQuestion } from "@/lib/leads/qualification";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
+import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
 import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
@@ -26,6 +27,8 @@ interface Interaction {
   leadId?: number | null;
   person: { id: number; firstName: string | null; lastName: string | null } | null;
   user?: { name: string } | null;
+  autoConfidence: number | null;
+  supersedesInteractionId?: number | null;
 }
 
 interface OpenTask {
@@ -69,6 +72,15 @@ interface Lead {
   } | null;
 }
 
+// ⚠️ HU string below is a PROPOSAL, unreviewed by Áron (same convention as
+// AUTO_OUTCOME_LABELS in lib/calls/auto-outcome.ts). `outcome: "transcribed"`
+// marks a queued dictation, not a real call outcome — it has no entry in
+// CALL_OUTCOMES, so the raw English key must never reach the chip.
+const TRANSCRIBED_OUTCOME_LABEL = "Átirat rögzítve";
+function outcomeChipLabel(outcome: string): string {
+  return outcome === "transcribed" ? TRANSCRIBED_OUTCOME_LABEL : callOutcomeLabel(outcome);
+}
+
 const MARKETING_KEYS = [
   "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
   "referrer", "landing_variant", "lead_score", "priority",
@@ -103,6 +115,8 @@ export function LeadDetailClient({
   const [converted, setConverted] = useState<number | null>(lead.convertedDealId ?? null);
   const [editing, setEditing] = useState(false);
   const [logging, setLogging] = useState(false);
+  // Non-null while the modal is open to correct THAT auto-derived interaction.
+  const [correcting, setCorrecting] = useState<number | null>(null);
   const [deleting, startDelete] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
   const [assignedTo, setAssignedTo] = useState(String(lead.assignedToId ?? ""));
@@ -419,7 +433,22 @@ export function LeadDetailClient({
                 <div style={{ fontSize: 12, color: "var(--fg-mute)", padding: "8px 0" }}>Nincs rögzített interakció.</div>
               ) : (
                 <div className="space-y-3">
-                  {interactions.map((r) => (
+                  {interactions.map((r) => {
+                    // A correction (supersedesInteractionId set) is never itself flagged
+                    // as auto-derived — it IS the human correction. And the badge/button
+                    // only ever apply to an interaction that actually belongs to the lead
+                    // being viewed — the timeline query also pulls in sibling leads of the
+                    // same company/person, and correcting THOSE would silently act on a
+                    // different lead than the one shown in the modal.
+                    const ownLead = r.leadId === lead.id;
+                    // NOT gated on supersedesInteractionId: an applied parse
+                    // that answered a dictated transcript supersedes that
+                    // transcript, and it is exactly the flow the badge exists
+                    // for. isAutoOutcome already excludes a human correction,
+                    // which never carries a confidence.
+                    const auto = ownLead && isAutoOutcome(r);
+                    const confidencePct = auto ? Math.round((r.autoConfidence ?? 0) * 100) : null;
+                    return (
                     <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                       <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--indigo)", marginTop: 5, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -428,16 +457,34 @@ export function LeadDetailClient({
                           {r.direction && <span style={{ color: "var(--fg-mute)" }}>· {interactionDirectionLabel(r.direction)}</span>}
                           {r.outcome && (
                             <span className="font-mono-ndt" style={{ fontSize: 12, padding: "1px 6px", borderRadius: 10, background: "var(--bg-hover)", color: "var(--fg-soft)" }}>
-                              {callOutcomeLabel(r.outcome)}
+                              {outcomeChipLabel(r.outcome)}
                             </span>
                           )}
                           {r.user?.name && <span style={{ color: "var(--fg-faint)", fontSize: 12 }}>· {r.user.name}</span>}
                           <span className="font-mono-ndt" style={{ color: "var(--fg-faint)", fontSize: 12, marginLeft: "auto" }}>{formatDateTime(r.occurredAt)}</span>
                         </div>
+                        {auto && (
+                          <div className="flex items-center gap-2" style={{ marginBottom: 2, flexWrap: "wrap" }}>
+                            <span className="font-mono-ndt" style={{ fontSize: 11, fontWeight: 600, padding: "1px 6px", borderRadius: 10, background: "var(--amber-soft)", color: "var(--amber)" }}>
+                              {AUTO_OUTCOME_LABELS.autoBadge}
+                            </span>
+                            <span style={{ fontSize: 11, color: "var(--fg-mute)" }}>
+                              {AUTO_OUTCOME_LABELS.autoBadgeHint.replace("{pct}", String(confidencePct))}
+                            </span>
+                            <button
+                              onClick={() => { setCorrecting(r.id); setLogging(true); }}
+                              disabled={closed}
+                              style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 11, fontWeight: 600, padding: 0, cursor: "pointer" }}
+                            >
+                              {AUTO_OUTCOME_LABELS.correct}
+                            </button>
+                          </div>
+                        )}
                         {r.notes && <p style={{ fontSize: 12, color: "var(--fg-soft)", lineHeight: 1.4 }}>{r.notes}</p>}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -463,12 +510,13 @@ export function LeadDetailClient({
 
       <CallOutcomeModal
         open={logging}
-        onClose={() => setLogging(false)}
+        onClose={() => { setLogging(false); setCorrecting(null); }}
         leadId={lead.id}
         title={[personName, lead.company?.name].filter(Boolean).join(" · ") || null}
         stageDescription={statuses.find((s) => s.key === status)?.description ?? null}
-        onLogged={() => router.refresh()}
+        onLogged={() => { setCorrecting(null); router.refresh(); }}
         scriptVariants={scriptVariants}
+        correctsInteractionId={correcting}
       />
 
       <LeadEditModal

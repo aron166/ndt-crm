@@ -354,6 +354,17 @@ export async function logLeadCallOutcome(
   if (lead.outcome !== "open" || lead.convertedDealId) {
     return { error: "A lead már lezárt: előbb nyisd újra" };
   }
+  // The row this one supersedes must be THIS lead's, in THIS tenant. Both
+  // current callers check it too, but the guard belongs here: the FK only
+  // proves the id exists somewhere, so without this a caller could point a
+  // correction at another tenant's interaction and read its id back.
+  if (input.supersedesInteractionId != null) {
+    const target = await db.interaction.findFirst({
+      where: { id: input.supersedesInteractionId, tenantId: ctx.tenantId, leadId },
+      select: { id: true },
+    });
+    if (!target) return { error: "A felülírt interakció nem ehhez a leadhez tartozik" };
+  }
   if (input.assignedToId != null) {
     const user = await db.user.findFirst({ where: { id: input.assignedToId, tenantId: ctx.tenantId }, select: { id: true } });
     if (!user) return { error: "Felhasználó nem található" };
@@ -390,9 +401,14 @@ export async function logLeadCallOutcome(
     const interaction = await tx.interaction.create({
       data: {
         tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId, userId: ctx.userId,
-        type: "call", direction: "outbound", outcome: input.outcome, notes: input.note, occurredAt: now,
+        type: "call", direction: "outbound", outcome: input.outcome, notes: input.note,
+        occurredAt: input.occurredAt ?? now,
         scriptVariant: input.scriptVariant ?? null,
         campaign: lead.campaign,
+        transcript: input.transcript ?? null,
+        autoConfidence: input.autoConfidence ?? null,
+        callId: input.callId ?? null,
+        supersedesInteractionId: input.supersedesInteractionId ?? null,
       },
       select: { id: true },
     });
@@ -431,7 +447,7 @@ export async function logLeadCallOutcome(
       },
     });
     if (lead.companyId) {
-      await tx.company.updateMany({ where: { id: lead.companyId, tenantId: ctx.tenantId }, data: { lastInteractionDate: now } });
+      await tx.company.updateMany({ where: { id: lead.companyId, tenantId: ctx.tenantId }, data: { lastInteractionDate: input.occurredAt ?? now } });
     }
     return { interaction, task, bookingTask };
   });

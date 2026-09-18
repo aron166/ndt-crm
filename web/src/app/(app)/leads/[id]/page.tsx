@@ -49,7 +49,9 @@ export default async function LeadDetailPage({
           ...(personId ? [{ personId }] : []),
         ],
       },
-      include: {
+      select: {
+        id: true, type: true, direction: true, outcome: true, notes: true,
+        occurredAt: true, leadId: true, autoConfidence: true, supersedesInteractionId: true,
         person: { select: { id: true, firstName: true, lastName: true } },
         user: { select: { name: true } },
       },

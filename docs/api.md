@@ -641,9 +641,92 @@ rewrite in flight.
 ### `POST /api/conversations` — append an agent conversation
 `{ "channel": "phone", "summary"?, "endedAt"?, "personId"?, "companyId"?, "agentId"?, "messages": [{ "role", "content" }] }` → `201 { ok, conversation }`.
 
+### `GET /api/calls/pending?limit=N` — transcripts waiting for a parse
+
+The queue the `call-outcome` skill (running on the Claude subscription, never
+an Anthropic API key — same pattern as `content-revise`) pulls from. The CRM
+never parses a transcript itself.
+
+```bash
+curl "$CRM/api/calls/pending?limit=20" -H "Authorization: Bearer $KEY"
+# → 200 { "ok": true,
+#          "items": [ { "id", "lead_id", "company_id", "company_name",
+#                       "person_name", "occurred_at", "transcript", "lead_status", "campaign" } ],
+#          "questions": [ { "slug", "label" } ] }
+```
+
+`limit` optional (1..50, default 50). Returns interactions that carry a raw
+transcript with no outcome parsed yet. `questions` is the tenant's CURRENT
+qualification list: the skill may call only this route and `result`, so without
+it the answer slugs it emits would come from a hard-coded default a tenant can
+rename at `/leads/setup` — and a wrong slug moves the lead's A-E tier.
+
 ### `POST /api/calls/result` — transcript / analysis of a recorded call
-`{ "company_id", "person_id"?, "call_id"?, "transcript"?, "analysis"?, "duration_sec"?, "occurred_at"? }` →
-`201 { ok, interactionId }`. Company-level (the Hívás mód cockpit), not lead-level.
+
+```bash
+curl -X POST $CRM/api/calls/result \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "company_id", "person_id"?, "call_id"?, "transcript"?, "analysis"?, "duration_sec"?, "occurred_at"? }'
+# → 201 { "ok": true, "interactionId": 91 }
+```
+Company-level (the Hívás mód cockpit), not lead-level.
+
+#### Auto-outcome fields (2026-09-18) — the `call-outcome` skill's half of the contract
+
+The same route also accepts a **lead-level** reading from the `call-outcome`
+skill. Send **exactly one** of `company_id` (the legacy company-level append)
+or `lead_id` — a body with both is a 400. `lead_id` requires `parsed`, and
+`parsed` requires `call_id`:
+
+```bash
+curl -X POST $CRM/api/calls/result \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "lead_id": 12, "call_id": "call-9f2", "pending_interaction_id": 91,
+        "transcript": "…",
+        "parsed": { "outcome": "callback_requested", "confidence": 0.86,
+                     "note": "Kedden 10-kor kéri a visszahívást.",
+                     "callback_at": "2026-09-22T08:00:00Z" } }'
+# applied   → 201 { "ok": true, "applied": true, "interactionId": 92, "taskId": null, "confidence": 0.86 }
+# held back → 201 { "ok": true, "applied": false, "reason": "low_confidence",
+#                    "interactionId": 92, "taskId": 40, "confidence": 0.55 }
+# repeat    → 200 { "ok": true, "deduped": true, "interactionId": 92 }
+```
+
+| field | notes |
+|---|---|
+| `lead_id` | the lead this call belongs to. Mutually exclusive with `company_id`, and requires `parsed` |
+| `pending_interaction_id` | optional — the `id` from `GET /api/calls/pending` this parse answers. It must belong to the same `lead_id` |
+| `parsed` | `{ outcome, confidence, note, answers?, callback_at?, demo_with?, booking_at?, lost_reason? }`, the exact shape `parsedCallSchema` validates (`lib/calls/auto-outcome.ts`) |
+| `call_id` | **idempotency key, required with `parsed`.** It is UNIQUE per tenant, so a repeat is caught by the database inside the write transaction, not by a pre-check: a retried POST returns `200 { deduped: true }` and cannot half-apply. Derive it from the queue row (`pending:<id>`), never per run |
+
+Interactions are append-only (`memory/decisions.md` #2), so nothing is ever
+stamped onto a row after the fact. The interaction a parse writes carries its
+own `transcript`, `auto_confidence` and `call_id` from the insert, and points
+at the row it replaces through `supersedes_interaction_id` — a queued
+transcript is waiting for a parse exactly while nothing supersedes it, and a
+human correction points at the auto-derived outcome it replaces. That last
+link is the parsed-vs-corrected agreement rate.
+
+**Whether a parse is applied — the trust ladder.** `confidence >= 0.8` **and**
+`outcome` in `{ no_answer, wrong_number, callback_requested }` → the reading is
+written through the one shared write path (`planCallOutcome`, same as a human
+logging a call) and the interaction is stamped as auto-derived. Every other
+case — `meeting_booked`, `not_interested`, `disqualified` **at any
+confidence**, or an in-range outcome below 0.8 — creates a "Kimenetel
+megerősítése" task for a human instead; nothing is applied. This is
+deliberate, not a threshold that will eventually cover everything:
+`meeting_booked` writes a slot into a demo host's calendar, and
+`not_interested`/`disqualified` close the lead (a closed lead refuses further
+logging), so a wrong parse there would need a human to re-open the lead before
+it could even be corrected — a booking or a closed lead is a human act that
+stays at the boundary, however confident the reading. The reversible outcomes
+(a stage advance, a no-op, an internal callback task) are the only ones a
+machine reading may commit on its own.
+
+`confidence` is stored on the interaction whether or not the parse was
+applied, so the agreement rate between what was parsed and what a human later
+corrects it to can be measured — the 0.8 bar itself is expected to move once
+that data exists (`lib/calls/auto-outcome.ts`, `AUTO_OUTCOME_THRESHOLD`).
 
 ## Automations (for reference)
 

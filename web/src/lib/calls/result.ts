@@ -1,10 +1,15 @@
 import { z } from "zod";
+import { parsedCallSchema } from "./auto-outcome";
 
 // Inbound call-result payload (POST /api/calls/result). After a call is recorded
 // and transcribed/analyzed by the external pipeline (Make scenario: recorder →
 // Drive → Whisper transcript → AI analysis), it posts the result back here. We
 // APPEND a new Interaction (interactions are append-only) onto the company's
 // timeline. snake_case on the wire to match the other ingestion endpoints.
+//
+// Two callers share this schema: the plain company-linked poster (company_id
+// only, as before) and the auto-outcome skill (lead_id + parsed — an outcome
+// lives on a LEAD, never a bare company, so `parsed` requires `lead_id`).
 
 const emptyToUndef = (v: unknown) =>
   typeof v === "string" && v.trim() === "" ? undefined : v;
@@ -13,7 +18,8 @@ export const callResultSchema = z
   .object({
     // Which company/person the call belonged to. The Make scenario carries these
     // through from the call-started webhook (keep the mapping in a Make data store).
-    company_id: z.coerce.number().int().positive(),
+    company_id: z.coerce.number().int().positive().optional(),
+    lead_id: z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional()),
     person_id: z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional()),
     // Free-form correlation id from the call-started webhook; stored for traceability.
     call_id: z.preprocess(emptyToUndef, z.string().trim().max(200).optional()),
@@ -22,9 +28,33 @@ export const callResultSchema = z
     duration_sec: z.preprocess(emptyToUndef, z.coerce.number().int().nonnegative().optional()),
     // When the call happened (ISO). Defaults to now if omitted.
     occurred_at: z.preprocess(emptyToUndef, z.string().datetime().optional()),
+    // Auto-outcome skill payload (lib/calls/auto-outcome.ts) — the CRM's read of
+    // a transcript it did not parse itself. Requires lead_id (see refine below).
+    parsed: parsedCallSchema.optional(),
+    // The queued-transcript row (GET /api/calls/pending) this post answers.
+    pending_interaction_id: z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional()),
   })
   .refine((d) => Boolean(d.transcript || d.analysis), {
     message: "transcript or analysis is required",
+  })
+  .refine((d) => Boolean(d.company_id) !== Boolean(d.lead_id), {
+    message: "exactly one of company_id or lead_id is required",
+  })
+  .refine((d) => !d.parsed || Boolean(d.lead_id), {
+    message: "parsed requires lead_id: an outcome lives on a lead",
+  })
+  .refine((d) => !d.lead_id || Boolean(d.parsed), {
+    // And the reverse. Without this a lead_id-only body falls through to the
+    // company path with `company_id: undefined`, which Prisma DROPS from the
+    // where clause — the lookup would then match an arbitrary company in the
+    // tenant and append the call to it.
+    message: "lead_id requires parsed: use the server action for a bare transcript",
+  })
+  .refine((d) => !d.parsed || Boolean(d.call_id), {
+    // call_id is the idempotency key for an applied auto-outcome. Without it a
+    // retry of the same POST writes a second interaction, task and status advance.
+    message: "call_id is required when parsed is present",
+    path: ["call_id"],
   });
 
 export type CallResultInput = z.infer<typeof callResultSchema>;

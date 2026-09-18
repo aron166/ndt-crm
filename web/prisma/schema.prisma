@@ -657,36 +657,62 @@ model QuoteLineItem {
 // ─────────────────────────────────────────────
 
 model Interaction {
-  id            Int      @id @default(autoincrement())
-  tenantId      Int      @map("tenant_id")
-  companyId     Int?     @map("company_id")
-  personId      Int?     @map("person_id")
-  leadId        Int?     @map("lead_id") // the lead this touch belongs to (exact per-lead history)
-  userId        Int?     @map("user_id") // who logged this
-  type          String? // call, email, meeting, note, site_visit
-  direction     String? // inbound, outbound
-  notes         String?
-  outcome       String? // maps to 0-8 status codes
+  id                      Int      @id @default(autoincrement())
+  tenantId                Int      @map("tenant_id")
+  companyId               Int?     @map("company_id")
+  personId                Int?     @map("person_id")
+  leadId                  Int?     @map("lead_id") // the lead this touch belongs to (exact per-lead history)
+  userId                  Int?     @map("user_id") // who logged this
+  type                    String? // call, email, meeting, note, site_visit
+  direction               String? // inbound, outbound
+  notes                   String?
+  outcome                 String? // maps to 0-8 status codes
   // Which call-script variant this call used — the key only; the definitions
   // live in tenants.settings.scriptVariants (lib/leads/scripts.ts).
-  scriptVariant String?  @map("script_variant")
+  scriptVariant           String?  @map("script_variant")
   // Campaign tag (campaign tracking, 2026-09-17): the free-string campaign key
   // shared with email_drafts.campaign / leads.campaign. Stamped from the lead
   // on lead-linked writes, so a non-email campaign (calls, meetings) counts on
   // the same dashboard as the email one.
-  campaign      String?
-  occurredAt    DateTime @default(now()) @map("occurred_at")
-  createdAt     DateTime @default(now()) @map("created_at")
+  campaign                String?
+  /**
+   * Auto-outcome from a call transcript (trust ladder, 2026-09-18). The parse
+   * runs OUTSIDE the CRM (the call-outcome skill on the Claude subscription);
+   * the CRM only validates and stores what it is given.
+   * - `transcript`: what the parse read. Kept so a human can check it.
+   * - `autoConfidence`: the parse's own 0..1 confidence. Set on an interaction
+   * with a real outcome = this outcome was machine-derived (see
+   * `isAutoOutcome` in lib/calls/auto-outcome.ts). On a `transcribed` row it
+   * is just the confidence of the parse that produced the confirm task.
+   * - `supersedesInteractionId`: the interaction this one replaces — a human
+   * correction of an auto-applied outcome, or a parse answering a queued
+   * transcript. Interactions are append-only (decisions.md #2), so nothing
+   * is ever written onto the older row: a transcript is still waiting for a
+   * parse exactly while nothing supersedes it, and the correction link is
+   * what makes the parsed-vs-corrected agreement rate measurable.
+   * - `callId`: the caller's correlation id, unique per tenant — a repeated
+   * POST is idempotent in the database, not in app code.
+   */
+  transcript              String?
+  autoConfidence          Float?   @map("auto_confidence")
+  supersedesInteractionId Int?     @map("supersedes_interaction_id")
+  callId                  String?  @map("call_id")
+  occurredAt              DateTime @default(now()) @map("occurred_at")
+  createdAt               DateTime @default(now()) @map("created_at")
 
-  tenant  Tenant   @relation(fields: [tenantId], references: [id])
-  company Company? @relation(fields: [companyId], references: [id])
-  person  Person?  @relation(fields: [personId], references: [id])
-  lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  user    User?    @relation(fields: [userId], references: [id])
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  company      Company?      @relation(fields: [companyId], references: [id])
+  person       Person?       @relation(fields: [personId], references: [id])
+  lead         Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id])
+  supersedes   Interaction?  @relation("InteractionSupersedes", fields: [supersedesInteractionId], references: [id], onDelete: SetNull)
+  supersededBy Interaction[] @relation("InteractionSupersedes")
 
+  @@unique([tenantId, callId])
   @@index([tenantId, leadId])
   @@index([tenantId, scriptVariant])
   @@index([tenantId, campaign])
+  @@index([supersedesInteractionId])
   @@map("interactions")
 }
 
@@ -1316,12 +1342,12 @@ model EmailDraft {
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  tenant    Tenant  @relation(fields: [tenantId], references: [id])
-  sender    User?   @relation("DraftSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  sender          User?           @relation("DraftSender", fields: [senderUserId], references: [id], onDelete: SetNull)
   // Restrict, not Cascade: a sent draft records an email that left the building.
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  person    Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
-  createdBy User?   @relation("DraftCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  person          Person?         @relation(fields: [personId], references: [id], onDelete: SetNull)
+  createdBy       User?           @relation("DraftCreator", fields: [createdById], references: [id], onDelete: SetNull)
   // SetNull: losing the template version must never delete the record of an email that left.
   templateVersion ContentVersion? @relation("DraftTemplate", fields: [templateVersionId], references: [id], onDelete: SetNull)
 
