@@ -76,14 +76,13 @@ If the transcript names no clear outcome, pick the closest read and drop
 **`answers` (qualification, optional, only real answers):**
 - Include a slug only when the transcript contains an actual answer to that
   question — never infer one from tone or silence.
-- Use the tenant's existing qualification slugs. The known default set is
-  `gate, situation, concrete, goal, size, postcode, timing, own_device` (task
-  branch) and `hook, use_case, work` (curious branch) — see
-  `web/src/lib/leads/qualification.ts` for what each means. A tenant may have
-  renamed or replaced this list at `/leads/setup`; this skill has no endpoint
-  to read the live list (see Setup — only `pending` and `result` are allowed),
-  so if you are not confident a slug is still the tenant's current one, omit
-  it. A wrong answer moves the lead's A-E tier — omitting beats guessing.
+- Use the slugs `GET /api/calls/pending` returns in its `questions` array:
+  `[{ slug, label }]` is the tenant's CURRENT list, and it is the only list you
+  may emit from. A tenant can rename or replace these at `/leads/setup`, so
+  never fall back to a slug you remember from a previous run or from the repo.
+- If a transcript answers something that no returned slug covers, leave it out
+  of `answers` and say so in the `note` instead. A wrong slug moves the lead's
+  A-E tier.
 
 **`callback_at` (only for `callback_requested`):**
 - Full ISO datetime, Europe/Budapest, resolved from `occurred_at` (e.g. "kedden
@@ -110,9 +109,12 @@ with `{ "lead_id", "call_id", "pending_interaction_id", "transcript", "parsed": 
 "booking_at"?, "lost_reason"? } }`. Build the JSON with a tool (`jq` or a
 script), never by hand-escaping.
 
-`call_id` is the idempotency key and it MUST be derived from the row, not
-invented: use `pending:<id>` where `<id>` is the pending row's `id`. A random
-or per-run id would let a second run write the same call twice.
+`call_id` is REQUIRED with `parsed`, and it MUST be derived from the row, not
+invented: use `pending:<id>` where `<id>` is the pending row's `id`. It is
+unique per tenant, so a retry of a POST you never saw the answer to is safe —
+but a random or per-run id would let a second run write the same call twice.
+`pending_interaction_id` must be the row you actually read, and it must belong
+to the same `lead_id`.
 
 - `{ ok: true, applied: true, ... }` → the CRM auto-applied your reading.
 - `{ ok: true, applied: false, reason, ... }` → left for a human (confirm-outcome

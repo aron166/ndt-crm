@@ -649,12 +649,17 @@ never parses a transcript itself.
 
 ```bash
 curl "$CRM/api/calls/pending?limit=20" -H "Authorization: Bearer $KEY"
-# → 200 { "ok": true, "items": [ { "id", "lead_id", "company_id", "company_name",
-#          "person_name", "occurred_at", "transcript", "lead_status", "campaign" } ] }
+# → 200 { "ok": true,
+#          "items": [ { "id", "lead_id", "company_id", "company_name",
+#                       "person_name", "occurred_at", "transcript", "lead_status", "campaign" } ],
+#          "questions": [ { "slug", "label" } ] }
 ```
 
-`limit` optional (default/cap per the route), 1-based. Returns interactions
-that carry a raw transcript with no outcome parsed yet.
+`limit` optional (1..50, default 50). Returns interactions that carry a raw
+transcript with no outcome parsed yet. `questions` is the tenant's CURRENT
+qualification list: the skill may call only this route and `result`, so without
+it the answer slugs it emits would come from a hard-coded default a tenant can
+rename at `/leads/setup` — and a wrong slug moves the lead's A-E tier.
 
 ### `POST /api/calls/result` — transcript / analysis of a recorded call
 
@@ -669,7 +674,9 @@ Company-level (the Hívás mód cockpit), not lead-level.
 #### Auto-outcome fields (2026-09-18) — the `call-outcome` skill's half of the contract
 
 The same route also accepts a **lead-level** reading from the `call-outcome`
-skill, adding three optional fields to the payload above:
+skill. Send **exactly one** of `company_id` (the legacy company-level append)
+or `lead_id` — a body with both is a 400. `lead_id` requires `parsed`, and
+`parsed` requires `call_id`:
 
 ```bash
 curl -X POST $CRM/api/calls/result \
@@ -687,10 +694,18 @@ curl -X POST $CRM/api/calls/result \
 
 | field | notes |
 |---|---|
-| `lead_id` | optional — present when this transcript came from a lead-level call (as opposed to the company-level cockpit above) |
-| `pending_interaction_id` | optional — the `id` from `GET /api/calls/pending` this parse answers |
-| `parsed` | optional — `{ outcome, confidence, note, answers?, callback_at?, demo_with?, booking_at?, lost_reason? }`, the exact shape `parsedCallSchema` validates (`lib/calls/auto-outcome.ts`) |
-| `call_id` | **idempotency key.** A repeated POST with the same `call_id` returns `200 { deduped: true }` and writes nothing a second time — safe to retry a POST that timed out |
+| `lead_id` | the lead this call belongs to. Mutually exclusive with `company_id`, and requires `parsed` |
+| `pending_interaction_id` | optional — the `id` from `GET /api/calls/pending` this parse answers. It must belong to the same `lead_id` |
+| `parsed` | `{ outcome, confidence, note, answers?, callback_at?, demo_with?, booking_at?, lost_reason? }`, the exact shape `parsedCallSchema` validates (`lib/calls/auto-outcome.ts`) |
+| `call_id` | **idempotency key, required with `parsed`.** It is UNIQUE per tenant, so a repeat is caught by the database inside the write transaction, not by a pre-check: a retried POST returns `200 { deduped: true }` and cannot half-apply. Derive it from the queue row (`pending:<id>`), never per run |
+
+Interactions are append-only (`memory/decisions.md` #2), so nothing is ever
+stamped onto a row after the fact. The interaction a parse writes carries its
+own `transcript`, `auto_confidence` and `call_id` from the insert, and points
+at the row it replaces through `supersedes_interaction_id` — a queued
+transcript is waiting for a parse exactly while nothing supersedes it, and a
+human correction points at the auto-derived outcome it replaces. That last
+link is the parsed-vs-corrected agreement rate.
 
 **Whether a parse is applied — the trust ladder.** `confidence >= 0.8` **and**
 `outcome` in `{ no_answer, wrong_number, callback_requested }` → the reading is
