@@ -28,7 +28,8 @@ export function isDraftStatus(v: unknown): v is DraftStatus {
 }
 
 // The sequence step (1-4) a draft belongs to within a campaign.
-export const MAX_STEP = 4;
+export { MAX_STEP } from "./steps";
+import { MAX_STEP } from "./steps";
 
 export function isValidStep(v: unknown): boolean {
   return typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= MAX_STEP;
