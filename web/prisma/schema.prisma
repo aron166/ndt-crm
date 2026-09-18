@@ -675,6 +675,28 @@ model Interaction {
   // on lead-linked writes, so a non-email campaign (calls, meetings) counts on
   // the same dashboard as the email one.
   campaign      String?
+  /**
+   * Auto-outcome from a call transcript (trust ladder, 2026-09-18). The parse
+   * runs OUTSIDE the CRM (the call-outcome skill on the Claude subscription);
+   * the CRM only validates and stores what it is given.
+   *
+   * - `transcript`: what the parse read. Kept so a human can check it.
+   * - `autoConfidence`: the parse's own 0..1 confidence. Set on an interaction
+   *   with a real outcome = this outcome was machine-derived (see
+   *   `isAutoOutcome` in lib/calls/auto-outcome.ts). On a `transcribed` row it
+   *   is just the confidence of the parse that produced the confirm task.
+   * - `parsedAt`: a queued transcript has been looked at; NULL = still pending.
+   * - `correctsInteractionId`: a human correction points back at the
+   *   auto-applied interaction it replaces. This link is what makes the
+   *   parsed-vs-corrected agreement rate measurable.
+   * - `callId`: the caller's correlation id, unique per tenant — a repeated
+   *   POST is idempotent in the database, not in app code.
+   */
+  transcript    String?
+  autoConfidence Float?  @map("auto_confidence")
+  parsedAt      DateTime? @map("parsed_at")
+  correctsInteractionId Int? @map("corrects_interaction_id")
+  callId        String?  @map("call_id")
   occurredAt    DateTime @default(now()) @map("occurred_at")
   createdAt     DateTime @default(now()) @map("created_at")
 
@@ -683,10 +705,14 @@ model Interaction {
   person  Person?  @relation(fields: [personId], references: [id])
   lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
   user    User?    @relation(fields: [userId], references: [id])
+  corrects   Interaction?  @relation("InteractionCorrection", fields: [correctsInteractionId], references: [id], onDelete: SetNull)
+  correctedBy Interaction[] @relation("InteractionCorrection")
 
   @@index([tenantId, leadId])
   @@index([tenantId, scriptVariant])
   @@index([tenantId, campaign])
+  @@index([tenantId, parsedAt])
+  @@unique([tenantId, callId])
   @@map("interactions")
 }
 
