@@ -11,6 +11,7 @@ import {
 import { logLeadCallOutcome, setLeadQualification, type LeadCtx } from "@/lib/leads/service";
 import { callOutcomeLabel } from "@/lib/leads/outcomes";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
+import { NOTE_PREVIEW_LEN } from "@/lib/calls/transcript";
 import { reportError } from "@/lib/report-error";
 
 // Call-result intake. The external transcription/analysis pipeline (Make:
@@ -229,9 +230,7 @@ async function handleLeadOutcome(
     };
 
     if (decision.apply) {
-      let outcomeResult: Awaited<ReturnType<typeof logLeadCallOutcome>>;
-      try {
-        outcomeResult = await logLeadCallOutcome(
+      const outcomeResult = await logLeadCallOutcome(
           leadId,
           {
             ...toCallOutcome(parsed),
@@ -248,14 +247,6 @@ async function handleLeadOutcome(
           },
           ctx,
         );
-      } catch (err) {
-        if (isUniqueViolation(err)) {
-          // callId is unique per tenant; the transaction committed nothing.
-          const dup = await db.interaction.findFirst({ where: { tenantId, callId }, select: { id: true } });
-          return json({ ok: true, deduped: true, interactionId: dup?.id ?? null }, 200);
-        }
-        throw err;
-      }
       if ("error" in outcomeResult) {
         // Do not fall through to applying anything — the write failed. File the
         // same confirm task a low-confidence parse would get, with the reason why.
@@ -341,6 +332,19 @@ async function handleLeadOutcome(
       201,
     );
   } catch (err) {
+    // (tenant_id, call_id) is unique, and the interaction insert is the first
+    // statement of every write path here, so a violation means the whole
+    // transaction rolled back and the winner already holds this call. Caught
+    // centrally so BOTH the applied and the confirm-task path answer a
+    // concurrent duplicate with the documented deduped 200 rather than a 500
+    // the caller is told to retry.
+    if (isUniqueViolation(err) && input.call_id) {
+      const dup = await db.interaction.findFirst({
+        where: { tenantId, callId: input.call_id },
+        select: { id: true },
+      });
+      if (dup) return json({ ok: true, deduped: true, interactionId: dup.id }, 200);
+    }
     reportError("api.calls.result", err, { tenantId, leadId });
     return json({ error: "Internal error" }, 500);
   }
@@ -362,7 +366,9 @@ async function createConfirmTask(
 ) {
   const notes = composeCallNotes({
     analysis: parsed.note,
-    transcript: input.transcript,
+    // A PREVIEW only: `notes` is selected by every detail page, while the full
+    // text lives on interaction.transcript, which none of them select.
+    transcript: input.transcript?.slice(0, NOTE_PREVIEW_LEN),
     durationSec: input.duration_sec,
     callId: input.call_id,
   });

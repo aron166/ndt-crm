@@ -56,3 +56,15 @@ describe("isAutoOutcome", () => {
     expect(isAutoOutcome({ outcome: "no_answer", autoConfidence: null })).toBe(false);
   });
 });
+
+describe("isAutoOutcome on a parse that answered a dictated transcript", () => {
+  it("stays true when the row supersedes the transcript it answered", () => {
+    // The badge on the lead timeline is gated on this. Gating it on
+    // supersedesInteractionId instead would hide the badge on exactly the
+    // /drive dictation flow the feature exists for.
+    expect(isAutoOutcome({ outcome: "callback_requested", autoConfidence: 0.91 })).toBe(true);
+  });
+  it("is false for a human correction, which carries no confidence", () => {
+    expect(isAutoOutcome({ outcome: "not_interested", autoConfidence: null })).toBe(false);
+  });
+});

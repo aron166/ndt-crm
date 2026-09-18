@@ -441,7 +441,12 @@ export function LeadDetailClient({
                     // same company/person, and correcting THOSE would silently act on a
                     // different lead than the one shown in the modal.
                     const ownLead = r.leadId === lead.id;
-                    const auto = ownLead && r.supersedesInteractionId == null && isAutoOutcome(r);
+                    // NOT gated on supersedesInteractionId: an applied parse
+                    // that answered a dictated transcript supersedes that
+                    // transcript, and it is exactly the flow the badge exists
+                    // for. isAutoOutcome already excludes a human correction,
+                    // which never carries a confidence.
+                    const auto = ownLead && isAutoOutcome(r);
                     const confidencePct = auto ? Math.round((r.autoConfidence ?? 0) * 100) : null;
                     return (
                     <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>

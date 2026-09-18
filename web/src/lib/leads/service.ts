@@ -447,7 +447,7 @@ export async function logLeadCallOutcome(
       },
     });
     if (lead.companyId) {
-      await tx.company.updateMany({ where: { id: lead.companyId, tenantId: ctx.tenantId }, data: { lastInteractionDate: now } });
+      await tx.company.updateMany({ where: { id: lead.companyId, tenantId: ctx.tenantId }, data: { lastInteractionDate: input.occurredAt ?? now } });
     }
     return { interaction, task, bookingTask };
   });
