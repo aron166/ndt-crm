@@ -209,6 +209,38 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     // afterAll removes them. Each run makes its own slug, so nothing leaks between runs.
   });
 
+  it("setOutreachSlot: one item per step, email only, and it can be cleared", async () => {
+    const campaign = `IT-SLOT-${Date.now()}`;
+    const a = await newItem("a", "email");
+    const b = await newItem("b", "email");
+    const notEmail = await newItem("c");
+
+    expect(await service.setOutreachSlot(actorA(), a.itemId, { campaign, step: 1 })).toMatchObject({ ok: true });
+
+    // The slot is taken: a second item cannot silently steal it.
+    expect(await service.setOutreachSlot(actorA(), b.itemId, { campaign, step: 1 }))
+      .toMatchObject({ ok: false, status: 409 });
+    // A different step in the same campaign is free.
+    expect(await service.setOutreachSlot(actorA(), b.itemId, { campaign, step: 2 })).toMatchObject({ ok: true });
+
+    // Only email content belongs in a cold-email sequence.
+    expect(await service.setOutreachSlot(actorA(), notEmail.itemId, { campaign, step: 3 }))
+      .toMatchObject({ ok: false, status: 400 });
+    expect(await service.setOutreachSlot(actorA(), a.itemId, { campaign, step: 0 }))
+      .toMatchObject({ ok: false, status: 400 });
+
+    // Re-assigning the SAME item to its own slot is not a conflict.
+    expect(await service.setOutreachSlot(actorA(), a.itemId, { campaign, step: 1 })).toMatchObject({ ok: true });
+
+    // Clearing frees the slot.
+    expect(await service.setOutreachSlot(actorA(), a.itemId, null)).toMatchObject({ ok: true });
+    expect(await service.setOutreachSlot(actorA(), b.itemId, { campaign, step: 1 })).toMatchObject({ ok: true });
+
+    const row = await db.contentItem.findUniqueOrThrow({ where: { id: a.itemId } });
+    expect(row.outreachCampaign).toBeNull();
+    expect(row.outreachStep).toBeNull();
+  });
+
   it("a rule check cannot be waived or answered by hand", async () => {
     const r = await newItem();
     const check = await db.contentCheck.create({

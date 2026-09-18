@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { gateDraft } from "@/lib/outreach/template";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
@@ -100,6 +101,11 @@ export async function markDraftSentManually(
   if (!MANUAL_SENDABLE_STATUSES.includes(row.status as DraftStatus)) {
     return { ok: false, error: "Előbb hagyd jóvá, vagy ez az érintés már elment" };
   }
+
+  // §6b: a step whose template exists but is not approved cannot be booked as
+  // sent, the same gate the copy button and the Resend path use.
+  const gate = await gateDraft(TENANT_ID, row.campaign, row.step);
+  if (!gate.ok) return { ok: false, error: gate.error };
 
   // Same rule as the Resend path: no unsubscribe line, no cold email. The copy
   // button appends it; this refuses to book a send while none is configured.

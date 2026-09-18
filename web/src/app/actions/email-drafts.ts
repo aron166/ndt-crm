@@ -2,6 +2,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { gateDraft } from "@/lib/outreach/template";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
@@ -142,8 +143,15 @@ export async function listDrafts(
 /** A single draft's body, fetched only when the editor expands a row — tenant-scoped. */
 export async function getDraftBody(id: number): Promise<{ ok: true; body: string } | { ok: false; error: string }> {
   if (!(await isCrmUser())) return DENIED;
-  const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID }, select: { body: true } });
+  const row = await db.emailDraft.findFirst({
+    where: { id, tenantId: TENANT_ID },
+    select: { body: true, campaign: true, step: true },
+  });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
+  // §6b: a draft whose step has an unapproved template may not be copied out
+  // of the CRM. An empty slot passes - round one predates templates.
+  const gate = await gateDraft(TENANT_ID, row.campaign, row.step);
+  if (!gate.ok) return { ok: false, error: gate.error };
   return { ok: true, body: row.body };
 }
 
@@ -289,6 +297,9 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   if (!canSend(row.status as DraftStatus)) {
     return { ok: false, error: "Ez a piszkozat nem küldhető ebben az állapotban" };
   }
+  // §6b: same template gate as the copy and the manual-send paths.
+  const gate = await gateDraft(TENANT_ID, row.campaign, row.step);
+  if (!gate.ok) return { ok: false, error: gate.error };
 
   // The consent/unsubscribe line is not optional. Without this guard a tenant
   // who never opened the settings panel cold-emails with no opt-out at all —

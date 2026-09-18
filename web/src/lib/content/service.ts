@@ -494,6 +494,56 @@ export async function releaseStaleClaims(tenantId: number, now: Date = new Date(
   return released;
 }
 
+/**
+ * §6b: put an item into (or take it out of) a cold-email step slot. Any status
+ * may be assigned - the campaign screen shows what is waiting - but only a LIVE
+ * item ever feeds a draft (see lib/outreach/template.ts). A slot holds exactly
+ * one item: taking a slot that is already filled is a 409, never a silent steal.
+ */
+export async function setOutreachSlot(
+  actor: UserActor,
+  itemId: number,
+  slot: { campaign: string; step: number } | null,
+): Promise<{ ok: true } | Fail> {
+  if (slot) {
+    if (!slot.campaign.trim()) return fail(400, "Hiányzik a kampány");
+    if (!Number.isInteger(slot.step) || slot.step < 1 || slot.step > 20) {
+      return fail(400, "Az érintés sorszáma 1 és 20 között lehet");
+    }
+  }
+  return db.$transaction(async (tx) => {
+    const row = await tx.contentItem.findFirst({
+      where: { id: itemId, tenantId: actor.tenantId },
+      select: { id: true, category: true, outreachCampaign: true, outreachStep: true },
+    });
+    if (!row) return fail(404, "Nem található");
+    if (slot && row.category !== "email") {
+      return fail(400, "Csak e-mail tartalom tehető kampánylépésbe");
+    }
+    if (slot) {
+      const taken = await tx.contentItem.findFirst({
+        where: {
+          tenantId: actor.tenantId, outreachCampaign: slot.campaign.trim(), outreachStep: slot.step,
+          id: { not: itemId },
+        },
+        select: { id: true, title: true },
+      });
+      if (taken) return fail(409, `Ezt a lépést már betölti: ${taken.title}`);
+    }
+    await tx.contentItem.update({
+      where: { id: itemId },
+      data: {
+        outreachCampaign: slot ? slot.campaign.trim() : null,
+        outreachStep: slot ? slot.step : null,
+      },
+    });
+    await writeAudit(tx, actor, "content_item", itemId, "update",
+      { outreachCampaign: row.outreachCampaign, outreachStep: row.outreachStep },
+      { outreachCampaign: slot?.campaign.trim() ?? null, outreachStep: slot?.step ?? null });
+    return { ok: true as const };
+  });
+}
+
 export async function archiveItem(actor: UserActor, itemId: number): Promise<{ ok: true } | Fail> {
   return db.$transaction(async (tx) => {
     const row = await lockItem(tx, actor.tenantId, itemId);

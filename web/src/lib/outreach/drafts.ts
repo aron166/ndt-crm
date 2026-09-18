@@ -95,6 +95,8 @@ export interface DraftUpsert {
   senderUserId?: number | null;
   wave?: number | null;
   dueAt?: Date | null;
+  /** §6b: the live template version this personalised draft was built from. */
+  templateVersionId?: number | null;
 }
 
 export const draftUpsertSchema = z.object({
@@ -109,6 +111,10 @@ export const draftUpsertSchema = z.object({
   senderUserId: z.number().int().positive().nullable().optional(),
   wave: z.number().int().min(1).max(52).nullable().optional(),
   dueAt: z.coerce.date().nullable().optional(),
+  // §6b: which live template version this draft was built from. Validated
+  // against the item sitting in that campaign+step slot, so an agent cannot
+  // claim a version that belongs to a different step.
+  templateVersionId: z.number().int().positive().nullable().optional(),
 });
 
 // Bulk drafting requests come from the agent skill in one batch; cap it so a

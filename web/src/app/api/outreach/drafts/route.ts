@@ -79,6 +79,31 @@ export async function POST(request: Request) {
       ? (await db.user.findMany({ where: { tenantId: key.tenantId, id: { in: wantedSenders } }, select: { id: true } })).map((u) => u.id)
       : [],
   );
+  // §6b: a claimed template version must really be a version of the item that
+  // fills that campaign+step slot. Anything else is dropped to null rather than
+  // trusted, the same way senderUserId and personId are.
+  const claimedTemplates = [...new Set(
+    items.map((d) => d.templateVersionId).filter((v): v is number => typeof v === "number"),
+  )];
+  const validTemplates = new Set<string>();
+  if (claimedTemplates.length) {
+    const versions = await db.contentVersion.findMany({
+      where: {
+        id: { in: claimedTemplates }, tenantId: key.tenantId,
+        item: { outreachCampaign: { not: null }, outreachStep: { not: null } },
+      },
+      select: { id: true, item: { select: { outreachCampaign: true, outreachStep: true } } },
+    });
+    for (const v of versions) {
+      validTemplates.add(`${v.id}:${v.item.outreachCampaign}:${v.item.outreachStep}`);
+    }
+  }
+  const templateFor = (item: { templateVersionId?: number | null; campaign: string; step: number }) =>
+    item.templateVersionId != null
+    && validTemplates.has(`${item.templateVersionId}:${item.campaign}:${item.step}`)
+      ? item.templateVersionId
+      : null;
+
   const trackingFor = (item: { senderUserId?: number | null; wave?: number | null; dueAt?: Date | null }) => ({
     ...(item.senderUserId !== undefined ? { senderUserId: item.senderUserId != null && validSenders.has(item.senderUserId) ? item.senderUserId : null } : {}),
     ...(item.wave !== undefined ? { wave: item.wave } : {}),
@@ -127,6 +152,7 @@ export async function POST(request: Request) {
             body: item.body,
             toEmail: item.toEmail ?? null,
             status: "draft",
+            templateVersionId: templateFor(item),
             ...trackingFor(item),
           },
         });
@@ -161,6 +187,7 @@ export async function POST(request: Request) {
           subject: item.subject,
           body: item.body,
           toEmail: item.toEmail ?? null,
+          templateVersionId: templateFor(item),
           ...trackingFor(item),
         },
       });
