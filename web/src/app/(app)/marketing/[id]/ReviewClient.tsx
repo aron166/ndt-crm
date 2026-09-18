@@ -19,6 +19,7 @@ import {
 } from "@/app/actions/content";
 import { publishContent, saveContentMetrics } from "@/app/actions/marketing";
 import { createClient } from "@/lib/supabase/client";
+import { MAX_STEP } from "@/lib/outreach/drafts";
 import "./review.css";
 
 // Bucket name duplicated here on purpose: storage.ts is server-only and must
@@ -59,8 +60,6 @@ function isHttpUrl(u: string): boolean {
 function fileNameOf(path: string): string {
   return path.split("/").pop()?.replace(/^[0-9a-f-]{36}-/, "") ?? path;
 }
-
-const NEW_CAMPAIGN_OPTION = "__new__";
 
 export function ReviewClient({
   data,
@@ -119,7 +118,6 @@ export function ReviewClient({
 
   const [slotEditing, setSlotEditing] = useState(false);
   const [slotCampaign, setSlotCampaign] = useState("");
-  const [slotCampaignNew, setSlotCampaignNew] = useState("");
   const [slotStep, setSlotStep] = useState("");
   const [slotError, setSlotError] = useState<string | null>(null);
   const [slotPending, setSlotPending] = useState(false);
@@ -260,16 +258,18 @@ export function ReviewClient({
 
   function openSlotEditor() {
     setSlotCampaign(item.outreachCampaign ?? "");
-    setSlotCampaignNew("");
     setSlotStep(item.outreachStep != null ? String(item.outreachStep) : "");
     setSlotError(null);
     setSlotEditing(true);
   }
 
   async function saveSlot() {
-    const campaign = slotCampaign === NEW_CAMPAIGN_OPTION ? slotCampaignNew.trim() : slotCampaign;
+    const campaign = slotCampaign.trim();
     const step = parseInt(slotStep, 10);
-    if (!campaign || !Number.isInteger(step) || step < 1 || step > 20) return;
+    if (!campaign || !Number.isInteger(step) || step < 1 || step > MAX_STEP) {
+      setSlotError(UI.outreachSlotInvalid);
+      return;
+    }
     setSlotPending(true);
     setSlotError(null);
     const res = await setContentOutreachSlot({ itemId: item.id, campaign, step });
@@ -349,27 +349,22 @@ export function ReviewClient({
             {slotEditing && (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10, marginTop: 8 }}>
                 <FormField label={UI.outreachSlotCampaign}>
-                  <select
+                  <input
+                    list="outreach-campaign-options"
                     value={slotCampaign}
                     onChange={(e) => setSlotCampaign(e.target.value)}
-                  >
-                    <option value="">{UI.outreachSlotCampaignPick}</option>
+                  />
+                  <datalist id="outreach-campaign-options">
                     {outreachCampaigns.map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c} />
                     ))}
-                    <option value={NEW_CAMPAIGN_OPTION}>{UI.outreachSlotCampaignNewOption}</option>
-                  </select>
+                  </datalist>
                 </FormField>
-                {slotCampaign === NEW_CAMPAIGN_OPTION && (
-                  <FormField label={UI.outreachSlotCampaignNew}>
-                    <input value={slotCampaignNew} onChange={(e) => setSlotCampaignNew(e.target.value)} />
-                  </FormField>
-                )}
                 <FormField label={UI.outreachSlotStep}>
                   <input
                     type="number"
                     min={1}
-                    max={20}
+                    max={MAX_STEP}
                     value={slotStep}
                     onChange={(e) => setSlotStep(e.target.value)}
                     style={{ width: 70 }}
@@ -383,8 +378,10 @@ export function ReviewClient({
                   className="btn primary"
                   disabled={
                     slotPending ||
+                    !slotCampaign.trim() ||
                     !slotStep ||
-                    (slotCampaign === NEW_CAMPAIGN_OPTION ? !slotCampaignNew.trim() : !slotCampaign)
+                    Number(slotStep) < 1 ||
+                    Number(slotStep) > MAX_STEP
                   }
                   onClick={saveSlot}
                 >

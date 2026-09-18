@@ -153,7 +153,7 @@ export default function DueToday({ touches: initialTouches, senders }: { touches
                     </span>
                   )}
                   {canMarkSent(t.status as DraftStatus) ? (
-                    <MarkSentControl draftId={t.draftId} onSent={reload} />
+                    <MarkSentControl draftId={t.draftId} onSent={reload} disabledReason={t.templateBlockedReason} />
                   ) : (
                     <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>Jóváhagyásra vár</span>
                   )}

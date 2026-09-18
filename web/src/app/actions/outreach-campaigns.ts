@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { gateDraft, templatesForCampaign, templateIsStale } from "@/lib/outreach/template";
+import { gateDraft, gateOn, templatesForCampaign, templatesForCampaigns, templateIsStale } from "@/lib/outreach/template";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
@@ -262,6 +262,8 @@ export interface DueTouch {
   status: string;
   dueAt: string;
   senderUserId: number | null;
+  /** §6b: null when copy/send is allowed; else the reason the server will refuse it. */
+  templateBlockedReason: string | null;
 }
 
 /**
@@ -299,9 +301,17 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
   });
   const answeredKey = new Set(answered.map((a) => `${a.campaign}:${a.companyId}`));
 
-  return rows
-    .filter((r) => !answeredKey.has(`${r.campaign}:${r.companyId}`))
-    .map((r) => ({
+  const visible = rows.filter((r) => !answeredKey.has(`${r.campaign}:${r.companyId}`));
+
+  // §6b: ONE query for every campaign on this screen, never one per row.
+  const templatesByCampaign = await templatesForCampaigns(
+    TENANT_ID,
+    [...new Set(visible.map((r) => r.campaign))],
+  );
+
+  return visible.map((r) => {
+    const gate = gateOn(templatesByCampaign.get(r.campaign)?.get(r.step) ?? null);
+    return {
       draftId: r.id,
       companyId: r.companyId,
       companyName: r.company.name,
@@ -314,7 +324,9 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
       status: r.status,
       dueAt: r.dueAt!.toISOString(),
       senderUserId: r.senderUserId,
-    }));
+      templateBlockedReason: gate.ok ? null : gate.error,
+    };
+  });
 }
 
 /** Every campaign key the CRM has seen — drafts, leads and tagged interactions. */

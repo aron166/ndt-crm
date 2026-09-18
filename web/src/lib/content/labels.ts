@@ -1,4 +1,5 @@
 import type { ContentCategory, Verdict } from "./types";
+import { MAX_STEP } from "@/lib/outreach/drafts";
 
 // ⚠️ HU PROPOSALS (translating-english-to-hungarian pass) — not signed off by Áron.
 // Status labels live in lib/marketing/types.ts (STATUS_LABELS).
@@ -144,10 +145,8 @@ export const UI = {
   outreachSlotCurrent: (campaign: string, step: number) => `Jelenleg: ${campaign} · ${step}. érintés`,
   outreachSlotNone: "Nincs kampánylépéshez rendelve",
   outreachSlotCampaign: "Kampány",
-  outreachSlotCampaignNew: "Új kampány neve",
-  outreachSlotCampaignPick: "Válassz kampányt",
-  outreachSlotCampaignNewOption: "+ Új kampány",
   outreachSlotStep: "Érintés sorszáma",
   outreachSlotSave: "Beállítás",
   outreachSlotClear: "Törlés",
+  outreachSlotInvalid: `Adj meg egy kampányt és egy 1 és ${MAX_STEP} közötti érintés sorszámot.`,
 };
