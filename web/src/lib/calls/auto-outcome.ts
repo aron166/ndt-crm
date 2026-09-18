@@ -116,7 +116,6 @@ export const AUTO_OUTCOME_LABELS = {
   analyze: "Átirat mentése",
   analyzeHint: "Diktáld be a hívást, a kimenetelt utána olvassuk ki belőle.",
   analyzeQueued: "Átirat mentve, elemzés folyamatban.",
-  suggestion: "Gépi javaslat",
 } as const;
 
 export const AUTO_OUTCOME_REASON_LABEL: Record<Exclude<AutoOutcomeDecision["reason"], null>, string> = {

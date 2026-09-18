@@ -42,6 +42,19 @@ export const callResultSchema = z
   })
   .refine((d) => !d.parsed || Boolean(d.lead_id), {
     message: "parsed requires lead_id: an outcome lives on a lead",
+  })
+  .refine((d) => !d.lead_id || Boolean(d.parsed), {
+    // And the reverse. Without this a lead_id-only body falls through to the
+    // company path with `company_id: undefined`, which Prisma DROPS from the
+    // where clause — the lookup would then match an arbitrary company in the
+    // tenant and append the call to it.
+    message: "lead_id requires parsed: use the server action for a bare transcript",
+  })
+  .refine((d) => !d.parsed || Boolean(d.call_id), {
+    // call_id is the idempotency key for an applied auto-outcome. Without it a
+    // retry of the same POST writes a second interaction, task and status advance.
+    message: "call_id is required when parsed is present",
+    path: ["call_id"],
   });
 
 export type CallResultInput = z.infer<typeof callResultSchema>;

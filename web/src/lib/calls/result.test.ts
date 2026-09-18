@@ -20,14 +20,18 @@ describe("callResultSchema", () => {
 
   const parsedPayload = { outcome: "no_answer", confidence: 0.9, note: "Nem vette fel" };
 
-  it("accepts lead_id + parsed and coerces lead_id", () => {
-    const r = callResultSchema.safeParse({ lead_id: "9", transcript: "Hello", parsed: parsedPayload });
+  it("accepts lead_id + parsed + call_id and coerces lead_id", () => {
+    const r = callResultSchema.safeParse({
+      lead_id: "9", call_id: "abc", transcript: "Hello", parsed: parsedPayload,
+    });
     expect(r.success).toBe(true);
     if (r.success) expect(r.data.lead_id).toBe(9);
   });
 
   it("rejects parsed without lead_id", () => {
-    const r = callResultSchema.safeParse({ company_id: 5, transcript: "Hello", parsed: parsedPayload });
+    const r = callResultSchema.safeParse({
+      company_id: 5, call_id: "abc", transcript: "Hello", parsed: parsedPayload,
+    });
     expect(r.success).toBe(false);
   });
 
@@ -37,8 +41,23 @@ describe("callResultSchema", () => {
   });
 
   it("rejects when both company_id and lead_id are present", () => {
-    const r = callResultSchema.safeParse({ company_id: 5, lead_id: 9, transcript: "Hello" });
+    const r = callResultSchema.safeParse({ company_id: 5, lead_id: 9, call_id: "abc", transcript: "Hello" });
     expect(r.success).toBe(false);
+  });
+
+  it("rejects lead_id without parsed", () => {
+    const r = callResultSchema.safeParse({ lead_id: 9, transcript: "Hello" });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects parsed without call_id", () => {
+    const r = callResultSchema.safeParse({ lead_id: 9, transcript: "Hello", parsed: parsedPayload });
+    expect(r.success).toBe(false);
+  });
+
+  it("accepts a company-only body without parsed or call_id", () => {
+    const r = callResultSchema.safeParse({ company_id: 5, transcript: "Hello" });
+    expect(r.success).toBe(true);
   });
 });
 
