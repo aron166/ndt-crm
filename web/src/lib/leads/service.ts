@@ -390,9 +390,14 @@ export async function logLeadCallOutcome(
     const interaction = await tx.interaction.create({
       data: {
         tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId, userId: ctx.userId,
-        type: "call", direction: "outbound", outcome: input.outcome, notes: input.note, occurredAt: now,
+        type: "call", direction: "outbound", outcome: input.outcome, notes: input.note,
+        occurredAt: input.occurredAt ?? now,
         scriptVariant: input.scriptVariant ?? null,
         campaign: lead.campaign,
+        transcript: input.transcript ?? null,
+        autoConfidence: input.autoConfidence ?? null,
+        callId: input.callId ?? null,
+        supersedesInteractionId: input.supersedesInteractionId ?? null,
       },
       select: { id: true },
     });

@@ -91,6 +91,25 @@ export const callOutcomeSchema = z
      * write into a statistics bucket nobody is looking at.
      */
     scriptVariant: z.string().trim().min(1).max(SCRIPT_KEY_MAX).optional(),
+    /**
+     * Auto-outcome provenance, written on the SAME interaction insert (trust
+     * ladder, 2026-09-18). Interactions are append-only — decisions.md #2 — so
+     * these can never be stamped on afterwards; they travel with the create or
+     * not at all. `callId` is unique per tenant, which makes a repeated POST
+     * fail INSIDE the transaction rather than after a partial write.
+     */
+    transcript: z.string().trim().max(100_000).optional(),
+    autoConfidence: z.number().min(0).max(1).optional(),
+    callId: z.string().trim().max(200).optional(),
+    /** The interaction this one replaces: a correction, or a parse answering a transcript. */
+    supersedesInteractionId: z.number().int().positive().optional(),
+    /**
+     * When the CALL happened, if that is not now. A parse of yesterday's queued
+     * transcript belongs on the timeline at the time of the call, not of the
+     * parse — it also feeds lastInteractionDate and the closeness score. Never
+     * in the future (superRefine below).
+     */
+    occurredAt: z.coerce.date().optional(),
   })
   .superRefine((d, ctx) => {
     if (d.outcome === "callback_requested") {
@@ -112,6 +131,9 @@ export const callOutcomeSchema = z
     }
     if (d.bookingAt && d.outcome !== "meeting_booked") {
       ctx.addIssue({ code: "custom", path: ["bookingAt"], message: "Foglalás csak demó-egyeztetésnél adható meg" });
+    }
+    if (d.occurredAt && d.occurredAt.getTime() > Date.now() + 60_000) {
+      ctx.addIssue({ code: "custom", path: ["occurredAt"], message: "A hívás időpontja nem lehet a jövőben" });
     }
     if (isLostCallOutcome(d.outcome) && (d.lostReason ?? "").length < LOST_REASON_MIN) {
       ctx.addIssue({ code: "custom", path: ["lostReason"], message: "Az elvesztés oka kötelező (min. 3 karakter)" });
