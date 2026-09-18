@@ -476,10 +476,18 @@ export async function saveContentApprovals(input: {
     return { ok: false, error: "Csak bíráló módosíthatja a jóváhagyási szabályt" };
   }
   const count = z.union([z.literal(1), z.literal(2)]);
+  // A partial update must be allowed: z.record(z.enum(...)) is EXHAUSTIVE in
+  // zod v4, so it would reject {email: 1} unless every category were listed.
   const parsed = z.object({
     default: count.optional(),
-    byCategory: z.record(z.enum(CONTENT_CATEGORIES), count).optional(),
+    byCategory: z.record(z.string(), count).optional(),
   }).safeParse(input);
+  if (parsed.success && parsed.data.byCategory) {
+    const unknown = Object.keys(parsed.data.byCategory).filter(
+      (k) => !(CONTENT_CATEGORIES as readonly string[]).includes(k),
+    );
+    if (unknown.length > 0) return { ok: false, error: "Ismeretlen kategória" };
+  }
   if (!parsed.success) return { ok: false, error: "Egy vagy két jóváhagyás adható meg" };
   const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
   const before = approvalsFromSettings(tenant?.settings);
