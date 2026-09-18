@@ -19,7 +19,7 @@ import {
 } from "@/app/actions/content";
 import { publishContent, saveContentMetrics } from "@/app/actions/marketing";
 import { createClient } from "@/lib/supabase/client";
-import { MAX_STEP } from "@/lib/outreach/drafts";
+import { MAX_STEP } from "@/lib/outreach/steps";
 import "./review.css";
 
 // Bucket name duplicated here on purpose: storage.ts is server-only and must

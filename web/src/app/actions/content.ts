@@ -17,7 +17,7 @@ import {
   approvalsFromSettings, getContentReviewers, requiredApprovalsFor, MAX_REVIEWERS, MIN_REVIEWERS,
 } from "@/lib/content/reviewers";
 import { digestOptOutFromSettings } from "@/lib/content/digest";
-import { MAX_STEP } from "@/lib/outreach/drafts";
+import { MAX_STEP } from "@/lib/outreach/steps";
 import { CONTENT_CATEGORIES, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from "@/lib/content/types";
 import {
   ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, removeObjects, stagingPath, statObject,

@@ -1,5 +1,5 @@
 import type { ContentCategory, Verdict } from "./types";
-import { MAX_STEP } from "@/lib/outreach/drafts";
+import { MAX_STEP } from "@/lib/outreach/steps";
 
 // ⚠️ HU PROPOSALS (translating-english-to-hungarian pass) — not signed off by Áron.
 // Status labels live in lib/marketing/types.ts (STATUS_LABELS).
