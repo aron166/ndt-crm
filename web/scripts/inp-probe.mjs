@@ -11,7 +11,9 @@ const BASE = "http://localhost:3100";
 // id was 280 as of the 2026-09-08 report; the fixture DB has since been
 // reseeded and ids now start at 696 — updated here (this is the "actually
 // broken" fix: the old id pointed at a row that no longer exists).
-const CONTENT_ITEM_ID = 696;
+// Overridable, because it drifts every time the fixture DB is reseeded and a
+// wrong id costs a whole measurement run: CONTENT_ITEM_ID=123 node scripts/inp-probe.mjs
+const CONTENT_ITEM_ID = Number(process.env.CONTENT_ITEM_ID) || 696;
 const CDP_PORT = 9333;
 const CHROME_BIN = "/usr/bin/google-chrome";
 const WEB_ROOT = new URL("..", import.meta.url).pathname; // .../web/
