@@ -4,6 +4,7 @@ import { applyEvent, isClaimStale, type ItemState } from "./transitions";
 import { getApprovalRule, getContentReviewers } from "./reviewers";
 import { runContentRules } from "./rules";
 import { isReviewReason, reasonRequiredFor, type ReviewReason } from "./reasons";
+import { MAX_STEP } from "@/lib/outreach/drafts";
 import {
   CLAIM_TTL_MS, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX,
   isContentStatus, type ContentCategory, type ContentStatus, type Verdict,
@@ -507,8 +508,8 @@ export async function setOutreachSlot(
 ): Promise<{ ok: true } | Fail> {
   if (slot) {
     if (!slot.campaign.trim()) return fail(400, "Hiányzik a kampány");
-    if (!Number.isInteger(slot.step) || slot.step < 1 || slot.step > 20) {
-      return fail(400, "Az érintés sorszáma 1 és 20 között lehet");
+    if (!Number.isInteger(slot.step) || slot.step < 1 || slot.step > MAX_STEP) {
+      return fail(400, `Az érintés sorszáma 1 és ${MAX_STEP} között lehet`);
     }
   }
   return db.$transaction(async (tx) => {
@@ -530,13 +531,23 @@ export async function setOutreachSlot(
       });
       if (taken) return fail(409, `Ezt a lépést már betölti: ${taken.title}`);
     }
-    await tx.contentItem.update({
-      where: { id: itemId },
-      data: {
-        outreachCampaign: slot ? slot.campaign.trim() : null,
-        outreachStep: slot ? slot.step : null,
-      },
-    });
+    try {
+      await tx.contentItem.update({
+        where: { id: itemId },
+        data: {
+          outreachCampaign: slot ? slot.campaign.trim() : null,
+          outreachStep: slot ? slot.step : null,
+        },
+      });
+    } catch (err) {
+      // The partial unique index is the real gate; the lookup above only lets
+      // us name the occupying item. A concurrent assignment loses here, and
+      // must read as the designed 409, not a 500 (Vanda, #105).
+      if ((err as { code?: string }).code === "P2002") {
+        return fail(409, "Ezt a lépést közben betöltötte egy másik tartalom");
+      }
+      throw err;
+    }
     await writeAudit(tx, actor, "content_item", itemId, "update",
       { outreachCampaign: row.outreachCampaign, outreachStep: row.outreachStep },
       { outreachCampaign: slot?.campaign.trim() ?? null, outreachStep: slot?.step ?? null });

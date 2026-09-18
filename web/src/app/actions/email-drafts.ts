@@ -2,7 +2,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { gateDraft, gateOn, templatesForCampaign } from "@/lib/outreach/template";
+import { gateDraft, gateOn, templatesForCampaigns } from "@/lib/outreach/template";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
@@ -112,14 +112,11 @@ export async function listDrafts(
   const truncated = rows.length > MAX_LIST_ROWS;
   const page = truncated ? rows.slice(0, MAX_LIST_ROWS) : rows;
 
-  // §6b: one templatesForCampaign query per DISTINCT campaign on this page
-  // (almost always 1, since the queue is normally filtered to one campaign),
-  // never one per row.
-  const pageCampaigns = [...new Set(page.map((r) => r.campaign))];
-  const templatesByCampaign = new Map(
-    await Promise.all(
-      pageCampaigns.map(async (c) => [c, await templatesForCampaign(TENANT_ID, c)] as const),
-    ),
+  // §6b: ONE query for every campaign on this page, never one per row and
+  // never one per campaign.
+  const templatesByCampaign = await templatesForCampaigns(
+    TENANT_ID,
+    [...new Set(page.map((r) => r.campaign))],
   );
 
   return {
@@ -133,6 +130,10 @@ export async function listDrafts(
         personName: r.person ? `${r.person.lastName} ${r.person.firstName}`.trim() : null,
         campaign: r.campaign,
         step: r.step,
+        // Kept even when the step is blocked: the subject is how a human
+        // identifies the row, and blanking it would leave a nameless card.
+        // The BODY is what the server refuses (getDraftBody), and without a
+        // body there is no email to send (Vanda, #105).
         subject: r.subject,
         toEmail: r.toEmail,
         status: r.status as DraftStatus,

@@ -28,7 +28,16 @@ export async function templateForStep(
     where: { tenantId, outreachCampaign: campaign, outreachStep: step },
     select: { id: true, title: true, status: true, liveVersionId: true },
   });
-  if (!row) return null;
+  return row ? toTemplate(row) : null;
+}
+
+/**
+ * The ONE place the "live means usable" rule lives. A non-live item never hands
+ * out a version id, whatever its liveVersionId column still says.
+ */
+function toTemplate(
+  row: { id: number; title: string; status: string; liveVersionId: number | null },
+): StepTemplate {
   return {
     itemId: row.id,
     title: row.title,
@@ -42,21 +51,31 @@ export async function templatesForCampaign(
   tenantId: number,
   campaign: string,
 ): Promise<Map<number, StepTemplate>> {
+  return (await templatesForCampaigns(tenantId, [campaign])).get(campaign) ?? new Map();
+}
+
+/**
+ * The slots of SEVERAL campaigns in ONE query. The draft queue can show rows
+ * from many campaigns at once; one query per campaign was a loop waiting to
+ * grow (Vanda, #105).
+ */
+export async function templatesForCampaigns(
+  tenantId: number,
+  campaigns: string[],
+): Promise<Map<string, Map<number, StepTemplate>>> {
+  const out = new Map<string, Map<number, StepTemplate>>();
+  if (campaigns.length === 0) return out;
   const rows = await db.contentItem.findMany({
-    where: { tenantId, outreachCampaign: campaign, outreachStep: { not: null } },
-    select: { id: true, title: true, status: true, liveVersionId: true, outreachStep: true },
+    where: { tenantId, outreachCampaign: { in: campaigns }, outreachStep: { not: null } },
+    select: { id: true, title: true, status: true, liveVersionId: true, outreachCampaign: true, outreachStep: true },
   });
-  return new Map(
-    rows.map((r) => [
-      r.outreachStep as number,
-      {
-        itemId: r.id,
-        title: r.title,
-        status: r.status,
-        liveVersionId: r.status === "live" ? r.liveVersionId : null,
-      },
-    ]),
-  );
+  for (const r of rows) {
+    const key = r.outreachCampaign as string;
+    const byStep = out.get(key) ?? new Map<number, StepTemplate>();
+    byStep.set(r.outreachStep as number, toTemplate(r));
+    out.set(key, byStep);
+  }
+  return out;
 }
 
 export type TemplateGate =
@@ -101,4 +120,22 @@ export function templateIsStale(
   if (!template || template.liveVersionId === null) return false;
   if (draft.templateVersionId === null) return false;
   return draft.templateVersionId !== template.liveVersionId;
+}
+
+/**
+ * Which template version a draft payload may claim. An app key supplies the id;
+ * it is only stored when that version really belongs to the item sitting in
+ * THIS campaign+step slot. Anything else is dropped to null rather than
+ * trusted - the same treatment personId and senderUserId get.
+ */
+export function validTemplateVersion(
+  claimed: number | null | undefined,
+  allowed: Map<number, { campaign: string | null; step: number | null }>,
+  campaign: string,
+  step: number,
+): number | null {
+  if (claimed == null) return null;
+  const slot = allowed.get(claimed);
+  if (!slot) return null;
+  return slot.campaign === campaign && slot.step === step ? claimed : null;
 }

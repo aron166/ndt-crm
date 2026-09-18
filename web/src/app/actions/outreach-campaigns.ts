@@ -421,21 +421,28 @@ export async function getCampaignStepTemplates(campaign: string): Promise<Campai
   if (!parsed.success) return [];
   const key = parsed.data;
 
-  const [templates, drafts] = await Promise.all([
+  // Counted with a groupBy, not by pulling every draft row of the campaign:
+  // the page is force-dynamic and a large campaign would ship thousands of
+  // rows on every render just to count them (Vanda, #105).
+  const [templates, groups] = await Promise.all([
     templatesForCampaign(TENANT_ID, key),
-    db.emailDraft.findMany({
-      where: { tenantId: TENANT_ID, campaign: key },
-      select: { step: true, templateVersionId: true, sentAt: true },
+    db.emailDraft.groupBy({
+      by: ["step", "templateVersionId"],
+      where: { tenantId: TENANT_ID, campaign: key, sentAt: null },
+      _count: { _all: true },
     }),
   ]);
 
   const steps = new Set<number>(Array.from({ length: MAX_STEP }, (_, i) => i + 1));
   for (const s of templates.keys()) steps.add(s);
-  for (const d of drafts) steps.add(d.step);
+  for (const g of groups) steps.add(g.step);
 
   return [...steps].sort((a, b) => a - b).map((step) => {
     const t = templates.get(step) ?? null;
-    const staleCount = drafts.filter((d) => d.step === step && templateIsStale(d, t)).length;
+    const staleCount = groups
+      .filter((g) => g.step === step
+        && templateIsStale({ templateVersionId: g.templateVersionId, sentAt: null }, t))
+      .reduce((n, g) => n + g._count._all, 0);
     return {
       step,
       template: t ? { itemId: t.itemId, title: t.title, status: t.status, live: t.liveVersionId !== null } : null,

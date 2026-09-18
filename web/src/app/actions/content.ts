@@ -17,6 +17,7 @@ import {
   approvalsFromSettings, getContentReviewers, requiredApprovalsFor, MAX_REVIEWERS, MIN_REVIEWERS,
 } from "@/lib/content/reviewers";
 import { digestOptOutFromSettings } from "@/lib/content/digest";
+import { MAX_STEP } from "@/lib/outreach/drafts";
 import { CONTENT_CATEGORIES, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from "@/lib/content/types";
 import {
   ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, removeObjects, stagingPath, statObject,
@@ -395,7 +396,7 @@ export async function setContentOutreachSlot(input: {
   const parsed = z.object({
     itemId: z.number().int().positive(),
     campaign: z.string().trim().min(1).max(80).nullable(),
-    step: z.number().int().min(1).max(20).nullable(),
+    step: z.number().int().min(1).max(MAX_STEP).nullable(),
   }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
   const { itemId, campaign, step } = parsed.data;

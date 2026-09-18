@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { gateOn, templateIsStale, type StepTemplate } from "./template";
+import { gateOn, templateIsStale, validTemplateVersion, type StepTemplate } from "./template";
 
 const live = (liveVersionId: number): StepTemplate => ({
   itemId: 1, title: "1. érintés", status: "live", liveVersionId,
@@ -51,5 +51,39 @@ describe("templateIsStale", () => {
   it("no slot, or a slot that is not live, means nothing to compare against", () => {
     expect(templateIsStale(unsent(1), null)).toBe(false);
     expect(templateIsStale(unsent(1), notLive("in_review"))).toBe(false);
+  });
+});
+
+describe("validTemplateVersion", () => {
+  const allowed = new Map([
+    [41, { campaign: "cold-email-v0", step: 1 }],
+    [42, { campaign: "cold-email-v0", step: 2 }],
+    [43, { campaign: "masik-kampany", step: 1 }],
+    [44, { campaign: null, step: null }], // a version of an item in no slot
+  ]);
+
+  it("stores a version that really belongs to this campaign and step", () => {
+    expect(validTemplateVersion(41, allowed, "cold-email-v0", 1)).toBe(41);
+  });
+
+  it("drops a version belonging to another STEP of the same campaign", () => {
+    expect(validTemplateVersion(42, allowed, "cold-email-v0", 1)).toBeNull();
+  });
+
+  it("drops a version belonging to another CAMPAIGN", () => {
+    expect(validTemplateVersion(43, allowed, "cold-email-v0", 1)).toBeNull();
+  });
+
+  it("drops a version whose item sits in no slot at all", () => {
+    expect(validTemplateVersion(44, allowed, "cold-email-v0", 1)).toBeNull();
+  });
+
+  it("drops an unknown id: another tenant's version never reaches the map", () => {
+    expect(validTemplateVersion(999, allowed, "cold-email-v0", 1)).toBeNull();
+  });
+
+  it("null and undefined mean no claim, not an error", () => {
+    expect(validTemplateVersion(null, allowed, "cold-email-v0", 1)).toBeNull();
+    expect(validTemplateVersion(undefined, allowed, "cold-email-v0", 1)).toBeNull();
   });
 });

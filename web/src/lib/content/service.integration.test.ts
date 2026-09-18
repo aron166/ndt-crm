@@ -228,6 +228,9 @@ describe.skipIf(!enabled)("content service (integration)", () => {
       .toMatchObject({ ok: false, status: 400 });
     expect(await service.setOutreachSlot(actorA(), a.itemId, { campaign, step: 0 }))
       .toMatchObject({ ok: false, status: 400 });
+    // A draft can only ever be steps 1..MAX_STEP, so a slot above that gates nothing.
+    expect(await service.setOutreachSlot(actorA(), a.itemId, { campaign, step: 9 }))
+      .toMatchObject({ ok: false, status: 400 });
 
     // Re-assigning the SAME item to its own slot is not a conflict.
     expect(await service.setOutreachSlot(actorA(), a.itemId, { campaign, step: 1 })).toMatchObject({ ok: true });
@@ -239,6 +242,26 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     const row = await db.contentItem.findUniqueOrThrow({ where: { id: a.itemId } });
     expect(row.outreachCampaign).toBeNull();
     expect(row.outreachStep).toBeNull();
+  });
+
+  it("two items racing for the same slot: exactly one wins, the loser gets a 409", async () => {
+    const campaign = `IT-RACE-${Date.now()}`;
+    const a = await newItem("a", "email");
+    const b = await newItem("b", "email");
+    const results = await Promise.all([
+      service.setOutreachSlot(actorA(), a.itemId, { campaign, step: 1 }),
+      service.setOutreachSlot(actorB(), b.itemId, { campaign, step: 1 }),
+    ]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    const loser = results.find((r) => !r.ok);
+    // Never a 500: the unique index is the gate, and it must read as the designed conflict.
+    expect(loser).toMatchObject({ ok: false, status: 409 });
+
+    const filled = await db.contentItem.findMany({
+      where: { tenantId: 1, outreachCampaign: campaign, outreachStep: 1 },
+      select: { id: true },
+    });
+    expect(filled).toHaveLength(1);
   });
 
   it("a rule check cannot be waived or answered by hand", async () => {
