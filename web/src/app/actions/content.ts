@@ -283,7 +283,15 @@ export async function saveContentReviewers(userIds: number[]): Promise<{ ok: tru
   if (ids.length < MIN_REVIEWERS || ids.length > MAX_REVIEWERS) {
     return { ok: false, error: `Egy vagy két bírálót adj meg` };
   }
-  if (!ids.includes(actor.userId)) return { ok: false, error: "Magadat is add meg bírálóként" };
+  // Bootstrap (no reviewer yet): whoever sets the list must be in it, so nobody
+  // can hand the approval power to someone else and stay out of the audit trail.
+  if (current.length === 0 && !ids.includes(actor.userId)) {
+    return { ok: false, error: "Magadat is add meg bírálóként" };
+  }
+  // Four eyes must not become one eye by one click: a reviewer may step down
+  // (take themselves off), but may never take the OTHER reviewer off (Vanda, #104).
+  const dropped = current.filter((id) => !ids.includes(id) && id !== actor.userId);
+  if (dropped.length > 0) return { ok: false, error: "Másik bírálót nem vehetsz le a listáról" };
   const found = await db.user.count({ where: { tenantId: TENANT_ID, id: { in: ids }, passwordHash: "supabase-auth" } });
   if (found !== ids.length) return { ok: false, error: "Ismeretlen felhasználó" };
   const before = await setTenantSettings(TENANT_ID, { contentReviewers: ids });
@@ -491,9 +499,11 @@ export async function saveContentApprovals(input: {
   if (!parsed.success) return { ok: false, error: "Egy vagy két jóváhagyás adható meg" };
   const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
   const before = approvalsFromSettings(tenant?.settings);
+  // Merge, do not replace: sending {default: 1} must not silently drop the
+  // per-category rules (every category would loosen to 1) and vice versa.
   const next = {
-    ...(parsed.data.default ? { default: parsed.data.default } : {}),
-    ...(parsed.data.byCategory ? { byCategory: parsed.data.byCategory } : {}),
+    default: parsed.data.default ?? before.default,
+    byCategory: { ...before.byCategory, ...(parsed.data.byCategory ?? {}) },
   };
   await setTenantSettings(TENANT_ID, { contentApprovals: next });
   audit("tenant", TENANT_ID, "update", { contentApprovals: before }, { contentApprovals: next }, { tenantId: TENANT_ID });

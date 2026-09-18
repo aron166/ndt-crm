@@ -39,6 +39,7 @@ type Tx = Prisma.TransactionClient;
 const STATE_SELECT = {
   id: true, status: true, currentVersionId: true, liveVersionId: true,
   claimedAt: true, claimedFrom: true, claimedBy: true, prevStatus: true, wasLive: true, category: true,
+  source: true, externalRef: true,
 } satisfies Prisma.ContentItemSelect;
 type StateRow = Prisma.ContentItemGetPayload<{ select: typeof STATE_SELECT }>;
 
@@ -160,12 +161,12 @@ export async function createItem(
       },
       select: { id: true },
     });
-    const violations = await reconcileRuleChecks(t, actor.tenantId, item.id, {
-      category: input.category,
-      format: input.format ?? null,
-      body: input.body,
-      requiresFooter: input.category === "email",
-    });
+    // Same context as every later version: an inline one left missing_footer and
+    // duplicate_hook structurally dead on the submit path (Vanda, #104).
+    const violations = await reconcileRuleChecks(t, actor.tenantId, item.id,
+      await ruleContextFor(t, actor.tenantId,
+        { id: item.id, category: input.category, format: input.format ?? null, campaignId: input.campaignId ?? null },
+        input.body));
     await t.contentItem.update({
       where: { id: item.id },
       data: {
@@ -262,6 +263,11 @@ export async function createVersion(
       } else if (state.status === "ai_working") {
         // Never overwrite a rewrite the AI is in the middle of.
         return fail(409, "The AI is rewriting this item");
+      } else if (row.source !== "import" && !row.externalRef) {
+        // Refresh restates a SOURCE FILE. An item that came from a human in the
+        // app has no source file, so there is nothing to refresh from, and an
+        // app key must not overwrite a human's current version without a claim.
+        return fail(409, "This item has no source file to refresh from");
       }
       // Race rule (spec §1): a human version since the claim wins, always.
       // Backstop: a human version already clears the claim, so the check above
@@ -284,7 +290,7 @@ export async function createVersion(
         basedOnVersionId: input.basedOnVersionId,
         selfScore: clampSelfScore(input.selfScore),
         selfNote: input.selfNote?.trim()?.slice(0, SELF_NOTE_MAX) ?? null,
-        ...authorFields(actor),
+        ...authorFields(actor, input.fromSource),
       },
       select: { id: true },
     });
@@ -657,9 +663,16 @@ export async function setCheckState(
   return db.$transaction(async (tx) => {
     const check = await tx.contentCheck.findFirst({
       where: { id: checkId, tenantId: actor.tenantId },
-      select: { id: true, itemId: true, state: true, question: true },
+      select: { id: true, itemId: true, state: true, question: true, source: true },
     });
     if (!check) return fail(404, "Nem található");
+    if (check.source === "rule") {
+      // A machine rule is code, not prose: the only way to clear it is a new
+      // version that passes the rule (reconcileRuleChecks closes it). Letting a
+      // human waive it would make every hard rule advisory, and would let a
+      // non-reviewer push an item with a forbidden claim straight to live.
+      return fail(403, "Szabály-ellenőrzést nem lehet kézzel lezárni: javítsd a szöveget");
+    }
     const row = await lockItem(tx, actor.tenantId, check.itemId);
     if (!row) return fail(404, "Nem található");
 
@@ -823,7 +836,13 @@ export async function getQueue(tenantId: number, statuses: ContentStatus[]): Pro
       externalRef: true, needsHumanAsset: true, currentVersionId: true, companyId: true,
       campaign: { select: { slug: true, name: true } },
       currentVersion: { select: { body: true } },
-      checks: { select: { id: true, question: true, forWhom: true, state: true, answer: true, source: true } },
+      // Capped: the payload is read by the rewrite skill, not archived. An item
+      // with more than 50 questions is a data problem, not a rewrite (Vanda, #104).
+      checks: {
+        orderBy: [{ state: "asc" }, { id: "asc" }],
+        take: 50,
+        select: { id: true, question: true, forWhom: true, state: true, answer: true, source: true },
+      },
       // Read-only facts for the rewrite: the dossier the enrichment skill wrote,
       // the closeness score and the verified contact.
       company: {

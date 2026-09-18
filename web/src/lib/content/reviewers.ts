@@ -13,8 +13,6 @@ import { db } from "@/lib/db";
 /** A tenant may run with one or two reviewers (Áron, 2026-09-17). */
 export const MIN_REVIEWERS = 1;
 export const MAX_REVIEWERS = 2;
-/** @deprecated the reviewer COUNT is no longer fixed; use MIN/MAX_REVIEWERS. */
-export const REQUIRED_REVIEWERS = MAX_REVIEWERS;
 
 const reviewersSchema = z.array(z.number().int().positive()).min(MIN_REVIEWERS).max(MAX_REVIEWERS);
 

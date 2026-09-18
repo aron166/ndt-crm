@@ -137,7 +137,12 @@ describe.skipIf(!enabled)("content service (integration)", () => {
   });
 
   it("fromSource: importer posts a version without a claim, but never over an AI rewrite", async () => {
-    const r = await newItem();
+    const r = await service.createItem(appActor, {
+      title: title(), body: "imported body", category: "other", channel: "other",
+      contentType: "other", source: "it", externalRef: `it-ref-${Date.now()}-${Math.random()}`,
+    });
+    if (!r.ok) throw new Error("setup");
+    createdItemIds.push(r.itemId);
 
     // No claim, no rewrite request: a plain app version is refused...
     const unclaimed = await service.createVersion(appActor, r.itemId, {
@@ -167,6 +172,59 @@ describe.skipIf(!enabled)("content service (integration)", () => {
       fromSource: true,
     });
     expect(duringRewrite).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("fromSource is refused on an item that has no source file", async () => {
+    const r = await newItem(); // no externalRef, source "it"
+    const res = await service.createVersion(appActor, r.itemId, {
+      body: "app text over a human draft", changeNote: "nope", basedOnVersionId: r.versionId!,
+      fromSource: true,
+    });
+    expect(res).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("duplicate_hook fires on FIRST submit, not only from version 2", async () => {
+    const slug = `it-campaign-${Date.now()}`;
+    const campaign = await db.campaign.create({ data: { tenantId: 1, name: slug, slug } });
+    const body = "Kedves Kovács Úr, a 2024-es Duna-hídi felújítás kapcsán keresem, betonvizsgálat ügyében.";
+    const first = await service.createItem(appActor, {
+      title: title(), body, category: "email", channel: "email", contentType: "email",
+      source: "it", campaignId: campaign.id,
+    });
+    if (!first.ok) throw new Error("setup");
+    createdItemIds.push(first.itemId);
+
+    const second = await service.createItem(appActor, {
+      title: title(), body, category: "email", channel: "email", contentType: "email",
+      source: "it", campaignId: campaign.id,
+    });
+    if (!second.ok) throw new Error("setup");
+    createdItemIds.push(second.itemId);
+
+    const checks = await db.contentCheck.findMany({ where: { itemId: second.itemId, source: "rule" } });
+    expect(checks.some((c) => c.question.includes("nyitása"))).toBe(true);
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: second.itemId } });
+    expect(item.status).toBe("rewrite_requested");
+    // The campaign is left behind on purpose: the items still reference it, and
+    // afterAll removes them. Each run makes its own slug, so nothing leaks between runs.
+  });
+
+  it("a rule check cannot be waived or answered by hand", async () => {
+    const r = await newItem();
+    const check = await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `Szabály: IT-${Date.now()}`, state: "open", source: "rule" },
+    });
+    await service.submitReview(actorA(), r.versionId!, "approve");
+    await service.submitReview(actorB(), r.versionId!, "approve");
+
+    const waive = await service.setCheckState(actorA(), check.id, "waived", "nem releváns");
+    expect(waive).toMatchObject({ ok: false, status: 403 });
+    const resolve = await service.setCheckState(actorA(), check.id, "resolved", "megnéztem");
+    expect(resolve).toMatchObject({ ok: false, status: 403 });
+
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } });
+    expect(item.status).not.toBe("live");
+    expect(item.liveVersionId).toBeNull();
   });
 
   it("rewrite request → claim → app version cycle", async () => {
