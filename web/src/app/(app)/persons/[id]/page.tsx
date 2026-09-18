@@ -33,6 +33,9 @@ export default async function PersonDetailPage({
     }),
     db.interaction.findMany({
       where: { personId, tenantId: TENANT_ID },
+      select: {
+        id: true, type: true, direction: true, outcome: true, notes: true, occurredAt: true,
+      },
       orderBy: { occurredAt: "desc" },
       take: 50,
     }),

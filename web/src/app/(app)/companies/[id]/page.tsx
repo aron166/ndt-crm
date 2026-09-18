@@ -36,7 +36,10 @@ export default async function CompanyDetailPage({
     }),
     db.interaction.findMany({
       where: { companyId, tenantId: TENANT_ID },
-      include: { person: { select: { id: true, firstName: true, lastName: true } } },
+      select: {
+        id: true, type: true, direction: true, outcome: true, notes: true, occurredAt: true,
+        person: { select: { id: true, firstName: true, lastName: true } },
+      },
       orderBy: { occurredAt: "desc" },
       take: 50,
     }),

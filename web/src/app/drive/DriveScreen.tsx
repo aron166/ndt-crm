@@ -89,11 +89,15 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   // default itself. Adjusting state during render (React's documented pattern
   // for this) instead of an effect: correct on the SAME render as the new
   // lead, no extra commit.
+  // queuedMessage is NOT reset here: it confirms the PREVIOUS lead's dictation
+  // saved, and this block fires the moment the queue advances to the next
+  // lead — clearing it here would null it out before it ever paints. It is
+  // cleared only by an explicit next action (resetFields, called from skip /
+  // submit / queueTranscript).
   const [trackedLeadId, setTrackedLeadId] = useState(lead?.id);
   if (lead?.id !== trackedLeadId) {
     setTrackedLeadId(lead?.id);
     setScriptKey(defaultScriptKey);
-    setQueuedMessage(null);
   }
   const script = scriptVariants.find((v) => v.key === scriptKey) ?? null;
 

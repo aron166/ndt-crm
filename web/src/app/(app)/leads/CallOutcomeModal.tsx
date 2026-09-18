@@ -100,7 +100,7 @@ export function CallOutcomeModal({
         scriptVariant: scriptKey || undefined,
       };
       const res = correctsInteractionId
-        ? await correctCallOutcome(correctsInteractionId, payload)
+        ? await correctCallOutcome(correctsInteractionId, leadId, payload)
         : await logLeadCall(leadId, payload);
       if ("error" in res) { setError(res.error); return; }
       if (res.bookingConflicts?.length > 0) { setSavedConflicts(res.bookingConflicts); return; }

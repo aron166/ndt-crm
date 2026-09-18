@@ -4,14 +4,15 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { userLeadCtx } from "@/lib/actor";
 import { logLeadCallOutcome } from "@/lib/leads/service";
+import { audit } from "@/lib/audit";
 import { NOTE_PREVIEW_LEN, validateTranscript } from "@/lib/calls/transcript";
 
 const TENANT_ID = 1;
 
 /**
  * Store a dictated call transcript as ONE append-only Interaction. This is a
- * fact, not an outcome: `outcome: "transcribed"` and `parsedAt: null` are what
- * make it visible to the (external) parse queue — no lead state changes here.
+ * fact, not an outcome: `outcome: "transcribed"` is what makes it visible to
+ * the (external) parse queue — no lead state changes here.
  */
 export async function queueCallTranscript(leadId: number, transcript: string) {
   const ctx = await userLeadCtx(TENANT_ID);
@@ -22,7 +23,7 @@ export async function queueCallTranscript(leadId: number, transcript: string) {
 
   const lead = await db.lead.findFirst({
     where: { id: leadId, tenantId: TENANT_ID },
-    select: { companyId: true, contact: { select: { personId: true } } },
+    select: { companyId: true, campaign: true, contact: { select: { personId: true } } },
   });
   if (!lead) return { error: "Lead nem található" };
 
@@ -39,10 +40,11 @@ export async function queueCallTranscript(leadId: number, transcript: string) {
       notes: validated.text.slice(0, NOTE_PREVIEW_LEN),
       transcript: validated.text,
       occurredAt: new Date(),
-      parsedAt: null,
+      campaign: lead.campaign,
     },
     select: { id: true },
   });
+  audit("interaction", interaction.id, "create", null, { leadId, outcome: "transcribed" });
 
   revalidatePath("/drive");
   revalidatePath(`/leads/${leadId}`);
@@ -52,11 +54,14 @@ export async function queueCallTranscript(leadId: number, transcript: string) {
 /**
  * Human correction of a machine-derived (or low-confidence, task-routed)
  * outcome. Logs the corrected outcome through the ONE shared write path
- * (logLeadCallOutcome — same as the UI's "Hívás eredménye"), then links the
- * new interaction back at the one it corrects. That link is what makes the
- * parsed-vs-corrected agreement rate measurable later.
+ * (logLeadCallOutcome — same as the UI's "Hívás eredménye"), passing
+ * supersedesInteractionId INTO that write so the link back to the interaction
+ * it replaces is written with the row, append-only. `leadId` is the lead the
+ * caller is actually viewing — required and checked against the original
+ * interaction's own leadId so a correction can never land on a sibling lead
+ * of the same company/person.
  */
-export async function correctCallOutcome(interactionId: number, input: {
+export async function correctCallOutcome(interactionId: number, leadId: number, input: {
   outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
   bookingAt?: string | null; bookingKind?: string | null;
   lostReason?: string | null; scriptVariant?: string | null;
@@ -70,12 +75,14 @@ export async function correctCallOutcome(interactionId: number, input: {
   });
   if (!original) return { error: "Interakció nem található" };
   if (!original.leadId) return { error: "Az interakcióhoz nincs lead társítva" };
+  if (original.leadId !== leadId) return { error: "Az interakció más leadhez tartozik" };
 
   const res = await logLeadCallOutcome(
-    original.leadId,
+    leadId,
     {
       outcome: input.outcome,
       note: input.note,
+      supersedesInteractionId: interactionId,
       ...(input.callbackAt ? { callbackAt: input.callbackAt } : {}),
       ...(input.demoWith ? { demoWith: input.demoWith } : {}),
       ...(input.bookingAt ? { bookingAt: input.bookingAt } : {}),
@@ -87,13 +94,8 @@ export async function correctCallOutcome(interactionId: number, input: {
   );
   if ("error" in res) return { error: res.error };
 
-  await db.interaction.update({
-    where: { id: res.interactionId },
-    data: { correctsInteractionId: interactionId },
-  });
-
   revalidatePath("/leads");
-  revalidatePath(`/leads/${original.leadId}`);
+  revalidatePath(`/leads/${leadId}`);
   revalidatePath("/tasks");
   return res;
 }

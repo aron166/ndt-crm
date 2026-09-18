@@ -28,7 +28,7 @@ interface Interaction {
   person: { id: number; firstName: string | null; lastName: string | null } | null;
   user?: { name: string } | null;
   autoConfidence: number | null;
-  correctsInteractionId?: number | null;
+  supersedesInteractionId?: number | null;
 }
 
 interface OpenTask {
@@ -70,6 +70,15 @@ interface Lead {
     id: number; role: string | null; email: string | null; phone: string | null;
     person: { id: number; firstName: string | null; lastName: string | null; email: string | null; phone: string | null } | null;
   } | null;
+}
+
+// ⚠️ HU string below is a PROPOSAL, unreviewed by Áron (same convention as
+// AUTO_OUTCOME_LABELS in lib/calls/auto-outcome.ts). `outcome: "transcribed"`
+// marks a queued dictation, not a real call outcome — it has no entry in
+// CALL_OUTCOMES, so the raw English key must never reach the chip.
+const TRANSCRIBED_OUTCOME_LABEL = "Átirat rögzítve";
+function outcomeChipLabel(outcome: string): string {
+  return outcome === "transcribed" ? TRANSCRIBED_OUTCOME_LABEL : callOutcomeLabel(outcome);
 }
 
 const MARKETING_KEYS = [
@@ -425,9 +434,14 @@ export function LeadDetailClient({
               ) : (
                 <div className="space-y-3">
                   {interactions.map((r) => {
-                    // A correction (correctsInteractionId set) is never itself flagged as
-                    // auto-derived — it IS the human correction.
-                    const auto = r.correctsInteractionId == null && isAutoOutcome(r);
+                    // A correction (supersedesInteractionId set) is never itself flagged
+                    // as auto-derived — it IS the human correction. And the badge/button
+                    // only ever apply to an interaction that actually belongs to the lead
+                    // being viewed — the timeline query also pulls in sibling leads of the
+                    // same company/person, and correcting THOSE would silently act on a
+                    // different lead than the one shown in the modal.
+                    const ownLead = r.leadId === lead.id;
+                    const auto = ownLead && r.supersedesInteractionId == null && isAutoOutcome(r);
                     const confidencePct = auto ? Math.round((r.autoConfidence ?? 0) * 100) : null;
                     return (
                     <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -438,7 +452,7 @@ export function LeadDetailClient({
                           {r.direction && <span style={{ color: "var(--fg-mute)" }}>· {interactionDirectionLabel(r.direction)}</span>}
                           {r.outcome && (
                             <span className="font-mono-ndt" style={{ fontSize: 12, padding: "1px 6px", borderRadius: 10, background: "var(--bg-hover)", color: "var(--fg-soft)" }}>
-                              {callOutcomeLabel(r.outcome)}
+                              {outcomeChipLabel(r.outcome)}
                             </span>
                           )}
                           {r.user?.name && <span style={{ color: "var(--fg-faint)", fontSize: 12 }}>· {r.user.name}</span>}
