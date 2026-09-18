@@ -666,7 +666,7 @@ curl -X POST $CRM/api/calls/result \
 ```
 Company-level (the Hívás mód cockpit), not lead-level.
 
-#### Auto-outcome fields (2026-09-17) — the `call-outcome` skill's half of the contract
+#### Auto-outcome fields (2026-09-18) — the `call-outcome` skill's half of the contract
 
 The same route also accepts a **lead-level** reading from the `call-outcome`
 skill, adding three optional fields to the payload above:

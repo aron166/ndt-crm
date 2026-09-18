@@ -108,9 +108,11 @@ curl -s -X POST "$CRM_URL/api/calls/result" \
 with `{ "lead_id", "call_id", "pending_interaction_id", "transcript", "parsed": {
 "outcome", "confidence", "note", "answers"?, "callback_at"?, "demo_with"?,
 "booking_at"?, "lost_reason"? } }`. Build the JSON with a tool (`jq` or a
-script), never by hand-escaping. `call_id` makes a repeat POST idempotent —
-always send the same `call_id` for a given pending row if you retry it in the
-same run.
+script), never by hand-escaping.
+
+`call_id` is the idempotency key and it MUST be derived from the row, not
+invented: use `pending:<id>` where `<id>` is the pending row's `id`. A random
+or per-run id would let a second run write the same call twice.
 
 - `{ ok: true, applied: true, ... }` → the CRM auto-applied your reading.
 - `{ ok: true, applied: false, reason, ... }` → left for a human (confirm-outcome
