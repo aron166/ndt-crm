@@ -199,7 +199,7 @@ async function resolveAssets(
 /** ✎ Szerkesztés — always a new version; both approvals reset (spec decision 3). */
 export async function saveContentVersion(
   input: z.input<typeof versionInput>,
-): Promise<{ ok: true; versionId: number; number: number } | Fail> {
+): Promise<{ ok: true; versionId: number; number: number; violations: { rule: string; message: string }[] } | Fail> {
   const actor = await userActor();
   if ("ok" in actor) return actor;
   const parsed = versionInput.safeParse(input);
@@ -271,6 +271,13 @@ export async function getContentReviewerOptions(): Promise<ReviewerOption[]> {
 export async function saveContentReviewers(userIds: number[]): Promise<{ ok: true } | Fail> {
   const actor = await userActor();
   if ("ok" in actor) return actor;
+  // Only a CURRENT reviewer may change who reviews. Without this any CRM user
+  // could make themselves the sole reviewer, drop the category to one approval
+  // and publish alone (Vanda, #104 critical).
+  const current = await getContentReviewers(TENANT_ID);
+  if (current.length > 0 && !current.includes(actor.userId)) {
+    return { ok: false, error: "Csak bíráló módosíthatja a bírálók listáját" };
+  }
   const parsed = z.array(z.number().int().positive()).min(MIN_REVIEWERS).max(MAX_REVIEWERS).safeParse(userIds);
   const ids = parsed.success ? [...new Set(parsed.data)] : [];
   if (ids.length < MIN_REVIEWERS || ids.length > MAX_REVIEWERS) {
@@ -463,6 +470,11 @@ export async function saveContentApprovals(input: {
 }): Promise<{ ok: true } | Fail> {
   const actor = await userActor();
   if ("ok" in actor) return actor;
+  // How many approvals are needed is a reviewer decision, not any user's.
+  const currentReviewers = await getContentReviewers(TENANT_ID);
+  if (currentReviewers.length > 0 && !currentReviewers.includes(actor.userId)) {
+    return { ok: false, error: "Csak bíráló módosíthatja a jóváhagyási szabályt" };
+  }
   const count = z.union([z.literal(1), z.literal(2)]);
   const parsed = z.object({
     default: count.optional(),
