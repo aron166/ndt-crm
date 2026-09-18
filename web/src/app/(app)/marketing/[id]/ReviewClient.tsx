@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Link2, Upload, X, Check, PencilLine, RotateCcw, Pencil } from "lucide-react";
+import { FormField } from "@/components/ui/FormField";
 import { Markdown } from "@/lib/content/markdown";
 import { wordDiff } from "@/lib/content/diff";
 import {
@@ -14,10 +15,11 @@ import type { ContentCategory, Verdict } from "@/lib/content/types";
 import type { ReviewPageData } from "@/lib/content/queries";
 import {
   submitContentReview, saveContentVersion, requestAssetUpload, archiveContent,
-  setContentCheck, addContentCheck,
+  setContentCheck, addContentCheck, setContentOutreachSlot,
 } from "@/app/actions/content";
 import { publishContent, saveContentMetrics } from "@/app/actions/marketing";
 import { createClient } from "@/lib/supabase/client";
+import { MAX_STEP } from "@/lib/outreach/drafts";
 import "./review.css";
 
 // Bucket name duplicated here on purpose: storage.ts is server-only and must
@@ -63,10 +65,12 @@ export function ReviewClient({
   data,
   userId,
   signedUrls,
+  outreachCampaigns,
 }: {
   data: ReviewPageData;
   userId: number | null;
   signedUrls: Record<string, string>;
+  outreachCampaigns: string[];
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -111,6 +115,12 @@ export function ReviewClient({
   const [addingCheck, setAddingCheck] = useState(false);
   const [checkQuestion, setCheckQuestion] = useState("");
   const [checkForWhom, setCheckForWhom] = useState<"aron" | "peter" | "either">("either");
+
+  const [slotEditing, setSlotEditing] = useState(false);
+  const [slotCampaign, setSlotCampaign] = useState("");
+  const [slotStep, setSlotStep] = useState("");
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [slotPending, setSlotPending] = useState(false);
 
   const [publishUrl, setPublishUrl] = useState(item.externalUrl ?? "");
   const [copied, setCopied] = useState(false);
@@ -246,6 +256,39 @@ export function ReviewClient({
     );
   }
 
+  function openSlotEditor() {
+    setSlotCampaign(item.outreachCampaign ?? "");
+    setSlotStep(item.outreachStep != null ? String(item.outreachStep) : "");
+    setSlotError(null);
+    setSlotEditing(true);
+  }
+
+  async function saveSlot() {
+    const campaign = slotCampaign.trim();
+    const step = parseInt(slotStep, 10);
+    if (!campaign || !Number.isInteger(step) || step < 1 || step > MAX_STEP) {
+      setSlotError(UI.outreachSlotInvalid);
+      return;
+    }
+    setSlotPending(true);
+    setSlotError(null);
+    const res = await setContentOutreachSlot({ itemId: item.id, campaign, step });
+    setSlotPending(false);
+    if (!res.ok) { setSlotError(res.error); return; }
+    setSlotEditing(false);
+    router.refresh();
+  }
+
+  async function clearSlot() {
+    setSlotPending(true);
+    setSlotError(null);
+    const res = await setContentOutreachSlot({ itemId: item.id, campaign: null, step: null });
+    setSlotPending(false);
+    if (!res.ok) { setSlotError(res.error); return; }
+    setSlotEditing(false);
+    router.refresh();
+  }
+
   function assetHref(a: AssetRow): string | null {
     if (a.kind === "link") return isHttpUrl(a.url) ? a.url : null;
     if (a.storagePath) return signedUrls[a.storagePath] ?? null;
@@ -288,6 +331,72 @@ export function ReviewClient({
             {STATUS_LABELS[item.status as keyof typeof STATUS_LABELS] ?? item.status}
           </span>
         </div>
+
+        {item.category === "email" && (
+          <div className="review-panel" style={{ marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 14, color: "var(--fg)" }}>
+                {item.outreachCampaign != null && item.outreachStep != null
+                  ? UI.outreachSlotCurrent(item.outreachCampaign, item.outreachStep)
+                  : UI.outreachSlotNone}
+              </span>
+              {!slotEditing && (
+                <button type="button" className="btn btn-sm" onClick={openSlotEditor}>
+                  {UI.outreachSlot}
+                </button>
+              )}
+            </div>
+            {slotEditing && (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10, marginTop: 8 }}>
+                <FormField label={UI.outreachSlotCampaign}>
+                  <input
+                    list="outreach-campaign-options"
+                    value={slotCampaign}
+                    onChange={(e) => setSlotCampaign(e.target.value)}
+                  />
+                  <datalist id="outreach-campaign-options">
+                    {outreachCampaigns.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </FormField>
+                <FormField label={UI.outreachSlotStep}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={MAX_STEP}
+                    value={slotStep}
+                    onChange={(e) => setSlotStep(e.target.value)}
+                    style={{ width: 70 }}
+                  />
+                </FormField>
+                <button type="button" className="btn" disabled={slotPending} onClick={() => setSlotEditing(false)}>
+                  {UI.cancel}
+                </button>
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={
+                    slotPending ||
+                    !slotCampaign.trim() ||
+                    !slotStep ||
+                    Number(slotStep) < 1 ||
+                    Number(slotStep) > MAX_STEP
+                  }
+                  onClick={saveSlot}
+                >
+                  {UI.outreachSlotSave}
+                </button>
+                {item.outreachCampaign != null && (
+                  <button type="button" className="btn" disabled={slotPending} onClick={clearSlot}>
+                    {UI.outreachSlotClear}
+                  </button>
+                )}
+              </div>
+            )}
+            {slotError && <p className="review-error">{slotError}</p>}
+          </div>
+        )}
 
         {reviewers.length > 0 && (
           <div className="review-verdict-row">

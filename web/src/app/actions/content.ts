@@ -10,13 +10,14 @@ import { dispatchApprovalWebhook } from "@/lib/marketing/webhook";
 import { reportError } from "@/lib/report-error";
 import {
   addChecks, archiveItem, canHardDelete, createVersion, deleteItemHard, restoreItem,
-  setCheckState, submitReview, CHECK_ANSWER_MAX, CHECK_FOR, CHECK_QUESTION_MAX, CHECK_STATES,
+  setCheckState, setOutreachSlot, submitReview, CHECK_ANSWER_MAX, CHECK_FOR, CHECK_QUESTION_MAX, CHECK_STATES,
   type UserActor,
 } from "@/lib/content/service";
 import {
   approvalsFromSettings, getContentReviewers, requiredApprovalsFor, MAX_REVIEWERS, MIN_REVIEWERS,
 } from "@/lib/content/reviewers";
 import { digestOptOutFromSettings } from "@/lib/content/digest";
+import { MAX_STEP } from "@/lib/outreach/drafts";
 import { CONTENT_CATEGORIES, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX, VERDICTS } from "@/lib/content/types";
 import {
   ALLOWED_MIME, MAX_ASSET_BYTES, createUploadUrl, isPathForItem, removeObjects, stagingPath, statObject,
@@ -381,6 +382,46 @@ export async function addContentCheck(input: {
   if (!res.ok) return { ok: false, error: res.error };
   revalidateContent(parsed.data.itemId);
   return { ok: true, created: res.created };
+}
+
+/**
+ * §6b: put this item into a cold-email step slot (or clear it). A reviewer
+ * action: the item then feeds that step's drafts, but only once it is live.
+ */
+export async function setContentOutreachSlot(input: {
+  itemId: number; campaign: string | null; step: number | null;
+}): Promise<{ ok: true } | Fail> {
+  const actor = await userActor();
+  if ("ok" in actor) return actor;
+  const parsed = z.object({
+    itemId: z.number().int().positive(),
+    campaign: z.string().trim().min(1).max(80).nullable(),
+    step: z.number().int().min(1).max(MAX_STEP).nullable(),
+  }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
+  const { itemId, campaign, step } = parsed.data;
+  // Both or neither: half a slot is not a slot.
+  if ((campaign === null) !== (step === null)) {
+    return { ok: false, error: "Add meg a kampányt és az érintés sorszámát is" };
+  }
+  const res = await setOutreachSlot(actor, itemId, campaign && step ? { campaign, step } : null);
+  if (!res.ok) return { ok: false, error: res.error };
+  revalidateContent(itemId);
+  revalidatePath("/outreach");
+  return { ok: true };
+}
+
+/** The campaign keys a reviewer can pick from: whatever the drafts already use. */
+export async function listOutreachCampaignKeys(): Promise<string[]> {
+  const actor = await userActor();
+  if ("ok" in actor) return [];
+  const rows = await db.emailDraft.findMany({
+    where: { tenantId: TENANT_ID },
+    select: { campaign: true },
+    distinct: ["campaign"],
+    orderBy: { campaign: "asc" },
+  });
+  return rows.map((r) => r.campaign);
 }
 
 export async function restoreContent(itemId: number): Promise<{ ok: true; status: string } | Fail> {

@@ -474,6 +474,21 @@ outside the key's tenant is skipped as `"unknown_company"`, never a 500 and
 never a cross-tenant write; a per-item failure is skipped as `"error"` rather
 than failing the whole batch.
 
+Per-item tracking fields (optional): `personId`, `toEmail`, `senderUserId`,
+`wave`, `dueAt`, and `templateVersionId`. The last one names the LIVE content
+version this personalised draft was written from. It is verified against the
+content item sitting in that campaign+step slot: a version belonging to another
+step, another tenant, or to no slot at all is stored as `null` rather than
+trusted. Once the slot's live version moves on, unsent drafts that recorded an
+older version are flagged in the campaign screen so a human re-copies them; sent
+drafts keep whatever they recorded, because history must not move.
+
+**Template gate (§6b).** If the step's slot holds a content item that is NOT
+live, the draft cannot be copied out of the CRM, sent through Resend, or marked
+sent by hand: all three refuse with a Hungarian message naming the template. A
+slot with NO item passes, because the first outreach wave was drafted before
+templates existed. Emission stays a human act either way: nothing here sends.
+
 Content fields (optional, 2026-09-17, trust ladder): `company_id` (the company
 this piece is for; verified against the key's tenant, stored as null otherwise)
 feeds that company's dossier to the rewrite loop, and `self_score` (0..1) plus

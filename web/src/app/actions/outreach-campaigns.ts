@@ -4,10 +4,11 @@ import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { gateDraft, gateOn, templatesForCampaign, templatesForCampaigns, templateIsStale } from "@/lib/outreach/template";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
-import { threadKeyFor, type DraftStatus } from "@/lib/outreach/drafts";
+import { threadKeyFor, MAX_STEP, type DraftStatus } from "@/lib/outreach/drafts";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import { runAutomations } from "@/lib/automations/engine";
 import {
@@ -100,6 +101,11 @@ export async function markDraftSentManually(
   if (!MANUAL_SENDABLE_STATUSES.includes(row.status as DraftStatus)) {
     return { ok: false, error: "Előbb hagyd jóvá, vagy ez az érintés már elment" };
   }
+
+  // §6b: a step whose template exists but is not approved cannot be booked as
+  // sent, the same gate the copy button and the Resend path use.
+  const gate = await gateDraft(TENANT_ID, row.campaign, row.step);
+  if (!gate.ok) return { ok: false, error: gate.error };
 
   // Same rule as the Resend path: no unsubscribe line, no cold email. The copy
   // button appends it; this refuses to book a send while none is configured.
@@ -256,6 +262,8 @@ export interface DueTouch {
   status: string;
   dueAt: string;
   senderUserId: number | null;
+  /** §6b: null when copy/send is allowed; else the reason the server will refuse it. */
+  templateBlockedReason: string | null;
 }
 
 /**
@@ -293,9 +301,17 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
   });
   const answeredKey = new Set(answered.map((a) => `${a.campaign}:${a.companyId}`));
 
-  return rows
-    .filter((r) => !answeredKey.has(`${r.campaign}:${r.companyId}`))
-    .map((r) => ({
+  const visible = rows.filter((r) => !answeredKey.has(`${r.campaign}:${r.companyId}`));
+
+  // §6b: ONE query for every campaign on this screen, never one per row.
+  const templatesByCampaign = await templatesForCampaigns(
+    TENANT_ID,
+    [...new Set(visible.map((r) => r.campaign))],
+  );
+
+  return visible.map((r) => {
+    const gate = gateOn(templatesByCampaign.get(r.campaign)?.get(r.step) ?? null);
+    return {
       draftId: r.id,
       companyId: r.companyId,
       companyName: r.company.name,
@@ -308,7 +324,9 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
       status: r.status,
       dueAt: r.dueAt!.toISOString(),
       senderUserId: r.senderUserId,
-    }));
+      templateBlockedReason: gate.ok ? null : gate.error,
+    };
+  });
 }
 
 /** Every campaign key the CRM has seen — drafts, leads and tagged interactions. */
@@ -393,4 +411,54 @@ export async function getCampaignStats(input: {
     targetsTotal: companyIds.length,
     ...buildFunnel(drafts, leads, interactions),
   };
+}
+
+export interface CampaignStepTemplate {
+  step: number;
+  /** null when no content item sits in this campaign+step slot. */
+  template: { itemId: number; title: string; status: string; live: boolean } | null;
+  /** Unsent drafts of this step built from a template version older than the current live one. */
+  staleCount: number;
+}
+
+/**
+ * §6b: per-step template state for the campaign screen. ONE query for the
+ * slots (templatesForCampaign) and one for the drafts — never one per step.
+ * Rows cover 1..MAX_STEP plus any step actually used by a template or a draft.
+ */
+export async function getCampaignStepTemplates(campaign: string): Promise<CampaignStepTemplate[]> {
+  const me = await requireUser();
+  if ("ok" in me) return [];
+  const parsed = z.string().trim().min(1).max(80).safeParse(campaign);
+  if (!parsed.success) return [];
+  const key = parsed.data;
+
+  // Counted with a groupBy, not by pulling every draft row of the campaign:
+  // the page is force-dynamic and a large campaign would ship thousands of
+  // rows on every render just to count them (Vanda, #105).
+  const [templates, groups] = await Promise.all([
+    templatesForCampaign(TENANT_ID, key),
+    db.emailDraft.groupBy({
+      by: ["step", "templateVersionId"],
+      where: { tenantId: TENANT_ID, campaign: key, sentAt: null },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const steps = new Set<number>(Array.from({ length: MAX_STEP }, (_, i) => i + 1));
+  for (const s of templates.keys()) steps.add(s);
+  for (const g of groups) steps.add(g.step);
+
+  return [...steps].sort((a, b) => a - b).map((step) => {
+    const t = templates.get(step) ?? null;
+    const staleCount = groups
+      .filter((g) => g.step === step
+        && templateIsStale({ templateVersionId: g.templateVersionId, sentAt: null }, t))
+      .reduce((n, g) => n + g._count._all, 0);
+    return {
+      step,
+      template: t ? { itemId: t.itemId, title: t.title, status: t.status, live: t.liveVersionId !== null } : null,
+      staleCount,
+    };
+  });
 }

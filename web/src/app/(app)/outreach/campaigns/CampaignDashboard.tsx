@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { REPLY_TYPE_LABEL } from "@/lib/outreach/labels";
-import type { CampaignStats } from "@/app/actions/outreach-campaigns";
+import { STATUS_LABELS } from "@/lib/marketing/types";
+import type { CampaignStats, CampaignStepTemplate } from "@/app/actions/outreach-campaigns";
 
 const TIER_ORDER = ["A", "B", "C", "D", "E", "none"] as const;
 
@@ -54,6 +55,7 @@ export default function CampaignDashboard({
   senderUserId,
   wave,
   stats,
+  stepTemplates,
 }: {
   campaigns: string[];
   senders: { id: number; name: string }[];
@@ -61,6 +63,7 @@ export default function CampaignDashboard({
   senderUserId: number | null;
   wave: number | null;
   stats: CampaignStats | null;
+  stepTemplates: CampaignStepTemplate[];
 }) {
   const router = useRouter();
 
@@ -119,6 +122,42 @@ export default function CampaignDashboard({
             <option key={w} value={w}>{w}. hullám</option>
           ))}
         </select>
+      </div>
+
+      <div className="panel panel-pad" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>Sablonok lépésenként</div>
+        {stepTemplates.map((s) => (
+          <div
+            key={s.step}
+            style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
+              fontSize: 14, flexWrap: "wrap", padding: "6px 0",
+              borderTop: "1px solid var(--line-soft)",
+            }}
+          >
+            <span style={{ color: "var(--fg-mute)", minWidth: 70 }}>{s.step}. érintés</span>
+            {s.template ? (
+              <>
+                <Link href={`/marketing/${s.template.itemId}`} style={{ flex: 1, minWidth: 160, color: "var(--indigo)" }}>
+                  {s.template.title}
+                </Link>
+                <span style={{ color: "var(--fg-mute)" }}>
+                  {STATUS_LABELS[s.template.status as keyof typeof STATUS_LABELS] ?? s.template.status}
+                </span>
+                <span style={{ color: s.template.live ? "var(--mint)" : "var(--fg-mute)", fontWeight: 500 }}>
+                  {s.template.live ? "Élő" : "Nem élő"}
+                </span>
+                {s.staleCount > 0 && (
+                  <span style={{ color: "var(--amber)" }}>
+                    {s.staleCount} piszkozat régebbi sablonváltozatból
+                  </span>
+                )}
+              </>
+            ) : (
+              <span style={{ flex: 1, color: "var(--fg-faint)" }}>Nincs sablon ehhez a lépéshez</span>
+            )}
+          </div>
+        ))}
       </div>
 
       {!stats ? (

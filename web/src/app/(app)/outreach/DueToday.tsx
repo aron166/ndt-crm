@@ -7,8 +7,15 @@ import type { DraftStatus } from "@/lib/outreach/drafts";
 
 type Sender = { id: number; name: string };
 
-/** "Kézzel elküldve" — shared between the due-today list and the queue rows. */
-export function MarkSentControl({ draftId, onSent }: { draftId: number; onSent: () => void }) {
+/**
+ * "Kézzel elküldve" — shared between the due-today list and the queue rows.
+ * `disabledReason` (§6b): the draft's step template is not live, so the
+ * server would refuse the send anyway — disable here and say why, instead of
+ * letting the human hit the server's refusal.
+ */
+export function MarkSentControl({
+  draftId, onSent, disabledReason,
+}: { draftId: number; onSent: () => void; disabledReason?: string | null }) {
   const [open, setOpen] = useState(false);
   const [threadId, setThreadId] = useState("");
   const [pending, setPending] = useState(false);
@@ -16,15 +23,21 @@ export function MarkSentControl({ draftId, onSent }: { draftId: number; onSent: 
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        style={{
-          fontSize: 13, fontWeight: 500, color: "var(--mint)", background: "var(--mint-soft)",
-          border: "1px solid oklch(0.80 0.13 165 / 0.35)", borderRadius: 8, padding: "6px 12px", cursor: "pointer",
-        }}
-      >
-        Kézzel elküldve
-      </button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+        <button
+          onClick={() => setOpen(true)}
+          disabled={!!disabledReason}
+          title={disabledReason ?? undefined}
+          style={{
+            fontSize: 13, fontWeight: 500, color: "var(--mint)", background: "var(--mint-soft)",
+            border: "1px solid oklch(0.80 0.13 165 / 0.35)", borderRadius: 8, padding: "6px 12px",
+            cursor: disabledReason ? "default" : "pointer", opacity: disabledReason ? 0.5 : 1,
+          }}
+        >
+          Kézzel elküldve
+        </button>
+        {disabledReason && <span style={{ fontSize: 12, color: "var(--amber)" }}>{disabledReason}</span>}
+      </div>
     );
   }
 
@@ -140,7 +153,7 @@ export default function DueToday({ touches: initialTouches, senders }: { touches
                     </span>
                   )}
                   {canMarkSent(t.status as DraftStatus) ? (
-                    <MarkSentControl draftId={t.draftId} onSent={reload} />
+                    <MarkSentControl draftId={t.draftId} onSent={reload} disabledReason={t.templateBlockedReason} />
                   ) : (
                     <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>Jóváhagyásra vár</span>
                   )}

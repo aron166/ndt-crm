@@ -4,6 +4,7 @@ import { reportError } from "@/lib/report-error";
 import { audit } from "@/lib/audit";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { draftsUpsertSchema, canEdit, type DraftStatus } from "@/lib/outreach/drafts";
+import { validTemplateVersion } from "@/lib/outreach/template";
 
 // Bulk draft upsert for the outreach drafting agent skill (addendum item 1).
 // Can only ever create/update rows in `draft` status — approving and sending
@@ -79,6 +80,25 @@ export async function POST(request: Request) {
       ? (await db.user.findMany({ where: { tenantId: key.tenantId, id: { in: wantedSenders } }, select: { id: true } })).map((u) => u.id)
       : [],
   );
+  // §6b: a claimed template version must really be a version of the item that
+  // fills that campaign+step slot. Anything else is dropped to null rather than
+  // trusted, the same way senderUserId and personId are.
+  const claimedTemplates = [...new Set(
+    items.map((d) => d.templateVersionId).filter((v): v is number => typeof v === "number"),
+  )];
+  const allowedTemplates = new Map<number, { campaign: string | null; step: number | null }>();
+  if (claimedTemplates.length) {
+    const versions = await db.contentVersion.findMany({
+      where: { id: { in: claimedTemplates }, tenantId: key.tenantId },
+      select: { id: true, item: { select: { outreachCampaign: true, outreachStep: true } } },
+    });
+    for (const v of versions) {
+      allowedTemplates.set(v.id, { campaign: v.item.outreachCampaign, step: v.item.outreachStep });
+    }
+  }
+  const templateFor = (item: { templateVersionId?: number | null; campaign: string; step: number }) =>
+    validTemplateVersion(item.templateVersionId, allowedTemplates, item.campaign, item.step);
+
   const trackingFor = (item: { senderUserId?: number | null; wave?: number | null; dueAt?: Date | null }) => ({
     ...(item.senderUserId !== undefined ? { senderUserId: item.senderUserId != null && validSenders.has(item.senderUserId) ? item.senderUserId : null } : {}),
     ...(item.wave !== undefined ? { wave: item.wave } : {}),
@@ -127,6 +147,7 @@ export async function POST(request: Request) {
             body: item.body,
             toEmail: item.toEmail ?? null,
             status: "draft",
+            templateVersionId: templateFor(item),
             ...trackingFor(item),
           },
         });
@@ -161,6 +182,10 @@ export async function POST(request: Request) {
           subject: item.subject,
           body: item.body,
           toEmail: item.toEmail ?? null,
+          // Absent means "not stated", not "clear it": a re-run of the drafting
+          // skill without the field must not wipe the provenance of a draft
+          // that WAS built from a template (Vanda, #105).
+          ...(item.templateVersionId !== undefined ? { templateVersionId: templateFor(item) } : {}),
           ...trackingFor(item),
         },
       });

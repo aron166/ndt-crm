@@ -2,6 +2,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { gateDraft, gateOn, templatesForCampaigns } from "@/lib/outreach/template";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
@@ -56,6 +57,8 @@ export interface DraftRow {
   externalThreadId: string | null;
   replyType: string | null;
   repliedAt: string | null;
+  /** §6b: null when copy/send is allowed; else the reason the server will refuse it. */
+  templateBlockedReason: string | null;
 }
 
 export interface DraftFilter {
@@ -109,31 +112,46 @@ export async function listDrafts(
   const truncated = rows.length > MAX_LIST_ROWS;
   const page = truncated ? rows.slice(0, MAX_LIST_ROWS) : rows;
 
+  // §6b: ONE query for every campaign on this page, never one per row and
+  // never one per campaign.
+  const templatesByCampaign = await templatesForCampaigns(
+    TENANT_ID,
+    [...new Set(page.map((r) => r.campaign))],
+  );
+
   return {
-    drafts: page.map((r) => ({
-      id: r.id,
-      companyId: r.companyId,
-      companyName: r.company.name,
-      personId: r.personId,
-      personName: r.person ? `${r.person.lastName} ${r.person.firstName}`.trim() : null,
-      campaign: r.campaign,
-      step: r.step,
-      subject: r.subject,
-      toEmail: r.toEmail,
-      status: r.status as DraftStatus,
-      threadKey: r.threadKey,
-      providerMessageId: r.providerMessageId,
-      lastError: r.lastError,
-      sentAt: r.sentAt?.toISOString() ?? null,
-      createdAt: r.createdAt.toISOString(),
-      senderUserId: r.senderUserId,
-      wave: r.wave,
-      dueAt: r.dueAt?.toISOString() ?? null,
-      sentVia: r.sentVia,
-      externalThreadId: r.externalThreadId,
-      replyType: r.replyType,
-      repliedAt: r.repliedAt?.toISOString() ?? null,
-    })),
+    drafts: page.map((r) => {
+      const gate = gateOn(templatesByCampaign.get(r.campaign)?.get(r.step) ?? null);
+      return {
+        id: r.id,
+        companyId: r.companyId,
+        companyName: r.company.name,
+        personId: r.personId,
+        personName: r.person ? `${r.person.lastName} ${r.person.firstName}`.trim() : null,
+        campaign: r.campaign,
+        step: r.step,
+        // Kept even when the step is blocked: the subject is how a human
+        // identifies the row, and blanking it would leave a nameless card.
+        // The BODY is what the server refuses (getDraftBody), and without a
+        // body there is no email to send (Vanda, #105).
+        subject: r.subject,
+        toEmail: r.toEmail,
+        status: r.status as DraftStatus,
+        threadKey: r.threadKey,
+        providerMessageId: r.providerMessageId,
+        lastError: r.lastError,
+        sentAt: r.sentAt?.toISOString() ?? null,
+        createdAt: r.createdAt.toISOString(),
+        senderUserId: r.senderUserId,
+        wave: r.wave,
+        dueAt: r.dueAt?.toISOString() ?? null,
+        sentVia: r.sentVia,
+        externalThreadId: r.externalThreadId,
+        replyType: r.replyType,
+        repliedAt: r.repliedAt?.toISOString() ?? null,
+        templateBlockedReason: gate.ok ? null : gate.error,
+      };
+    }),
     campaigns: campaignRows.map((c) => c.campaign),
     truncated,
   };
@@ -142,8 +160,15 @@ export async function listDrafts(
 /** A single draft's body, fetched only when the editor expands a row — tenant-scoped. */
 export async function getDraftBody(id: number): Promise<{ ok: true; body: string } | { ok: false; error: string }> {
   if (!(await isCrmUser())) return DENIED;
-  const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID }, select: { body: true } });
+  const row = await db.emailDraft.findFirst({
+    where: { id, tenantId: TENANT_ID },
+    select: { body: true, campaign: true, step: true },
+  });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
+  // §6b: a draft whose step has an unapproved template may not be copied out
+  // of the CRM. An empty slot passes - round one predates templates.
+  const gate = await gateDraft(TENANT_ID, row.campaign, row.step);
+  if (!gate.ok) return { ok: false, error: gate.error };
   return { ok: true, body: row.body };
 }
 
@@ -289,6 +314,9 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   if (!canSend(row.status as DraftStatus)) {
     return { ok: false, error: "Ez a piszkozat nem küldhető ebben az állapotban" };
   }
+  // §6b: same template gate as the copy and the manual-send paths.
+  const gate = await gateDraft(TENANT_ID, row.campaign, row.step);
+  if (!gate.ok) return { ok: false, error: gate.error };
 
   // The consent/unsubscribe line is not optional. Without this guard a tenant
   // who never opened the settings panel cold-emails with no opt-out at all —

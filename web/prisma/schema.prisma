@@ -1081,6 +1081,12 @@ model ContentItem {
   format           String? // plain_text_email | pdf | 9x16_video | 16x9_video | phone_script | meta_ad | …
   purpose          String? // "Q4 cold email, step 1"
   externalRef      String?   @map("external_ref") // source file / consumer, e.g. growth/…/a-hid.md#touch-1
+  // §6b: the cold-email slot this piece fills. Keyed on the outreach campaign
+  // STRING, which is what drafts, leads, interactions and thread keys already
+  // use; unifying that string with the Campaign row is its own migration.
+  // Only a LIVE item ever feeds a draft.
+  outreachCampaign String?   @map("outreach_campaign")
+  outreachStep     Int?      @map("outreach_step")
   // The version under review, and the version operations read (dual-approved).
   currentVersionId Int?      @unique @map("current_version_id")
   liveVersionId    Int?      @unique @map("live_version_id")
@@ -1109,6 +1115,7 @@ model ContentItem {
   liveVersion    ContentVersion?  @relation("ItemLiveVersion", fields: [liveVersionId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, externalRef])
+  @@index([tenantId, outreachCampaign, outreachStep])
   @@index([tenantId, status])
   @@index([tenantId, category])
   @@index([tenantId, companyId])
@@ -1178,6 +1185,7 @@ model ContentVersion {
   assets        ContentAsset[]
   currentOfItem ContentItem?     @relation("ItemCurrentVersion")
   liveOfItem    ContentItem?     @relation("ItemLiveVersion")
+  builtDrafts   EmailDraft[]     @relation("DraftTemplate")
 
   @@unique([itemId, number])
   @@index([tenantId])
@@ -1302,6 +1310,9 @@ model EmailDraft {
   externalThreadId  String?   @map("external_thread_id")
   repliedAt         DateTime? @map("replied_at")
   replyType         String?   @map("reply_type")
+  // §6b: the live template version this draft was built from. NULL on every
+  // draft that predates the link, which reads as "unknown", not "stale".
+  templateVersionId Int?      @map("template_version_id")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -1311,6 +1322,8 @@ model EmailDraft {
   company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
   person    Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
   createdBy User?   @relation("DraftCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  // SetNull: losing the template version must never delete the record of an email that left.
+  templateVersion ContentVersion? @relation("DraftTemplate", fields: [templateVersionId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, companyId, campaign, step])
   @@index([tenantId, campaign, status])

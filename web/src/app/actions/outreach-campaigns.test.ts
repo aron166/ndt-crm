@@ -24,6 +24,8 @@ vi.mock("@/lib/db", () => ({
     lead: { findFirst: vi.fn(), findMany: vi.fn() },
     interaction: { findMany: vi.fn() },
     company: { updateMany: vi.fn() },
+    // §6b template gate: no slot configured means the gate passes.
+    contentItem: { findFirst: vi.fn().mockResolvedValue(null) },
     $transaction: vi.fn(),
   },
 }));
@@ -36,6 +38,7 @@ const mockDb = db as unknown as {
   lead: { findFirst: M; findMany: M };
   interaction: { findMany: M };
   company: { updateMany: M };
+  contentItem: { findFirst: M };
   $transaction: M;
 };
 const mockGetActor = getActor as unknown as M;
@@ -46,6 +49,8 @@ const mockAudit = audit as unknown as M;
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetActor.mockResolvedValue({ userId: 2, email: "u@x.com" });
+  // Default: no template configured for the step, so the §6b gate passes.
+  mockDb.contentItem.findFirst.mockResolvedValue(null);
 });
 
 describe("every action rejects a signed-in-but-not-a-CRM-user actor", () => {
@@ -88,6 +93,29 @@ describe("markDraftSentManually", () => {
     const res = await markDraftSentManually({ draftId: 1 });
     expect(res).toEqual({ ok: false, error: "Előbb hagyd jóvá, vagy ez az érintés már elment" });
     expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("§6b: a step whose template is not live is refused, no transaction runs", async () => {
+    mockDb.emailDraft.findFirst.mockResolvedValue({ ...ROW, status: "approved" });
+    mockDb.contentItem.findFirst.mockResolvedValue({
+      id: 7, title: "1. érintés", status: "in_review", liveVersionId: null,
+    });
+    const res = await markDraftSentManually({ draftId: 1 });
+    expect(res).toMatchObject({ ok: false });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("§6b: a live template lets the send through", async () => {
+    mockDb.emailDraft.findFirst.mockResolvedValue({ ...ROW, status: "approved" });
+    mockDb.contentItem.findFirst.mockResolvedValue({
+      id: 7, title: "1. érintés", status: "live", liveVersionId: 33,
+    });
+    mockDb.tenant.findUnique.mockResolvedValue({ settings: { outreachFooter: "Leiratkozás: …" } });
+    mockDb.lead.findFirst.mockResolvedValue(null);
+    const tx = txWith(1);
+    mockDb.$transaction.mockImplementation(async (fn: (t: unknown) => unknown) => fn(tx));
+    const res = await markDraftSentManually({ draftId: 1 });
+    expect(res).toMatchObject({ ok: true });
   });
 
   it("missing outreach footer in tenant settings is refused, no transaction runs", async () => {

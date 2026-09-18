@@ -4,6 +4,7 @@ import { applyEvent, isClaimStale, type ItemState } from "./transitions";
 import { getApprovalRule, getContentReviewers } from "./reviewers";
 import { runContentRules } from "./rules";
 import { isReviewReason, reasonRequiredFor, type ReviewReason } from "./reasons";
+import { MAX_STEP } from "@/lib/outreach/drafts";
 import {
   CLAIM_TTL_MS, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX,
   isContentStatus, type ContentCategory, type ContentStatus, type Verdict,
@@ -492,6 +493,66 @@ export async function releaseStaleClaims(tenantId: number, now: Date = new Date(
     });
   }
   return released;
+}
+
+/**
+ * §6b: put an item into (or take it out of) a cold-email step slot. Any status
+ * may be assigned - the campaign screen shows what is waiting - but only a LIVE
+ * item ever feeds a draft (see lib/outreach/template.ts). A slot holds exactly
+ * one item: taking a slot that is already filled is a 409, never a silent steal.
+ */
+export async function setOutreachSlot(
+  actor: UserActor,
+  itemId: number,
+  slot: { campaign: string; step: number } | null,
+): Promise<{ ok: true } | Fail> {
+  if (slot) {
+    if (!slot.campaign.trim()) return fail(400, "Hiányzik a kampány");
+    if (!Number.isInteger(slot.step) || slot.step < 1 || slot.step > MAX_STEP) {
+      return fail(400, `Az érintés sorszáma 1 és ${MAX_STEP} között lehet`);
+    }
+  }
+  return db.$transaction(async (tx) => {
+    const row = await tx.contentItem.findFirst({
+      where: { id: itemId, tenantId: actor.tenantId },
+      select: { id: true, category: true, outreachCampaign: true, outreachStep: true },
+    });
+    if (!row) return fail(404, "Nem található");
+    if (slot && row.category !== "email") {
+      return fail(400, "Csak e-mail tartalom tehető kampánylépésbe");
+    }
+    if (slot) {
+      const taken = await tx.contentItem.findFirst({
+        where: {
+          tenantId: actor.tenantId, outreachCampaign: slot.campaign.trim(), outreachStep: slot.step,
+          id: { not: itemId },
+        },
+        select: { id: true, title: true },
+      });
+      if (taken) return fail(409, `Ezt a lépést már betölti: ${taken.title}`);
+    }
+    try {
+      await tx.contentItem.update({
+        where: { id: itemId },
+        data: {
+          outreachCampaign: slot ? slot.campaign.trim() : null,
+          outreachStep: slot ? slot.step : null,
+        },
+      });
+    } catch (err) {
+      // The partial unique index is the real gate; the lookup above only lets
+      // us name the occupying item. A concurrent assignment loses here, and
+      // must read as the designed 409, not a 500 (Vanda, #105).
+      if ((err as { code?: string }).code === "P2002") {
+        return fail(409, "Ezt a lépést közben betöltötte egy másik tartalom");
+      }
+      throw err;
+    }
+    await writeAudit(tx, actor, "content_item", itemId, "update",
+      { outreachCampaign: row.outreachCampaign, outreachStep: row.outreachStep },
+      { outreachCampaign: slot?.campaign.trim() ?? null, outreachStep: slot?.step ?? null });
+    return { ok: true as const };
+  });
 }
 
 export async function archiveItem(actor: UserActor, itemId: number): Promise<{ ok: true } | Fail> {

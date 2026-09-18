@@ -174,6 +174,8 @@ export interface ReviewPageData {
     channel: string; status: string; internal: boolean; externalRef: string | null;
     needsHumanAsset: boolean; externalUrl: string | null; publishedAt: string | null; wasLive: boolean;
     campaign: { id: number; name: string } | null;
+    /** §6b: the cold-email slot this item fills, when its category is "email". */
+    outreachCampaign: string | null; outreachStep: number | null;
     currentVersionId: number | null; liveVersionId: number | null;
     claimedBy: string | null;
     metrics: Record<string, number> | null;
@@ -204,6 +206,7 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
       internal: true, externalRef: true, needsHumanAsset: true, externalUrl: true, publishedAt: true,
       currentVersionId: true, liveVersionId: true, claimedBy: true, metrics: true, wasLive: true,
       campaign: { select: { id: true, name: true } },
+      outreachCampaign: true, outreachStep: true,
       checks: {
         orderBy: [{ state: "asc" }, { id: "asc" }],
         select: {
