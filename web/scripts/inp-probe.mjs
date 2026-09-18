@@ -6,6 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const BASE = "http://localhost:3100";
+// Fixture content item seeded by scripts/content-fixtures.mjs ("FX A-Híd: 1. érintés",
+// status in_review, 2 versions, tenant reviewer = balogharon16@gmail.com).
+const CONTENT_ITEM_ID = 280;
 const CDP_PORT = 9333;
 const CHROME_BIN = "/usr/bin/google-chrome";
 const WEB_ROOT = new URL("..", import.meta.url).pathname; // .../web/
@@ -106,7 +109,7 @@ async function main() {
 
   log(`Running ${REPEAT} repetition(s) per interaction, rotating order each rep...`);
 
-  const WARM_KEYS = ["a", "b", "c", "d", "e", "f", "g"].filter(wantKey);
+  const WARM_KEYS = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r"].filter(wantKey);
   const warmSamples = new Map(); // label -> [{ r, result }]
   for (let r = 0; r < REPEAT; r++) {
     for (const key of rotate(WARM_KEYS, r)) {
@@ -119,7 +122,7 @@ async function main() {
   let coldStats = null;
   let coldSamples = null;
   if (COLD) {
-    const COLD_KEYS = ["a", "b", "e", "g"].filter(wantKey);
+    const COLD_KEYS = ["a", "b", "e", "g", "h", "k", "l", "o", "p", "q", "r"].filter(wantKey);
     coldSamples = new Map();
     for (let r = 0; r < REPEAT; r++) {
       for (const key of rotate(COLD_KEYS, r)) {
@@ -166,12 +169,32 @@ const WARM_ROW_LABELS = [
   "companies: filter typing",
   "persons: search typing",
   "tasks: completion click",
+  "marketing board: board/list view toggle",
+  "marketing board: 'Csak ami rám vár' toggle",
+  "marketing board: category filter select",
+  "marketing board: bulk-select checkbox",
+  "marketing/[id]: verdict button (Javítást kérek)",
+  "marketing/[id]: reason select",
+  "marketing/[id]: comment textarea typing",
+  "marketing/[id]: diff toggle (Eltérések az előző verzióhoz)",
+  "marketing/[id]: version history item click",
+  "outreach: campaign filter select",
+  "outreach: row expand",
+  "drive: outcome button",
+  "drive: note textarea typing",
 ];
 const COLD_ROW_LABELS = [
   "dashboard: panel-head nav link click (cold)",
   "leads: kanban card open (cold)",
   "companies: filter typing (cold)",
   "tasks: completion click (cold)",
+  "marketing board: board/list view toggle (cold)",
+  "marketing board: bulk-select checkbox (cold)",
+  "marketing/[id]: verdict button (cold)",
+  "outreach: campaign filter select (cold)",
+  "outreach: row expand (cold)",
+  "drive: outcome button (cold)",
+  "drive: note textarea typing (cold)",
 ];
 
 // One repetition of one warm interaction. Returns an array of finalize()
@@ -213,6 +236,38 @@ async function warmOnce(key, cdp, sessionId) {
       await ensureOpenTaskExists(cdp, sessionId);
       return [await runOnPage(cdp, sessionId, "tasks: completion click", `${BASE}/tasks`, () =>
         clickAndMeasure(cdp, sessionId, 'button[title="Kész"]'))];
+    case "h":
+      return [await runOnPage(cdp, sessionId, "marketing board: board/list view toggle", `${BASE}/marketing?view=board`, () =>
+        clickByText(cdp, sessionId, "a", "Lista"))];
+    case "i":
+      return [await runOnPage(cdp, sessionId, "marketing board: 'Csak ami rám vár' toggle", `${BASE}/marketing?view=board`, () =>
+        clickAndMeasure(cdp, sessionId, "a.badge-ds.dot"))];
+    case "j":
+      return [await runOnPage(cdp, sessionId, "marketing board: category filter select", `${BASE}/marketing?view=board`, () =>
+        selectAndMeasure(cdp, sessionId, "select"))];
+    case "k":
+      return [await runOnPage(cdp, sessionId, "marketing board: bulk-select checkbox", `${BASE}/marketing?view=board`, () =>
+        clickAndMeasure(cdp, sessionId, '.kcol-body input[type="checkbox"]'))];
+    case "l":
+      return await measureReviewPanel(cdp, sessionId, `${BASE}/marketing/${CONTENT_ITEM_ID}`);
+    case "m":
+      return [await runOnPage(cdp, sessionId, "marketing/[id]: diff toggle (Eltérések az előző verzióhoz)", `${BASE}/marketing/${CONTENT_ITEM_ID}`, () =>
+        clickAndMeasure(cdp, sessionId, ".diff-toggle"))];
+    case "n":
+      return [await runOnPage(cdp, sessionId, "marketing/[id]: version history item click", `${BASE}/marketing/${CONTENT_ITEM_ID}`, () =>
+        clickAndMeasure(cdp, sessionId, ".version-item:not(.active)"))];
+    case "o":
+      return [await runOnPage(cdp, sessionId, "outreach: campaign filter select", `${BASE}/outreach`, () =>
+        selectAndMeasure(cdp, sessionId, ".panel.panel-pad select"))];
+    case "p":
+      return [await runOnPage(cdp, sessionId, "outreach: row expand", `${BASE}/outreach`, () =>
+        clickAndMeasure(cdp, sessionId, ".tbl-row"))];
+    case "q":
+      return [await runOnPage(cdp, sessionId, "drive: outcome button", `${BASE}/drive`, () =>
+        clickByText(cdp, sessionId, "button", "Nem vette fel"))];
+    case "r":
+      return [await runOnPage(cdp, sessionId, "drive: note textarea typing", `${BASE}/drive`, () =>
+        typeAndMeasure(cdp, sessionId, 'textarea[placeholder="Jegyzet"]', "teszt"))];
     default:
       return [];
   }
@@ -249,6 +304,27 @@ async function coldOnce(key, cdp, warmSessionId) {
       await ensureOpenTaskExists(cdp, warmSessionId); // a prior "g" repetition likely just completed the last open task
       return [await coldInteraction(cdp, "tasks: completion click (cold)", `${BASE}/tasks`, (sid) =>
         coldClick(sid.cdp, sid.sessionId, 'button[title="Kész"]'))];
+    case "h":
+      return [await coldInteraction(cdp, "marketing board: board/list view toggle (cold)", `${BASE}/marketing?view=board`, (sid) =>
+        coldClickByText(sid.cdp, sid.sessionId, "a", "Lista"))];
+    case "k":
+      return [await coldInteraction(cdp, "marketing board: bulk-select checkbox (cold)", `${BASE}/marketing?view=board`, (sid) =>
+        coldClick(sid.cdp, sid.sessionId, '.kcol-body input[type="checkbox"]'))];
+    case "l":
+      return [await coldInteraction(cdp, "marketing/[id]: verdict button (cold)", `${BASE}/marketing/${CONTENT_ITEM_ID}`, (sid) =>
+        coldClick(sid.cdp, sid.sessionId, ".actionbar-btn.changes"))];
+    case "o":
+      return [await coldInteraction(cdp, "outreach: campaign filter select (cold)", `${BASE}/outreach`, (sid) =>
+        coldSelect(sid.cdp, sid.sessionId, ".panel.panel-pad select"))];
+    case "p":
+      return [await coldInteraction(cdp, "outreach: row expand (cold)", `${BASE}/outreach`, (sid) =>
+        coldClick(sid.cdp, sid.sessionId, ".tbl-row"))];
+    case "q":
+      return [await coldInteraction(cdp, "drive: outcome button (cold)", `${BASE}/drive`, (sid) =>
+        coldClickByText(sid.cdp, sid.sessionId, "button", "Nem vette fel"))];
+    case "r":
+      return [await coldInteraction(cdp, "drive: note textarea typing (cold)", `${BASE}/drive`, (sid) =>
+        coldType(sid.cdp, sid.sessionId, 'textarea[placeholder="Jegyzet"]', "t"))];
     default:
       return [];
   }
@@ -483,6 +559,15 @@ async function getCenter(cdp, sessionId, selector) {
         el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         res = hit(el.getBoundingClientRect());
       }
+      // 'nearest' is a no-op when the element is already within the layout
+      // viewport — which is true even when a FIXED-position bar (e.g. the
+      // bottom status bar) is painted on top of it, since fixed elements
+      // don't affect scroll-into-view's notion of "in view". Re-centering
+      // moves the element away from the fixed band at top or bottom.
+      if (!res.ok) {
+        el.scrollIntoView({ block: 'center', inline: 'nearest' });
+        res = hit(el.getBoundingClientRect());
+      }
       return res;
     })()
   `);
@@ -573,6 +658,85 @@ async function typeAndMeasure(cdp, sessionId, selector, text) {
   const { inp, loaf } = await readPerf(cdp, sessionId);
   const keyEntries = inp.filter((e) => e.name === "keydown" || e.name === "keypress" || e.name === "keyup");
   return summarize(keyEntries.length ? keyEntries : inp, loaf, keyEntries.length ? null : "no keydown/keypress/keyup entries; falling back to full entry set");
+}
+
+// Clicks the first element of `tag` whose textContent includes `text` — for
+// nav links / buttons identified by label rather than a stable class (the
+// board/list segmented control, the drive outcome buttons).
+async function clickByText(cdp, sessionId, tag, text) {
+  const found = await evalExpr(cdp, sessionId, `
+    (() => {
+      const els = Array.from(document.querySelectorAll(${JSON.stringify(tag)}));
+      const el = els.find(e => e.textContent && e.textContent.includes(${JSON.stringify(text)}));
+      if (!el) return false;
+      el.setAttribute('data-inp-target', '1');
+      return true;
+    })()
+  `);
+  if (!found.value) return { skip: `${tag}:contains("${text}")` };
+  return clickAndMeasure(cdp, sessionId, '[data-inp-target="1"]');
+}
+
+async function coldClickByText(cdp, sessionId, tag, text) {
+  const found = await pollUntilHitTestable(cdp, sessionId, tag, async (c, s, sel) => {
+    const r = await evalExpr(c, s, `
+      (() => {
+        const els = Array.from(document.querySelectorAll(${JSON.stringify(sel)}));
+        const el = els.find(e => e.textContent && e.textContent.includes(${JSON.stringify(text)}));
+        if (!el) return null;
+        const rect = el.getBoundingClientRect();
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2, w: rect.width, h: rect.height };
+      })()
+    `);
+    return r.value;
+  });
+  if (!found) return { skip: `${tag}:contains("${text}") (never hit-testable within 3s of load)` };
+  await trustedMouseMove(cdp, sessionId, found.rect.x, found.rect.y);
+  await trustedPressRelease(cdp, sessionId, found.rect.x, found.rect.y);
+  // ponytail: fixed 2.2s buffer; poll for the route commit instead if this run gets slow
+  await sleep(2200);
+  const { inp, loaf } = await readPerf(cdp, sessionId);
+  return { ...summarize(inp, loaf), clickAtMs: found.elapsedMs };
+}
+
+// A native <select>'s own picker is OS-level chrome that headless Chrome
+// cannot render (confirmed empirically: a trusted ArrowDown key event on a
+// focused, closed select changes nothing — value in, value out, zero Event
+// Timing entries). The only part of a select interaction Event Timing ever
+// attributes INP to is the click that focuses/opens it — same as any other
+// control — so a select is measured with the plain click helpers, not a
+// dedicated one.
+const selectAndMeasure = clickAndMeasure;
+const coldSelect = coldClick;
+
+// ---------- review page action bar + comment sheet (interaction l) ----------
+// Three chained warm rows on the SAME page load: opening "Javítást kérek"
+// reveals the reason select and comment textarea, so they cannot each get
+// their own fresh navigation the way an independent row would (there would be
+// nothing to click yet). Not resubmitted — canReviewButtons stays satisfied
+// (no verdict is ever confirmed here), so this reads the fixture item, never
+// writes it.
+async function measureReviewPanel(cdp, sessionId, url) {
+  await navigate(cdp, sessionId, url);
+  await settle(cdp, sessionId);
+
+  const openR = await clickAndMeasure(cdp, sessionId, ".actionbar-btn.changes");
+  const openFinal = finalize("marketing/[id]: verdict button (Javítást kérek)", openR);
+
+  await sleep(200);
+  const panelPresent = await evalExpr(cdp, sessionId, `!!document.querySelector('#review-reason')`);
+  if (!panelPresent.value) {
+    const skipped = { skipped: true, note: "SKIPPED (comment sheet did not appear after clicking Javítást kérek)" };
+    return [openFinal, finalize("marketing/[id]: reason select", skipped), finalize("marketing/[id]: comment textarea typing", skipped)];
+  }
+
+  const reasonR = await selectAndMeasure(cdp, sessionId, "#review-reason");
+  const reasonFinal = finalize("marketing/[id]: reason select", reasonR);
+
+  const commentR = await typeAndMeasure(cdp, sessionId, "#review-comment", "teszt");
+  const commentFinal = finalize("marketing/[id]: comment textarea typing", commentR);
+
+  return [openFinal, reasonFinal, commentFinal];
 }
 
 // ---------- measurement summary ----------

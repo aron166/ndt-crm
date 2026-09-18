@@ -7,8 +7,9 @@
 // never touches a database or web/.env*. --apply needs --i-have-arons-approval AND
 // CRM_URL + CRM_APP_KEY env, and POSTs through the HTTP API only.
 //
-// Run from web/: node scripts/import-content.mjs [--apply --i-have-arons-approval] [--only=<category>]
+// Run from web/: node scripts/import-content.mjs [--apply --i-have-arons-approval] [--only=<category>] [--refresh] [--refs-only]
 
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -27,6 +28,9 @@ if (APPLY && !(HAS_APPROVAL && process.env.CRM_URL && process.env.CRM_APP_KEY)) 
   );
 }
 const REFS_ONLY = args.includes("--refs-only");
+// --refresh: when the source file changed since the import, post a NEW version
+// instead of reporting the item as already existing.
+const REFRESH = args.includes("--refresh");
 const DO_APPLY = APPLY && HAS_APPROVAL && !!process.env.CRM_URL && !!process.env.CRM_APP_KEY;
 
 /**
@@ -379,7 +383,10 @@ if (REFS_ONLY) {
   for (const it of items) console.log(it.external_ref);
   process.exit(0);
 }
-console.log(`Mode: ${DO_APPLY ? "APPLY" : "DRY-RUN"}${ONLY ? ` (only=${ONLY})` : ""}`);
+console.log(`Mode: ${DO_APPLY ? "APPLY" : "DRY-RUN"}${ONLY ? ` (only=${ONLY})` : ""}${REFRESH ? " +refresh" : ""}`);
+if (REFRESH && !DO_APPLY) {
+  console.log("refresh: needs --apply to read the current body hashes from the CRM; dry-run only lists the candidates.");
+}
 console.log("");
 
 const byCategory = {};
@@ -433,7 +440,7 @@ if (notFound.length) {
 
 if (DO_APPLY) {
   console.log("");
-  let created = 0, existed = 0, errors = 0, consecutiveErrors = 0;
+  let created = 0, existed = 0, refreshed = 0, unchanged = 0, errors = 0, consecutiveErrors = 0;
   for (const it of items) {
     let res, text;
     try {
@@ -471,15 +478,44 @@ if (DO_APPLY) {
       parsed = {};
     }
     if (parsed.existed) {
-      console.log(`existed ${it.external_ref}`);
-      existed++;
+      if (!REFRESH) {
+        console.log(`existed ${it.external_ref}`);
+        existed++;
+      } else if (!parsed.versionId || !parsed.bodyHash) {
+        console.log(`existed ${it.external_ref} (no hash returned, cannot refresh)`);
+        existed++;
+      } else if (createHash("sha256").update(it.body).digest("hex") === parsed.bodyHash) {
+        console.log(`unchanged ${it.external_ref}`);
+        unchanged++;
+      } else {
+        const vr = await fetch(`${process.env.CRM_URL}/api/content/${parsed.contentItemId}/versions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CRM_APP_KEY}` },
+          body: JSON.stringify({
+            body: it.body,
+            change_note: `Frissítve a forrásfájlból: ${it.external_ref}`,
+            based_on_version_id: parsed.versionId,
+            from_source: true,
+          }),
+        });
+        const vt = await vr.text();
+        if (vr.ok) {
+          console.log(`refreshed ${it.external_ref}`);
+          refreshed++;
+        } else {
+          console.log(`error ${vr.status} refresh ${it.external_ref}: ${vt}`);
+          errors++;
+          consecutiveErrors++;
+          if (consecutiveErrors >= 3) { console.log("Stopping: 3 consecutive errors."); break; }
+        }
+      }
     } else {
       console.log(`created ${it.external_ref}`);
       created++;
     }
   }
   console.log("");
-  console.log(`Summary: created=${created} existed=${existed} errors=${errors} of ${items.length}`);
+  console.log(`Summary: created=${created} existed=${existed} refreshed=${refreshed} unchanged=${unchanged} errors=${errors} of ${items.length}`);
   if (videoItems.length) {
     console.log("Videó feltöltése kézzel a bírálati oldalon (az upload API böngészős flow, ezt a script nem csinálja).");
   }

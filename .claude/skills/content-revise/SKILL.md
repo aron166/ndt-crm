@@ -39,11 +39,13 @@ The queue entry carries, when the CRM knows them:
   `translated`, `fact_wrong`, `claim_not_allowed`, `wrong_contact`, `too_long`,
   `wrong_ask`, `wrong_format`, `other`). The tag says WHAT KIND of problem it is; the
   comment says the specifics. Answer both.
-- `ruleViolations` — machine checks that already failed (forbidden claim, unfilled
-  placeholder, missing footer, too long, reused hook …). Every one of them must be gone
-  from your new version. They are blocking: an item with an open one cannot go live.
-- `company` — the CRM dossier (`companies.enrichment`), the closeness score and the
-  verified contact. **These are read-only facts.** Use them for the hook and the
+- `openChecks` — blocking questions: imported warning markers AND failed machine rules
+  (each rule check's question starts with "Szabály:"). Every one of them must be gone from
+  your new version; the item cannot go live while any is open.
+- `settledChecks` — questions a human already answered. Those answers are FACTS you may
+  use. Never invent an answer to something still open.
+- `company` — the CRM dossier (`companies.enrichment`), the closeness score, the city and
+  the verified contact. **These are read-only facts.** Use them for the hook and the
   personalisation; never invent, "improve" or round a fact, and never contradict the
   dossier. Say in the change note which dossier facts you used.
 - `externalRef` — the source draft's path, so you can read the original and the
@@ -76,9 +78,9 @@ company, not to guess here.
    - Hungarian typography: „ ” quotes, decimal comma, `2026. szeptember 22.` dates.
    - **Claims: closed list — no list, no rewrite.** If the claim list below cannot be read
      (file missing, no access), do **not** write or post anything for any item: stop the run
-     and report "claim list unavailable". Before writing, read §6 of
-     `/home/aron166/Projects/growth/campaigns/cold-email-v0/FRAMEWORK.md` (or
-     `docs/cold-email-framework.md` in ndt-crm once PR #90 is merged). Only the claims listed
+     and report "claim list unavailable". Before writing, read the claim
+     list in `docs/cold-email-framework.md` (in THIS repo, merged 2026-09-17; the
+     original lives in growth/campaigns/cold-email-v0/FRAMEWORK.md §6). Only the claims listed
      there may appear. Never add a claim, a number, a price, a reference customer, a depth,
      a tolerance, or "röntgen". If a reviewer asks for something that would need a claim
      outside the list, do **not** invent it — write the version without it and say so in the
@@ -88,7 +90,7 @@ company, not to guess here.
    visual): you do not generate media. Post a version whose body is the updated brief for the
    human/agent who will produce it, set `needs_human_asset: true`, and say exactly what must be
    produced in the change note.
-6. **Write the change note** (Hungarian, plain text): one line per comment point —
+6. **Write the change note and your own verdict** (Hungarian, plain text): one line per comment point —
    `1. <the request, briefly> → <what you changed>` — then anything you deliberately did not do
    and why. Every comment point must be answered. Start with `v{new} a v{current} alapján.`
 7. **Post the version** —
@@ -98,8 +100,11 @@ company, not to guess here.
      -d @version.json
    ```
    with `{ "body": "...", "change_note": "...", "based_on_version_id": <currentVersion.id>,
-   "needs_human_asset": false }` (build the JSON with a tool like `jq` or a script — never by
-   hand-escaping).
+   "needs_human_asset": false, "self_score": 0.0-1.0, "self_note": "..." }`
+   Build that JSON with a tool (`jq` or a script), never by hand-escaping.
+   `self_score` is YOUR OWN confidence that this version is ready for a human, and
+   `self_note` one line on what you were unsure about. Be honest: a low score gets your work
+   sampled, not punished, and the score is only recorded and displayed, nothing acts on it.
    - `201` → done.
    - `409` → **a human edited the item after your claim** (or your claim expired). Their version
      wins. Do **not** retry, do not re-claim, do not post again. Record it as skipped.

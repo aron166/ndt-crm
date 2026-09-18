@@ -17,7 +17,12 @@ const tx = {
   appEvent: { create: vi.fn() },
 };
 vi.mock("@/lib/db", () => ({
-  db: { $transaction: vi.fn((cb: (tx: unknown) => unknown) => cb(tx)) },
+  db: {
+    $transaction: vi.fn((cb: (tx: unknown) => unknown) => cb(tx)),
+    // The existed branch hashes the current body so an importer can spot a
+    // changed source file (--refresh).
+    contentVersion: { findFirst: vi.fn().mockResolvedValue({ body: "current body" }) },
+  },
 }));
 
 import { POST } from "./route";

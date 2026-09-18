@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { UI, CATEGORY_LABEL, VERDICT_LABEL } from "@/lib/content/labels";
 import type { ContentCategory, Verdict } from "@/lib/content/types";
 import type { InboxSections, InboxRow } from "@/lib/content/queries";
-import { FilterBar } from "./InboxClient";
+import { FilterBar, Pager } from "./InboxClient";
 import { BulkBar } from "./BulkBar";
 
 const VERDICT_COLOR: Record<Verdict, string> = {
@@ -30,13 +30,14 @@ const COLUMNS: { key: ColumnKey; label: string; color: string; acceptsDrop: bool
   { key: "in_campaign", label: UI.columnInCampaign, color: "var(--fg-faint)", acceptsDrop: false },
 ];
 
-function columnOf(status: string): ColumnKey {
+/** Null = this status has no board column (archived), so the card is not shown. */
+function columnOf(status: string): ColumnKey | null {
   if (status === "draft") return "draft";
   if (status === "in_review") return "in_review";
   if (status === "changes_requested" || status === "rewrite_requested") return "changes";
   if (status === "ai_working") return "ai_working";
   if (status === "live") return "live";
-  return "draft";
+  return null;
 }
 
 function Card({
@@ -71,6 +72,11 @@ function Card({
             </span>
             {item.format && <span className="badge-ds slate">{item.format}</span>}
             {item.openChecks > 0 && <span className="badge-ds amber">{UI.checksOpen(item.openChecks)}</span>}
+            {item.selfScore !== null && (
+              <span className="badge-ds" style={{ color: "var(--fg-mute)" }}>
+                {UI.selfScoreShort(Math.round(item.selfScore * 100))}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)", marginBottom: 6, lineHeight: 1.3 }}>
             {item.title}
@@ -124,7 +130,10 @@ export function BoardClient({
   const rows = onlyMine ? allRows.filter((r) => mineIds.has(r.id)) : allRows;
   const byColumn = useMemo(() => {
     const map = new Map<ColumnKey, InboxRow[]>(COLUMNS.map((c) => [c.key, []]));
-    for (const r of rows) map.get(columnOf(r.status))!.push(r);
+    for (const r of rows) {
+      const col = columnOf(r.status);
+      if (col) map.get(col)!.push(r);
+    }
     return map;
   }, [rows]);
 
@@ -244,6 +253,8 @@ export function BoardClient({
           );
         })}
       </div>
+
+      <Pager page={sections.page} hasMore={sections.hasMore} onNavigate={() => setSelected(new Set())} />
 
       <BulkBar
         selectedIds={[...selected]}

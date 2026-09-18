@@ -1,7 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { applyEvent, isClaimStale, type ItemState } from "./transitions";
-import { getContentReviewers } from "./reviewers";
+import { getApprovalRule, getContentReviewers } from "./reviewers";
+import { runContentRules } from "./rules";
 import { isReviewReason, reasonRequiredFor, type ReviewReason } from "./reasons";
 import {
   CLAIM_TTL_MS, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX,
@@ -37,7 +38,8 @@ type Tx = Prisma.TransactionClient;
 
 const STATE_SELECT = {
   id: true, status: true, currentVersionId: true, liveVersionId: true,
-  claimedAt: true, claimedFrom: true, claimedBy: true, prevStatus: true, wasLive: true,
+  claimedAt: true, claimedFrom: true, claimedBy: true, prevStatus: true, wasLive: true, category: true,
+  source: true, externalRef: true,
 } satisfies Prisma.ContentItemSelect;
 type StateRow = Prisma.ContentItemGetPayload<{ select: typeof STATE_SELECT }>;
 
@@ -95,6 +97,8 @@ export interface CreateItemInput {
   format?: string | null;
   purpose?: string | null;
   campaignId?: number | null;
+  /** The company this piece is for (its dossier feeds the rewrite loop). */
+  companyId?: number | null;
   externalRef?: string | null;
   changeNote?: string | null;
   internal?: boolean;
@@ -103,6 +107,9 @@ export interface CreateItemInput {
   scheduledFor?: Date | null;
   /** App-key imports of existing material are `import`, not `ai`. */
   importing?: boolean;
+  /** Submitting agent's own confidence 0..1 and a short note (display only). */
+  selfScore?: number | null;
+  selfNote?: string | null;
 }
 
 /**
@@ -127,6 +134,7 @@ export async function createItem(
       data: {
         tenantId: actor.tenantId,
         campaignId: input.campaignId ?? null,
+        companyId: input.companyId ?? null,
         channel: input.channel,
         contentType: input.contentType,
         category: input.category,
@@ -147,13 +155,33 @@ export async function createItem(
       data: {
         tenantId: actor.tenantId, itemId: item.id, number: 1, body: input.body,
         changeNote: input.changeNote ?? null,
+        selfScore: clampSelfScore(input.selfScore),
+        selfNote: input.selfNote?.trim()?.slice(0, SELF_NOTE_MAX) ?? null,
         ...authorFields(actor, input.importing),
       },
       select: { id: true },
     });
-    await t.contentItem.update({ where: { id: item.id }, data: { currentVersionId: version.id } });
+    // Same context as every later version: an inline one left missing_footer and
+    // duplicate_hook structurally dead on the submit path (Vanda, #104).
+    const violations = await reconcileRuleChecks(t, actor.tenantId, item.id,
+      await ruleContextFor(t, actor.tenantId,
+        { id: item.id, category: input.category, format: input.format ?? null, campaignId: input.campaignId ?? null },
+        input.body));
+    await t.contentItem.update({
+      where: { id: item.id },
+      data: {
+        currentVersionId: version.id,
+        // A submission that already breaks a rule goes to the AI queue.
+        ...(violations.length > 0 ? { status: "rewrite_requested" } : {}),
+      },
+    });
     await writeAudit(t, actor, "content_item", item.id, "create", null,
-      { title: input.title, category: input.category, status: "in_review", externalRef: input.externalRef ?? null });
+      {
+        title: input.title, category: input.category,
+        status: violations.length > 0 ? "rewrite_requested" : "in_review",
+        ...(violations.length ? { ruleViolations: violations.map((v) => v.rule) } : {}),
+        externalRef: input.externalRef ?? null,
+      });
     await writeAudit(t, actor, "content_version", version.id, "create", null, { itemId: item.id, number: 1 });
     return { ok: true as const, itemId: item.id, versionId: version.id, existed: false };
   };
@@ -179,6 +207,16 @@ export interface CreateVersionInput {
   basedOnVersionId: number;
   /** AI only: the change needs an image/video a human must produce. */
   needsHumanAsset?: boolean;
+  /** Submitting agent's own confidence 0..1 and a short note (display only). */
+  selfScore?: number | null;
+  selfNote?: string | null;
+  /**
+   * Import refresh: the SOURCE FILE changed, so this version restates the
+   * source rather than being an AI rewrite. It needs no claim (the importer is
+   * not the rewrite loop) but every other rule still applies: stale base is a
+   * 409, the content rules run, reviews reset. Ignored for user actors.
+   */
+  fromSource?: boolean;
   /**
    * The files of the new version. Omitted → the base version's files are
    * carried forward (always the case for AI versions, which cannot upload).
@@ -201,7 +239,7 @@ export async function createVersion(
   actor: ContentActor,
   itemId: number,
   input: CreateVersionInput,
-): Promise<{ ok: true; versionId: number; number: number } | Fail> {
+): Promise<{ ok: true; versionId: number; number: number; violations: { rule: string; message: string }[] } | Fail> {
   if (!input.body.trim() || input.body.length > CONTENT_BODY_MAX) return fail(400, "Invalid body");
   const changeNote = input.changeNote?.trim() || null;
   if (changeNote && changeNote.length > CHANGE_NOTE_MAX) return fail(400, "Change note too long");
@@ -217,17 +255,29 @@ export async function createVersion(
     }
 
     if (actor.kind === "app") {
-      if (state.status !== "ai_working" || row.claimedBy !== actor.appSlug || !row.claimedAt) {
-        return fail(409, "Not claimed by this app");
+      if (!input.fromSource) {
+        if (state.status !== "ai_working" || row.claimedBy !== actor.appSlug || !row.claimedAt) {
+          return fail(409, "Not claimed by this app");
+        }
+        if (isClaimStale(row.claimedAt, new Date())) return fail(409, "Claim expired");
+      } else if (state.status === "ai_working") {
+        // Never overwrite a rewrite the AI is in the middle of.
+        return fail(409, "The AI is rewriting this item");
+      } else if (row.source !== "import" && !row.externalRef) {
+        // Refresh restates a SOURCE FILE. An item that came from a human in the
+        // app has no source file, so there is nothing to refresh from, and an
+        // app key must not overwrite a human's current version without a claim.
+        return fail(409, "This item has no source file to refresh from");
       }
-      if (isClaimStale(row.claimedAt, new Date())) return fail(409, "Claim expired");
       // Race rule (spec §1): a human version since the claim wins, always.
       // Backstop: a human version already clears the claim, so the check above
       // normally fires first — kept deliberately in case that ever changes.
-      const humanSince = await tx.contentVersion.count({
-        where: { itemId, authorType: "user", createdAt: { gt: row.claimedAt } },
-      });
-      if (humanSince > 0) return fail(409, "A human edited this item after the claim");
+      if (row.claimedAt) {
+        const humanSince = await tx.contentVersion.count({
+          where: { itemId, authorType: "user", createdAt: { gt: row.claimedAt } },
+        });
+        if (humanSince > 0) return fail(409, "A human edited this item after the claim");
+      }
     }
 
     const last = await tx.contentVersion.findFirst({
@@ -238,7 +288,9 @@ export async function createVersion(
       data: {
         tenantId: actor.tenantId, itemId, number, body: input.body, changeNote,
         basedOnVersionId: input.basedOnVersionId,
-        ...authorFields(actor),
+        selfScore: clampSelfScore(input.selfScore),
+        selfNote: input.selfNote?.trim()?.slice(0, SELF_NOTE_MAX) ?? null,
+        ...authorFields(actor, input.fromSource),
       },
       select: { id: true },
     });
@@ -260,10 +312,22 @@ export async function createVersion(
 
     const next = applyEvent(state, { type: "version_created", versionId: version.id });
     if (!next.ok) return fail(409, next.reason);
+
+    // Hard checks: a violated version goes BACK TO THE AI QUEUE, not to a human,
+    // and each violation is an open check so the live gate blocks it.
+    const itemRow = await tx.contentItem.findFirst({
+      where: { id: itemId, tenantId: actor.tenantId },
+      select: { id: true, category: true, format: true, campaignId: true },
+    });
+    const violations = itemRow
+      ? await reconcileRuleChecks(tx, actor.tenantId, itemId, await ruleContextFor(tx, actor.tenantId, itemRow, input.body))
+      : [];
+    const statusAfterRules = violations.length > 0 ? "rewrite_requested" : next.state.status;
+
     await tx.contentItem.update({
       where: { id: itemId },
       data: {
-        status: next.state.status,
+        status: statusAfterRules,
         currentVersionId: next.state.currentVersionId,
         claimedAt: null, claimedFrom: null, claimedBy: null,
         body: input.body,
@@ -272,8 +336,11 @@ export async function createVersion(
     });
     await writeAudit(tx, actor, "content_version", version.id, "create",
       { itemId, status: state.status, currentVersionId: state.currentVersionId },
-      { itemId, number, status: next.state.status, basedOnVersionId: input.basedOnVersionId });
-    return { ok: true as const, versionId: version.id, number };
+      {
+        itemId, number, status: statusAfterRules, basedOnVersionId: input.basedOnVersionId,
+        ...(violations.length ? { ruleViolations: violations.map((v) => v.rule) } : {}),
+      });
+    return { ok: true as const, versionId: version.id, number, violations };
   });
 }
 
@@ -343,11 +410,14 @@ export async function submitReview(
     // The check gate must be evaluated HERE too: two approvals must not make an
     // item live while a ⚠ check is open (Vanda, #103 finding 1).
     const openChecks = await tx.contentCheck.count({ where: { itemId: row.id, state: "open" } });
+    // How many approvals THIS item needs (per-category setting, default 2).
+    const rule = await getApprovalRule(actor.tenantId, row.category, tx);
     const next = applyEvent(state, {
       type: "reviews_changed",
-      reviewers,
+      reviewers: rule.reviewers,
       reviews: all.map((r) => ({ reviewerUserId: r.reviewerUserId, verdict: r.verdict as Verdict })),
       openChecks,
+      requiredApprovals: rule.required,
     });
     if (!next.ok) return fail(409, next.reason);
 
@@ -448,7 +518,94 @@ export async function archiveItem(actor: UserActor, itemId: number): Promise<{ o
   });
 }
 
+/** Rule-check questions are prefixed so they can be told apart from ⚠ imports. */
+const RULE_CHECK_PREFIX = "Szabály:";
+
+/**
+ * Run the blocking content rules against a body and reconcile them with the
+ * item's rule checks (Áron 2026-09-17, "hard checks, code not prose"):
+ *  - a new violation becomes an OPEN check, so the live gate blocks the item
+ *    exactly like an imported ⚠ question;
+ *  - a violation that the new version fixed is auto-resolved, with a note;
+ *  - the caller decides the status (a violated item goes back to the AI queue).
+ * Returns the violations found.
+ */
+async function reconcileRuleChecks(
+  tx: Tx,
+  tenantId: number,
+  itemId: number,
+  ctx: { category: string; format?: string | null; body: string; footer?: string | null; requiresFooter?: boolean; otherHooks?: string[]; recipientVerified?: boolean | null },
+): Promise<{ rule: string; message: string }[]> {
+  const violations = runContentRules(ctx);
+  const open = violations.map((v) => `${RULE_CHECK_PREFIX} ${v.message}`);
+
+  if (open.length > 0) {
+    await tx.contentCheck.createMany({
+      data: open.map((question) => ({
+        tenantId, itemId, question: question.slice(0, CHECK_QUESTION_MAX),
+        forWhom: "either", state: "open", source: "rule",
+      })),
+      skipDuplicates: true,
+    });
+    // A rule that fires again must be OPEN even if a human had waived it before.
+    await tx.contentCheck.updateMany({
+      where: { itemId, source: "rule", question: { in: open.map((q) => q.slice(0, CHECK_QUESTION_MAX)) } },
+      data: { state: "open", answer: null, resolvedByUserId: null },
+    });
+  }
+
+  // Everything else that came from a rule is fixed now.
+  await tx.contentCheck.updateMany({
+    where: {
+      itemId, source: "rule", state: "open",
+      ...(open.length ? { question: { notIn: open.map((q) => q.slice(0, CHECK_QUESTION_MAX)) } } : {}),
+    },
+    data: { state: "resolved", answer: "A szabály már nem sérül ebben a verzióban." },
+  });
+
+  return violations.map((v) => ({ rule: v.rule, message: v.message }));
+}
+
+/** Context the rules need that lives in other rows (footer, sibling hooks). */
+async function ruleContextFor(
+  tx: Tx,
+  tenantId: number,
+  item: { id: number; category: string; format?: string | null; campaignId?: number | null },
+  body: string,
+): Promise<Parameters<typeof reconcileRuleChecks>[3]> {
+  const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  const footer = (tenant?.settings as Record<string, unknown> | null)?.outreachFooter;
+  // Only the opening of each sibling is needed (duplicate-hook detection), so
+  // the bodies are truncated in SQL instead of loaded whole (Vanda, #104).
+  const siblings = item.campaignId
+    ? await tx.$queryRaw<{ hook: string }[]>`
+        SELECT left(v."body", 200) AS hook
+        FROM "content_items" i
+        JOIN "content_versions" v ON v."id" = i."current_version_id"
+        WHERE i."tenant_id" = ${tenantId}
+          AND i."campaign_id" = ${item.campaignId}
+          AND i."id" <> ${item.id}
+          AND i."status" <> 'archived'
+        LIMIT 100`
+    : [];
+  return {
+    category: item.category,
+    format: item.format ?? null,
+    body,
+    footer: typeof footer === "string" ? footer : null,
+    // Cold outreach email copy must carry the consent line.
+    requiresFooter: item.category === "email",
+    otherHooks: siblings.map((s) => s.hook ?? "").filter(Boolean),
+  };
+}
+
 // ── §6c: ⚠ checks, restore, hard delete ─────────────────────────────────────
+
+export const SELF_NOTE_MAX = 500;
+/** A confidence outside 0..1 (or not a number) is stored as null, never clamped silently into a lie. */
+export function clampSelfScore(v: number | null | undefined): number | null {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1 ? v : null;
+}
 
 export const CHECK_QUESTION_MAX = 500;
 export const CHECK_ANSWER_MAX = 2000;
@@ -503,13 +660,19 @@ export async function setCheckState(
   }
   if (answer && answer.length > CHECK_ANSWER_MAX) return fail(400, "A válasz túl hosszú");
 
-  const reviewers = await getContentReviewers(actor.tenantId);
   return db.$transaction(async (tx) => {
     const check = await tx.contentCheck.findFirst({
       where: { id: checkId, tenantId: actor.tenantId },
-      select: { id: true, itemId: true, state: true, question: true },
+      select: { id: true, itemId: true, state: true, question: true, source: true },
     });
     if (!check) return fail(404, "Nem található");
+    if (check.source === "rule") {
+      // A machine rule is code, not prose: the only way to clear it is a new
+      // version that passes the rule (reconcileRuleChecks closes it). Letting a
+      // human waive it would make every hard rule advisory, and would let a
+      // non-reviewer push an item with a forbidden claim straight to live.
+      return fail(403, "Szabály-ellenőrzést nem lehet kézzel lezárni: javítsd a szöveget");
+    }
     const row = await lockItem(tx, actor.tenantId, check.itemId);
     if (!row) return fail(404, "Nem található");
 
@@ -533,10 +696,12 @@ export async function setCheckState(
       where: { versionId: state0.currentVersionId }, select: { reviewerUserId: true, verdict: true },
     });
     const openChecks = await tx.contentCheck.count({ where: { itemId: check.itemId, state: "open" } });
+    const rule = await getApprovalRule(actor.tenantId, row.category, tx);
     const next = applyEvent(state0, {
-      type: "reviews_changed", reviewers,
+      type: "reviews_changed", reviewers: rule.reviewers,
       reviews: reviews.map((r) => ({ reviewerUserId: r.reviewerUserId, verdict: r.verdict as Verdict })),
       openChecks,
+      requiredApprovals: rule.required,
     });
     if (!next.ok) return { ok: true as const, itemStatus: state0.status, wentLive: false };
     await tx.contentItem.update({
@@ -630,11 +795,34 @@ export interface QueueItem {
   externalRef: string | null;
   needsHumanAsset: boolean;
   campaign: { slug: string; name: string } | null;
-  currentVersion: { id: number; number: number; body: string; changeNote: string | null; authorType: string } | null;
+  currentVersion: {
+    id: number; number: number; body: string; changeNote: string | null; authorType: string;
+    selfScore: number | null; selfNote: string | null;
+  } | null;
   assets: { kind: string; mimeType: string | null; caption: string | null }[];
-  /** Every review on every version, newest first — why earlier versions failed. */
-  reviews: { versionNumber: number; reviewer: string; verdict: string; comment: string | null; at: string }[];
-  versions: { id: number; number: number; changeNote: string | null; authorType: string; createdAt: string }[];
+  /**
+   * Every review on every version, newest first: why earlier versions failed.
+   * `reason` is the structured tag (lib/content/reasons.ts) the reviewer picked.
+   */
+  reviews: { versionNumber: number; reviewer: string; verdict: string; reason: string | null; comment: string | null; at: string }[];
+  versions: { id: number; number: number; changeNote: string | null; authorType: string; createdAt: string; selfScore: number | null }[];
+  /** Blocking machine checks and imported warning questions that are still open. */
+  openChecks: { id: number; question: string; forWhom: string; source: string }[];
+  /** Answers a human gave: facts the rewrite may rely on. */
+  settledChecks: { question: string; state: string; answer: string | null }[];
+  /**
+   * What the CRM knows about the company (Áron: a rewrite must never lose what
+   * the drafting agent knew). READ-ONLY input: the skill may use these facts and
+   * must never invent or alter one. Null when the item has no company.
+   */
+  company: {
+    id: number;
+    name: string;
+    city: string | null;
+    dossier: unknown;
+    closenessScore: number | null;
+    contact: { name: string; email: string | null; phone: string | null } | null;
+  } | null;
 }
 
 export async function getQueue(tenantId: number, statuses: ContentStatus[]): Promise<QueueItem[]> {
@@ -645,16 +833,40 @@ export async function getQueue(tenantId: number, statuses: ContentStatus[]): Pro
     take: 100,
     select: {
       id: true, title: true, category: true, format: true, purpose: true, channel: true, status: true,
-      externalRef: true, needsHumanAsset: true, currentVersionId: true,
+      externalRef: true, needsHumanAsset: true, currentVersionId: true, companyId: true,
       campaign: { select: { slug: true, name: true } },
       currentVersion: { select: { body: true } },
+      // Capped: the payload is read by the rewrite skill, not archived. An item
+      // with more than 50 questions is a data problem, not a rewrite (Vanda, #104).
+      checks: {
+        orderBy: [{ state: "asc" }, { id: "asc" }],
+        take: 50,
+        select: { id: true, question: true, forWhom: true, state: true, answer: true, source: true },
+      },
+      // Read-only facts for the rewrite: the dossier the enrichment skill wrote,
+      // the closeness score and the verified contact.
+      company: {
+        select: {
+          id: true, name: true, city: true, enrichment: true, closenessScore: true,
+          contacts: {
+            where: { endedAt: null },
+            orderBy: [{ isPrimary: "desc" }, { startedAt: "desc" }],
+            take: 1,
+            select: {
+              email: true, phone: true,
+              person: { select: { firstName: true, lastName: true, email: true, phone: true } },
+            },
+          },
+        },
+      },
       versions: {
         orderBy: { number: "desc" },
         select: {
           id: true, number: true, changeNote: true, authorType: true, createdAt: true,
+          selfScore: true, selfNote: true,
           reviews: {
             orderBy: { updatedAt: "desc" },
-            select: { verdict: true, comment: true, updatedAt: true, reviewer: { select: { name: true } } },
+            select: { verdict: true, reason: true, comment: true, updatedAt: true, reviewer: { select: { name: true } } },
           },
           assets: { select: { kind: true, mimeType: true, caption: true } },
         },
@@ -668,15 +880,42 @@ export async function getQueue(tenantId: number, statuses: ContentStatus[]): Pro
       channel: it.channel, status: it.status, externalRef: it.externalRef, needsHumanAsset: it.needsHumanAsset,
       campaign: it.campaign,
       currentVersion: current
-        ? { id: current.id, number: current.number, body: it.currentVersion?.body ?? "", changeNote: current.changeNote, authorType: current.authorType }
+        ? {
+            id: current.id, number: current.number, body: it.currentVersion?.body ?? "",
+            changeNote: current.changeNote, authorType: current.authorType,
+            selfScore: current.selfScore ?? null, selfNote: current.selfNote ?? null,
+          }
         : null,
       assets: current?.assets ?? [],
       reviews: it.versions.flatMap((v) => v.reviews.map((r) => ({
-        versionNumber: v.number, reviewer: r.reviewer.name, verdict: r.verdict, comment: r.comment,
-        at: r.updatedAt.toISOString(),
+        versionNumber: v.number, reviewer: r.reviewer.name, verdict: r.verdict, reason: r.reason,
+        comment: r.comment, at: r.updatedAt.toISOString(),
       }))),
+      openChecks: it.checks
+        .filter((c) => c.state === "open")
+        .map((c) => ({ id: c.id, question: c.question, forWhom: c.forWhom, source: c.source })),
+      settledChecks: it.checks
+        .filter((c) => c.state !== "open")
+        .map((c) => ({ question: c.question, state: c.state, answer: c.answer })),
+      company: it.company
+        ? {
+            id: it.company.id,
+            name: it.company.name,
+            city: it.company.city,
+            dossier: it.company.enrichment ?? null,
+            closenessScore: it.company.closenessScore ?? null,
+            contact: it.company.contacts[0]
+              ? {
+                  name: `${it.company.contacts[0].person.lastName} ${it.company.contacts[0].person.firstName}`.trim(),
+                  email: it.company.contacts[0].email ?? it.company.contacts[0].person.email ?? null,
+                  phone: it.company.contacts[0].phone ?? it.company.contacts[0].person.phone ?? null,
+                }
+              : null,
+          }
+        : null,
       versions: it.versions.map((v) => ({
-        id: v.id, number: v.number, changeNote: v.changeNote, authorType: v.authorType, createdAt: v.createdAt.toISOString(),
+        id: v.id, number: v.number, changeNote: v.changeNote, authorType: v.authorType,
+        createdAt: v.createdAt.toISOString(), selfScore: v.selfScore ?? null,
       })),
     };
   });

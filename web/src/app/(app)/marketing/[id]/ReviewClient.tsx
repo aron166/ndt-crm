@@ -72,7 +72,7 @@ export function ReviewClient({
   const supabase = useMemo(() => createClient(), []);
   const [isPending, startTransition] = useTransition();
 
-  const { item, versions, reviewers, isReviewer, checks } = data;
+  const { item, versions, reviewers, isReviewer, checks, approvals } = data;
 
   const currentVersion = versions.find((v) => v.id === item.currentVersionId) ?? null;
   const liveVersion = item.liveVersionId ? versions.find((v) => v.id === item.liveVersionId) ?? null : null;
@@ -164,8 +164,9 @@ export function ReviewClient({
   function saveEdit() {
     if (!item.currentVersionId) return;
     if (!confirm(UI.resetWarning)) return;
-    run(
-      () => saveContentVersion({
+    setActionError(null);
+    startTransition(async () => {
+      const res = await saveContentVersion({
         itemId: item.id,
         basedOnVersionId: item.currentVersionId!,
         body: editBody,
@@ -173,9 +174,16 @@ export function ReviewClient({
         keepAssetIds: Array.from(editKeep),
         uploads: newUploads.map(({ path, caption }) => ({ path, caption: caption.trim() || undefined })),
         links: newLinks.map((l) => ({ url: l.url, caption: l.caption.trim() || undefined })),
-      }),
-      () => setEditing(false),
-    );
+      });
+      if (!res.ok) { setActionError(res.error); return; }
+      setEditing(false);
+      // A saved version that breaks a blocking rule goes back to the AI queue;
+      // say so instead of reporting a plain save (Vanda, #104).
+      if (res.violations.length > 0) {
+        setActionError(`${UI.ruleViolations} ${res.violations.map((v) => v.message).join(" ")}`);
+      }
+      router.refresh();
+    });
   }
 
   async function handleFiles(files: FileList) {
@@ -308,6 +316,13 @@ export function ReviewClient({
         )}
         {item.status === "ai_working" && <p className="review-note amber">{UI.aiBusy}</p>}
         {item.needsHumanAsset && <p className="review-note amber">{UI.needsHumanAsset}</p>}
+        {/* What the approval rule for THIS category is, in words. */}
+        <p className="review-note">
+          {approvals.required >= 2 ? UI.approvalsTwo : UI.approvalsOne}
+          {" · "}
+          {UI.approvalsCount(approvals.approved, approvals.required)}
+        </p>
+        {!approvals.enoughReviewers && <p className="review-note amber">{UI.approvalsBlocked}</p>}
         {hasOpenChecks && <p className="review-note amber">{UI.checkBlocksLive}</p>}
         {!isReviewer && <p className="review-note">{UI.notReviewer}</p>}
         {reviewers.length < 2 && <p className="review-note">{UI.noReviewers}</p>}
@@ -780,6 +795,10 @@ export function ReviewClient({
                       <div className="version-meta">
                         {authorLabel}{authorName ? ` · ${authorName}` : ""} · {new Date(v.createdAt).toLocaleDateString("hu-HU")}
                       </div>
+                      {v.selfScore !== null && (
+                        <div className="version-meta">{UI.selfScore(Math.round(v.selfScore * 100))}</div>
+                      )}
+                      {v.selfNote && <div className="version-note">{v.selfNote}</div>}
                       {v.changeNote && <div className="version-note">{v.changeNote}</div>}
                     </button>
                   </li>

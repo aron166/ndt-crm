@@ -99,6 +99,12 @@ describe("CONTENT_RULES table: one violating + one clean input per rule", () => 
     ).not.toContain("missing_footer");
   });
 
+  it("missing_footer does not fire when no footer is configured (unfixable otherwise)", () => {
+    expect(
+      violationRules(ctx({ body: "Üdvözlettel,\nBalogh Áron", requiresFooter: true, footer: null })),
+    ).not.toContain("missing_footer");
+  });
+
   it("body_too_long", () => {
     expect(violationRules(ctx({ body: "x".repeat(BODY_MAX_CHARS_EMAIL + 1) }))).toContain("body_too_long");
     expect(violationRules(ctx({ body: "x".repeat(BODY_MAX_CHARS_EMAIL - 1) }))).not.toContain(

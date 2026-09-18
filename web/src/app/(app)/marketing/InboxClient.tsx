@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { restoreContent } from "@/app/actions/content";
 import { UI, CATEGORY_LABEL, VERDICT_LABEL } from "@/lib/content/labels";
 import { CONTENT_CATEGORIES, type ContentCategory, type Verdict } from "@/lib/content/types";
 import { STATUS_LABELS, STATUS_COLORS, CONTENT_STATUSES } from "@/lib/marketing/types";
@@ -40,6 +41,7 @@ export function FilterBar({
     const params = new URLSearchParams(searchParams.toString());
     if (value === "all") params.delete(key);
     else params.set(key, value);
+    params.delete("page"); // a new filter starts on page 1
     router.push(`/marketing?${params.toString()}`);
   }
 
@@ -65,6 +67,43 @@ export function FilterBar({
   );
 }
 
+/** Shared by board + list — prev/next over the pipeline page, preserving every other param. */
+export function Pager({
+  page, hasMore, onNavigate,
+}: {
+  page: number; hasMore: boolean; onNavigate?: () => void;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  if (page <= 1 && !hasMore) return null;
+
+  function go(next: number) {
+    onNavigate?.();
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", String(next));
+    router.push(`/marketing?${params.toString()}`);
+  }
+
+  return (
+    <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
+      <button
+        type="button" className="btn sm" style={{ minHeight: 44, opacity: page > 1 ? 1 : 0.5 }}
+        disabled={page <= 1} onClick={() => go(page - 1)}
+      >
+        {UI.pagePrev}
+      </button>
+      <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>{UI.pageLabel(page)}</span>
+      <button
+        type="button" className="btn sm" style={{ minHeight: 44, opacity: hasMore ? 1 : 0.5 }}
+        disabled={!hasMore} onClick={() => go(page + 1)}
+      >
+        {UI.pageNext}
+      </button>
+    </div>
+  );
+}
+
 function StatusChip({ status }: { status: string }) {
   const color = STATUS_COLORS[status as keyof typeof STATUS_COLORS] ?? "#64748b";
   const label = STATUS_LABELS[status as keyof typeof STATUS_LABELS] ?? status;
@@ -86,6 +125,8 @@ function Row({
 }: {
   item: InboxRow; selected: boolean; onToggle: (id: number) => void;
 }) {
+  const router = useRouter();
+  const [restoring, setRestoring] = useState(false);
   return (
     <div className="flex items-start gap-2">
       <input
@@ -131,6 +172,11 @@ function Row({
           {item.openChecks > 0 && (
             <span className="badge-ds amber">{UI.checksOpen(item.openChecks)}</span>
           )}
+          {item.selfScore !== null && (
+            <span className="badge-ds" style={{ color: "var(--fg-mute)" }}>
+              {UI.selfScoreShort(Math.round(item.selfScore * 100))}
+            </span>
+          )}
         </div>
         <div style={{ fontSize: 15, fontWeight: 500, color: "var(--fg)", marginBottom: 3 }}>
           {item.title}
@@ -152,6 +198,22 @@ function Row({
           ))}
         </div>
       </Link>
+      {item.status === "archived" && (
+        <button
+          type="button"
+          className="btn sm"
+          style={{ marginTop: 14, minHeight: 44 }}
+          disabled={restoring}
+          onClick={async () => {
+            setRestoring(true);
+            const res = await restoreContent(item.id);
+            setRestoring(false);
+            if (res.ok) router.refresh();
+          }}
+        >
+          {UI.restore}
+        </button>
+      )}
     </div>
   );
 }
@@ -353,6 +415,8 @@ export function InboxClient({
           </Section>
         )}
       </div>
+
+      <Pager page={sections.page} hasMore={sections.hasMore} onNavigate={() => setSelected(new Set())} />
 
       <ReviewerSettings />
 

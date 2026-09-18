@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { getContentReviewers } from "./reviewers";
+import { getApprovalRule, getContentReviewers } from "./reviewers";
 import { STALE_REVIEW_MS } from "./types";
 
 /**
@@ -26,6 +26,8 @@ export interface InboxRow {
   /** §6c: open ⚠ questions (blocks live) and whether it may be hard-deleted. */
   openChecks: number;
   wasLive: boolean;
+  /** Submitting agent's own confidence on the current version (display only). */
+  selfScore: number | null;
   /** Verdict per configured reviewer on the current version. */
   verdicts: { reviewerId: number; reviewerName: string; verdict: string | null }[];
   hasLive: boolean;
@@ -63,7 +65,7 @@ const ROW_SELECT = {
   _count: { select: { checks: { where: { state: "open" } } } },
   currentVersion: {
     select: {
-      number: true, createdAt: true,
+      number: true, createdAt: true, selfScore: true,
       reviews: { select: { reviewerUserId: true, verdict: true } },
     },
   },
@@ -81,6 +83,7 @@ function toRow(r: Row, reviewers: { id: number; name: string }[], now: number): 
     overdue: r.status === "in_review" && since !== null && now - since.getTime() > STALE_REVIEW_MS,
     needsHumanAsset: r.needsHumanAsset,
     openChecks: r._count.checks,
+    selfScore: r.currentVersion?.selfScore ?? null,
     wasLive: r.wasLive,
     verdicts: reviewers.map((u) => ({
       reviewerId: u.id, reviewerName: u.name,
@@ -115,8 +118,10 @@ export async function getInbox(tenantId: number, userId: number, filter: InboxFi
       where: filter.status ? where : { ...where, status: { notIn: ["archived", "live"] } },
       select: ROW_SELECT, orderBy: { updatedAt: "desc" }, skip, take: PAGE_SIZE + 1,
     }),
-    filter.status && filter.status !== "live"
-      ? Promise.resolve([])
+    (filter.status && filter.status !== "live") || page > 1
+      ? // The live preview belongs to page 1 only: it is not paged, so repeating
+        // it under every page would be the same 50 rows over and over.
+        Promise.resolve([])
       : // The live section is a preview only (browse them on /marketing/live), so
         // it is not paged with the pipeline rows.
         db.contentItem.findMany({
@@ -176,11 +181,14 @@ export interface ReviewPageData {
   versions: {
     id: number; number: number; body: string; authorType: string; authorName: string | null;
     authorApp: string | null; changeNote: string | null; basedOnVersionId: number | null; createdAt: string;
+    selfScore: number | null; selfNote: string | null;
     reviews: { reviewerId: number; reviewerName: string; verdict: string; comment: string | null; at: string }[];
     assets: { id: number; kind: string; url: string; storagePath: string | null; mimeType: string | null; caption: string | null; sizeBytes: number | null }[];
   }[];
   reviewers: { id: number; name: string }[];
   isReviewer: boolean;
+  /** How many approvals this item's category needs, and whether that is possible. */
+  approvals: { required: number; enoughReviewers: boolean; approved: number };
   /** §6c: ⚠ questions; an open one blocks going live. */
   checks: {
     id: number; question: string; forWhom: string; state: string; answer: string | null;
@@ -207,7 +215,7 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
         orderBy: { number: "desc" },
         select: {
           id: true, number: true, body: true, authorType: true, authorApp: true, changeNote: true,
-          basedOnVersionId: true, createdAt: true,
+          basedOnVersionId: true, createdAt: true, selfScore: true, selfNote: true,
           authorUser: { select: { name: true } },
           reviews: {
             orderBy: { updatedAt: "asc" },
@@ -223,6 +231,11 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
   });
   if (!item) return null;
   const reviewers = await reviewerNames(tenantId);
+  const rule = await getApprovalRule(tenantId, item.category);
+  const currentVersion = item.versions.find((v) => v.id === item.currentVersionId);
+  const approved = (currentVersion?.reviews ?? []).filter(
+    (r) => r.verdict === "approve" && rule.reviewers.includes(r.reviewerUserId),
+  ).length;
   const { versions, publishedAt, checks, ...rest } = item;
   return {
     item: {
@@ -238,6 +251,7 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
       id: v.id, number: v.number, body: v.body, authorType: v.authorType,
       authorName: v.authorUser?.name ?? null, authorApp: v.authorApp, changeNote: v.changeNote,
       basedOnVersionId: v.basedOnVersionId, createdAt: v.createdAt.toISOString(),
+      selfScore: v.selfScore ?? null, selfNote: v.selfNote ?? null,
       reviews: v.reviews.map((r) => ({
         reviewerId: r.reviewerUserId, reviewerName: r.reviewer.name, verdict: r.verdict,
         comment: r.comment, at: r.updatedAt.toISOString(),
@@ -246,6 +260,7 @@ export async function getReviewPage(tenantId: number, itemId: number, userId: nu
     })),
     reviewers,
     isReviewer: reviewers.some((r) => r.id === userId),
+    approvals: { required: rule.required, enoughReviewers: rule.enoughReviewers, approved },
   };
 }
 

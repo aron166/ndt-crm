@@ -48,7 +48,7 @@ Van most olyan műtárgyuk, ahol a meglévő vaskiosztásról nincs meg a megval
 
 Üdvözlettel,
 Balogh Áron
-Uphill Trade`;
+BetonScan`;
 const V2 = V1.replace("Most egy új mérési képesség miatt keresem:", "Egy új mérési képességről írok, ami a „bontás előtti” kérdést oldja meg:")
   .replace("Van most olyan műtárgyuk,", "Van jelenleg olyan műtárgyuk,");
 
@@ -85,7 +85,7 @@ const main = await item({
   ],
 });
 await item({ title: "FX Setter szkript: bejövő hívás", category: "script", format: "phone_script", purpose: "Setter szkript", status: "in_review", daysAgo: 1,
-  versions: [{ body: "## Nyitás\n\nJó napot kívánok, Balogh Áron vagyok az Uphill Trade-től…\n\n## Kérdések\n\n1. Van most futó projektjük?\n2. Mikorra kellene a felmérés?", author: "import" }] });
+  versions: [{ body: "## Nyitás\n\nJó napot kívánok, Balogh Áron vagyok az BetonScan-től…\n\n## Kérdések\n\n1. Van most futó projektjük?\n2. Mikorra kellene a felmérés?", author: "import" }] });
 await item({ title: "FX Demó ajánlat", category: "email", format: "plain_text_email", purpose: "Demó ajánlat", status: "changes_requested", daysAgo: 2,
   versions: [{ body: "Tisztelt Ügyfelünk!\n\nSzívesen bemutatjuk a mérést a helyszínen.", author: "import" }],
   reviews: [{ v: 0, who: "aron", verdict: "changes", comment: "Legyen benne a konkrét időtartam (kb. 2 óra)." }] });
@@ -93,7 +93,7 @@ await item({ title: "FX BirdsView hirdetés: rövid vágás", category: "video",
   versions: [{ body: "Forgatókönyv: 15 mp, nyitókép a födémről…", author: "import" }],
   reviews: [{ v: 0, who: "aron", verdict: "rewrite", comment: "Rövidebb, 10 mp, és a végén logó." }] });
 await item({ title: "FX Aláírás és jogi lábléc", category: "other", format: null, purpose: "Aláírás", status: "live", live: 0, daysAgo: 6,
-  versions: [{ body: "Balogh Áron\nUphill Trade Kft.\n+36 …", author: "user" }],
+  versions: [{ body: "Balogh Áron\nBetonScan\n+36 …", author: "user" }],
   reviews: [{ v: 0, who: "aron", verdict: "approve" }, { v: 0, who: "peter", verdict: "approve" }] });
 await q(`UPDATE content_items SET claimed_at = now(), claimed_by = 'content-revise', claimed_from = 'rewrite_requested' WHERE title = 'FX BirdsView hirdetés: rövid vágás'`);
 

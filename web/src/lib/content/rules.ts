@@ -255,11 +255,18 @@ export const CONTENT_RULES: ContentRule[] = [
   {
     id: "missing_footer",
     message:
-      "Hiányzik a leiratkozási/hozzájárulási lábléc a hideg e-mailből, vagy nincs beállítva tenant-lábléc. Illeszd be a konfigurált láblécet a levél végére.",
-    appliesTo: (ctx) => isEmail(ctx) && ctx.requiresFooter === true,
+      "Hiányzik a leiratkozási lábléc a hideg e-mail végéről. Illeszd be a beállított láblécet.",
+    /**
+     * Only when a footer IS configured. A tenant without one is a SETTINGS
+     * problem, not a copy problem: blocking here would make the rule unfixable
+     * by any version, human or AI, and the item could never leave the queue
+     * (Vanda, #104). Emission is still gated: sendDraft and the manual
+     * "kézzel elküldve" both refuse while no footer is set.
+     */
+    appliesTo: (ctx) => isEmail(ctx) && ctx.requiresFooter === true && Boolean(ctx.footer?.trim()),
     check: (ctx) => {
       const footer = ctx.footer?.trim();
-      if (!footer) return { ok: false };
+      if (!footer) return { ok: true };
       const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
       return normalize(ctx.body).includes(normalize(footer)) ? { ok: true } : { ok: false };
     },
@@ -278,6 +285,11 @@ export const CONTENT_RULES: ContentRule[] = [
     check: (ctx) => (hasHook(ctx.body) ? { ok: true } : { ok: false }),
   },
   {
+    // DORMANT: ruleContextFor never sets recipientVerified, so this rule cannot
+    // fire yet. It stays here (and stays tested) because the recipient list is
+    // not in the CRM: it lives in recipients.csv, and the check only becomes
+    // real once that list is imported and linked to the item. Until then a
+    // human verifies the recipient before sending.
     id: "unverified_recipient",
     message:
       "A címzett nincs ellenőrizve (recipients.csv szerint verify_before_send). Ellenőrizd a címzettet küldés előtt.",

@@ -14,12 +14,17 @@ vi.mock("@/lib/db", () => ({
     contentVersion: { findFirst: vi.fn() },
     contentAsset: { findMany: vi.fn() },
     user: { findMany: vi.fn(), count: vi.fn() },
+    tenant: { findUnique: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({
       $executeRaw: (...a: unknown[]) => txExecuteRaw(...a),
       tenant: { findUnique: (...a: unknown[]) => txTenantFindUnique(...a) },
     })),
   },
 }));
+vi.mock("@/lib/content/reviewers", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/content/reviewers")>("@/lib/content/reviewers");
+  return { ...actual, getContentReviewers: vi.fn() };
+});
 vi.mock("@/lib/content/service", () => ({
   archiveItem: vi.fn(),
   createVersion: vi.fn(),
@@ -52,7 +57,10 @@ import { statObject } from "@/lib/content/storage";
 import {
   submitContentReview, saveContentVersion, requestAssetUpload, archiveContent,
   updateContentMeta, getContentReviewerOptions, saveContentReviewers, setMyDigestEnabled,
+  saveContentApprovals,
 } from "./content";
+import { getContentReviewers } from "@/lib/content/reviewers";
+import { setTenantSettings } from "@/lib/tenant-settings";
 
 const mocked = <T extends (...args: never[]) => unknown>(fn: T) => fn as unknown as ReturnType<typeof vi.fn>;
 
@@ -62,6 +70,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocked(getActor).mockResolvedValue({ userId: CALLER_ID, email: "caller@example.com" });
   mocked(db.contentAsset.findMany).mockResolvedValue([]);
+  // Default: the caller IS a configured reviewer.
+  mocked(getContentReviewers).mockResolvedValue([CALLER_ID, 7]);
 });
 
 describe("non-CRM user refusal", () => {
@@ -247,18 +257,78 @@ describe("setMyDigestEnabled", () => {
 });
 
 describe("saveContentReviewers", () => {
-  it("requires exactly two distinct ids including the caller", async () => {
-    const tooFew = await saveContentReviewers([CALLER_ID]);
-    expect(tooFew.ok).toBe(false);
+  it("takes one or two distinct ids", async () => {
+    mocked(getContentReviewers).mockResolvedValue([]); // bootstrap: nothing to drop
+    mocked(db.user.count).mockResolvedValue(1);
+    const solo = await saveContentReviewers([CALLER_ID]);
+    expect(solo.ok).toBe(true); // a single reviewer is legal now
 
+    // A duplicate collapses to one distinct id, which is a legal single reviewer.
     const dup = await saveContentReviewers([CALLER_ID, CALLER_ID]);
-    expect(dup.ok).toBe(false);
+    expect(dup).toMatchObject({ ok: true });
 
     const withoutCaller = await saveContentReviewers([7, 8]);
-    expect(withoutCaller.ok).toBe(false);
+    expect(withoutCaller.ok).toBe(false); // bootstrap must include the caller
 
-    mocked(db.user.count).mockResolvedValue(2);
-    const ok = await saveContentReviewers([CALLER_ID, 7]);
-    expect(ok.ok).toBe(true);
+    const tooMany = await saveContentReviewers([CALLER_ID, 7, 8]);
+    expect(tooMany.ok).toBe(false);
   });
+
+  it("a reviewer may step down, but may not take the OTHER reviewer off the list", async () => {
+    mocked(getContentReviewers).mockResolvedValue([CALLER_ID, 7]);
+    mocked(db.user.count).mockResolvedValue(1);
+
+    // Dropping the other reviewer would turn four eyes into one eye.
+    const dropOther = await saveContentReviewers([CALLER_ID]);
+    expect(dropOther).toMatchObject({ ok: false });
+
+    // Stepping down leaves the other reviewer in place: allowed.
+    const stepDown = await saveContentReviewers([7]);
+    expect(stepDown).toMatchObject({ ok: true });
+  });
+
+  it("only a CURRENT reviewer may change the reviewer list (privilege escalation)", async () => {
+    mocked(getContentReviewers).mockResolvedValue([7, 8]); // caller is not one of them
+    mocked(db.user.count).mockResolvedValue(1);
+    const res = await saveContentReviewers([CALLER_ID]);
+    expect(res).toMatchObject({ ok: false });
+    expect(db.user.count).not.toHaveBeenCalled();
+  });
+
+  it("bootstraps: with no reviewers configured yet, any CRM user may set the list", async () => {
+    mocked(getContentReviewers).mockResolvedValue([]);
+    mocked(db.user.count).mockResolvedValue(2);
+    const res = await saveContentReviewers([CALLER_ID, 7]);
+    expect(res).toMatchObject({ ok: true });
+  });
+
+  it("a partial approval update merges, it never drops the other half", async () => {
+    mocked(getContentReviewers).mockResolvedValue([CALLER_ID, 7]);
+    mocked(db.tenant.findUnique).mockResolvedValue({
+      settings: { contentApprovals: { default: 2, byCategory: { email: 2, social: 1 } } },
+    } as never);
+    const res = await saveContentApprovals({ byCategory: { email: 1 } });
+    expect(res).toMatchObject({ ok: true });
+    const written = mocked(setTenantSettings).mock.calls.at(-1)?.[1] as {
+      contentApprovals: { default: number; byCategory: Record<string, number> };
+    };
+    expect(written.contentApprovals).toEqual({ default: 2, byCategory: { email: 1, social: 1 } });
+  });
+
+  it("only a CURRENT reviewer may change the approval rule", async () => {
+    mocked(getContentReviewers).mockResolvedValue([7, 8]);
+    const res = await saveContentApprovals({ byCategory: { email: 1 } });
+    expect(res).toMatchObject({ ok: false });
+
+    mocked(getContentReviewers).mockResolvedValue([CALLER_ID, 7]);
+    mocked(db.tenant.findUnique).mockResolvedValue({ settings: {} });
+    const ok = await saveContentApprovals({ byCategory: { email: 1 } });
+    expect(ok).toMatchObject({ ok: true });
+  });
+
+  it("refuses an approval count outside 1..2", async () => {
+    const res = await saveContentApprovals({ byCategory: { email: 3 } as never });
+    expect(res).toMatchObject({ ok: false });
+  });
+
 });

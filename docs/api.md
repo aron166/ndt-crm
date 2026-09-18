@@ -474,6 +474,26 @@ outside the key's tenant is skipped as `"unknown_company"`, never a 500 and
 never a cross-tenant write; a per-item failure is skipped as `"error"` rather
 than failing the whole batch.
 
+Content fields (optional, 2026-09-17, trust ladder): `company_id` (the company
+this piece is for; verified against the key's tenant, stored as null otherwise)
+feeds that company's dossier to the rewrite loop, and `self_score` (0..1) plus
+`self_note` record the SUBMITTING AGENT's own confidence in the version. The
+score is stored and displayed only: nothing in the pipeline acts on it. Both are
+also accepted on `POST /api/content/:id/versions`.
+
+`GET /api/content/queue` returns, per item: `openChecks` (blocking warning
+questions and failed rules), `settledChecks` (answers a human gave, usable as
+facts), every review with its structured `reason` tag, `currentVersion.selfScore`
+/ `selfNote`, and `company` (name, city, `dossier` = companies.enrichment,
+`closenessScore`, the verified `contact`). Company facts are READ-ONLY inputs:
+the rewrite must never invent or alter one, and an email item with no dossier is
+flagged for enrichment instead of rewritten.
+
+A version that breaks a blocking rule (closed claim list, unfilled placeholder,
+missing consent footer, oversized body, reused hook, unverified recipient) is
+accepted but the item goes to `rewrite_requested` with one open check per
+violated rule, so it returns to the AI queue and cannot go live.
+
 Campaign tracking fields (optional, 2026-09-17): `senderUserId` (whose inbox
 sends the touch; must be a user of the key's tenant, otherwise stored as `null`),
 `wave` (1-52) and `dueAt` (ISO datetime, when the touch is due). Touch 1's
@@ -524,7 +544,10 @@ exists), `import` (boolean — `true` authors the version as `import` instead
 of `ai`, for migrating existing material).
 
 Idempotent on `external_ref`: an item with the same ref already existing
-returns `200 { "ok": true, "contentItemId", "versionId", "existed": true }`
+returns `200 { "ok": true, "contentItemId", "versionId", "existed": true, "bodyHash" }`
+(`bodyHash` is a sha256 of the item's CURRENT version body, so an importer can
+tell a changed source file from an unchanged one and post a new version instead
+of skipping it: that is what `scripts/import-content.mjs --refresh` does)
 and writes **no** new assets, no `content.submitted` app event — the caller
 already has an item, nothing is duplicated.
 
@@ -585,6 +608,14 @@ produce (the skill doesn't regenerate media).
 version was created after the claim, or a newer version exists, the post is
 rejected with `409` and the app must re-claim and re-read the (now current)
 version before retrying. The AI never overwrites a human edit.
+
+**`from_source` (importer only):** the import script sets `"from_source": true`
+when the source file behind an item changed and the new version merely restates
+it. Such a post needs no claim, because the importer is not the rewrite loop.
+Everything else still holds: `based_on_version_id` must be the current version,
+the content rules run, reviews reset, and a post is rejected with `409` while
+the AI holds a claim (status `ai_working`) so a refresh can never overwrite a
+rewrite in flight.
 
 ## Ecosystem hub
 

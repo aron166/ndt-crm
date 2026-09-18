@@ -1,7 +1,11 @@
 import { CLAIM_TTL_MS, REQUESTABLE_STATUSES, type ContentStatus, type Verdict } from "./types";
 
-/** Dual approval (spec decision 2). Fewer configured reviewers → never live. */
-export const REQUIRED_APPROVALS = 2;
+/**
+ * Default number of approvals. Per category it is configurable (1 or 2) in
+ * tenants.settings.contentApprovals; the caller passes the resolved number.
+ * Fewer CONFIGURED reviewers than the item needs → never live.
+ */
+export const DEFAULT_REQUIRED_APPROVALS = 2;
 
 /**
  * THE content status machine (spec §1). Pure: state + event in, new state out.
@@ -34,7 +38,14 @@ export interface ReviewRow {
 
 export type ContentEvent =
   | { type: "version_created"; versionId: number }
-  | { type: "reviews_changed"; reviewers: number[]; reviews: ReviewRow[]; openChecks?: number }
+  | {
+      type: "reviews_changed";
+      reviewers: number[];
+      reviews: ReviewRow[];
+      openChecks?: number;
+      /** Approvals this item's category needs (1 or 2). Default 2. */
+      requiredApprovals?: number;
+    }
   | { type: "claim"; now: Date }
   | { type: "release_stale"; now: Date }
   | { type: "archive" };
@@ -56,14 +67,19 @@ export function isClaimStale(claimedAt: Date | null, now: Date): boolean {
 export function statusFromReviews(
   reviewers: number[],
   reviews: ReviewRow[],
+  requiredApprovals: number = DEFAULT_REQUIRED_APPROVALS,
 ): "in_review" | "changes_requested" | "rewrite_requested" | "live" {
   const byReviewer = new Map<number, Verdict>();
   for (const r of reviews) if (reviewers.includes(r.reviewerUserId)) byReviewer.set(r.reviewerUserId, r.verdict);
   const verdicts = [...byReviewer.values()];
   if (verdicts.includes("rewrite")) return "rewrite_requested";
   if (verdicts.includes("changes")) return "changes_requested";
+  // Live needs `requiredApprovals` distinct configured reviewers to have
+  // approved, and the tenant must actually have that many reviewers.
   const distinct = [...new Set(reviewers)];
-  if (distinct.length >= REQUIRED_APPROVALS && distinct.every((id) => byReviewer.get(id) === "approve")) return "live";
+  const required = Math.max(1, requiredApprovals);
+  const approvals = distinct.filter((id) => byReviewer.get(id) === "approve").length;
+  if (distinct.length >= required && approvals >= required) return "live";
   return "in_review";
 }
 
@@ -80,7 +96,7 @@ export function applyEvent(state: ItemState, event: ContentEvent): TransitionRes
       if (state.status === "archived") return conflict("archived item");
       if (state.status === "ai_working") return conflict("AI is rewriting this item");
       if (state.currentVersionId === null) return { ok: false, code: "invalid", reason: "no current version" };
-      const next = statusFromReviews(event.reviewers, event.reviews);
+      const next = statusFromReviews(event.reviewers, event.reviews, event.requiredApprovals);
       // §6c: an open ⚠ check blocks going live. The approvals are still
       // recorded; the item goes live when the last check is settled.
       if (next === "live" && (event.openChecks ?? 0) > 0) {

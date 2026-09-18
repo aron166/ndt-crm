@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -90,6 +91,14 @@ export async function POST(request: Request) {
         }
       }
 
+      // A company_id is verified against the tenant before it is stored: it
+      // arrives from an app-key payload like personId does.
+      const ownedCompanyId = input.company_id
+        ? (await tx.company.findFirst({
+            where: { id: input.company_id, tenantId, deletedAt: null }, select: { id: true },
+          }))?.id ?? null
+        : null;
+
       // 2. Create the item (+ version 1) through the one write path.
       const created = await createItem(
         actor,
@@ -102,6 +111,9 @@ export async function POST(request: Request) {
           format: input.format ?? null,
           purpose: input.purpose ?? null,
           campaignId,
+          companyId: ownedCompanyId,
+          selfScore: input.self_score ?? null,
+          selfNote: input.self_note ?? null,
           externalRef: input.external_ref ?? null,
           changeNote: input.change_note ?? null,
           internal: input.internal,
@@ -147,7 +159,16 @@ export async function POST(request: Request) {
 
     if (!result.ok) return json({ error: result.error }, result.status);
     if (result.existed) {
-      return json({ ok: true, contentItemId: result.contentItemId, versionId: result.versionId, existed: true }, 200);
+      // A hash, not the body: enough for an importer to see that the source file
+      // changed and post a new version (`--refresh`), without shipping bodies.
+      const current = result.versionId
+        ? await db.contentVersion.findFirst({ where: { id: result.versionId, tenantId }, select: { body: true } })
+        : null;
+      const bodyHash = current ? createHash("sha256").update(current.body).digest("hex") : null;
+      return json(
+        { ok: true, contentItemId: result.contentItemId, versionId: result.versionId, existed: true, bodyHash },
+        200,
+      );
     }
 
     // Extract ⚠ checks AFTER commit — addChecks uses the global db client, not

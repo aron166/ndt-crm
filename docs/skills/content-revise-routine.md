@@ -8,8 +8,8 @@ Kai / Áron set this up (Claude Code routines). Nate does not schedule it.
   `.claude/skills/content-revise/SKILL.md`.
 - **Secrets / environment:** `CRM_URL=https://ndt-crm.vercel.app`, `CRM_APP_KEY=<app key minted
   in CRM → Beállítások → API kulcsok, slug "content-revise">`.
-- **Needs access to:** the FRAMEWORK claim list. Until PR #90 (`docs/cold-email-framework.md`) is
-  merged, give the routine read access to the `growth` repo or merge #90 first.
+- **Needs access to:** nothing outside this repo. The claim list is
+  `docs/cold-email-framework.md` (merged 2026-09-17).
 - **Billing:** Claude subscription only. The routine must not use an Anthropic API key.
 
 ## Routine prompt (paste verbatim)

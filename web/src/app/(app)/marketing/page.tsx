@@ -18,6 +18,7 @@ interface SearchParams {
   status?: string;
   view?: string;
   mine?: string;
+  page?: string;
 }
 
 export default async function MarketingPage({
@@ -41,11 +42,15 @@ export default async function MarketingPage({
     );
   }
 
+  const pageNum = Number(params.page);
+  const page = Number.isInteger(pageNum) && pageNum > 0 ? pageNum : 1;
+
   const filter = {
     category: params.category,
     campaignId: params.campaign ? Number(params.campaign) : undefined,
     format: params.format,
     status: params.status,
+    page,
   };
   const view = params.view === "list" ? "list" : "board";
   const onlyMine = params.mine !== "0";
