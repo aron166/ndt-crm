@@ -8,7 +8,12 @@ import { join } from "node:path";
 const BASE = "http://localhost:3100";
 // Fixture content item seeded by scripts/content-fixtures.mjs ("FX A-Híd: 1. érintés",
 // status in_review, 2 versions, tenant reviewer = balogharon16@gmail.com).
-const CONTENT_ITEM_ID = 280;
+// id was 280 as of the 2026-09-08 report; the fixture DB has since been
+// reseeded and ids now start at 696 — updated here (this is the "actually
+// broken" fix: the old id pointed at a row that no longer exists).
+// Overridable, because it drifts every time the fixture DB is reseeded and a
+// wrong id costs a whole measurement run: CONTENT_ITEM_ID=123 node scripts/inp-probe.mjs
+const CONTENT_ITEM_ID = Number(process.env.CONTENT_ITEM_ID) || 696;
 const CDP_PORT = 9333;
 const CHROME_BIN = "/usr/bin/google-chrome";
 const WEB_ROOT = new URL("..", import.meta.url).pathname; // .../web/
@@ -109,7 +114,7 @@ async function main() {
 
   log(`Running ${REPEAT} repetition(s) per interaction, rotating order each rep...`);
 
-  const WARM_KEYS = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r"].filter(wantKey);
+  const WARM_KEYS = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u"].filter(wantKey);
   const warmSamples = new Map(); // label -> [{ r, result }]
   for (let r = 0; r < REPEAT; r++) {
     for (const key of rotate(WARM_KEYS, r)) {
@@ -122,7 +127,7 @@ async function main() {
   let coldStats = null;
   let coldSamples = null;
   if (COLD) {
-    const COLD_KEYS = ["a", "b", "e", "g", "h", "k", "l", "o", "p", "q", "r"].filter(wantKey);
+    const COLD_KEYS = ["a", "b", "e", "g", "h", "k", "l", "o", "p", "q", "r", "s", "t", "u"].filter(wantKey);
     coldSamples = new Map();
     for (let r = 0; r < REPEAT; r++) {
       for (const key of rotate(COLD_KEYS, r)) {
@@ -178,8 +183,11 @@ const WARM_ROW_LABELS = [
   "marketing/[id]: comment textarea typing",
   "marketing/[id]: diff toggle (Eltérések az előző verzióhoz)",
   "marketing/[id]: version history item click",
+  "marketing/[id]: edit box open",
+  "marketing/[id]: checklist panel toggle",
   "outreach: campaign filter select",
   "outreach: row expand",
+  "outreach: copy button (Tárgy másolása)",
   "drive: outcome button",
   "drive: note textarea typing",
 ];
@@ -191,8 +199,11 @@ const COLD_ROW_LABELS = [
   "marketing board: board/list view toggle (cold)",
   "marketing board: bulk-select checkbox (cold)",
   "marketing/[id]: verdict button (cold)",
+  "marketing/[id]: edit box open (cold)",
+  "marketing/[id]: checklist panel toggle (cold)",
   "outreach: campaign filter select (cold)",
   "outreach: row expand (cold)",
+  "outreach: copy button (cold)",
   "drive: outcome button (cold)",
   "drive: note textarea typing (cold)",
 ];
@@ -262,6 +273,18 @@ async function warmOnce(key, cdp, sessionId) {
     case "p":
       return [await runOnPage(cdp, sessionId, "outreach: row expand", `${BASE}/outreach`, () =>
         clickAndMeasure(cdp, sessionId, ".tbl-row"))];
+    case "s":
+      return [await runOnPage(cdp, sessionId, "marketing/[id]: edit box open", `${BASE}/marketing/${CONTENT_ITEM_ID}`, () =>
+        clickAndMeasure(cdp, sessionId, ".actionbar-btn.edit"))];
+    case "t":
+      // No whole-panel collapse exists (see docs/PERF_2026-09-18_INP.md) —
+      // this is the closest real toggle: clicking a checklist item's
+      // resolve/waive control opens its inline answer form.
+      return [await runOnPage(cdp, sessionId, "marketing/[id]: checklist panel toggle", `${BASE}/marketing/${CONTENT_ITEM_ID}`, () =>
+        clickAndMeasure(cdp, sessionId, ".check-actions .btn.btn-sm"))];
+    case "u":
+      return [await runOnPage(cdp, sessionId, "outreach: copy button (Tárgy másolása)", `${BASE}/outreach`, () =>
+        clickByText(cdp, sessionId, "button", "Tárgy másolása"))];
     case "q":
       return [await runOnPage(cdp, sessionId, "drive: outcome button", `${BASE}/drive`, () =>
         clickByText(cdp, sessionId, "button", "Nem vette fel"))];
@@ -319,6 +342,15 @@ async function coldOnce(key, cdp, warmSessionId) {
     case "p":
       return [await coldInteraction(cdp, "outreach: row expand (cold)", `${BASE}/outreach`, (sid) =>
         coldClick(sid.cdp, sid.sessionId, ".tbl-row"))];
+    case "s":
+      return [await coldInteraction(cdp, "marketing/[id]: edit box open (cold)", `${BASE}/marketing/${CONTENT_ITEM_ID}`, (sid) =>
+        coldClick(sid.cdp, sid.sessionId, ".actionbar-btn.edit"))];
+    case "t":
+      return [await coldInteraction(cdp, "marketing/[id]: checklist panel toggle (cold)", `${BASE}/marketing/${CONTENT_ITEM_ID}`, (sid) =>
+        coldClick(sid.cdp, sid.sessionId, ".check-actions .btn.btn-sm"))];
+    case "u":
+      return [await coldInteraction(cdp, "outreach: copy button (cold)", `${BASE}/outreach`, (sid) =>
+        coldClickByText(sid.cdp, sid.sessionId, "button", "Tárgy másolása"))];
     case "q":
       return [await coldInteraction(cdp, "drive: outcome button (cold)", `${BASE}/drive`, (sid) =>
         coldClickByText(sid.cdp, sid.sessionId, "button", "Nem vette fel"))];
