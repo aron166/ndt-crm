@@ -12,6 +12,7 @@ import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import type { QualificationQuestion } from "@/lib/leads/qualification";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
+import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
 import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
@@ -26,6 +27,8 @@ interface Interaction {
   leadId?: number | null;
   person: { id: number; firstName: string | null; lastName: string | null } | null;
   user?: { name: string } | null;
+  autoConfidence: number | null;
+  correctsInteractionId?: number | null;
 }
 
 interface OpenTask {
@@ -419,7 +422,12 @@ export function LeadDetailClient({
                 <div style={{ fontSize: 12, color: "var(--fg-mute)", padding: "8px 0" }}>Nincs rögzített interakció.</div>
               ) : (
                 <div className="space-y-3">
-                  {interactions.map((r) => (
+                  {interactions.map((r) => {
+                    // A correction (correctsInteractionId set) is never itself flagged as
+                    // auto-derived — it IS the human correction.
+                    const auto = r.correctsInteractionId == null && isAutoOutcome(r);
+                    const confidencePct = auto ? Math.round((r.autoConfidence ?? 0) * 100) : null;
+                    return (
                     <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                       <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--indigo)", marginTop: 5, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -434,10 +442,28 @@ export function LeadDetailClient({
                           {r.user?.name && <span style={{ color: "var(--fg-faint)", fontSize: 12 }}>· {r.user.name}</span>}
                           <span className="font-mono-ndt" style={{ color: "var(--fg-faint)", fontSize: 12, marginLeft: "auto" }}>{formatDateTime(r.occurredAt)}</span>
                         </div>
+                        {auto && (
+                          <div className="flex items-center gap-2" style={{ marginBottom: 2, flexWrap: "wrap" }}>
+                            <span className="font-mono-ndt" style={{ fontSize: 11, fontWeight: 600, padding: "1px 6px", borderRadius: 10, background: "var(--amber-soft)", color: "var(--amber)" }}>
+                              {AUTO_OUTCOME_LABELS.autoBadge}
+                            </span>
+                            <span style={{ fontSize: 11, color: "var(--fg-mute)" }}>
+                              {AUTO_OUTCOME_LABELS.autoBadgeHint.replace("{pct}", String(confidencePct))}
+                            </span>
+                            <button
+                              onClick={() => setLogging(true)}
+                              disabled={closed}
+                              style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 11, fontWeight: 600, padding: 0, cursor: "pointer" }}
+                            >
+                              {AUTO_OUTCOME_LABELS.correct}
+                            </button>
+                          </div>
+                        )}
                         {r.notes && <p style={{ fontSize: 12, color: "var(--fg-soft)", lineHeight: 1.4 }}>{r.notes}</p>}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
