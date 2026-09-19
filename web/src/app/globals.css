@@ -159,10 +159,10 @@
   --indigo-dim:  oklch(0.44 0.19 278);
   --indigo-soft: oklch(0.52 0.20 278 / 0.10);
   --indigo-line: oklch(0.52 0.20 278 / 0.32);
-  --amber:       oklch(0.62 0.14 68);
-  --amber-soft:  oklch(0.62 0.14 68 / 0.13);
-  --mint:        oklch(0.54 0.13 165);
-  --mint-soft:   oklch(0.54 0.13 165 / 0.13);
+  --amber:       oklch(0.56 0.13 68);
+  --amber-soft:  oklch(0.56 0.13 68 / 0.13);
+  --mint:        oklch(0.50 0.12 165);
+  --mint-soft:   oklch(0.50 0.12 165 / 0.13);
   --coral:       oklch(0.55 0.20 25);
   --coral-soft:  oklch(0.55 0.20 25 / 0.11);
   --sky:         oklch(0.53 0.13 230);
@@ -177,8 +177,8 @@
   --coral-fg:    oklch(0.47 0.18 25);
   --sky-fg:      oklch(0.44 0.12 230);
   --violet-fg:   oklch(0.43 0.17 305);
-  --amber-line:  oklch(0.62 0.14 68 / 0.38);
-  --mint-line:   oklch(0.54 0.13 165 / 0.38);
+  --amber-line:  oklch(0.56 0.13 68 / 0.38);
+  --mint-line:   oklch(0.50 0.12 165 / 0.38);
   --coral-line:  oklch(0.55 0.20 25 / 0.34);
   --sky-line:    oklch(0.53 0.13 230 / 0.34);
   --orange-fg:   oklch(0.48 0.15 48);
@@ -202,8 +202,8 @@
 
   --shadow-card:  0 1px 0 0 oklch(1 0 0 / 0.8) inset, 0 8px 24px -18px oklch(0 0 0 / 0.35);
   --glow-indigo:  0 0 0 1px oklch(0.52 0.20 278 / 0.45), 0 4px 18px -8px oklch(0.52 0.20 278 / 0.35);
-  --glow-mint:    0 0 0 1px oklch(0.54 0.13 165 / 0.35);
-  --glow-amber:   0 0 0 1px oklch(0.62 0.14 68 / 0.35);
+  --glow-mint:    0 0 0 1px oklch(0.50 0.12 165 / 0.35);
+  --glow-amber:   0 0 0 1px oklch(0.56 0.13 68 / 0.35);
   --shadow-pop:   0 12px 32px oklch(0 0 0 / 0.14);
   --shadow-bar:   0 8px 24px -8px oklch(0 0 0 / 0.20);
   --shadow-inset-deep: inset 0 1px 0 oklch(1 0 0 / 0.6), inset 0 -8px 16px oklch(0 0 0 / 0.05);
