@@ -788,4 +788,37 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     const item = await db.contentItem.findUniqueOrThrow({ where: { id: created.itemId }, select: { internal: true } });
     expect(item.internal).toBe(true);
   });
+
+  // "Élő anyagok" is the SENDABLE library and round-one outreach is hand-sent
+  // from its copy button, so an internal item appearing there is a route to a
+  // real recipient — the same class of hole as the outreach slot (Vanda F1).
+  // An internal item is also the one item the claim rules never check, which
+  // is exactly why it must not be one click from a paste into Gmail.
+  it("the live library never lists an internal item", async () => {
+    const queries = await import("./queries");
+    // A unique format scopes the assertion to just these two rows: the shared
+    // fixture DB carries far more live items than one 50-row library page.
+    const fmt = `it-lib-${Date.now()}`;
+    const mk = async (internal: boolean) => {
+      const c = await service.createItem(appActor, {
+        title: title(), body: "library body", category: "other", channel: "other",
+        contentType: "other", source: "it", internal, format: fmt,
+      });
+      if (!c.ok) throw new Error("setup");
+      createdItemIds.push(c.itemId);
+      // Straight to live: the library keys off liveVersionId, not the path taken.
+      await db.contentItem.update({
+        where: { id: c.itemId },
+        data: { liveVersionId: c.versionId, status: "live", wasLive: true },
+      });
+      return c.itemId;
+    };
+    const internalId = await mk(true);
+    const publicId = await mk(false);
+
+    const { rows } = await queries.getLibrary(1, { format: fmt });
+    const ids = rows.map((r) => r.id);
+    expect(ids).toContain(publicId);
+    expect(ids).not.toContain(internalId);
+  });
 });
