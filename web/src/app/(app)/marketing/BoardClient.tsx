@@ -71,6 +71,7 @@ function Card({
               {CATEGORY_LABEL[item.category as ContentCategory] ?? item.category}
             </span>
             {item.format && <span className="badge-ds slate">{item.format}</span>}
+            {item.bouncedByRule && <span className="badge-ds coral">{UI.bouncedByRule}</span>}
             {item.openChecks > 0 && <span className="badge-ds amber">{UI.checksOpen(item.openChecks)}</span>}
             {item.selfScore !== null && (
               <span className="badge-ds" style={{ color: "var(--fg-mute)" }}>

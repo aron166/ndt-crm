@@ -25,6 +25,8 @@ export interface InboxRow {
   needsHumanAsset: boolean;
   /** §6c: open ⚠ questions (blocks live) and whether it may be hard-deleted. */
   openChecks: number;
+  /** True when a hard-rule (not a person) bounced this item and the bounce is still open. */
+  bouncedByRule: boolean;
   wasLive: boolean;
   /** Submitting agent's own confidence on the current version (display only). */
   selfScore: number | null;
@@ -62,7 +64,9 @@ const ROW_SELECT = {
   id: true, title: true, category: true, format: true, purpose: true, status: true,
   needsHumanAsset: true, liveVersionId: true, wasLive: true,
   campaign: { select: { id: true, name: true } },
-  _count: { select: { checks: { where: { state: "open" } } } },
+  // Loaded (not _count) so toRow can also see WHICH checks are open, to derive
+  // bouncedByRule — still one relation load, no second query.
+  checks: { where: { state: "open" }, select: { source: true } },
   currentVersion: {
     select: {
       number: true, createdAt: true, selfScore: true,
@@ -82,7 +86,9 @@ function toRow(r: Row, reviewers: { id: number; name: string }[], now: number): 
     waitingSince: since?.toISOString() ?? null,
     overdue: r.status === "in_review" && since !== null && now - since.getTime() > STALE_REVIEW_MS,
     needsHumanAsset: r.needsHumanAsset,
-    openChecks: r._count.checks,
+    openChecks: r.checks.length,
+    bouncedByRule: (r.status === "rewrite_requested" || r.status === "changes_requested")
+      && r.checks.some((c) => c.source === "rule"),
     selfScore: r.currentVersion?.selfScore ?? null,
     wasLive: r.wasLive,
     verdicts: reviewers.map((u) => ({
@@ -138,8 +144,16 @@ export async function getInbox(tenantId: number, userId: number, filter: InboxFi
   const oldestFirst = (a: InboxRow, b: InboxRow) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "");
 
   const inReview = all.filter((r) => r.status === "in_review" || r.status === "draft");
+  // A rule bounce hides nothing: the default "only mine" filter used to hide the
+  // one status that most needs a human, because `mine` only looked at
+  // in_review|draft. A rule-bounced item has no verdict to wait on — the
+  // machine bounced it, not a person — so it belongs in `mine` unconditionally.
+  const mineBase = isReviewer ? inReview.filter((r) => myVerdict(r) === null) : [];
+  const bounced = all.filter((r) => r.bouncedByRule);
+  const mineIds = new Set(mineBase.map((r) => r.id));
+  const mine = [...mineBase, ...bounced.filter((r) => !mineIds.has(r.id))].sort(oldestFirst);
   return {
-    mine: isReviewer ? inReview.filter((r) => myVerdict(r) === null).sort(oldestFirst) : [],
+    mine,
     otherReviewer: inReview.filter((r) => !isReviewer || myVerdict(r) !== null).sort(oldestFirst),
     aiWorking: all.filter((r) => r.status === "ai_working"),
     changesRequested: all.filter((r) => r.status === "changes_requested" || r.status === "rewrite_requested"),
@@ -317,6 +331,73 @@ export async function getLibrary(tenantId: number, filter: InboxFilter = {}): Pr
         assets: r.liveVersion!.assets, usedBy: [],
       })),
   };
+}
+
+export interface DecisionRow {
+  checkId: number;
+  question: string;
+  /** rule | decision | import | manual — where the question came from. */
+  source: string;
+  createdAt: string; // ISO
+  daysWaiting: number; // whole days, floor, never negative
+  item: { id: number; title: string; category: string; status: string };
+}
+export interface DecisionQueue {
+  aron: DecisionRow[];
+  peter: DecisionRow[];
+  either: DecisionRow[];
+  total: number;
+}
+
+const DECISION_ROW_SELECT = {
+  id: true, question: true, source: true, forWhom: true, createdAt: true,
+  item: { select: { id: true, title: true, category: true, status: true } },
+} satisfies Prisma.ContentCheckSelect;
+type DecisionRawRow = Prisma.ContentCheckGetPayload<{ select: typeof DECISION_ROW_SELECT }>;
+
+/** Pure: groups already-fetched open checks into the three answer buckets, oldest first. */
+export function groupDecisions(rows: DecisionRawRow[], now: Date): DecisionQueue {
+  const toDecisionRow = (r: DecisionRawRow): DecisionRow => ({
+    checkId: r.id, question: r.question, source: r.source, createdAt: r.createdAt.toISOString(),
+    daysWaiting: Math.max(0, Math.floor((now.getTime() - r.createdAt.getTime()) / 86_400_000)),
+    item: r.item,
+  });
+  const aron: DecisionRow[] = [];
+  const peter: DecisionRow[] = [];
+  const either: DecisionRow[] = [];
+  for (const r of rows) {
+    const bucket = r.forWhom === "aron" ? aron : r.forWhom === "peter" ? peter : either;
+    bucket.push(toDecisionRow(r));
+  }
+  return { aron, peter, either, total: aron.length + peter.length + either.length };
+}
+
+function openDecisionsWhere(tenantId: number): Prisma.ContentCheckWhereInput {
+  return { tenantId, state: "open", item: { status: { not: "archived" } } };
+}
+
+// ponytail: one list shape; a decision item with no check would not appear,
+// which intake makes impossible. Every decision-category item gets one
+// addressed open check at intake (the API does that), so listing open checks
+// lists every unanswered decision — no second list shape, no new table.
+export async function getDecisionQueue(tenantId: number, now: Date = new Date()): Promise<DecisionQueue> {
+  const rows = await db.contentCheck.findMany({
+    where: openDecisionsWhere(tenantId),
+    orderBy: { createdAt: "asc" },
+    take: 200,
+    select: DECISION_ROW_SELECT,
+  });
+  return groupDecisions(rows, now);
+}
+
+/** Digest count: open decisions for a reviewer, optionally narrowed to who must answer. */
+export async function countOpenDecisions(tenantId: number, forWhom?: string): Promise<number> {
+  return db.contentCheck.count({
+    where: {
+      ...openDecisionsWhere(tenantId),
+      ...(forWhom ? { forWhom: { in: [forWhom, "either"] } } : {}),
+    },
+  });
 }
 
 export async function getFilterOptions(tenantId: number) {
