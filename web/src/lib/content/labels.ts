@@ -164,6 +164,9 @@ export const UI = {
   decisionsOpenCount: (n: number) => `${n} nyitott kérdés`,
   decisionsAnswerPlaceholder: "Írd le a választ...",
   decisionsFromRule: "Gépi szabály",
+  // A rule check is code, not prose: setCheckState refuses to settle one by
+  // hand, so the page must not offer an answer box that can only 403.
+  decisionsRuleReadOnly: "Ezt nem lehet kézzel megválaszolni. Javítsd a szöveget, és a szabály magától lezárul.",
   decisionsFromDecision: "Döntési kérdés",
   decisionsFromImport: "Importált kérdés",
   decisionsFromManual: "Kézi kérdés",
