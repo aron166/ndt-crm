@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { crmUserIdForEmail } from "./crm-user";
 import { createClient } from "./supabase/server";
 import type { LeadCtx } from "./leads/service";
@@ -16,7 +17,11 @@ export interface Actor {
 export { normalizeEmail } from "./email";
 import { normalizeEmail } from "./email";
 
-export async function getActor(tenantId: number): Promise<Actor> {
+// cache(): the root layout now resolves the actor (for the theme attribute)
+// and so does (app)/layout, and supabase.auth.getUser() is a round-trip to the
+// auth endpoint, not a local cookie read. Without this, every app page paid
+// two of them (Vanda, #110).
+export const getActor = cache(async (tenantId: number): Promise<Actor> => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   const email = normalizeEmail(data.user?.email);
@@ -24,7 +29,7 @@ export async function getActor(tenantId: number): Promise<Actor> {
   // Cached email → users.id (lib/crm-user.ts). The proxy resolved the same
   // email for this request, so this is normally free (2026-09-17 query pass).
   return { userId: await crmUserIdForEmail(tenantId, email), email };
-}
+});
 
 import { NOT_A_CRM_USER } from "./crm-user-message";
 export { NOT_A_CRM_USER };

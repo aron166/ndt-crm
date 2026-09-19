@@ -42,10 +42,16 @@ export function ThemeMenuItem() {
     document.documentElement.dataset.theme = next;
     setOverride(next);
     startTransition(async () => {
-      const res = await setTheme(next);
-      if ("error" in res) {
-        // Persisting failed; don't leave the user looking at a theme that
-        // will be gone on the next load.
+      // A returned { error } and a THROWN action (connection reset mid-submit,
+      // a Prisma error) both have to roll back, or the user browses in a theme
+      // the database does not have until the next full document load.
+      let ok = false;
+      try {
+        ok = !("error" in (await setTheme(next)));
+      } catch {
+        ok = false;
+      }
+      if (!ok) {
         document.documentElement.dataset.theme = theme;
         setOverride(theme);
       }

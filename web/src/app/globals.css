@@ -101,6 +101,16 @@
   --row-hover:    oklch(0.66 0.19 278 / 0.06);
   --panel-edge:   oklch(1 0 0 / 0.06);           /* inner top-edge highlight */
   --dot-grid:     oklch(0.35 0.014 255 / 0.18);
+  /* Ambient indigo wash (page radials, active-nav gradient tail). Distinct
+     from --row-hover: that one is a hover state, this one is decoration. */
+  --tint-faint:   oklch(0.66 0.19 278 / 0.09);
+  /* The two Tailwind greys the palette remap borrows; they are their own
+     values, not --line/--line-soft, and swapping them shifted every
+     border-slate-200 in dark mode. */
+  --line-200:     oklch(0.30 0.014 255 / 0.40);
+  --line-300:     oklch(0.40 0.018 255 / 0.50);
+  /* Muted violet surface behind assistant messages (person dossier chat). */
+  --violet-surface: oklch(0.24 0.04 290 / 0.5);
   --scroll-thumb:       oklch(0.32 0.014 255 / 0.6);
   --scroll-thumb-hover: oklch(0.40 0.014 255 / 0.8);
   /* Text laid ON a filled accent (avatars, primary buttons). */
@@ -112,8 +122,6 @@
   --glow-indigo:  0 0 0 1px oklch(0.66 0.19 278 / 0.5), 0 0 32px -4px oklch(0.66 0.19 278 / 0.35);
   --glow-mint:    0 0 12px -2px oklch(0.80 0.13 165 / 0.5);
   --glow-amber:   0 0 24px -4px oklch(0.80 0.15 75 / 0.5);
-  --shadow-pop:   0 12px 32px oklch(0 0 0 / 0.35);
-  --shadow-bar:   0 8px 24px -8px oklch(0 0 0 / 0.6);
   --shadow-inset-deep: inset 0 1px 0 oklch(1 0 0 / 0.1), inset 0 -8px 16px oklch(0 0 0 / 0.2);
   --shadow-primary:       0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6);
   --shadow-primary-hover: 0 0 0 1px oklch(0.66 0.19 278 / 0.5), 0 6px 20px -4px oklch(0.66 0.19 278 / 0.7);
@@ -128,6 +136,17 @@
      sidebar/statusbar over blur. */
   --overlay:          oklch(0 0 0 / 0.5);
   --shadow-color:     oklch(0 0 0 / 0.4);
+  --shadow-strong:    oklch(0 0 0 / 0.7);
+  --indigo-glow-strong: oklch(0.66 0.19 278 / 0.7);
+  /* Dot glows are a length, not a colour, so one token kills every one of
+     them in light mode — including the ones drawn in a DB-supplied hex that
+     no colour token can reach. A glow on white is mud. */
+  --glow-size:    8px;
+  /* Ink for a chip whose colour comes from the database (lead statuses,
+     pipeline stages, tags). 0% = use the stored colour as-is; light mode
+     mixes all the way to --fg, because a swatch picked against the dark
+     panel (#f59e0b) is ~2:1 on white. Border and dot keep the stored hue. */
+  --data-ink-mix: 0%;
   --grid-line:        oklch(0.35 0.014 255 / 0.25);
   --brand-grad-end:   oklch(0.56 0.18 295);
   --bg-sidebar-blur:  oklch(0.135 0.014 258 / 0.95);
@@ -193,6 +212,10 @@
   --row-hover:    oklch(0.52 0.20 278 / 0.06);
   --panel-edge:   transparent;
   --dot-grid:     oklch(0.55 0.014 255 / 0.13);
+  --tint-faint:   oklch(0.52 0.20 278 / 0.06);
+  --line-200:     oklch(0.55 0.014 255 / 0.22);
+  --line-300:     oklch(0.50 0.016 255 / 0.32);
+  --violet-surface: oklch(0.50 0.19 305 / 0.07);
   --scroll-thumb:       oklch(0.60 0.014 255 / 0.45);
   --scroll-thumb-hover: oklch(0.50 0.014 255 / 0.65);
   --fg-on-accent: oklch(1 0 0 / 0.95);
@@ -204,8 +227,6 @@
   --glow-indigo:  0 0 0 1px oklch(0.52 0.20 278 / 0.45), 0 4px 18px -8px oklch(0.52 0.20 278 / 0.35);
   --glow-mint:    0 0 0 1px oklch(0.50 0.12 165 / 0.35);
   --glow-amber:   0 0 0 1px oklch(0.56 0.13 68 / 0.35);
-  --shadow-pop:   0 12px 32px oklch(0 0 0 / 0.14);
-  --shadow-bar:   0 8px 24px -8px oklch(0 0 0 / 0.20);
   --shadow-inset-deep: inset 0 1px 0 oklch(1 0 0 / 0.6), inset 0 -8px 16px oklch(0 0 0 / 0.05);
   --shadow-primary:       0 0 0 1px oklch(0.52 0.20 278 / 0.35), 0 4px 12px -6px oklch(0.52 0.20 278 / 0.5);
   --shadow-primary-hover: 0 0 0 1px oklch(0.52 0.20 278 / 0.5), 0 6px 16px -6px oklch(0.52 0.20 278 / 0.55);
@@ -218,6 +239,10 @@
 
   --overlay:          oklch(0.28 0.02 255 / 0.38);
   --shadow-color:     oklch(0.25 0.02 255 / 0.16);
+  --shadow-strong:    oklch(0.25 0.02 255 / 0.24);
+  --indigo-glow-strong: transparent;
+  --glow-size:    0px;
+  --data-ink-mix: 100%;
   --grid-line:        oklch(0.55 0.014 255 / 0.22);
   --brand-grad-end:   oklch(0.44 0.18 295);
   --bg-sidebar-blur:  oklch(0.972 0.005 258 / 0.95);
@@ -266,8 +291,8 @@
 
   --color-slate-50:     var(--bg-page);
   --color-slate-100:    var(--bg-raised);
-  --color-slate-200:    var(--line-soft);
-  --color-slate-300:    var(--line);
+  --color-slate-200:    var(--line-200);
+  --color-slate-300:    var(--line-300);
   --color-slate-400:    var(--fg-faint);
   --color-slate-500:    var(--fg-mute);
   --color-slate-600:    var(--fg-soft);
@@ -278,7 +303,7 @@
 
   --color-gray-50:      var(--bg-page);
   --color-gray-100:     var(--bg-raised);
-  --color-gray-200:     var(--line-soft);
+  --color-gray-200:     var(--line-200);
   --color-gray-400:     var(--fg-faint);
   --color-gray-500:     var(--fg-mute);
   --color-gray-600:     var(--fg-soft);
@@ -610,7 +635,7 @@
   content: '';
   width: 5px; height: 5px; border-radius: 999px;
   background: currentColor;
-  box-shadow: 0 0 6px currentColor;
+  box-shadow: 0 0 var(--glow-size) currentColor;
   flex-shrink: 0;
 }
 .badge-ds.indigo { color: var(--indigo-fg); background: var(--indigo-soft); border-color: var(--indigo-line); }
