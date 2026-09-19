@@ -5,9 +5,10 @@ const TABS = [
   { key: "inbox" as const, href: "/marketing", label: "Anyagok" },
   { key: "live" as const, href: "/marketing/live", label: "Élő anyagok" },
   { key: "campaigns" as const, href: "/marketing/campaigns", label: "Kampányok" },
+  { key: "decisions" as const, href: "/marketing/decisions", label: UI.decisionsTab },
 ];
 
-export function MarketingTabs({ active }: { active: "inbox" | "live" | "campaigns" }) {
+export function MarketingTabs({ active }: { active: "inbox" | "live" | "campaigns" | "decisions" }) {
   return (
     <div style={{ marginBottom: 18, maxWidth: "100%", overflow: "hidden" }}>
       <div
