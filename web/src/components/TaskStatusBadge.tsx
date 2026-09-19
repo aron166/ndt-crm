@@ -2,8 +2,8 @@ const STATUS_MAP = {
   created:     { label: "Kiírva",      color: "var(--fg-mute)",  bg: "var(--bg-raised)",   border: "var(--line-soft)" },
   not_started: { label: "Kiírva",      color: "var(--fg-mute)",  bg: "var(--bg-raised)",   border: "var(--line-soft)" },
   in_progress: { label: "Folyamatban", color: "var(--indigo)",   bg: "var(--indigo-soft)", border: "var(--indigo-line)" },
-  done:        { label: "Elvégezve",   color: "var(--mint)",     bg: "var(--mint-soft)",   border: "oklch(0.80 0.13 165 / 0.35)" },
-  cancelled:   { label: "Törölve",     color: "var(--coral)",    bg: "var(--coral-soft)",  border: "oklch(0.72 0.18 25 / 0.35)" },
+  done:        { label: "Elvégezve",   color: "var(--mint)",     bg: "var(--mint-soft)",   border: "var(--mint-line)" },
+  cancelled:   { label: "Törölve",     color: "var(--coral)",    bg: "var(--coral-soft)",  border: "var(--coral-line)" },
 } as const;
 
 type TaskStatus = keyof typeof STATUS_MAP;

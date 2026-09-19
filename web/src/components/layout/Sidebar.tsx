@@ -212,7 +212,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(800px 200px at 0% 0%, oklch(0.66 0.19 278 / 0.10), transparent 60%)",
+          background: "radial-gradient(800px 200px at 0% 0%, var(--indigo-soft), transparent 60%)",
         }}
       />
 
@@ -233,7 +233,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
               className="shrink-0 flex items-center justify-center rounded-md"
               style={{
                 width: 28, height: 28,
-                background: "linear-gradient(135deg, var(--indigo) 0%, oklch(0.56 0.18 295) 100%)",
+                background: "linear-gradient(135deg, var(--indigo) 0%, var(--brand-grad-end) 100%)",
                 boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.5), 0 6px 20px -4px oklch(0.66 0.19 278 / 0.4)",
               }}
             >
@@ -294,10 +294,10 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
                         fontSize: 14, fontWeight: 500,
                         color: active ? "var(--fg)" : "var(--fg-soft)",
                         background: active
-                          ? "linear-gradient(90deg, oklch(0.66 0.19 278 / 0.18), oklch(0.66 0.19 278 / 0.04))"
+                          ? "linear-gradient(90deg, var(--indigo-soft), var(--row-hover))"
                           : "transparent",
                       }}
-                      onMouseOver={(e) => { if (!active) e.currentTarget.style.background = "oklch(0.30 0.014 255 / 0.30)"; }}
+                      onMouseOver={(e) => { if (!active) e.currentTarget.style.background = "var(--line-soft)"; }}
                       onMouseOut={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
                     >
                       {/* Active indicator */}
@@ -307,7 +307,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
                           style={{
                             left: -10, top: 6, bottom: 6, width: 2,
                             background: "var(--indigo)",
-                            boxShadow: "0 0 12px oklch(0.66 0.19 278 / 0.7)",
+                            boxShadow: "0 0 12px var(--indigo-glow)",
                           }}
                         />
                       )}
@@ -335,7 +335,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
                             fontSize: 12, fontWeight: 700, lineHeight: 1,
                             color: "white", background: "var(--indigo)",
                             borderRadius: 8,
-                            boxShadow: "0 0 8px oklch(0.66 0.19 278 / 0.5)",
+                            boxShadow: "0 0 8px var(--indigo-glow)",
                           }}
                         >
                           {badge}

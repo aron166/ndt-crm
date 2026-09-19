@@ -54,7 +54,7 @@ export function AreaChart({ data, height = 180, color = "var(--indigo)" }: AreaC
         </defs>
         {gridLines.map((g, i) => (
           <line key={i} x1={8} x2={width - 8} y1={g.y} y2={g.y}
-            stroke="oklch(0.35 0.014 255 / 0.25)" strokeDasharray="2 4" />
+            stroke="var(--grid-line)" strokeDasharray="2 4" />
         ))}
         <path d={dFill} fill={`url(#${gradId})`} />
         <path d={d} fill="none" stroke={color} strokeWidth="2"

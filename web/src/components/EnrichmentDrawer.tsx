@@ -129,7 +129,7 @@ function ProposalCard({ proposal, onApplied }: { proposal: Proposal; onApplied: 
               <label key={key} style={{
                 display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px",
                 cursor: "pointer", borderBottom: "1px solid var(--line-soft)",
-                background: selected.has(key) ? "oklch(0.66 0.19 278 / 0.07)" : "transparent",
+                background: selected.has(key) ? "var(--row-hover)" : "transparent",
                 transition: "background 0.1s",
               }}>
                 <input type="checkbox" checked={selected.has(key)}
@@ -189,7 +189,7 @@ export function EnrichmentDrawer({ proposals, onClose }: Props) {
       {/* Backdrop */}
       <div
         onClick={onClose}
-        style={{ position: "fixed", inset: 0, background: "oklch(0 0 0 / 0.5)", zIndex: 50, backdropFilter: "blur(2px)" }}
+        style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 50, backdropFilter: "blur(2px)" }}
       />
 
       {/* Drawer */}
@@ -197,7 +197,7 @@ export function EnrichmentDrawer({ proposals, onClose }: Props) {
         position: "fixed", top: 0, right: 0, bottom: 0, width: 480,
         background: "var(--bg-panel)", borderLeft: "1px solid var(--line-soft)",
         zIndex: 51, display: "flex", flexDirection: "column",
-        boxShadow: "-20px 0 60px oklch(0 0 0 / 0.4)",
+        boxShadow: "-20px 0 60px var(--shadow-color)",
         animation: "slideInRight 0.2s ease-out",
       }}>
 

@@ -131,7 +131,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--line)",
-          boxShadow: "var(--glow-indigo), 0 24px 64px -12px rgba(0,0,0,0.8)",
+          boxShadow: "var(--glow-indigo), 0 24px 64px -12px var(--shadow-color)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -194,7 +194,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     onMouseEnter={() => setActiveIdx(idx)}
                     className="w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors"
                     style={{
-                      background: isActive ? "oklch(0.66 0.19 278 / 0.12)" : "transparent",
+                      background: isActive ? "var(--indigo-soft)" : "transparent",
                       borderLeft: isActive ? "2px solid var(--indigo)" : "2px solid transparent",
                     }}
                   >

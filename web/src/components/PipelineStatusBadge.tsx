@@ -2,13 +2,13 @@
 const STATUS_MAP: Record<number, { label: string; color: string; bg: string; border: string }> = {
   0: { label: "KUKA",        color: "var(--fg-faint)",  bg: "var(--bg-raised)",   border: "var(--line-soft)" },
   1: { label: "Nem hívtuk",  color: "var(--fg-mute)",   bg: "var(--bg-raised)",   border: "var(--line-soft)" },
-  2: { label: "NV",          color: "var(--amber)",      bg: "var(--amber-soft)",  border: "oklch(0.80 0.15 75 / 0.35)" },
-  3: { label: "Érdeklődő",   color: "var(--sky)",        bg: "var(--sky-soft)",    border: "oklch(0.78 0.12 230 / 0.35)" },
-  4: { label: "Nem érdekelt",color: "var(--coral)",      bg: "var(--coral-soft)",  border: "oklch(0.72 0.18 25 / 0.35)" },
-  5: { label: "Kéri",        color: "var(--mint)",       bg: "var(--mint-soft)",   border: "oklch(0.80 0.13 165 / 0.35)" },
+  2: { label: "NV",          color: "var(--amber)",      bg: "var(--amber-soft)",  border: "var(--amber-line)" },
+  3: { label: "Érdeklődő",   color: "var(--sky)",        bg: "var(--sky-soft)",    border: "var(--sky-line)" },
+  4: { label: "Nem érdekelt",color: "var(--coral)",      bg: "var(--coral-soft)",  border: "var(--coral-line)" },
+  5: { label: "Kéri",        color: "var(--mint)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
   6: { label: "Folyamatban", color: "var(--indigo)",     bg: "var(--indigo-soft)", border: "var(--indigo-line)" },
   7: { label: "CL",          color: "var(--fg-faint)",   bg: "var(--bg-raised)",   border: "var(--line-soft)" },
-  8: { label: "CW",          color: "var(--mint)",       bg: "var(--mint-soft)",   border: "oklch(0.80 0.13 165 / 0.35)" },
+  8: { label: "CW",          color: "var(--mint)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
 };
 
 export function PipelineStatusBadge({

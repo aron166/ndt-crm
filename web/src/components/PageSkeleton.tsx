@@ -28,7 +28,7 @@ export function TablePageSkeleton({ cols = 5, rows = 12 }: { cols?: number; rows
       {/* Table */}
       <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12, overflow: "hidden" }}>
         {/* Table header */}
-        <div style={{ display: "flex", gap: 16, padding: "10px 16px", borderBottom: "1px solid var(--line-soft)", background: "oklch(0.20 0.014 255 / 0.5)" }}>
+        <div style={{ display: "flex", gap: 16, padding: "10px 16px", borderBottom: "1px solid var(--line-soft)", background: "var(--bg-thead)" }}>
           {Array.from({ length: cols }).map((_, i) => (
             <Pulse key={i}><div style={S.bar(i === 0 ? 24 : i === 1 ? 140 : 80, 10)} /></Pulse>
           ))}
