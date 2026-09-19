@@ -268,7 +268,7 @@ function CompanyFilterBarInner({ facets }: { facets: CompanyFacets }) {
             style={{
               background: "var(--bg-panel)",
               border: "1px solid var(--line-soft)",
-              boxShadow: "0 12px 32px oklch(0 0 0 / 0.35)",
+              boxShadow: "0 12px 32px var(--shadow-color)",
             }}
           >
             {GROUPS.map((g) => (

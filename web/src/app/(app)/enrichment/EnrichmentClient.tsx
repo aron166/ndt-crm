@@ -226,7 +226,7 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
             style={{
               display: "flex", alignItems: "flex-start", gap: 10,
               padding: "8px 16px", cursor: "pointer",
-              background: selected.has(key) ? "oklch(0.66 0.19 278 / 0.06)" : "transparent",
+              background: selected.has(key) ? "var(--row-hover)" : "transparent",
               transition: "background 0.15s",
             }}
           >

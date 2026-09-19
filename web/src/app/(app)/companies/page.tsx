@@ -21,8 +21,8 @@ const TENANT_ID = 1;
 
 function avatarBg(id: number) {
   const palette = [
-    "oklch(0.66 0.19 278)", "oklch(0.80 0.13 165)", "oklch(0.80 0.15 75)",
-    "oklch(0.78 0.12 230)", "oklch(0.72 0.16 305)", "oklch(0.72 0.18 25)",
+    "var(--indigo)", "var(--mint)", "var(--amber)",
+    "var(--sky)", "var(--violet)", "var(--coral)",
   ];
   return palette[id % palette.length];
 }
@@ -247,7 +247,7 @@ export default async function CompaniesPage({
                       style={{
                         width: 28, height: 28, borderRadius: 6,
                         fontSize: 12, fontWeight: 700,
-                        background: avatarBg(c.id), color: "oklch(0.10 0 0 / 0.7)",
+                        background: avatarBg(c.id), color: "var(--fg-on-accent)",
                         letterSpacing: "0.02em",
                       }}
                     >

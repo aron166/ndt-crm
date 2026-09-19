@@ -91,9 +91,9 @@ function DealCard({
       className={cn("relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
         background: "var(--bg-panel)",
-        border: `1px solid ${isStale ? "oklch(0.72 0.18 25 / 0.5)" : "var(--line-soft)"}`,
+        border: `1px solid ${isStale ? "var(--coral-line)" : "var(--line-soft)"}`,
         padding: "10px 12px", cursor: "grab",
-        boxShadow: isStale ? "inset 0 0 0 1px oklch(0.72 0.18 25 / 0.15)" : "inset 0 1px 0 oklch(1 0 0 / 0.05)",
+        boxShadow: isStale ? "inset 0 0 0 1px var(--coral-soft)" : "inset 0 1px 0 var(--panel-edge)",
         transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
         willChange: "transform",
       }}
@@ -103,8 +103,8 @@ function DealCard({
         e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseOut={(e) => {
-        e.currentTarget.style.borderColor = isStale ? "oklch(0.72 0.18 25 / 0.5)" : "var(--line-soft)";
-        e.currentTarget.style.boxShadow = isStale ? "inset 0 0 0 1px oklch(0.72 0.18 25 / 0.15)" : "inset 0 1px 0 oklch(1 0 0 / 0.05)";
+        e.currentTarget.style.borderColor = isStale ? "var(--coral-line)" : "var(--line-soft)";
+        e.currentTarget.style.boxShadow = isStale ? "inset 0 0 0 1px var(--coral-soft)" : "inset 0 1px 0 var(--panel-edge)";
         e.currentTarget.style.transform = "none";
       }}
     >
@@ -274,7 +274,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
               key={stage.id}
               className="kcol mount"
               style={{
-                background: isHover ? `${stage.color}10` : "oklch(0.18 0.014 255 / 0.5)",
+                background: isHover ? `${stage.color}10` : "var(--bg-col)",
                 border: `1px solid ${isHover ? stage.color : "var(--line-soft)"}`,
                 transition: "border-color .15s, background .15s",
               }}
