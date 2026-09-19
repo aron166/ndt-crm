@@ -138,6 +138,29 @@ describe("CONTENT_RULES table: one violating + one clean input per rule", () => 
     ).not.toContain("duplicate_hook");
   });
 
+  it("forbidden_price: a bare price word with no number nearby passes", () => {
+    expect(violationRules(ctx({ body: "Az árajánlat elküldése után jelentkezünk." }))).not.toContain(
+      "forbidden_price",
+    );
+  });
+
+  it("forbidden_price: a price word with a number nearby fires", () => {
+    expect(violationRules(ctx({ body: "Az árajánlatunk 120 000 Ft." }))).toContain("forbidden_price");
+    expect(violationRules(ctx({ body: "A díj 5%." }))).toContain("forbidden_price");
+  });
+
+  it("claim rules never fire on internal items, even with a blatant claim", () => {
+    const body = "Az ár 500 000 Ft. Röntgennel dolgozunk.";
+    expect(violationRules(ctx({ body, internal: true }))).toEqual([]);
+  });
+
+  it("claim rules never fire on process_doc format, even with a blatant claim", () => {
+    const body = "Az ár 500 000 Ft. Röntgennel dolgozunk.";
+    // category: "script" (not "email") so the email-only rules (no_personal_hook
+    // etc.) stay out of this claim-rules-only assertion.
+    expect(violationRules(ctx({ body, category: "script", format: "process_doc" }))).toEqual([]);
+  });
+
   it("every rule id is covered above", () => {
     const ids = CONTENT_RULES.map((r) => r.id).sort();
     expect(ids).toEqual(

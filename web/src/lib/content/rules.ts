@@ -26,6 +26,8 @@ export interface RuleContext {
   otherHooks?: string[];
   /** The item requires a consent footer (cold outreach email). */
   requiresFooter?: boolean;
+  /** Internal-only material (never sent to a customer): ContentItem.internal. */
+  internal?: boolean;
 }
 
 export interface RuleViolation {
@@ -45,8 +47,32 @@ export interface ContentRule {
 // The claim rules (1-7) apply to any outbound copy category: cold email is
 // the only one drafted today, script/ad share the same claim discipline.
 const CLAIM_CATEGORIES = new Set(["email", "script", "ad"]);
-const isClaimCategory = (ctx: RuleContext) => CLAIM_CATEGORIES.has(ctx.category);
-const isEmail = (ctx: RuleContext) => ctx.category === "email";
+
+// A process document is internal reference material (e.g. "how we handle
+// price objections in a call"), never something we send to a customer — so
+// claim rules don't apply to it even when `internal` itself is unset. The
+// next colliding format (a training deck, an internal FAQ, …) is a one-word
+// edit here.
+const NON_COPY_FORMATS = new Set(["process_doc"]);
+
+/**
+ * Claim rules (1-7) exist to stop a forbidden claim reaching a CUSTOMER. They
+ * apply ONLY when the item is customer-facing COPY, meaning ALL of:
+ *  (a) not internal (ContentItem.internal) — an internal document read by
+ *      our own people makes no claim TO anyone;
+ *  (b) category is in CLAIM_CATEGORIES — `decision` never qualifies: it is a
+ *      question for Áron/Péter, not copy we send;
+ *  (c) format is not a NON_COPY_FORMAT — a process_doc is reference
+ *      material, not something we send.
+ * An internal price-objection doc or an internal note explaining why we
+ * never say "röntgen" is the OPPOSITE of a violation.
+ */
+const isCustomerFacingCopy = (ctx: RuleContext) =>
+  !ctx.internal && CLAIM_CATEGORIES.has(ctx.category) && !NON_COPY_FORMATS.has(ctx.format ?? "");
+
+// An internal email TEMPLATE needs no consent footer and no personal hook —
+// those rules exist for outbound copy actually sent to a customer.
+const isEmail = (ctx: RuleContext) => !ctx.internal && ctx.category === "email";
 
 /**
  * Real touch bodies in growth/campaigns/cold-email-v0/drafts/*.md run
@@ -75,10 +101,31 @@ const NOT_LETTER_AFTER = "(?!\\p{L})";
 const PRICE_CURRENCY_RE = /\d[\d.,\s]*\s?(ft|huf|eur)(?!\p{L})|\d[\d.,\s]*\s?[€$]|[€$]\s?\d/iu;
 // Whole-word only, so "árazniuk"/"felárral" (their pricing, not ours) don't
 // match: "ajánlat" alone is fine, only the price-compound "árajánlat*" is not.
+// A bare price word is not by itself a price CLAIM ("az árajánlat elküldése
+// után" just names a document); it only becomes one when a number sits near
+// it. Global flag so every occurrence can be checked, not just the first.
 const PRICE_WORD_RE = new RegExp(
   `${NOT_LETTER_BEFORE}(ár|árat|árajánlat\\p{L}*|díj\\p{L}*)${NOT_LETTER_AFTER}`,
-  "iu",
+  "giu",
 );
+// How far a digit may sit from a price word and still count as the same
+// claim: comfortably wider than "ár: 120 000" but short enough that an
+// unrelated number elsewhere in a long paragraph doesn't false-positive.
+const PRICE_NUMBER_PROXIMITY = 40;
+
+/** A PRICE_WORD_RE match with a digit within PRICE_NUMBER_PROXIMITY chars, on the same line. */
+function findPriceWordNearNumber(body: string): RegExpMatchArray | null {
+  for (const m of body.matchAll(PRICE_WORD_RE)) {
+    const idx = m.index ?? 0;
+    const lineStart = body.lastIndexOf("\n", idx) + 1;
+    const nextNewline = body.indexOf("\n", idx);
+    const lineEnd = nextNewline === -1 ? body.length : nextNewline;
+    const windowStart = Math.max(lineStart, idx - PRICE_NUMBER_PROXIMITY);
+    const windowEnd = Math.min(lineEnd, idx + m[0].length + PRICE_NUMBER_PROXIMITY);
+    if (/\d/.test(body.slice(windowStart, windowEnd))) return m;
+  }
+  return null;
+}
 
 // --- 2. forbidden_depth -------------------------------------------------
 // FRAMEWORK §6: "80 cm mélység": a depth number is not true, never send one.
@@ -168,9 +215,9 @@ export const CONTENT_RULES: ContentRule[] = [
     id: "forbidden_price",
     message:
       "Tilos áreallítás (ár/díj/árajánlat, vagy szám + Ft/HUF/EUR/€/$) a hideg szövegben (FRAMEWORK §6). Vedd ki az árra utaló részt, árat sosem közlünk hideg megkeresésben.",
-    appliesTo: isClaimCategory,
+    appliesTo: isCustomerFacingCopy,
     check: (ctx) => {
-      const m = ctx.body.match(PRICE_CURRENCY_RE) ?? ctx.body.match(PRICE_WORD_RE);
+      const m = ctx.body.match(PRICE_CURRENCY_RE) ?? findPriceWordNearNumber(ctx.body);
       return m ? { ok: false, excerpt: excerptAt(ctx.body, m.index ?? 0) } : { ok: true };
     },
   },
@@ -178,7 +225,7 @@ export const CONTENT_RULES: ContentRule[] = [
     id: "forbidden_depth",
     message:
       "Tilos konkrét mélységszám (pl. „80 cm”, „0,8 m mélyen”): a FRAMEWORK szerint nem igaz és hideg levélbe nem megy. Vedd ki a mélységszámot, szám nélkül fogalmazz.",
-    appliesTo: isClaimCategory,
+    appliesTo: isCustomerFacingCopy,
     check: (ctx) => {
       const matches = [...ctx.body.matchAll(DEPTH_UNIT_RE)];
       const hasMely = /mély/i.test(ctx.body);
@@ -190,7 +237,7 @@ export const CONTENT_RULES: ContentRule[] = [
     id: "forbidden_report_time",
     message:
       "Tilos riportidő-ígéret (pl. „72 órán belül”, „72h”): ilyen nincs, a mérés eredménye valós idejű a helyszínen. Vedd ki az időígéretet.",
-    appliesTo: isClaimCategory,
+    appliesTo: isCustomerFacingCopy,
     check: (ctx) => {
       const m = ctx.body.match(REPORT_TIME_RE);
       return m ? { ok: false, excerpt: excerptAt(ctx.body, m.index ?? 0) } : { ok: true };
@@ -200,7 +247,7 @@ export const CONTENT_RULES: ContentRule[] = [
     id: "forbidden_throughput",
     message:
       "Tilos m²/óra átereszőképesség-állítás (pl. „500 m²/óra”): nem publikus forrásból való. Vedd ki, vagy a „600 m² két óra alatt” engedélyezett formát használd, projektfüggő kitétellel.",
-    appliesTo: isClaimCategory,
+    appliesTo: isCustomerFacingCopy,
     check: (ctx) => {
       const m = ctx.body.match(THROUGHPUT_RE);
       return m ? { ok: false, excerpt: excerptAt(ctx.body, m.index ?? 0) } : { ok: true };
@@ -210,7 +257,7 @@ export const CONTENT_RULES: ContentRule[] = [
     id: "forbidden_tolerance",
     message:
       "Tilos ± tűrésszám (pl. „±1 mm”, „plusz-mínusz 4 mm”): a FRAMEWORK csak a „milliméteres pontosság” kifejezést engedi, szám nélkül. Vedd ki a tűrésszámot.",
-    appliesTo: isClaimCategory,
+    appliesTo: isCustomerFacingCopy,
     check: (ctx) => {
       const m = ctx.body.match(TOLERANCE_RE);
       return m ? { ok: false, excerpt: excerptAt(ctx.body, m.index ?? 0) } : { ok: true };
@@ -220,7 +267,7 @@ export const CONTENT_RULES: ContentRule[] = [
     id: "forbidden_xray",
     message:
       "Tilos röntgent/X-ray-t/átvilágítást a saját módszerünkként feltüntetni: nem sugárzással dolgozunk. Ha a mondat nem kifejezetten tagadja a sugárzás használatát, vedd ki vagy fogalmazd át tagadó formára.",
-    appliesTo: isClaimCategory,
+    appliesTo: isCustomerFacingCopy,
     check: (ctx) => {
       const sentences = ctx.body.split(/(?<=[.!?])\s+|\n+/);
       for (const sentence of sentences) {
@@ -236,7 +283,7 @@ export const CONTENT_RULES: ContentRule[] = [
     id: "forbidden_reference",
     message:
       "Tilos vasúti/kikötői/kórházi referenciára hivatkozni: ilyen referenciánk nincs. Vedd ki, vagy csak olyan referenciát használj, amit ténylegesen elvégeztünk.",
-    appliesTo: isClaimCategory,
+    appliesTo: isCustomerFacingCopy,
     check: (ctx) => {
       const m = ctx.body.match(REFERENCE_RE);
       return m ? { ok: false, excerpt: excerptAt(ctx.body, m.index ?? 0) } : { ok: true };

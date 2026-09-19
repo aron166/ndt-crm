@@ -121,15 +121,24 @@ export async function createItem(
   actor: ContentActor,
   input: CreateItemInput,
   tx?: Tx,
-): Promise<{ ok: true; itemId: number; versionId: number | null; existed: boolean } | Fail> {
+): Promise<
+  | { ok: true; itemId: number; versionId: number | null; existed: boolean; status: ContentStatus; ruleChecks: number }
+  | Fail
+> {
   if (!input.body.trim() || input.body.length > CONTENT_BODY_MAX) return fail(400, "Invalid body");
   const run = async (t: Tx) => {
     if (input.externalRef) {
       const existing = await t.contentItem.findFirst({
         where: { tenantId: actor.tenantId, externalRef: input.externalRef },
-        select: { id: true, currentVersionId: true },
+        select: { id: true, currentVersionId: true, status: true },
       });
-      if (existing) return { ok: true as const, itemId: existing.id, versionId: existing.currentVersionId, existed: true };
+      if (existing) {
+        return {
+          ok: true as const, itemId: existing.id, versionId: existing.currentVersionId, existed: true,
+          status: isContentStatus(existing.status) ? existing.status : "draft",
+          ruleChecks: 0,
+        };
+      }
     }
     const item = await t.contentItem.create({
       data: {
@@ -166,7 +175,10 @@ export async function createItem(
     // duplicate_hook structurally dead on the submit path (Vanda, #104).
     const violations = await reconcileRuleChecks(t, actor.tenantId, item.id,
       await ruleContextFor(t, actor.tenantId,
-        { id: item.id, category: input.category, format: input.format ?? null, campaignId: input.campaignId ?? null },
+        {
+          id: item.id, category: input.category, format: input.format ?? null,
+          campaignId: input.campaignId ?? null, internal: input.internal ?? false,
+        },
         input.body));
     await t.contentItem.update({
       where: { id: item.id },
@@ -184,7 +196,11 @@ export async function createItem(
         externalRef: input.externalRef ?? null,
       });
     await writeAudit(t, actor, "content_version", version.id, "create", null, { itemId: item.id, number: 1 });
-    return { ok: true as const, itemId: item.id, versionId: version.id, existed: false };
+    return {
+      ok: true as const, itemId: item.id, versionId: version.id, existed: false,
+      status: violations.length > 0 ? "rewrite_requested" as const : "in_review" as const,
+      ruleChecks: violations.length,
+    };
   };
   try {
     return await (tx ? run(tx) : db.$transaction(run));
@@ -194,9 +210,15 @@ export async function createItem(
     if (!tx && input.externalRef && (err as { code?: string }).code === "P2002") {
       const existing = await db.contentItem.findFirst({
         where: { tenantId: actor.tenantId, externalRef: input.externalRef },
-        select: { id: true, currentVersionId: true },
+        select: { id: true, currentVersionId: true, status: true },
       });
-      if (existing) return { ok: true, itemId: existing.id, versionId: existing.currentVersionId, existed: true };
+      if (existing) {
+        return {
+          ok: true, itemId: existing.id, versionId: existing.currentVersionId, existed: true,
+          status: isContentStatus(existing.status) ? existing.status : "draft",
+          ruleChecks: 0,
+        };
+      }
     }
     throw err;
   }
@@ -318,7 +340,7 @@ export async function createVersion(
     // and each violation is an open check so the live gate blocks it.
     const itemRow = await tx.contentItem.findFirst({
       where: { id: itemId, tenantId: actor.tenantId },
-      select: { id: true, category: true, format: true, campaignId: true },
+      select: { id: true, category: true, format: true, campaignId: true, internal: true },
     });
     const violations = itemRow
       ? await reconcileRuleChecks(tx, actor.tenantId, itemId, await ruleContextFor(tx, actor.tenantId, itemRow, input.body))
@@ -595,7 +617,7 @@ async function reconcileRuleChecks(
   tx: Tx,
   tenantId: number,
   itemId: number,
-  ctx: { category: string; format?: string | null; body: string; footer?: string | null; requiresFooter?: boolean; otherHooks?: string[]; recipientVerified?: boolean | null },
+  ctx: { category: string; format?: string | null; body: string; footer?: string | null; requiresFooter?: boolean; otherHooks?: string[]; recipientVerified?: boolean | null; internal?: boolean },
 ): Promise<{ rule: string; message: string }[]> {
   const violations = runContentRules(ctx);
   const open = violations.map((v) => `${RULE_CHECK_PREFIX} ${v.message}`);
@@ -631,7 +653,7 @@ async function reconcileRuleChecks(
 async function ruleContextFor(
   tx: Tx,
   tenantId: number,
-  item: { id: number; category: string; format?: string | null; campaignId?: number | null },
+  item: { id: number; category: string; format?: string | null; campaignId?: number | null; internal?: boolean },
   body: string,
 ): Promise<Parameters<typeof reconcileRuleChecks>[3]> {
   const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
@@ -657,6 +679,7 @@ async function ruleContextFor(
     // Cold outreach email copy must carry the consent line.
     requiresFooter: item.category === "email",
     otherHooks: siblings.map((s) => s.hook ?? "").filter(Boolean),
+    internal: item.internal ?? false,
   };
 }
 
@@ -677,7 +700,7 @@ export const CHECK_FOR = ["aron", "peter", "either"] as const;
 export interface CheckInput {
   question: string;
   forWhom?: string;
-  source?: "import" | "manual";
+  source?: "import" | "manual" | "decision";
 }
 
 /**
@@ -886,10 +909,12 @@ export interface QueueItem {
   } | null;
 }
 
-export async function getQueue(tenantId: number, statuses: ContentStatus[]): Promise<QueueItem[]> {
+export async function getQueue(
+  tenantId: number, statuses: ContentStatus[], opts: { category?: string } = {},
+): Promise<QueueItem[]> {
   await releaseStaleClaims(tenantId);
   const items = await db.contentItem.findMany({
-    where: { tenantId, status: { in: statuses } },
+    where: { tenantId, status: { in: statuses }, ...(opts.category ? { category: opts.category } : {}) },
     orderBy: { updatedAt: "asc" },
     take: 100,
     select: {

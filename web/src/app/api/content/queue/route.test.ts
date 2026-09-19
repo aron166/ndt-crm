@@ -37,7 +37,22 @@ describe("GET /api/content/queue", () => {
     (getQueue as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: 1 }]);
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(getQueue).toHaveBeenCalledWith(7, ["changes_requested", "rewrite_requested"]);
+    expect(getQueue).toHaveBeenCalledWith(7, ["changes_requested", "rewrite_requested"], { category: undefined });
     expect((await res.json()).items).toEqual([{ id: 1 }]);
+  });
+
+  it("rejects an unknown category with 400", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    const res = await GET(req("?category=bogus"));
+    expect(res.status).toBe(400);
+  });
+
+  it("passes a valid category through to getQueue (agent read-back of a decision)", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    (getQueue as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: 2 }]);
+    const res = await GET(req("?status=in_review&category=decision"));
+    expect(res.status).toBe(200);
+    expect(getQueue).toHaveBeenCalledWith(7, ["in_review"], { category: "decision" });
+    expect((await res.json()).items).toEqual([{ id: 2 }]);
   });
 });
