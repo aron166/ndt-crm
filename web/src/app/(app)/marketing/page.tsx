@@ -6,6 +6,7 @@ import { UI } from "@/lib/content/labels";
 import { MarketingTabs } from "./MarketingTabs";
 import { InboxClient } from "./InboxClient";
 import { BoardClient } from "./BoardClient";
+import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
 const TENANT_ID = 1;
 
@@ -83,6 +84,7 @@ export default async function MarketingPage({
 
   return (
     <div className="mount">
+      <RefreshOnFocus />
       <MarketingTabs active="inbox" />
 
       <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 16 }}>

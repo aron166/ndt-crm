@@ -3,6 +3,7 @@ import { getDecisionQueue } from "@/lib/content/queries";
 import { UI } from "@/lib/content/labels";
 import { MarketingTabs } from "../MarketingTabs";
 import { DecisionsClient } from "./DecisionsClient";
+import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
 const TENANT_ID = 1;
 
@@ -28,6 +29,7 @@ export default async function DecisionsPage() {
 
   return (
     <div className="mount">
+      <RefreshOnFocus />
       <MarketingTabs active="decisions" />
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 18, fontWeight: 600, color: "var(--fg)", marginBottom: 4 }}>{UI.decisionsTitle}</h1>
