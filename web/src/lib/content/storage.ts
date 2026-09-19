@@ -85,13 +85,35 @@ export async function uploadObject(path: string, bytes: Uint8Array, contentType:
   if (error) throw new Error(`storage upload failed: ${error.message}`);
 }
 
+// ponytail: unbounded map, one entry per asset path ever viewed on this
+// server instance — bound it (LRU, or evict on cache miss growth) if the
+// asset count ever gets large enough to matter.
+const urlCache = new Map<string, { url: string; expiresAt: number }>();
+/** Re-sign once less than this much of the TTL remains, so a focus-triggered
+ * refresh serves the same `src` and the asset doesn't visibly re-download. */
+const REFRESH_MARGIN_MS = 60_000;
+
 export async function signedViewUrls(paths: string[]): Promise<Record<string, string>> {
   const unique = [...new Set(paths)];
   if (unique.length === 0) return {};
-  const { data, error } = await admin().storage.from(CONTENT_BUCKET).createSignedUrls(unique, VIEW_URL_TTL_S);
-  if (error || !data) return {};
+  const now = Date.now();
   const out: Record<string, string> = {};
-  for (const d of data) if (d.path && d.signedUrl) out[d.path] = d.signedUrl;
+  const misses: string[] = [];
+  for (const p of unique) {
+    const hit = urlCache.get(p);
+    if (hit && hit.expiresAt - now > REFRESH_MARGIN_MS) out[p] = hit.url;
+    else misses.push(p);
+  }
+  if (misses.length === 0) return out;
+  const { data, error } = await admin().storage.from(CONTENT_BUCKET).createSignedUrls(misses, VIEW_URL_TTL_S);
+  if (error || !data) return out;
+  const expiresAt = now + VIEW_URL_TTL_S * 1000;
+  for (const d of data) {
+    if (d.path && d.signedUrl) {
+      out[d.path] = d.signedUrl;
+      urlCache.set(d.path, { url: d.signedUrl, expiresAt });
+    }
+  }
   return out;
 }
 

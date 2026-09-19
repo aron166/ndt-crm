@@ -45,4 +45,18 @@ describe("groupDecisions", () => {
     const q = groupDecisions([row(1, "aron", NOW), row(2, "peter", NOW), row(3, "either", NOW)], NOW);
     expect(q.total).toBe(3);
   });
+
+  it("truncated is false and every row is kept when 200 or fewer rows come back", () => {
+    const rows = Array.from({ length: 200 }, (_, i) => row(i, "either", NOW));
+    const q = groupDecisions(rows, NOW);
+    expect(q.truncated).toBe(false);
+    expect(q.total).toBe(200);
+  });
+
+  it("truncated is true and the 201st row is sliced off when take: 201 returns 201 rows", () => {
+    const rows = Array.from({ length: 201 }, (_, i) => row(i, "either", NOW));
+    const q = groupDecisions(rows, NOW);
+    expect(q.truncated).toBe(true);
+    expect(q.total).toBe(200);
+  });
 });

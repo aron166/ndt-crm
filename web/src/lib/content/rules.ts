@@ -48,33 +48,25 @@ export interface ContentRule {
 // the only one drafted today, script/ad share the same claim discipline.
 const CLAIM_CATEGORIES = new Set(["email", "script", "ad"]);
 
-// A process document is internal reference material (e.g. "how we handle
-// price objections in a call"), never something we send to a customer — so
-// claim rules don't apply to it even when `internal` itself is unset. The
-// next colliding format (a training deck, an internal FAQ, …) is a one-word
-// edit here.
-const NON_COPY_FORMATS = new Set(["process_doc"]);
-
+// `format` is free text from the intake payload (z.string().trim().max(60)),
+// so it must never gate a safety rule: any app key could write
+// `format: "process_doc"` and switch off all seven claim rules. That used to
+// half-work anyway — the email carve-out only rescued `category: "email"`,
+// so `script` and `ad` still lost every claim rule, and a phone script is
+// spoken to a customer. `internal` is a real boolean column, not a string an
+// app key writes, so it is the only gate we keep: a document that is
+// internal must say so with `internal: true`, never inferred from `format`.
 /**
  * Claim rules (1-7) exist to stop a forbidden claim reaching a CUSTOMER. They
- * apply ONLY when the item is customer-facing COPY, meaning ALL of:
+ * apply ONLY when the item is customer-facing COPY, meaning BOTH of:
  *  (a) not internal (ContentItem.internal) — an internal document read by
  *      our own people makes no claim TO anyone;
  *  (b) category is in CLAIM_CATEGORIES — `decision` never qualifies: it is a
- *      question for Áron/Péter, not copy we send;
- *  (c) format is not a NON_COPY_FORMAT — a process_doc is reference
- *      material, not something we send. This exemption applies only when the
- *      category itself isn't "email": an email is copy we send, whatever its
- *      free-text `format` field claims to be, so a `format: "process_doc"` on
- *      `category: "email"` must not switch off the claim rules for something
- *      that can still be slotted into a cold-email step.
+ *      question for Áron/Péter, not copy we send.
  * An internal price-objection doc or an internal note explaining why we
  * never say "röntgen" is the OPPOSITE of a violation.
  */
-const isCustomerFacingCopy = (ctx: RuleContext) =>
-  !ctx.internal
-  && CLAIM_CATEGORIES.has(ctx.category)
-  && !(ctx.category !== "email" && NON_COPY_FORMATS.has(ctx.format ?? ""));
+const isCustomerFacingCopy = (ctx: RuleContext) => !ctx.internal && CLAIM_CATEGORIES.has(ctx.category);
 
 // An internal email TEMPLATE needs no consent footer and no personal hook —
 // those rules exist for outbound copy actually sent to a customer.
@@ -104,7 +96,7 @@ const NOT_LETTER_AFTER = "(?!\\p{L})";
 
 // --- 1. forbidden_price -----------------------------------------------
 // FRAMEWORK §6: "ár bármilyen formában": price/fee, in any form.
-const PRICE_CURRENCY_RE = /\d[\d.,\s]*\s?(ft|huf|eur|forint\p{L}*)(?!\p{L})|\d[\d.,\s]*\s?[€$]|[€$]\s?\d/iu;
+const PRICE_CURRENCY_RE = /\d[\d.,\s]*(-)?\s?(e|ezer|m|millió|mrd|milliárd)?\s?(ft|huf|eur|forint\p{L}*)(?!\p{L})|\d[\d.,\s]*\s?[€$]|[€$]\s?\d/iu;
 // Whole-word only, so "árazniuk"/"felárral" (their pricing, not ours) don't
 // match: "ajánlat" alone is fine, only the price-compound "árajánlat*" is not.
 // A bare price word is not by itself a price CLAIM ("az árajánlat elküldése

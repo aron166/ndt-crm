@@ -1,5 +1,6 @@
 import { getActor } from "@/lib/actor";
 import { getDecisionQueue } from "@/lib/content/queries";
+import { getContentReviewers } from "@/lib/content/reviewers";
 import { UI } from "@/lib/content/labels";
 import { MarketingTabs } from "../MarketingTabs";
 import { DecisionsClient } from "./DecisionsClient";
@@ -11,8 +12,11 @@ export const dynamic = "force-dynamic";
 
 export default async function DecisionsPage() {
   const { userId } = await getActor(TENANT_ID);
+  // setCheckState requires a reviewer, so a non-reviewer must not see the
+  // answer box — every submit would 403 (Vanda F5).
+  const reviewers = userId == null ? [] : await getContentReviewers(TENANT_ID);
 
-  if (userId == null) {
+  if (userId == null || !reviewers.includes(userId)) {
     return (
       <div className="mount">
         <MarketingTabs active="decisions" />

@@ -48,10 +48,22 @@ describe("hasUnsavedInput", () => {
     expect(hasUnsavedInput(document)).toBe(true);
   });
 
-  it("is true when a (even empty) input is focused", () => {
+  it("is true when a (even empty) text input is focused", () => {
     document.body.innerHTML = `<input type="text" />`;
     (document.querySelector("input") as HTMLInputElement).focus();
     expect(hasUnsavedInput(document)).toBe(true);
+  });
+
+  it("is true when a focused input has no type attribute (defaults to text)", () => {
+    document.body.innerHTML = `<input />`;
+    (document.querySelector("input") as HTMLInputElement).focus();
+    expect(hasUnsavedInput(document)).toBe(true);
+  });
+
+  it("is false when a focused checkbox is the active element (not typed prose)", () => {
+    document.body.innerHTML = `<input type="checkbox" />`;
+    (document.querySelector("input") as HTMLInputElement).focus();
+    expect(hasUnsavedInput(document)).toBe(false);
   });
 
   // jsdom does not implement `isContentEditable` (it's always `undefined`,

@@ -42,12 +42,35 @@ export function shouldRefresh(lastAt: number, now: number, visible: boolean): bo
  *
  * ponytail: a DOM read, not a form registry. A registry would mean every
  * form opting in, and the one that forgets is the one that loses the text.
+ *
+ * Known, accepted gap: text typed into an <input> on the review page
+ * (publish URL, metrics, outreach slot, change note) is NOT protected once
+ * that input loses focus, because ReviewClient is keyed on currentVersionId
+ * and remounts when a refresh brings a new version. Deliberately not fixed
+ * by also scanning unfocused inputs the way textareas are scanned: those
+ * fields are pre-filled from server data, so a non-empty scan would mean the
+ * review page never refreshes at all. The realistic sequence (type, alt-tab,
+ * return) IS covered, because the browser keeps the input as activeElement
+ * across a tab switch.
  */
+/**
+ * Input types that hold TYPED TEXT. A checkbox, radio or button is not
+ * unsaved prose — and blocking on one would defeat the whole feature: on
+ * /marketing the only <input>s are the bulk-select checkboxes (the filters
+ * are <select>), and a browser leaves a ticked checkbox as activeElement, so
+ * "tick a card, alt-tab, come back" would never refresh (Vanda F7).
+ * `""` is in the set on purpose: `<input>` with no type attribute is text.
+ */
+const TEXT_INPUT_TYPES = new Set(["text", "search", "email", "url", "tel", "password", "number", ""]);
+
+function isTextInput(el: Element | null): el is HTMLInputElement {
+  return el?.tagName === "INPUT" && TEXT_INPUT_TYPES.has((el as HTMLInputElement).type);
+}
+
 export function hasUnsavedInput(doc: Document = document): boolean {
   const active = doc.activeElement as HTMLElement | null;
   if (active?.isContentEditable) return true;
-  const tag = active?.tagName;
-  if (tag === "TEXTAREA" || tag === "INPUT") return true;
+  if (active?.tagName === "TEXTAREA" || isTextInput(active)) return true;
   for (const ta of doc.querySelectorAll("textarea")) {
     if (ta.value.trim() !== "") return true;
   }

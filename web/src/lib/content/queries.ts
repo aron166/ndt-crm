@@ -301,6 +301,10 @@ export async function getLibrary(tenantId: number, filter: InboxFilter = {}): Pr
       tenantId,
       liveVersionId: { not: null },
       status: { not: "archived" },
+      // "Élő anyagok" is the SENDABLE library; an internal item is by
+      // definition not sendable, and it is the one item the claim rules no
+      // longer check (see rules.ts isCustomerFacingCopy).
+      internal: false,
       ...(filter.category ? { category: filter.category } : {}),
       ...(filter.format ? { format: filter.format } : {}),
       ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
@@ -350,6 +354,8 @@ export interface DecisionQueue {
   peter: DecisionRow[];
   either: DecisionRow[];
   total: number;
+  /** True when the queue was capped at 200 rows (more open decisions exist than shown). */
+  truncated: boolean;
 }
 
 const DECISION_ROW_SELECT = {
@@ -358,8 +364,15 @@ const DECISION_ROW_SELECT = {
 } satisfies Prisma.ContentCheckSelect;
 type DecisionRawRow = Prisma.ContentCheckGetPayload<{ select: typeof DECISION_ROW_SELECT }>;
 
-/** Pure: groups already-fetched open checks into the three answer buckets, oldest first. */
+/**
+ * Pure: groups already-fetched open checks into the three answer buckets,
+ * oldest first. `rows` may carry one extra row past the 200 the page shows
+ * (see getDecisionQueue's take: 201) — that extra row signals `truncated`
+ * and is sliced off before grouping, never shown.
+ */
 export function groupDecisions(rows: DecisionRawRow[], now: Date): DecisionQueue {
+  const truncated = rows.length > 200;
+  const shown = truncated ? rows.slice(0, 200) : rows;
   const toDecisionRow = (r: DecisionRawRow): DecisionRow => ({
     checkId: r.id, question: r.question, source: r.source, createdAt: r.createdAt.toISOString(),
     daysWaiting: Math.max(0, Math.floor((now.getTime() - r.createdAt.getTime()) / 86_400_000)),
@@ -368,11 +381,11 @@ export function groupDecisions(rows: DecisionRawRow[], now: Date): DecisionQueue
   const aron: DecisionRow[] = [];
   const peter: DecisionRow[] = [];
   const either: DecisionRow[] = [];
-  for (const r of rows) {
+  for (const r of shown) {
     const bucket = r.forWhom === "aron" ? aron : r.forWhom === "peter" ? peter : either;
     bucket.push(toDecisionRow(r));
   }
-  return { aron, peter, either, total: aron.length + peter.length + either.length };
+  return { aron, peter, either, total: aron.length + peter.length + either.length, truncated };
 }
 
 // A source: "rule" check is code, not prose: setCheckState hard-403s it, and
@@ -394,7 +407,10 @@ export async function getDecisionQueue(tenantId: number, now: Date = new Date())
   const rows = await db.contentCheck.findMany({
     where: openDecisionsWhere(tenantId),
     orderBy: { createdAt: "asc" },
-    take: 200,
+    // One more than the 200 shown: the extra row (if it comes back) is the
+    // truncation signal groupDecisions slices off, so the page and the
+    // uncapped countOpenDecisions digest never disagree silently.
+    take: 201,
     select: DECISION_ROW_SELECT,
   });
   return groupDecisions(rows, now);

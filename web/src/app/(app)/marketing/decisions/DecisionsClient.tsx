@@ -81,7 +81,7 @@ function Row({ row }: { row: DecisionRow }) {
           style={{
             minHeight: 32, padding: "0 12px", borderRadius: 6, fontSize: 13, fontWeight: 500,
             cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1,
-            background: "var(--mint-soft)", color: "var(--mint)", border: "1px solid var(--mint)",
+            background: "var(--mint-soft)", color: "var(--mint-fg)", border: "1px solid var(--mint-line)",
           }}
         >
           {UI.checkResolve}
@@ -133,6 +133,9 @@ export function DecisionsClient({ queue }: { queue: DecisionQueue }) {
 
   return (
     <div>
+      {queue.truncated && (
+        <p style={{ fontSize: 12, color: "var(--fg-mute)", marginBottom: 16 }}>{UI.decisionsTruncated}</p>
+      )}
       <Group title={UI.decisionsGroupAron} rows={queue.aron} />
       <Group title={UI.decisionsGroupPeter} rows={queue.peter} />
       <Group title={UI.decisionsGroupEither} rows={queue.either} />

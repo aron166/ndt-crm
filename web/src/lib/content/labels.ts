@@ -163,6 +163,7 @@ export const UI = {
   decisionsWaited: (n: number) => (n === 0 ? "ma érkezett" : `${n} napja vár`),
   decisionsOpenCount: (n: number) => `${n} nyitott kérdés`,
   decisionsAnswerPlaceholder: "Írd le a választ...",
+  decisionsTruncated: "Több mint 200 nyitott kérdés van. A legrégebbi 200 látszik.",
   // Provenance label for a rule-sourced check. Rule checks no longer appear in
   // the Döntések queue (they leave nobody to answer them — see queries.ts
   // openDecisionsWhere), but SOURCE_LABEL keeps this as a defensive fallback.
