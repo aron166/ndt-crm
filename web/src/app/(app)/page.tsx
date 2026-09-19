@@ -188,7 +188,7 @@ export default async function DashboardPage() {
                 ))}
                 {todayTasks.map((t) => (
                   <Link key={t.id} href={`/tasks/${t.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--line-soft)", textDecoration: "none" }} className="tbl-row">
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--indigo)", boxShadow: "0 0 6px oklch(0.66 0.19 278 / 0.6)", flexShrink: 0 }} />
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--indigo)", boxShadow: "0 0 6px var(--indigo-glow)", flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
                       {t.company && <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>{t.company.name}</div>}

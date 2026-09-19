@@ -207,7 +207,7 @@ export function BoardClient({
               key={col.key}
               className="kcol"
               style={{
-                background: isHover && col.acceptsDrop ? `${col.color}10` : "oklch(0.18 0.014 255 / 0.5)",
+                background: isHover && col.acceptsDrop ? `${col.color}10` : "var(--bg-col)",
                 border: `1px solid ${isHover && col.acceptsDrop ? col.color : "var(--line-soft)"}`,
                 width: 280, flexShrink: 0,
                 opacity: isMuted ? 0.55 : 1,

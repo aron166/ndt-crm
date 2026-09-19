@@ -44,7 +44,7 @@ export default function LoginPage() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(900px 600px at 50% 40%, oklch(0.66 0.19 278 / 0.08), transparent 65%)",
+            "radial-gradient(900px 600px at 50% 40%, var(--row-hover), transparent 65%)",
         }}
       />
 
@@ -55,7 +55,7 @@ export default function LoginPage() {
             className="flex items-center justify-center rounded-xl mb-4"
             style={{
               width: 44, height: 44,
-              background: "linear-gradient(135deg, var(--indigo) 0%, oklch(0.56 0.18 295) 100%)",
+              background: "linear-gradient(135deg, var(--indigo) 0%, var(--brand-grad-end) 100%)",
               boxShadow: "var(--glow-indigo)",
             }}
           >
@@ -156,7 +156,7 @@ export default function LoginPage() {
                 border: "1px solid var(--indigo-dim)",
                 borderRadius: 6, color: "white", fontSize: 14, fontWeight: 500,
                 cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1,
-                boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6)",
+                boxShadow: "var(--shadow-primary)",
                 fontFamily: "inherit",
               }}
             >

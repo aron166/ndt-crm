@@ -255,7 +255,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           style={{
             display: "block", width: "100%", textAlign: "center", boxSizing: "border-box",
             padding: "18px 16px", fontSize: 22, fontWeight: 700, borderRadius: 12,
-            background: "linear-gradient(180deg, oklch(0.66 0.19 278), oklch(0.56 0.18 278))",
+            background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
             color: "white", textDecoration: "none",
           }}
         >
