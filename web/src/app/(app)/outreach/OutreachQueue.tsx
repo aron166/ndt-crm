@@ -608,7 +608,7 @@ export default function OutreachQueue({
                         disabled={!canSend(row.status) || busy}
                         style={{
                           fontSize: 14, fontWeight: 600, color: "var(--mint)", background: "var(--mint-soft)",
-                          border: "1px solid oklch(0.80 0.13 165 / 0.35)", borderRadius: 8, padding: "8px 14px",
+                          border: "1px solid var(--mint-line)", borderRadius: 8, padding: "8px 14px",
                           cursor: !canSend(row.status) || busy ? "default" : "pointer",
                           opacity: !canSend(row.status) || busy ? 0.5 : 1,
                         }}

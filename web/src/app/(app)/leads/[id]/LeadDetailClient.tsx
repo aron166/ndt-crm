@@ -257,7 +257,7 @@ export function LeadDetailClient({
             title="Kimenetel"
             style={{
               fontSize: 12, padding: "6px 10px", borderRadius: 6, fontWeight: 600,
-              background: outcome === "won" ? "var(--mint-soft)" : outcome === "lost" ? "oklch(0.7 0.15 25 / 0.15)" : "var(--bg-panel)",
+              background: outcome === "won" ? "var(--mint-soft)" : outcome === "lost" ? "var(--coral-soft)" : "var(--bg-panel)",
               border: `1px solid ${outcome === "won" ? "var(--mint)" : outcome === "lost" ? "var(--coral)" : "var(--line-soft)"}`,
               color: outcome === "won" ? "var(--mint)" : outcome === "lost" ? "var(--coral)" : "var(--fg)", outline: "none",
             }}

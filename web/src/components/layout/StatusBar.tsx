@@ -43,7 +43,7 @@ export function StatusBar({ collapsed, overdueCount = 0 }: StatusBarProps) {
       style={{
         left: collapsed ? "3.5rem" : "240px",
         height: 26,
-        background: "oklch(0.135 0.014 258 / 0.95)",
+        background: "var(--bg-sidebar-blur)",
         backdropFilter: "blur(8px)",
         borderTop: "1px solid var(--line-soft)",
         fontSize: 12,

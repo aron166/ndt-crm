@@ -30,7 +30,7 @@ export function MarkSentControl({
           title={disabledReason ?? undefined}
           style={{
             fontSize: 13, fontWeight: 500, color: "var(--mint)", background: "var(--mint-soft)",
-            border: "1px solid oklch(0.80 0.13 165 / 0.35)", borderRadius: 8, padding: "6px 12px",
+            border: "1px solid var(--mint-line)", borderRadius: 8, padding: "6px 12px",
             cursor: disabledReason ? "default" : "pointer", opacity: disabledReason ? 0.5 : 1,
           }}
         >
@@ -71,7 +71,7 @@ export function MarkSentControl({
           disabled={pending}
           style={{
             fontSize: 13, fontWeight: 500, color: "var(--mint)", background: "var(--mint-soft)",
-            border: "1px solid oklch(0.80 0.13 165 / 0.35)", borderRadius: 8, padding: "6px 12px",
+            border: "1px solid var(--mint-line)", borderRadius: 8, padding: "6px 12px",
             cursor: pending ? "default" : "pointer", opacity: pending ? 0.5 : 1,
           }}
         >

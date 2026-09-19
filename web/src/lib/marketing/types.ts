@@ -58,15 +58,31 @@ export const STATUS_LABELS: Record<ContentStatus, string> = {
   archived: "Archiválva",
 };
 
-export const STATUS_COLORS: Record<ContentStatus, string> = {
-  draft: "#64748b",
-  in_review: "#f59e0b",
-  changes_requested: "#f97316",
-  rewrite_requested: "#ef4444",
-  ai_working: "#8b5cf6",
-  live: "#22c55e",
-  archived: "#94a3b8",
+/**
+ * Status chip tones. Token triples rather than hex, so the chips stay
+ * readable in both themes — a hex tuned for the dark panel (#f59e0b as text)
+ * drops to ~2:1 on white. Six distinct hues plus two greys: the status is
+ * still legible from colour alone at a glance, in either theme.
+ */
+export interface StatusTone {
+  fg: string;
+  bg: string;
+  line: string;
+}
+
+export const STATUS_TONES: Record<ContentStatus, StatusTone> = {
+  draft:             { fg: "var(--fg-mute)",   bg: "var(--bg-raised)",   line: "var(--line-soft)" },
+  in_review:         { fg: "var(--amber-fg)",  bg: "var(--amber-soft)",  line: "var(--amber-line)" },
+  changes_requested: { fg: "var(--orange-fg)", bg: "var(--orange-soft)", line: "var(--orange-line)" },
+  rewrite_requested: { fg: "var(--coral-fg)",  bg: "var(--coral-soft)",  line: "var(--coral-line)" },
+  ai_working:        { fg: "var(--violet-fg)", bg: "var(--violet-soft)", line: "var(--violet-line)" },
+  live:              { fg: "var(--mint-fg)",   bg: "var(--mint-soft)",   line: "var(--mint-line)" },
+  archived:          { fg: "var(--fg-faint)",  bg: "var(--bg-raised)",   line: "var(--line-soft)" },
 };
+
+export function statusTone(status: string): StatusTone {
+  return STATUS_TONES[status as ContentStatus] ?? STATUS_TONES.draft;
+}
 
 // Order the review queue renders its status sections in.
 export const QUEUE_SECTION_ORDER: ContentStatus[] = [

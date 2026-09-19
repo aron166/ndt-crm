@@ -13,6 +13,7 @@ import {
   LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, promptLostReason, type LeadOutcome,
 } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { dataInk } from "@/lib/data-color";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 
 interface Lead {
@@ -92,7 +93,7 @@ function LeadCard({
         background: "var(--bg-panel)",
         border: `1px solid ${cbTone === "overdue" ? "var(--coral)" : "var(--line-soft)"}`,
         padding: "10px 12px", cursor: "grab",
-        boxShadow: "inset 0 1px 0 oklch(1 0 0 / 0.05)",
+        boxShadow: "inset 0 1px 0 var(--panel-edge)",
         transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
         willChange: "transform",
       }}
@@ -101,7 +102,7 @@ function LeadCard({
         e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseOut={(e) => {
-        e.currentTarget.style.boxShadow = "inset 0 1px 0 oklch(1 0 0 / 0.05)";
+        e.currentTarget.style.boxShadow = "inset 0 1px 0 var(--panel-edge)";
         e.currentTarget.style.transform = "none";
       }}
     >
@@ -180,7 +181,7 @@ function LeadCard({
           title="Visszahívás esedékes"
           style={{
             fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 6, width: "fit-content",
-            background: cbTone === "overdue" ? "var(--coral)" : cbTone === "soon" ? "oklch(0.7 0.15 25 / 0.18)" : "var(--bg-hover)",
+            background: cbTone === "overdue" ? "var(--coral)" : cbTone === "soon" ? "var(--coral-soft)" : "var(--bg-hover)",
             color: cbTone === "overdue" ? "white" : cbTone === "soon" ? "var(--coral)" : "var(--fg-mute)",
             fontWeight: cbTone ? 700 : 500,
           }}
@@ -341,9 +342,9 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
             style={{
               background: isHover
                 ? `${status.color}10`
-                : status.isCommitment ? `${status.color}0d` : "oklch(0.18 0.014 255 / 0.5)",
+                : status.isCommitment ? `${status.color}0d` : "var(--bg-col)",
               border: `1px solid ${isHover || status.isCommitment ? status.color : "var(--line-soft)"}`,
-              ...(status.isCommitment ? { boxShadow: `0 0 0 1px ${status.color}55, 0 0 14px ${status.color}22` } : {}),
+              ...(status.isCommitment ? { boxShadow: `0 0 0 1px ${status.color}55, 0 0 var(--glow-size) ${status.color}22` } : {}),
               transition: "border-color .15s, background .15s",
             }}
             onDragOver={(e) => { e.preventDefault(); setHoverCol(status.key); }}
@@ -351,7 +352,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
             onDrop={() => handleDrop(status.key)}
           >
             <div className="kcol-head">
-              <span className="kcol-dot" style={{ background: status.color, boxShadow: `0 0 8px ${status.color}` }} />
+              <span className="kcol-dot" style={{ background: status.color, boxShadow: `0 0 var(--glow-size) ${status.color}` }} />
               <span className="kcol-title">{status.label}</span>
               {status.isCommitment && (
                 <span
@@ -359,7 +360,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
                   title="Az időpont lefoglalása maga a megrendelés"
                   style={{
                     fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-                    color: status.color, background: `${status.color}1f`,
+                    color: dataInk(status.color), background: `${status.color}1f`,
                     border: `1px solid ${status.color}55`, borderRadius: 4, padding: "1px 5px",
                   }}
                 >

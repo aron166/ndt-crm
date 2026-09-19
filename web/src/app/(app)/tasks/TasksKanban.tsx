@@ -12,10 +12,10 @@ import { cn } from "@/lib/utils";
 import { BOOKING_KIND_LABEL, isBookingKind } from "@/lib/booking/priority";
 
 const COLUMNS = [
-  { key: "created",     label: "Kiírva",      color: "var(--fg-mute)",  glow: "oklch(0.62 0.012 255 / 0.4)" },
-  { key: "in_progress", label: "Folyamatban", color: "var(--indigo)",   glow: "oklch(0.66 0.19 278 / 0.4)"  },
-  { key: "done",        label: "Elvégezve",   color: "var(--mint)",     glow: "oklch(0.80 0.13 165 / 0.4)"  },
-  { key: "cancelled",   label: "Törölve",     color: "var(--coral)",    glow: "oklch(0.72 0.18 25 / 0.4)"   },
+  { key: "created",     label: "Kiírva",      color: "var(--fg-mute)",  glow: "var(--mute-glow)" },
+  { key: "in_progress", label: "Folyamatban", color: "var(--indigo)",   glow: "var(--indigo-glow)"  },
+  { key: "done",        label: "Elvégezve",   color: "var(--mint)",     glow: "var(--mint-glow)"  },
+  { key: "cancelled",   label: "Törölve",     color: "var(--coral)",    glow: "var(--coral-glow)"   },
 ] as const;
 
 type Status = (typeof COLUMNS)[number]["key"];
@@ -63,8 +63,8 @@ function isOverdue(dueDate: Date | null, status: string) {
 
 function avatarColor(name: string) {
   const colors = [
-    "oklch(0.66 0.19 278)", "oklch(0.80 0.13 165)", "oklch(0.80 0.15 75)",
-    "oklch(0.78 0.12 230)", "oklch(0.72 0.16 305)", "oklch(0.72 0.18 25)",
+    "var(--indigo)", "var(--mint)", "var(--amber)",
+    "var(--sky)", "var(--violet)", "var(--coral)",
   ];
   let h = 0;
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
@@ -75,8 +75,8 @@ function PersonAvatar({ name }: { name: string }) {
   const initials = name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
   return (
     <span
-      className="inline-flex items-center justify-center rounded-full font-mono-ndt text-white shrink-0"
-      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name) }}
+      className="inline-flex items-center justify-center rounded-full font-mono-ndt shrink-0"
+      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name), color: "var(--fg-on-accent)" }}
     >
       {initials}
     </span>
@@ -350,7 +350,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
               key={col.key}
               className="flex flex-col rounded-xl transition-all duration-150"
               style={{
-                background: isHover ? `${col.color}10` : "oklch(0.18 0.014 255 / 0.5)",
+                background: isHover ? `${col.color}10` : "var(--bg-col)",
                 border: `1px solid ${isHover ? col.color : "var(--line-soft)"}`,
                 minHeight: 200,
                 maxHeight: "calc(100vh - 215px)",

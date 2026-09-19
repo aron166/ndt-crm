@@ -187,7 +187,7 @@ export function PersonDetailClient({
           <div style={{
             width: 72, height: 72, borderRadius: "50%",
             background: avatarColor, display: "grid", placeItems: "center",
-            fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 22, color: "white",
+            fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 22, color: "var(--fg-on-accent)",
             flexShrink: 0, position: "relative",
           }}>
             {initials}
@@ -453,7 +453,7 @@ export function PersonDetailClient({
                         {conv.summary ?? conv.channel}
                       </span>
                       {conv.agent && (
-                        <span className="badge-ds" style={{ background: "var(--violet-soft, oklch(0.26 0.05 290))", color: "var(--violet)", border: "1px solid oklch(0.45 0.12 290)", fontSize: 12 }}>
+                        <span className="badge-ds" style={{ background: "var(--violet-soft)", color: "var(--violet)", border: "1px solid var(--violet-line)", fontSize: 12 }}>
                           {conv.agent.name} · {conv.agent.owner ?? conv.agent.role}
                         </span>
                       )}
@@ -470,7 +470,7 @@ export function PersonDetailClient({
                             borderRadius: 6,
                             fontSize: 14,
                             lineHeight: 1.5,
-                            background: msg.role === "user" ? "var(--bg-0)" : "oklch(0.24 0.04 290 / 0.5)",
+                            background: msg.role === "user" ? "var(--bg-0)" : "var(--violet-surface)",
                             color: msg.role === "user" ? "var(--fg-soft)" : "var(--fg)",
                             marginLeft: msg.role === "user" ? 0 : 16,
                             border: "1px solid var(--line-soft)",

@@ -56,7 +56,7 @@ export default async function LeadsPage({
           height: 26, padding: "0 12px", fontSize: 12, lineHeight: "26px",
           background: showConverted ? "var(--mint-soft)" : "var(--bg-panel)",
           color: showConverted ? "var(--mint)" : "var(--fg-mute)",
-          border: `1px solid ${showConverted ? "oklch(0.80 0.13 165 / 0.35)" : "var(--line-soft)"}`,
+          border: `1px solid ${showConverted ? "var(--mint-line)" : "var(--line-soft)"}`,
         }}
       >
         Lezárt · {convertedCount}

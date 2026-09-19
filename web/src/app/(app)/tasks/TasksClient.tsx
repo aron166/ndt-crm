@@ -135,7 +135,7 @@ export function TasksClient({ tasks }: TasksClientProps) {
                   textAlign: "left", padding: i === 0 ? "10px 12px" : "10px 16px",
                   fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em",
                   color: "var(--fg-faint)", borderBottom: "1px solid var(--line-soft)",
-                  background: "oklch(0.20 0.014 255 / 0.5)",
+                  background: "var(--bg-thead)",
                   display: i >= 2 && i <= 4 ? undefined : undefined,
                 }}>{h}</th>
               ))}
@@ -156,7 +156,7 @@ export function TasksClient({ tasks }: TasksClientProps) {
                 <tr
                   key={t.id}
                   style={{ borderBottom: "1px solid var(--line-soft)", transition: "background 0.12s", opacity: t.status === "done" ? 0.6 : 1 }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "oklch(0.66 0.19 278 / 0.05)")}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "var(--row-hover)")}
                   onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <td style={{ padding: "8px 12px", width: 36 }}>

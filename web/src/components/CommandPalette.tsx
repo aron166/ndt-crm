@@ -123,7 +123,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]"
-      style={{ background: "oklch(0 0 0 / 0.6)", backdropFilter: "blur(6px)" }}
+      style={{ background: "var(--overlay)", backdropFilter: "blur(6px)" }}
       onClick={onClose}
     >
       <div
@@ -131,7 +131,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--line)",
-          boxShadow: "var(--glow-indigo), 0 24px 64px -12px rgba(0,0,0,0.8)",
+          boxShadow: "var(--glow-indigo), 0 24px 64px -12px var(--shadow-heavy)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -194,7 +194,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     onMouseEnter={() => setActiveIdx(idx)}
                     className="w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors"
                     style={{
-                      background: isActive ? "oklch(0.66 0.19 278 / 0.12)" : "transparent",
+                      background: isActive ? "var(--tint-faint)" : "transparent",
                       borderLeft: isActive ? "2px solid var(--indigo)" : "2px solid transparent",
                     }}
                   >
@@ -215,7 +215,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     )}
                     {item.kind === "tag" && (
                       <div className="flex items-center gap-2">
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, boxShadow: `0 0 6px ${item.color}` }} />
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, boxShadow: `0 0 var(--glow-size) ${item.color}` }} />
                         <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{item.count}</span>
                       </div>
                     )}

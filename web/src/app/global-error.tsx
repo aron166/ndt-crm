@@ -1,5 +1,10 @@
 "use client";
 
+// Deliberately literal colours, and deliberately always dark. global-error
+// REPLACES the root layout when it fires, so globals.css is never applied
+// here — every var(--token) would resolve to nothing and the page would
+// render unstyled. This is the one screen the theme setting does not reach.
+
 export default function GlobalError({
   error,
   reset,

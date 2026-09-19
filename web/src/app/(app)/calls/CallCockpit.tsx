@@ -306,7 +306,7 @@ export default function CallCockpit({
                       style={{
                         display: "inline-flex", alignItems: "center", gap: 6,
                         fontSize: 16, fontWeight: 600, color: "var(--mint)",
-                        background: "var(--mint-soft)", border: "1px solid oklch(0.80 0.13 165 / 0.35)",
+                        background: "var(--mint-soft)", border: "1px solid var(--mint-line)",
                         padding: "8px 16px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap",
                       }}
                     >
@@ -494,7 +494,7 @@ function CallList({
                 style={{
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   fontSize: 14, fontWeight: 600, color: "var(--mint)", background: "var(--mint-soft)",
-                  border: "1px solid oklch(0.80 0.13 165 / 0.35)", padding: "5px 10px", borderRadius: 7,
+                  border: "1px solid var(--mint-line)", padding: "5px 10px", borderRadius: 7,
                   textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
                 }}
               >

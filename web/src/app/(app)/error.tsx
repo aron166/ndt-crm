@@ -14,7 +14,7 @@ export default function AppError({
     >
       <div
         className="font-mono-ndt text-xs px-2 py-0.5 rounded"
-        style={{ background: "var(--coral-soft)", color: "var(--coral)", border: "1px solid oklch(0.72 0.18 25 / 0.35)" }}
+        style={{ background: "var(--coral-soft)", color: "var(--coral)", border: "1px solid var(--coral-line)" }}
       >
         HIBA
       </div>

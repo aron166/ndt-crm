@@ -14,8 +14,8 @@ import { isConnected } from "@/lib/integrations/google_maps";
 const TENANT_ID = 1;
 
 const AVATAR_PALETTE = [
-  "oklch(0.66 0.19 278)", "oklch(0.80 0.13 165)", "oklch(0.80 0.15 75)",
-  "oklch(0.78 0.12 230)", "oklch(0.72 0.16 305)", "oklch(0.72 0.18 25)",
+  "var(--indigo)", "var(--mint)", "var(--amber)",
+  "var(--sky)", "var(--violet)", "var(--coral)",
 ];
 
 export default async function CompanyDetailPage({

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import dynamic from "next/dynamic";
 import { LogOut, User, Plus, Bell, Search, ChevronDown } from "lucide-react";
+import { ThemeMenuItem } from "./ThemeMenuItem";
 
 // The Topbar is in the app shell on EVERY route, and these two modals pull in
 // EntitySearch, Select, Textarea, FormField, the costing lib and two server
@@ -152,7 +153,7 @@ export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen
         style={{
           left: collapsed ? "3.5rem" : "240px",
           height: 60,
-          background: "oklch(0.155 0.012 255 / 0.85)",
+          background: "var(--bg-page-blur)",
           backdropFilter: "blur(12px)",
           borderBottom: "1px solid var(--line-soft)",
         }}
@@ -253,7 +254,7 @@ export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen
                 background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
                 color: "white", border: "1px solid var(--indigo-dim)",
                 borderRight: "none", borderRadius: "6px 0 0 6px",
-                boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6)",
+                boxShadow: "var(--shadow-primary)",
               }}
               onMouseOver={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
               onMouseOut={(e) => (e.currentTarget.style.filter = "none")}
@@ -261,7 +262,7 @@ export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen
               <Plus className="size-3.5" />
               Feladat
             </button>
-            <div style={{ width: 1, background: "oklch(0.56 0.18 278)" }} />
+            <div style={{ width: 1, background: "var(--indigo-dim)" }} />
             <button
               onClick={() => defaultPipeline ? openDeal() : router.push("/deals/setup")}
               onMouseEnter={prepDeal}
@@ -272,7 +273,7 @@ export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen
                 background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
                 color: "white", border: "1px solid var(--indigo-dim)",
                 borderLeft: "none", borderRadius: "0 6px 6px 0",
-                boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.3), 0 4px 14px -4px oklch(0.66 0.19 278 / 0.6)",
+                boxShadow: "var(--shadow-primary)",
               }}
               title="Új deal"
               onMouseOver={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
@@ -296,7 +297,7 @@ export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen
                   width: 28, height: 28,
                   background: "var(--indigo)",
                   color: "white",
-                  boxShadow: "0 0 0 2px oklch(0.66 0.19 278 / 0.25)",
+                  boxShadow: "var(--ring-indigo)",
                 }}
               >
                 {initials}
@@ -310,6 +311,7 @@ export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen
                 <User className="size-4" />
                 Profil
               </DropdownMenuItem>
+              <ThemeMenuItem />
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="gap-2 text-red-400 focus:text-red-400"

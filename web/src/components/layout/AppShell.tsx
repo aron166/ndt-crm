@@ -67,7 +67,7 @@ export function AppShell({ children, email, overdueCount = 0, marketingReviewCou
         <div
           aria-hidden
           onClick={() => setDrawerOpen(false)}
-          style={{ position: "fixed", inset: 0, zIndex: 40, background: "oklch(0 0 0 / 0.5)" }}
+          style={{ position: "fixed", inset: 0, zIndex: 40, background: "var(--overlay)" }}
         />
       )}
       <Sidebar

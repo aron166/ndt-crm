@@ -102,7 +102,7 @@ export function EntitySearch({
         <span className="absolute right-2 top-2 text-xs text-slate-400">...</span>
       )}
       {open && options.length > 0 && (
-        <ul style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", boxShadow: "0 8px 24px oklch(0 0 0 / 0.4)", maxHeight: 200, overflowY: "auto", listStyle: "none", padding: 0, margin: "4px 0 0" }}>
+        <ul style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", boxShadow: "0 8px 24px var(--shadow-color)", maxHeight: 200, overflowY: "auto", listStyle: "none", padding: 0, margin: "4px 0 0" }}>
           {options.map((opt) => (
             <li key={opt.id}>
               <button

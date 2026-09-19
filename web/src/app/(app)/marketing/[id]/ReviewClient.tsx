@@ -10,7 +10,7 @@ import {
   UI, CATEGORY_LABEL, VERDICT_LABEL, VERDICT_ACTION, AUTHOR_LABEL,
 } from "@/lib/content/labels";
 import { REVIEW_REASONS, REVIEW_REASON_LABEL, type ReviewReason } from "@/lib/content/reasons";
-import { STATUS_LABELS, STATUS_COLORS } from "@/lib/marketing/types";
+import { STATUS_LABELS, statusTone } from "@/lib/marketing/types";
 import type { ContentCategory, Verdict } from "@/lib/content/types";
 import type { ReviewPageData } from "@/lib/content/queries";
 import {
@@ -297,7 +297,7 @@ export function ReviewClient({
   }
 
   const categoryLabel = CATEGORY_LABEL[item.category as ContentCategory] ?? item.category;
-  const statusColor = STATUS_COLORS[item.status as keyof typeof STATUS_COLORS] ?? "#64748b";
+  const statusT = statusTone(item.status);
   const myVerdict = userId != null ? currentVersion?.reviews.find((r) => r.reviewerId === userId)?.verdict ?? null : null;
   const openChecksCount = checks.filter((c) => c.state === "open").length;
   const hasOpenChecks = openChecksCount > 0;
@@ -326,7 +326,7 @@ export function ReviewClient({
           {item.campaign && <span className="badge-ds slate">{item.campaign.name}</span>}
           <span
             className="status-chip"
-            style={{ color: statusColor, background: `${statusColor}1a`, borderColor: `${statusColor}40` }}
+            style={{ color: statusT.fg, background: statusT.bg, borderColor: statusT.line }}
           >
             {STATUS_LABELS[item.status as keyof typeof STATUS_LABELS] ?? item.status}
           </span>

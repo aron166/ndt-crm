@@ -260,11 +260,11 @@ export function CompanyDetailClient({
           <div style={{
             width: 72, height: 72, borderRadius: 14,
             background: avatarColor, display: "grid", placeItems: "center",
-            fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 22, color: "var(--fg)",
+            fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 22, color: "var(--fg-on-accent)",
             position: "relative", flexShrink: 0,
           }}>
             {initials}
-            <div style={{ position: "absolute", inset: 0, borderRadius: 14, boxShadow: "inset 0 1px 0 oklch(1 0 0 / 0.1), inset 0 -8px 16px oklch(0 0 0 / 0.2)" }} />
+            <div style={{ position: "absolute", inset: 0, borderRadius: 14, boxShadow: "var(--shadow-inset-deep)" }} />
           </div>
 
           {/* Company info */}
@@ -615,7 +615,7 @@ export function CompanyDetailClient({
               <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
                 {engagementBreakdown.map((x, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: 999, background: x.color, boxShadow: `0 0 6px ${x.color}`, flexShrink: 0 }} />
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: x.color, boxShadow: `0 0 var(--glow-size) ${x.color}`, flexShrink: 0 }} />
                     <span style={{ flex: 1, color: "var(--fg-soft)" }}>{x.label}</span>
                     <span style={{ fontFamily: "var(--font-mono)", color: "var(--fg-mute)" }}>{x.value}</span>
                   </div>

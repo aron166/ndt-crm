@@ -102,7 +102,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
               position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 50,
               minWidth: 220,
               background: "var(--bg-panel)", border: "1px solid var(--line-soft)",
-              borderRadius: 8, boxShadow: "0 8px 24px oklch(0 0 0 / 0.4)",
+              borderRadius: 8, boxShadow: "0 8px 24px var(--shadow-color)",
               overflow: "hidden",
             }}
           >
