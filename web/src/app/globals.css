@@ -104,6 +104,10 @@
   /* Ambient indigo wash (page radials, active-nav gradient tail). Distinct
      from --row-hover: that one is a hover state, this one is decoration. */
   --tint-faint:   oklch(0.66 0.19 278 / 0.09);
+  /* The active-nav gradient TAIL was 0.04 — a quarter of --indigo-soft and
+     less than half of --tint-faint. It is the most-looked-at pixel in the
+     app, so it keeps its own value rather than being rounded into one. */
+  --tint-faintest: oklch(0.66 0.19 278 / 0.04);
   /* The two Tailwind greys the palette remap borrows; they are their own
      values, not --line/--line-soft, and swapping them shifted every
      border-slate-200 in dark mode. */
@@ -136,12 +140,14 @@
      sidebar/statusbar over blur. */
   --overlay:          oklch(0 0 0 / 0.5);
   --shadow-color:     oklch(0 0 0 / 0.4);
-  --shadow-strong:    oklch(0 0 0 / 0.7);
+  --shadow-strong:    oklch(0 0 0 / 0.6);
+  --shadow-heavy:     oklch(0 0 0 / 0.8);
   --indigo-glow-strong: oklch(0.66 0.19 278 / 0.7);
   /* Dot glows are a length, not a colour, so one token kills every one of
      them in light mode — including the ones drawn in a DB-supplied hex that
      no colour token can reach. A glow on white is mud. */
   --glow-size:    8px;
+  --glow-size-sm: 6px;
   /* Ink for a chip whose colour comes from the database (lead statuses,
      pipeline stages, tags). 0% = use the stored colour as-is; light mode
      mixes all the way to --fg, because a swatch picked against the dark
@@ -213,6 +219,7 @@
   --panel-edge:   transparent;
   --dot-grid:     oklch(0.55 0.014 255 / 0.13);
   --tint-faint:   oklch(0.52 0.20 278 / 0.06);
+  --tint-faintest: oklch(0.52 0.20 278 / 0.03);
   --line-200:     oklch(0.55 0.014 255 / 0.22);
   --line-300:     oklch(0.50 0.016 255 / 0.32);
   --violet-surface: oklch(0.50 0.19 305 / 0.07);
@@ -239,9 +246,11 @@
 
   --overlay:          oklch(0.28 0.02 255 / 0.38);
   --shadow-color:     oklch(0.25 0.02 255 / 0.16);
-  --shadow-strong:    oklch(0.25 0.02 255 / 0.24);
+  --shadow-strong:    oklch(0.25 0.02 255 / 0.22);
+  --shadow-heavy:     oklch(0.25 0.02 255 / 0.28);
   --indigo-glow-strong: transparent;
   --glow-size:    0px;
+  --glow-size-sm: 0px;
   --data-ink-mix: 100%;
   --grid-line:        oklch(0.55 0.014 255 / 0.22);
   --brand-grad-end:   oklch(0.44 0.18 295);
@@ -635,7 +644,7 @@
   content: '';
   width: 5px; height: 5px; border-radius: 999px;
   background: currentColor;
-  box-shadow: 0 0 var(--glow-size) currentColor;
+  box-shadow: 0 0 var(--glow-size-sm) currentColor;
   flex-shrink: 0;
 }
 .badge-ds.indigo { color: var(--indigo-fg); background: var(--indigo-soft); border-color: var(--indigo-line); }

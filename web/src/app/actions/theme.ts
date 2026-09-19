@@ -22,10 +22,14 @@ export async function setTheme(theme: Theme) {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
 
-  await db.$executeRaw`
+  const rows = await db.$executeRaw`
     UPDATE "users"
        SET "settings" = jsonb_set(COALESCE("settings", '{}'::jsonb), ARRAY['theme'], ${JSON.stringify(theme)}::jsonb, true)
      WHERE "id" = ${userId} AND "tenant_id" = ${TENANT_ID}`;
+  // Nothing written means nothing to show. Unreachable today, since
+  // crmUserIdForEmail already resolves the id within this tenant — but
+  // without the check the toggle would report success and roll nothing back.
+  if (rows === 0) return { error: NOT_A_CRM_USER };
 
   // The attribute is rendered by the root layout, so every route's HTML is
   // stale after a flip.
