@@ -178,11 +178,37 @@ export function pendingForReviewerWhere(tenantId: number, userId: number): Prism
   };
 }
 
-/** Nav badge + dashboard tile: current versions I have not judged yet. */
+/**
+ * A rule-bounced item: the machine sent it back, so there is no verdict
+ * pending on it, but it still sits in the reviewer's `mine` section because
+ * somebody has to know it exists. Kept next to pendingForReviewerWhere so the
+ * two stay in step.
+ */
+export function bouncedByRuleWhere(tenantId: number): Prisma.ContentItemWhereInput {
+  return {
+    tenantId,
+    status: { in: ["rewrite_requested", "changes_requested"] },
+    checks: { some: { state: "open", source: "rule" } },
+  };
+}
+
+/**
+ * Nav badge + dashboard tile. Counts exactly what `getInbox(...).mine` shows:
+ * versions I have not judged, PLUS rule-bounced items. The badge and the "Rám
+ * vár" section must agree — a badge reading 16 over a list of 22 is its own
+ * small lie, and this screen has already cost us two "why can't I see it"
+ * threads.
+ *
+ * The DIGEST deliberately does NOT include bounced items (it still uses
+ * pendingForReviewerWhere): its sentence is "N anyag vár Önre", and a bounced
+ * item is waiting on a text fix, not on the reviewer's judgement.
+ */
 export async function countPendingForReviewer(tenantId: number, userId: number): Promise<number> {
   const reviewers = await getContentReviewers(tenantId);
   if (!reviewers.includes(userId)) return 0;
-  return db.contentItem.count({ where: pendingForReviewerWhere(tenantId, userId) });
+  return db.contentItem.count({
+    where: { OR: [pendingForReviewerWhere(tenantId, userId), bouncedByRuleWhere(tenantId)] },
+  });
 }
 
 export interface ReviewPageData {
