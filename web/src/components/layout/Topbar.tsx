@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import dynamic from "next/dynamic";
 import { LogOut, User, Plus, Bell, Search, ChevronDown } from "lucide-react";
+import { ThemeMenuItem } from "./ThemeMenuItem";
 
 // The Topbar is in the app shell on EVERY route, and these two modals pull in
 // EntitySearch, Select, Textarea, FormField, the costing lib and two server
@@ -310,6 +311,7 @@ export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen
                 <User className="size-4" />
                 Profil
               </DropdownMenuItem>
+              <ThemeMenuItem />
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="gap-2 text-red-400 focus:text-red-400"
