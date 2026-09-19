@@ -60,9 +60,6 @@ function Row({ row }: { row: DecisionRow }) {
         </Link>
       </div>
 
-      <label htmlFor={inputId} style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
-        {row.question}
-      </label>
       <textarea
         id={inputId}
         aria-label={row.question}
