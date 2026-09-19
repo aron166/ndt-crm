@@ -344,7 +344,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
                 ? `${status.color}10`
                 : status.isCommitment ? `${status.color}0d` : "var(--bg-col)",
               border: `1px solid ${isHover || status.isCommitment ? status.color : "var(--line-soft)"}`,
-              ...(status.isCommitment ? { boxShadow: `0 0 0 1px ${status.color}55, 0 0 14px ${status.color}22` } : {}),
+              ...(status.isCommitment ? { boxShadow: `0 0 0 1px ${status.color}55, 0 0 var(--glow-size) ${status.color}22` } : {}),
               transition: "border-color .15s, background .15s",
             }}
             onDragOver={(e) => { e.preventDefault(); setHoverCol(status.key); }}

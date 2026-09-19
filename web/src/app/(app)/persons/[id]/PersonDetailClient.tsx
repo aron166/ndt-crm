@@ -187,7 +187,7 @@ export function PersonDetailClient({
           <div style={{
             width: 72, height: 72, borderRadius: "50%",
             background: avatarColor, display: "grid", placeItems: "center",
-            fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 22, color: "white",
+            fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 22, color: "var(--fg-on-accent)",
             flexShrink: 0, position: "relative",
           }}>
             {initials}

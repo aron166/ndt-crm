@@ -294,7 +294,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
                         fontSize: 14, fontWeight: 500,
                         color: active ? "var(--fg)" : "var(--fg-soft)",
                         background: active
-                          ? "linear-gradient(90deg, var(--indigo-soft), var(--tint-faint))"
+                          ? "linear-gradient(90deg, var(--indigo-soft), var(--tint-faintest))"
                           : "transparent",
                       }}
                       onMouseOver={(e) => { if (!active) e.currentTarget.style.background = "var(--bg-hover)"; }}

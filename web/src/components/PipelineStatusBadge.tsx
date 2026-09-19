@@ -35,7 +35,7 @@ export function PipelineStatusBadge({
         style={{
           width: 5, height: 5, borderRadius: 999,
           background: "currentColor",
-          boxShadow: "0 0 var(--glow-size) currentColor",
+          boxShadow: "0 0 var(--glow-size-sm) currentColor",
           flexShrink: 0,
         }}
       />

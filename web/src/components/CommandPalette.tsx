@@ -131,7 +131,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         style={{
           background: "var(--bg-panel)",
           border: "1px solid var(--line)",
-          boxShadow: "var(--glow-indigo), 0 24px 64px -12px var(--shadow-strong)",
+          boxShadow: "var(--glow-indigo), 0 24px 64px -12px var(--shadow-heavy)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -215,7 +215,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     )}
                     {item.kind === "tag" && (
                       <div className="flex items-center gap-2">
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, boxShadow: `0 0 6px ${item.color}` }} />
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, boxShadow: `0 0 var(--glow-size) ${item.color}` }} />
                         <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{item.count}</span>
                       </div>
                     )}

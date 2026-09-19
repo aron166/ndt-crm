@@ -253,7 +253,7 @@ export default async function AnalyticsPage({
                 className="flex items-center gap-2"
                 style={{ fontSize: 14, color: "var(--fg-soft)" }}
               >
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color, flexShrink: 0, boxShadow: `0 0 4px ${p.color}` }} />
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color, flexShrink: 0, boxShadow: `0 0 var(--glow-size) ${p.color}` }} />
                 <PipelineStatusBadge status={p.status} />
                 <span className="font-mono-ndt ml-auto" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
                   {p.count.toLocaleString("hu-HU")}

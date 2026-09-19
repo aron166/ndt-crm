@@ -86,7 +86,7 @@ function StatusRow({
         >
           <GripVertical style={{ width: 14, height: 14, color: "var(--fg-faint)" }} />
         </span>
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: status.color, flexShrink: 0, boxShadow: `0 0 6px ${status.color}` }} />
+        <span style={{ width: 10, height: 10, borderRadius: "50%", background: status.color, flexShrink: 0, boxShadow: `0 0 var(--glow-size) ${status.color}` }} />
         <span style={{ flex: 1, fontSize: 14, color: "var(--fg)" }}>{status.label}</span>
         {status.isInitial && <span className="badge-ds indigo" style={{ fontSize: 12 }}>Kezdő</span>}
         {status.isCommitment && (
@@ -123,6 +123,7 @@ function StatusRow({
               style={{
                 width: 24, height: 24, borderRadius: "50%", background: c, cursor: "pointer",
                 outline: color === c ? `2px solid ${c}` : "none", outlineOffset: 2,
+                // affordance, not decoration — keep a literal radius in both themes so the selected swatch stays visible
                 boxShadow: color === c ? `0 0 8px ${c}` : "none",
               }}
             />
