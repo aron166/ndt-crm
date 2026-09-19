@@ -123,7 +123,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]"
-      style={{ background: "oklch(0 0 0 / 0.6)", backdropFilter: "blur(6px)" }}
+      style={{ background: "var(--overlay)", backdropFilter: "blur(6px)" }}
       onClick={onClose}
     >
       <div

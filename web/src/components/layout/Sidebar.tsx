@@ -234,7 +234,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
               style={{
                 width: 28, height: 28,
                 background: "linear-gradient(135deg, var(--indigo) 0%, var(--brand-grad-end) 100%)",
-                boxShadow: "0 0 0 1px oklch(0.66 0.19 278 / 0.5), 0 6px 20px -4px oklch(0.66 0.19 278 / 0.4)",
+                boxShadow: "var(--glow-indigo)",
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -297,7 +297,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
                           ? "linear-gradient(90deg, var(--indigo-soft), var(--row-hover))"
                           : "transparent",
                       }}
-                      onMouseOver={(e) => { if (!active) e.currentTarget.style.background = "var(--line-soft)"; }}
+                      onMouseOver={(e) => { if (!active) e.currentTarget.style.background = "var(--bg-hover)"; }}
                       onMouseOut={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
                     >
                       {/* Active indicator */}

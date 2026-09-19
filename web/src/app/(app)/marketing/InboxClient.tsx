@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { restoreContent } from "@/app/actions/content";
 import { UI, CATEGORY_LABEL, VERDICT_LABEL } from "@/lib/content/labels";
 import { CONTENT_CATEGORIES, type ContentCategory, type Verdict } from "@/lib/content/types";
-import { STATUS_LABELS, STATUS_COLORS, CONTENT_STATUSES } from "@/lib/marketing/types";
+import { STATUS_LABELS, statusTone, CONTENT_STATUSES } from "@/lib/marketing/types";
 import type { InboxSections, InboxRow } from "@/lib/content/queries";
 import { ReviewerSettings } from "./ReviewerSettings";
 import { BulkBar } from "./BulkBar";
@@ -105,13 +105,13 @@ export function Pager({
 }
 
 function StatusChip({ status }: { status: string }) {
-  const color = STATUS_COLORS[status as keyof typeof STATUS_COLORS] ?? "#64748b";
+  const tone = statusTone(status);
   const label = STATUS_LABELS[status as keyof typeof STATUS_LABELS] ?? status;
   return (
     <span
       className="font-mono-ndt"
       style={{
-        fontSize: 12, color, background: `${color}1a`, border: `1px solid ${color}40`,
+        fontSize: 12, color: tone.fg, background: tone.bg, border: `1px solid ${tone.line}`,
         borderRadius: 4, padding: "1px 6px",
       }}
     >

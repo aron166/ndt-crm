@@ -90,7 +90,7 @@ function StatusRow({
         <span style={{ flex: 1, fontSize: 14, color: "var(--fg)" }}>{status.label}</span>
         {status.isInitial && <span className="badge-ds indigo" style={{ fontSize: 12 }}>Kezdő</span>}
         {status.isCommitment && (
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#16a34a", background: "#16a34a1f", border: "1px solid #16a34a55", borderRadius: 4, padding: "1px 6px" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--mint-fg)", background: "var(--mint-soft)", border: "1px solid var(--mint-line)", borderRadius: 4, padding: "1px 6px" }}>
             Megrendelés
           </span>
         )}
