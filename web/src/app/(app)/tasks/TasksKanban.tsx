@@ -75,8 +75,8 @@ function PersonAvatar({ name }: { name: string }) {
   const initials = name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
   return (
     <span
-      className="inline-flex items-center justify-center rounded-full font-mono-ndt text-white shrink-0"
-      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name) }}
+      className="inline-flex items-center justify-center rounded-full font-mono-ndt shrink-0"
+      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name), color: "var(--fg-on-accent)" }}
     >
       {initials}
     </span>

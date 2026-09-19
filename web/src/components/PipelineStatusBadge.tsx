@@ -2,13 +2,13 @@
 const STATUS_MAP: Record<number, { label: string; color: string; bg: string; border: string }> = {
   0: { label: "KUKA",        color: "var(--fg-faint)",  bg: "var(--bg-raised)",   border: "var(--line-soft)" },
   1: { label: "Nem hívtuk",  color: "var(--fg-mute)",   bg: "var(--bg-raised)",   border: "var(--line-soft)" },
-  2: { label: "NV",          color: "var(--amber)",      bg: "var(--amber-soft)",  border: "var(--amber-line)" },
-  3: { label: "Érdeklődő",   color: "var(--sky)",        bg: "var(--sky-soft)",    border: "var(--sky-line)" },
-  4: { label: "Nem érdekelt",color: "var(--coral)",      bg: "var(--coral-soft)",  border: "var(--coral-line)" },
-  5: { label: "Kéri",        color: "var(--mint)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
-  6: { label: "Folyamatban", color: "var(--indigo)",     bg: "var(--indigo-soft)", border: "var(--indigo-line)" },
+  2: { label: "NV",          color: "var(--amber-fg)",      bg: "var(--amber-soft)",  border: "var(--amber-line)" },
+  3: { label: "Érdeklődő",   color: "var(--sky-fg)",        bg: "var(--sky-soft)",    border: "var(--sky-line)" },
+  4: { label: "Nem érdekelt",color: "var(--coral-fg)",      bg: "var(--coral-soft)",  border: "var(--coral-line)" },
+  5: { label: "Kéri",        color: "var(--mint-fg)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
+  6: { label: "Folyamatban", color: "var(--indigo-fg)",     bg: "var(--indigo-soft)", border: "var(--indigo-line)" },
   7: { label: "CL",          color: "var(--fg-faint)",   bg: "var(--bg-raised)",   border: "var(--line-soft)" },
-  8: { label: "CW",          color: "var(--mint)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
+  8: { label: "CW",          color: "var(--mint-fg)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
 };
 
 export function PipelineStatusBadge({
@@ -35,7 +35,7 @@ export function PipelineStatusBadge({
         style={{
           width: 5, height: 5, borderRadius: 999,
           background: "currentColor",
-          boxShadow: `0 0 6px currentColor`,
+          boxShadow: "0 0 var(--glow-size) currentColor",
           flexShrink: 0,
         }}
       />

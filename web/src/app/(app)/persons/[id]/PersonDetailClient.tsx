@@ -470,7 +470,7 @@ export function PersonDetailClient({
                             borderRadius: 6,
                             fontSize: 14,
                             lineHeight: 1.5,
-                            background: msg.role === "user" ? "var(--bg-0)" : "var(--violet-soft)",
+                            background: msg.role === "user" ? "var(--bg-0)" : "var(--violet-surface)",
                             color: msg.role === "user" ? "var(--fg-soft)" : "var(--fg)",
                             marginLeft: msg.role === "user" ? 0 : 16,
                             border: "1px solid var(--line-soft)",

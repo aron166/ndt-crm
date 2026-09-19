@@ -21,7 +21,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         position: "fixed", left: "50%", transform: "translateX(-50%)",
         bottom: "max(16px, env(safe-area-inset-bottom))",
         zIndex: 60, display: "flex", alignItems: "center", gap: 12,
-        padding: "10px 14px", boxShadow: "0 8px 24px -8px var(--shadow-color)",
+        padding: "10px 14px", boxShadow: "0 8px 24px -8px var(--shadow-strong)",
         maxWidth: "calc(100vw - 32px)",
       }}
     >

@@ -212,7 +212,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(800px 200px at 0% 0%, var(--indigo-soft), transparent 60%)",
+          background: "radial-gradient(800px 200px at 0% 0%, var(--tint-faint), transparent 60%)",
         }}
       />
 
@@ -294,7 +294,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
                         fontSize: 14, fontWeight: 500,
                         color: active ? "var(--fg)" : "var(--fg-soft)",
                         background: active
-                          ? "linear-gradient(90deg, var(--indigo-soft), var(--row-hover))"
+                          ? "linear-gradient(90deg, var(--indigo-soft), var(--tint-faint))"
                           : "transparent",
                       }}
                       onMouseOver={(e) => { if (!active) e.currentTarget.style.background = "var(--bg-hover)"; }}
@@ -307,7 +307,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
                           style={{
                             left: -10, top: 6, bottom: 6, width: 2,
                             background: "var(--indigo)",
-                            boxShadow: "0 0 12px var(--indigo-glow)",
+                            boxShadow: "0 0 12px var(--indigo-glow-strong)",
                           }}
                         />
                       )}

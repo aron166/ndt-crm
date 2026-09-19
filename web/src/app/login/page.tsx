@@ -44,7 +44,7 @@ export default function LoginPage() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(900px 600px at 50% 40%, var(--indigo-soft), transparent 65%)",
+            "radial-gradient(900px 600px at 50% 40%, var(--tint-faint), transparent 65%)",
         }}
       />
 

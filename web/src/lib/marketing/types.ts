@@ -80,10 +80,8 @@ export const STATUS_TONES: Record<ContentStatus, StatusTone> = {
   archived:          { fg: "var(--fg-faint)",  bg: "var(--bg-raised)",   line: "var(--line-soft)" },
 };
 
-export const UNKNOWN_STATUS_TONE: StatusTone = STATUS_TONES.draft;
-
 export function statusTone(status: string): StatusTone {
-  return STATUS_TONES[status as ContentStatus] ?? UNKNOWN_STATUS_TONE;
+  return STATUS_TONES[status as ContentStatus] ?? STATUS_TONES.draft;
 }
 
 // Order the review queue renders its status sections in.

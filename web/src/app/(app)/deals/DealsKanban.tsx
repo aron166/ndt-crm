@@ -283,7 +283,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
               onDrop={() => handleDrop(stage.id)}
             >
               <div className="kcol-head">
-                <span className="kcol-dot" style={{ background: stage.color, boxShadow: `0 0 8px ${stage.color}` }} />
+                <span className="kcol-dot" style={{ background: stage.color, boxShadow: `0 0 var(--glow-size) ${stage.color}` }} />
                 <span className="kcol-title">{stage.name}</span>
                 <span className="kcol-count font-mono-ndt">{cards.length}</span>
                 {colValue > 0 && (

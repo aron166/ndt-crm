@@ -13,6 +13,7 @@ import {
   LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, promptLostReason, type LeadOutcome,
 } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { dataInk } from "@/lib/data-color";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 
 interface Lead {
@@ -351,7 +352,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
             onDrop={() => handleDrop(status.key)}
           >
             <div className="kcol-head">
-              <span className="kcol-dot" style={{ background: status.color, boxShadow: `0 0 8px ${status.color}` }} />
+              <span className="kcol-dot" style={{ background: status.color, boxShadow: `0 0 var(--glow-size) ${status.color}` }} />
               <span className="kcol-title">{status.label}</span>
               {status.isCommitment && (
                 <span
@@ -359,7 +360,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
                   title="Az időpont lefoglalása maga a megrendelés"
                   style={{
                     fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-                    color: status.color, background: `${status.color}1f`,
+                    color: dataInk(status.color), background: `${status.color}1f`,
                     border: `1px solid ${status.color}55`, borderRadius: 4, padding: "1px 5px",
                   }}
                 >

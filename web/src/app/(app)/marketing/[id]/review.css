@@ -94,7 +94,7 @@
   font-size: 13px;
   color: var(--coral);
   background: var(--coral-soft);
-  border: 1px solid oklch(0.72 0.18 25 / 0.35);
+  border: 1px solid var(--coral-line);
   border-radius: var(--r-md);
   padding: 8px 12px;
   margin: 8px 0 0;
@@ -567,7 +567,7 @@
 .lightbox {
   position: fixed;
   inset: 0;
-  background: oklch(0.05 0 0 / 0.85);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
