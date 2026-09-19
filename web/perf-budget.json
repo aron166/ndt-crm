@@ -1,12 +1,29 @@
 {
   "_comment": "Regression gate for scripts/check-bundle.mjs, not a target to design down to. Seeded from an actual `next build` on 2026-09-17 (feat/content-board) with ~10% headroom over the measured KB. Bump a number deliberately (with a reason in the PR) when a route legitimately grows; see docs/ci.md.",
-  "shared": { "maxKB": 612 },
+  "shared": {
+    "maxKB": 612
+  },
   "routes": {
-    "/marketing": { "maxKB": 624 },
-    "/marketing/[id]": { "maxKB": 631 },
-    "/marketing/live": { "maxKB": 606 },
-    "/outreach": { "maxKB": 926 },
-    "/drive": { "maxKB": 387 },
-    "/leads": { "maxKB": 947 }
+    "/marketing": {
+      "maxKB": 624
+    },
+    "/marketing/[id]": {
+      "maxKB": 631
+    },
+    "/marketing/live": {
+      "maxKB": 606
+    },
+    "/outreach": {
+      "maxKB": 926
+    },
+    "/drive": {
+      "maxKB": 387
+    },
+    "/leads": {
+      "maxKB": 947
+    },
+    "/marketing/decisions": {
+      "maxKB": 606
+    }
   }
 }
