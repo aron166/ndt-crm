@@ -12,6 +12,7 @@ export const CATEGORY_LABEL: Record<ContentCategory, string> = {
   landing: "Landing oldal",
   video: "Videó",
   image: "Kép",
+  decision: "Döntés",
   other: "Egyéb",
 };
 
@@ -149,4 +150,24 @@ export const UI = {
   outreachSlotSave: "Beállítás",
   outreachSlotClear: "Törlés",
   outreachSlotInvalid: `Adj meg egy kampányt és egy 1 és ${MAX_STEP} közötti érintés sorszámot.`,
+
+  // Döntések — the open-question queue across every item. ⚠ HU PROPOSALS.
+  decisionsTab: "Döntések",
+  decisionsTitle: "Döntések",
+  decisionsLead: "Minden nyitott kérdés, amire válasz kell. A legrégebbi elöl.",
+  decisionsEmpty: "Nincs megválaszolatlan kérdés.",
+  decisionsGroupAron: "Áronra vár",
+  decisionsGroupPeter: "Péterre vár",
+  decisionsGroupEither: "Bármelyikőtökre vár",
+  decisionsBlocks: "Ezt az anyagot blokkolja",
+  decisionsWaited: (n: number) => (n === 0 ? "ma érkezett" : `${n} napja vár`),
+  decisionsOpenCount: (n: number) => `${n} nyitott kérdés`,
+  decisionsAnswerPlaceholder: "Írd le a választ...",
+  decisionsFromRule: "Gépi szabály",
+  decisionsFromDecision: "Döntési kérdés",
+  decisionsFromImport: "Importált kérdés",
+  decisionsFromManual: "Kézi kérdés",
+  // Board: an item the RULE engine bounced, not a person.
+  bouncedByRule: "Szabály dobta vissza",
+  digestDecisions: (n: number) => `${n} megválaszolatlan kérdés vár Önre.`,
 };
