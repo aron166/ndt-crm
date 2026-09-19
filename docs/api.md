@@ -551,6 +551,13 @@ itself only fires when a price word (ár/díj/árajánlat) sits within ~40
 characters of a digit on the same line — a bare mention of "árajánlat" with no
 number nearby is not a price claim.
 
+`internal` means our own material — never customer-facing, never claim-checked,
+never sendable (it cannot fill an outreach campaign step), and never listed in
+the live library (`GET /api/content/live`). `POST /api/content/:id/versions`
+(below) accepts `internal` too: posting a new version is how a wrongly-set
+value gets corrected, since the create path above is idempotent on
+`external_ref` and won't touch an existing item.
+
 ### `POST /api/content` — submit a new item (v1, straight into review)
 
 ```bash
@@ -655,7 +662,11 @@ Posts the app's rewrite as a new, immutable version. `body` (1-50000),
 `change_note` (1-4000, required), `based_on_version_id` (positive int,
 required); a Zod failure is `400 { error, details }`. Optional
 `needs_human_asset` flags that the change needs an image/video a human must
-produce (the skill doesn't regenerate media).
+produce (the skill doesn't regenerate media). Optional `internal` corrects a
+wrongly-set flag on the item (see the Content section above): the new version
+is evaluated against the corrected value, so a version posted with
+`internal: true` is exempt from the claim rules and resolves any rule checks
+that had wrongly fired. Omitted → the item's current `internal` is unchanged.
 
 **Race rule (409):** the app must hold a live claim on the item and
 `based_on_version_id` must equal the item's current version — if a human

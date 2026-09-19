@@ -51,6 +51,22 @@ describe("POST /api/content/:id/versions", () => {
     expect(await res.json()).toEqual({ ok: true, versionId: 9, number: 2 });
   });
 
+  it("passes internal: true through to createVersion", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    (createVersion as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, versionId: 9, number: 2 });
+    await POST(req({ ...VALID, internal: true }), params());
+    expect(createVersion).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.objectContaining({ internal: true }));
+  });
+
+  it("omitting internal passes undefined, not false", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    (createVersion as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, versionId: 9, number: 2 });
+    await POST(req(VALID), params());
+    expect(createVersion).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.objectContaining({ internal: undefined }));
+  });
+
   it("maps a service 409 (race rule) to HTTP 409", async () => {
     (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
     (createVersion as ReturnType<typeof vi.fn>).mockResolvedValue({

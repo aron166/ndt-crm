@@ -34,6 +34,8 @@ const versionSchema = z.object({
   self_note: z.string().trim().max(500).optional(),
   /** The source file changed: restate it as a new version (importer --refresh). */
   from_source: z.boolean().optional(),
+  /** Correct a wrongly-set internal flag on the item (see docs/api.md). */
+  internal: z.boolean().optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -71,6 +73,7 @@ export async function POST(request: Request, { params }: Params) {
         selfScore: input.self_score ?? null,
         selfNote: input.self_note ?? null,
         fromSource: input.from_source ?? false,
+        internal: input.internal,
       },
     );
     if (!result.ok) return json({ error: result.error }, result.status);

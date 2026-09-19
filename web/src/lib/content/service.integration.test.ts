@@ -738,4 +738,54 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     expect(item.status).toBe("in_review");
     await db.tenant.update({ where: { id: 1 }, data: { settings: saved as never } });
   });
+
+  it("posting a version with internal: true corrects a wrongly-set item and resolves the rules it wrongly fired", async () => {
+    const body = "Az ár 250 000 Ft. A méréshez röntgent használunk.";
+    const created = await service.createItem(appActor, {
+      title: title(), body, category: "script", channel: "other", contentType: "other",
+      source: "it", internal: false,
+    });
+    if (!created.ok) throw new Error("setup");
+    createdItemIds.push(created.itemId);
+    expect(created.status).toBe("rewrite_requested");
+    const openBefore = await db.contentCheck.findMany({
+      where: { itemId: created.itemId, source: "rule", state: "open" },
+    });
+    expect(openBefore.length).toBeGreaterThan(0);
+
+    const corrected = await service.createVersion(actorA(), created.itemId, {
+      body, changeNote: "internal was set wrong at intake", basedOnVersionId: created.versionId!,
+      internal: true,
+    });
+    expect(corrected.ok).toBe(true);
+    if (!corrected.ok) return;
+    expect(corrected.violations).toEqual([]);
+
+    const item = await db.contentItem.findUniqueOrThrow({
+      where: { id: created.itemId }, select: { internal: true, status: true },
+    });
+    expect(item.internal).toBe(true);
+    expect(item.status).toBe("in_review");
+    const openAfter = await db.contentCheck.count({
+      where: { itemId: created.itemId, source: "rule", state: "open" },
+    });
+    expect(openAfter).toBe(0);
+  });
+
+  it("omitting internal on a version leaves the item's internal flag unchanged", async () => {
+    const created = await service.createItem(appActor, {
+      title: title(), body: "internal reference text", category: "other", channel: "other",
+      contentType: "other", source: "it", internal: true,
+    });
+    if (!created.ok) throw new Error("setup");
+    createdItemIds.push(created.itemId);
+
+    const v2 = await service.createVersion(actorA(), created.itemId, {
+      body: "internal reference text v2", changeNote: null, basedOnVersionId: created.versionId!,
+    });
+    expect(v2.ok).toBe(true);
+
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: created.itemId }, select: { internal: true } });
+    expect(item.internal).toBe(true);
+  });
 });

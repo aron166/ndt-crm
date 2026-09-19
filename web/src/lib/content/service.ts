@@ -246,6 +246,14 @@ export interface CreateVersionInput {
    * Given → exactly these (the caller has verified storage paths / tenancy).
    */
   assets?: NewAssetInput[];
+  /**
+   * Correct a wrongly-set `internal` on the item. `internal` is the only gate
+   * that switches off the seven forbidden-claim rules, and `POST /api/content`
+   * is idempotent on `external_ref` — reposting cannot fix a mislabelled item —
+   * so a new version is the supported way to correct it. Omitted → the item's
+   * current value is unchanged.
+   */
+  internal?: boolean;
 }
 
 export interface NewAssetInput {
@@ -342,8 +350,13 @@ export async function createVersion(
       where: { id: itemId, tenantId: actor.tenantId },
       select: { id: true, category: true, format: true, campaignId: true, internal: true },
     });
+    // The corrected value, not the stale one: a version posted with
+    // internal: true must be evaluated as internal material so the claim
+    // rules do not fire on it (this is the whole point of the field).
+    const correctedInternal = input.internal ?? itemRow?.internal ?? false;
     const violations = itemRow
-      ? await reconcileRuleChecks(tx, actor.tenantId, itemId, await ruleContextFor(tx, actor.tenantId, itemRow, input.body))
+      ? await reconcileRuleChecks(tx, actor.tenantId, itemId,
+          await ruleContextFor(tx, actor.tenantId, { ...itemRow, internal: correctedInternal }, input.body))
       : [];
     const statusAfterRules = violations.length > 0 ? "rewrite_requested" : next.state.status;
 
@@ -355,13 +368,16 @@ export async function createVersion(
         claimedAt: null, claimedFrom: null, claimedBy: null,
         body: input.body,
         needsHumanAsset: actor.kind === "app" ? Boolean(input.needsHumanAsset) : false,
+        ...(input.internal !== undefined ? { internal: input.internal } : {}),
       },
     });
+    const internalChanged = input.internal !== undefined && itemRow?.internal !== input.internal;
     await writeAudit(tx, actor, "content_version", version.id, "create",
       { itemId, status: state.status, currentVersionId: state.currentVersionId },
       {
         itemId, number, status: statusAfterRules, basedOnVersionId: input.basedOnVersionId,
         ...(violations.length ? { ruleViolations: violations.map((v) => v.rule) } : {}),
+        ...(internalChanged ? { internal: { before: itemRow?.internal ?? false, after: input.internal } } : {}),
       });
     return { ok: true as const, versionId: version.id, number, violations };
   });
