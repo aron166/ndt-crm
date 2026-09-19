@@ -3,8 +3,8 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
 import { getContentReviewers } from "./reviewers";
-import { pendingForReviewerWhere } from "./queries";
-import { CATEGORY_LABEL } from "./labels";
+import { countOpenDecisions, pendingForReviewerWhere } from "./queries";
+import { CATEGORY_LABEL, UI } from "./labels";
 import { STALE_REVIEW_MS, type ContentCategory } from "./types";
 
 /**
@@ -29,6 +29,7 @@ export interface DigestInput {
   items: DigestItem[];
   now: Date;
   baseUrl: string;
+  openDecisions?: number;
 }
 
 /** "Nagy Péter" (last-name-first) → "Péter"; a single token is used as-is. */
@@ -38,8 +39,10 @@ function firstName(reviewerName: string): string {
 }
 
 export function buildDigest(input: DigestInput): { subject: string; text: string } | null {
-  const { reviewerName, items, now, baseUrl } = input;
-  if (items.length === 0) return null;
+  const { reviewerName, items, now, baseUrl, openDecisions = 0 } = input;
+  // A reviewer with zero items but open decisions still has work waiting: only
+  // skip the email when there is truly nothing for them.
+  if (items.length === 0 && openDecisions <= 0) return null;
 
   const oldestFirst = [...items].sort((a, b) => a.waitingSince.getTime() - b.waitingSince.getTime());
   const lines = oldestFirst.map((item) => {
@@ -52,12 +55,20 @@ export function buildDigest(input: DigestInput): { subject: string; text: string
     return `- ${item.title} (${label}), ${age}. ${baseUrl}/marketing/${item.id}`;
   });
 
-  const subject = `${items.length} anyag vár Önre`;
+  const subject = items.length > 0
+    ? `${items.length} anyag vár Önre`
+    : `${openDecisions} megválaszolatlan kérdés vár Önre`;
+
+  const decisionLines = openDecisions > 0
+    ? [UI.digestDecisions(openDecisions), `${baseUrl}/marketing/decisions`, ""]
+    : [];
+
   const text = [
     `Kedves ${firstName(reviewerName)}!`,
     "",
     ...lines,
-    "",
+    ...(lines.length > 0 ? [""] : []),
+    ...decisionLines,
     `Az összes anyag itt: ${baseUrl}/marketing`,
     "A napi összefoglaló ott kapcsolható ki.",
   ].join("\n");
@@ -139,6 +150,13 @@ export async function sendContentDigests(
   let sent = 0;
   let skipped = 0;
 
+  // ponytail: no userId -> aron|peter mapping exists in this codebase, so
+  // every reviewer gets the same tenant-wide open-decision count rather than
+  // one scoped to them; narrow with forWhom once that mapping exists. Hoisted
+  // out of the loop below: the arguments never change per reviewer, so one
+  // call covers all of them.
+  const openDecisions = await countOpenDecisions(tenantId);
+
   for (const reviewerId of reviewerIds) {
     try {
       if (optOut.includes(reviewerId)) {
@@ -167,6 +185,7 @@ export async function sendContentDigests(
           .map((i) => ({ id: i.id, title: i.title, category: i.category, waitingSince: i.currentVersion!.createdAt })),
         now,
         baseUrl,
+        openDecisions,
       });
       if (!digest) {
         skipped++;

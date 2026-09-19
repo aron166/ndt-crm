@@ -121,15 +121,24 @@ export async function createItem(
   actor: ContentActor,
   input: CreateItemInput,
   tx?: Tx,
-): Promise<{ ok: true; itemId: number; versionId: number | null; existed: boolean } | Fail> {
+): Promise<
+  | { ok: true; itemId: number; versionId: number | null; existed: boolean; status: ContentStatus; ruleChecks: number }
+  | Fail
+> {
   if (!input.body.trim() || input.body.length > CONTENT_BODY_MAX) return fail(400, "Invalid body");
   const run = async (t: Tx) => {
     if (input.externalRef) {
       const existing = await t.contentItem.findFirst({
         where: { tenantId: actor.tenantId, externalRef: input.externalRef },
-        select: { id: true, currentVersionId: true },
+        select: { id: true, currentVersionId: true, status: true },
       });
-      if (existing) return { ok: true as const, itemId: existing.id, versionId: existing.currentVersionId, existed: true };
+      if (existing) {
+        return {
+          ok: true as const, itemId: existing.id, versionId: existing.currentVersionId, existed: true,
+          status: isContentStatus(existing.status) ? existing.status : "draft",
+          ruleChecks: 0,
+        };
+      }
     }
     const item = await t.contentItem.create({
       data: {
@@ -166,7 +175,10 @@ export async function createItem(
     // duplicate_hook structurally dead on the submit path (Vanda, #104).
     const violations = await reconcileRuleChecks(t, actor.tenantId, item.id,
       await ruleContextFor(t, actor.tenantId,
-        { id: item.id, category: input.category, format: input.format ?? null, campaignId: input.campaignId ?? null },
+        {
+          id: item.id, category: input.category, format: input.format ?? null,
+          campaignId: input.campaignId ?? null, internal: input.internal ?? false,
+        },
         input.body));
     await t.contentItem.update({
       where: { id: item.id },
@@ -184,7 +196,11 @@ export async function createItem(
         externalRef: input.externalRef ?? null,
       });
     await writeAudit(t, actor, "content_version", version.id, "create", null, { itemId: item.id, number: 1 });
-    return { ok: true as const, itemId: item.id, versionId: version.id, existed: false };
+    return {
+      ok: true as const, itemId: item.id, versionId: version.id, existed: false,
+      status: violations.length > 0 ? "rewrite_requested" as const : "in_review" as const,
+      ruleChecks: violations.length,
+    };
   };
   try {
     return await (tx ? run(tx) : db.$transaction(run));
@@ -194,9 +210,15 @@ export async function createItem(
     if (!tx && input.externalRef && (err as { code?: string }).code === "P2002") {
       const existing = await db.contentItem.findFirst({
         where: { tenantId: actor.tenantId, externalRef: input.externalRef },
-        select: { id: true, currentVersionId: true },
+        select: { id: true, currentVersionId: true, status: true },
       });
-      if (existing) return { ok: true, itemId: existing.id, versionId: existing.currentVersionId, existed: true };
+      if (existing) {
+        return {
+          ok: true, itemId: existing.id, versionId: existing.currentVersionId, existed: true,
+          status: isContentStatus(existing.status) ? existing.status : "draft",
+          ruleChecks: 0,
+        };
+      }
     }
     throw err;
   }
@@ -224,6 +246,14 @@ export interface CreateVersionInput {
    * Given → exactly these (the caller has verified storage paths / tenancy).
    */
   assets?: NewAssetInput[];
+  /**
+   * Correct a wrongly-set `internal` on the item. `internal` is the only gate
+   * that switches off the seven forbidden-claim rules, and `POST /api/content`
+   * is idempotent on `external_ref` — reposting cannot fix a mislabelled item —
+   * so a new version is the supported way to correct it. Omitted → the item's
+   * current value is unchanged.
+   */
+  internal?: boolean;
 }
 
 export interface NewAssetInput {
@@ -318,10 +348,15 @@ export async function createVersion(
     // and each violation is an open check so the live gate blocks it.
     const itemRow = await tx.contentItem.findFirst({
       where: { id: itemId, tenantId: actor.tenantId },
-      select: { id: true, category: true, format: true, campaignId: true },
+      select: { id: true, category: true, format: true, campaignId: true, internal: true },
     });
+    // The corrected value, not the stale one: a version posted with
+    // internal: true must be evaluated as internal material so the claim
+    // rules do not fire on it (this is the whole point of the field).
+    const correctedInternal = input.internal ?? itemRow?.internal ?? false;
     const violations = itemRow
-      ? await reconcileRuleChecks(tx, actor.tenantId, itemId, await ruleContextFor(tx, actor.tenantId, itemRow, input.body))
+      ? await reconcileRuleChecks(tx, actor.tenantId, itemId,
+          await ruleContextFor(tx, actor.tenantId, { ...itemRow, internal: correctedInternal }, input.body))
       : [];
     const statusAfterRules = violations.length > 0 ? "rewrite_requested" : next.state.status;
 
@@ -333,13 +368,16 @@ export async function createVersion(
         claimedAt: null, claimedFrom: null, claimedBy: null,
         body: input.body,
         needsHumanAsset: actor.kind === "app" ? Boolean(input.needsHumanAsset) : false,
+        ...(input.internal !== undefined ? { internal: input.internal } : {}),
       },
     });
+    const internalChanged = input.internal !== undefined && itemRow?.internal !== input.internal;
     await writeAudit(tx, actor, "content_version", version.id, "create",
       { itemId, status: state.status, currentVersionId: state.currentVersionId },
       {
         itemId, number, status: statusAfterRules, basedOnVersionId: input.basedOnVersionId,
         ...(violations.length ? { ruleViolations: violations.map((v) => v.rule) } : {}),
+        ...(internalChanged ? { internal: { before: itemRow?.internal ?? false, after: input.internal } } : {}),
       });
     return { ok: true as const, versionId: version.id, number, violations };
   });
@@ -515,11 +553,20 @@ export async function setOutreachSlot(
   return db.$transaction(async (tx) => {
     const row = await tx.contentItem.findFirst({
       where: { id: itemId, tenantId: actor.tenantId },
-      select: { id: true, category: true, outreachCampaign: true, outreachStep: true },
+      select: { id: true, category: true, internal: true, outreachCampaign: true, outreachStep: true },
     });
     if (!row) return fail(404, "Nem található");
     if (slot && row.category !== "email") {
       return fail(400, "Csak e-mail tartalom tehető kampánylépésbe");
+    }
+    // `internal` means never sent to a customer — the intake schema already
+    // says "INTERNAL angles are never postable" — so enforcing it here is what
+    // makes the relaxed claim-rule gate (rules.ts isCustomerFacingCopy) safe:
+    // an internal item is exactly the one the claim rules no longer check.
+    // "live" still means approved library material, which stays legitimate —
+    // this only blocks the step that feeds the cold-email send flow.
+    if (slot && row.internal) {
+      return fail(400, "Belső anyag nem tölthet be kampánylépést"); // ⚠ HU PROPOSAL
     }
     if (slot) {
       const taken = await tx.contentItem.findFirst({
@@ -595,7 +642,7 @@ async function reconcileRuleChecks(
   tx: Tx,
   tenantId: number,
   itemId: number,
-  ctx: { category: string; format?: string | null; body: string; footer?: string | null; requiresFooter?: boolean; otherHooks?: string[]; recipientVerified?: boolean | null },
+  ctx: { category: string; format?: string | null; body: string; footer?: string | null; requiresFooter?: boolean; otherHooks?: string[]; recipientVerified?: boolean | null; internal?: boolean },
 ): Promise<{ rule: string; message: string }[]> {
   const violations = runContentRules(ctx);
   const open = violations.map((v) => `${RULE_CHECK_PREFIX} ${v.message}`);
@@ -631,7 +678,7 @@ async function reconcileRuleChecks(
 async function ruleContextFor(
   tx: Tx,
   tenantId: number,
-  item: { id: number; category: string; format?: string | null; campaignId?: number | null },
+  item: { id: number; category: string; format?: string | null; campaignId?: number | null; internal?: boolean },
   body: string,
 ): Promise<Parameters<typeof reconcileRuleChecks>[3]> {
   const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
@@ -657,6 +704,7 @@ async function ruleContextFor(
     // Cold outreach email copy must carry the consent line.
     requiresFooter: item.category === "email",
     otherHooks: siblings.map((s) => s.hook ?? "").filter(Boolean),
+    internal: item.internal ?? false,
   };
 }
 
@@ -677,7 +725,7 @@ export const CHECK_FOR = ["aron", "peter", "either"] as const;
 export interface CheckInput {
   question: string;
   forWhom?: string;
-  source?: "import" | "manual";
+  source?: "import" | "manual" | "decision";
 }
 
 /**
@@ -720,6 +768,12 @@ export async function setCheckState(
     return fail(400, state === "resolved" ? "Írd le a választ" : "Írd le, miért nem kell ez");
   }
   if (answer && answer.length > CHECK_ANSWER_MAX) return fail(400, "A válasz túl hosszú");
+
+  // Settling the LAST open check can take an item live (below), so this is a
+  // publish-privilege boundary, not a comment box — same class of hole as
+  // PR #104. Any CRM user must not be able to settle a check.
+  const reviewers = await getContentReviewers(actor.tenantId);
+  if (!reviewers.includes(actor.userId)) return fail(403, "Nem vagy bíráló ennél a cégnél");
 
   return db.$transaction(async (tx) => {
     const check = await tx.contentCheck.findFirst({
@@ -886,10 +940,12 @@ export interface QueueItem {
   } | null;
 }
 
-export async function getQueue(tenantId: number, statuses: ContentStatus[]): Promise<QueueItem[]> {
+export async function getQueue(
+  tenantId: number, statuses: ContentStatus[], opts: { category?: string } = {},
+): Promise<QueueItem[]> {
   await releaseStaleClaims(tenantId);
   const items = await db.contentItem.findMany({
-    where: { tenantId, status: { in: statuses } },
+    where: { tenantId, status: { in: statuses }, ...(opts.category ? { category: opts.category } : {}) },
     orderBy: { updatedAt: "asc" },
     take: 100,
     select: {

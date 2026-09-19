@@ -66,6 +66,8 @@ export const contentIntakeSchema = z.object({
   ),
   // INTERNAL angles are never postable; the publish flow is hidden for them.
   internal: boolish,
+  // category: "decision" only — who the answer is needed from; defaults to "either".
+  decided_by: z.enum(["aron", "peter", "either"]).optional(),
 
   /** The company this piece is for: its dossier feeds the rewrite loop. */
   company_id: z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional()),

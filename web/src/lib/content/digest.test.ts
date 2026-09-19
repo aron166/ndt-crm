@@ -3,12 +3,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const tenantFindUnique = vi.fn();
 const userFindFirst = vi.fn();
 const contentItemFindMany = vi.fn();
+const contentCheckCount = vi.fn();
 const executeRaw = vi.fn();
 vi.mock("@/lib/db", () => ({
   db: {
     tenant: { findUnique: (...a: unknown[]) => tenantFindUnique(...a) },
     user: { findFirst: (...a: unknown[]) => userFindFirst(...a) },
     contentItem: { findMany: (...a: unknown[]) => contentItemFindMany(...a) },
+    contentCheck: { count: (...a: unknown[]) => contentCheckCount(...a) },
     $executeRaw: (...a: unknown[]) => executeRaw(...a),
   },
 }));
@@ -100,6 +102,28 @@ describe("buildDigest", () => {
     expect(d.text).toContain(`${BASE}/marketing/9`);
     expect(d.text).toContain(`${BASE}/marketing`);
   });
+
+  it("still returns null with zero items and zero (or no) open decisions", () => {
+    expect(buildDigest({ reviewerId: 1, reviewerName: "Áron", items: [], now: NOW, baseUrl: BASE, openDecisions: 0 })).toBeNull();
+    expect(buildDigest({ reviewerId: 1, reviewerName: "Áron", items: [], now: NOW, baseUrl: BASE })).toBeNull();
+  });
+
+  it("a reviewer with items AND open decisions gets both in the email", () => {
+    const d = buildDigest({
+      reviewerId: 1, reviewerName: "Áron", now: NOW, baseUrl: BASE, openDecisions: 3,
+      items: [{ id: 1, title: "A", category: "email", waitingSince: NOW }],
+    })!;
+    expect(d.subject).toBe("1 anyag vár Önre");
+    expect(d.text).toContain("3 megválaszolatlan kérdés vár Önre.");
+    expect(d.text).toContain(`${BASE}/marketing/decisions`);
+  });
+
+  it("a reviewer with zero items but open decisions still gets an email", () => {
+    const d = buildDigest({ reviewerId: 1, reviewerName: "Áron", items: [], now: NOW, baseUrl: BASE, openDecisions: 2 })!;
+    expect(d).not.toBeNull();
+    expect(d.subject).toBe("2 megválaszolatlan kérdés vár Önre");
+    expect(d.text).toContain("2 megválaszolatlan kérdés vár Önre.");
+  });
 });
 
 describe("isDigestTime", () => {
@@ -126,12 +150,14 @@ describe("sendContentDigests", () => {
     tenantFindUnique.mockReset();
     userFindFirst.mockReset();
     contentItemFindMany.mockReset();
+    contentCheckCount.mockReset();
     getContentReviewers.mockReset();
     sendEmail.mockReset();
     reportError.mockReset();
     executeRaw.mockReset();
     tenantFindUnique.mockResolvedValue({ settings: {} });
     executeRaw.mockResolvedValue(1); // claim succeeds by default
+    contentCheckCount.mockResolvedValue(0);
   });
 
   const DIGEST_TIME = new Date("2026-06-01T06:00:00Z"); // Monday 08:00 Budapest
@@ -213,5 +239,52 @@ describe("sendContentDigests", () => {
     const res = await sendContentDigests(1, DIGEST_TIME, { force: true });
     expect(res.sent).toBe(1);
     expect(executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("a reviewer with items and open decisions gets one email covering both", async () => {
+    getContentReviewers.mockResolvedValue([1]);
+    userFindFirst.mockResolvedValue({ name: "Áron", email: "aron@example.com" });
+    contentItemFindMany.mockResolvedValue([
+      { id: 1, title: "X", category: "email", currentVersion: { createdAt: DIGEST_TIME } },
+    ]);
+    contentCheckCount.mockResolvedValue(4);
+    sendEmail.mockResolvedValue({ ok: true, id: "abc" });
+    const res = await sendContentDigests(1, DIGEST_TIME);
+    expect(res.sent).toBe(1);
+    expect(sendEmail.mock.calls[0][0].text).toContain("4 megválaszolatlan kérdés vár Önre.");
+  });
+
+  it("a reviewer with only open decisions (no items) still gets an email", async () => {
+    getContentReviewers.mockResolvedValue([1]);
+    userFindFirst.mockResolvedValue({ name: "Áron", email: "aron@example.com" });
+    contentItemFindMany.mockResolvedValue([]);
+    contentCheckCount.mockResolvedValue(1);
+    sendEmail.mockResolvedValue({ ok: true, id: "abc" });
+    const res = await sendContentDigests(1, DIGEST_TIME);
+    expect(res.sent).toBe(1);
+    expect(sendEmail.mock.calls[0][0].subject).toBe("1 megválaszolatlan kérdés vár Önre");
+  });
+
+  it("open checks exist but none are decisions (all source: rule, excluded by countOpenDecisions/openDecisionsWhere) → no decision line, no email, for a reviewer with zero pending items", async () => {
+    getContentReviewers.mockResolvedValue([1]);
+    userFindFirst.mockResolvedValue({ name: "Áron", email: "aron@example.com" });
+    contentItemFindMany.mockResolvedValue([]);
+    // Stands in for queries.ts's countOpenDecisions, which now filters out
+    // source: "rule" checks (fix A) — a tenant with only rule checks open
+    // sees 0 here, same as a tenant with no open checks at all.
+    contentCheckCount.mockResolvedValue(0);
+    const res = await sendContentDigests(1, DIGEST_TIME);
+    expect(res).toEqual({ sent: 0, skipped: 1 });
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("a reviewer with neither items nor open decisions gets nothing", async () => {
+    getContentReviewers.mockResolvedValue([1]);
+    userFindFirst.mockResolvedValue({ name: "Áron", email: "aron@example.com" });
+    contentItemFindMany.mockResolvedValue([]);
+    contentCheckCount.mockResolvedValue(0);
+    const res = await sendContentDigests(1, DIGEST_TIME);
+    expect(res).toEqual({ sent: 0, skipped: 1 });
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 });

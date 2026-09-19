@@ -19,7 +19,11 @@ export function isContentStatus(v: unknown): v is ContentStatus {
 export const VERDICTS = ["approve", "changes", "rewrite"] as const;
 export type Verdict = (typeof VERDICTS)[number];
 
-export const CONTENT_CATEGORIES = ["script", "email", "ad", "lead_magnet", "landing", "video", "image", "other"] as const;
+// `decision` is not a piece of copy: the title IS a question for Áron or Péter,
+// the body carries the context and the options, and the answer arrives as a
+// resolved check (or a reviewer comment). It is never claim-checked — see the
+// customer-facing gate in rules.ts.
+export const CONTENT_CATEGORIES = ["script", "email", "ad", "lead_magnet", "landing", "video", "image", "decision", "other"] as const;
 export type ContentCategory = (typeof CONTENT_CATEGORIES)[number];
 
 /** What the AI may pick up. */

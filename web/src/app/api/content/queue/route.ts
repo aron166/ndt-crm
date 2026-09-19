@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { getQueue } from "@/lib/content/service";
-import { CONTENT_STATUSES, isContentStatus, type ContentStatus } from "@/lib/content/types";
+import { CONTENT_CATEGORIES, CONTENT_STATUSES, isContentStatus, type ContentStatus } from "@/lib/content/types";
 
 // GET /api/content/queue — items the content-revise skill should pick up.
 // App-key auth, same shape as the rest of the content API.
@@ -42,8 +42,23 @@ export async function GET(request: Request) {
     statuses = parts as ContentStatus[];
   }
 
+  // Optional category filter: an agent that posted a `decision` question
+  // reads back whether it was answered without a human relaying it (the
+  // per-item `checks` payload already carries `state` and `answer`).
+  const queryParams = new URL(request.url).searchParams;
+  let category: string | undefined;
+  // `.has` (not the value's truthiness): an empty `?category=` is falsy and
+  // would otherwise skip validation, silently returning every category.
+  if (queryParams.has("category")) {
+    const rawCategory = queryParams.get("category") ?? "";
+    if (!(CONTENT_CATEGORIES as readonly string[]).includes(rawCategory)) {
+      return json({ error: "Invalid category", details: { allowed: CONTENT_CATEGORIES } }, 400);
+    }
+    category = rawCategory;
+  }
+
   try {
-    const items = await getQueue(key.tenantId, statuses);
+    const items = await getQueue(key.tenantId, statuses, { category });
     return json({ ok: true, items }, 200);
   } catch (err) {
     reportError("api.content.queue", err, { tenantId: key.tenantId });

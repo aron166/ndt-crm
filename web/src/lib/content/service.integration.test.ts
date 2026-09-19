@@ -244,6 +244,23 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     expect(row.outreachStep).toBeNull();
   });
 
+  it("setOutreachSlot: an internal item is refused a slot; a non-internal email item still gets one", async () => {
+    const campaign = `IT-INTERNAL-${Date.now()}`;
+    const internal = await service.createItem(appActor, {
+      title: title(), body: "internal reference copy", category: "email", channel: "email",
+      contentType: "email", source: "it", internal: true,
+    });
+    if (!internal.ok) throw new Error("setup");
+    createdItemIds.push(internal.itemId);
+    const notInternal = await newItem("outbound copy", "email");
+
+    const refused = await service.setOutreachSlot(actorA(), internal.itemId, { campaign, step: 1 });
+    expect(refused).toMatchObject({ ok: false, status: 400, error: "Belső anyag nem tölthet be kampánylépést" });
+
+    const ok = await service.setOutreachSlot(actorA(), notInternal.itemId, { campaign, step: 1 });
+    expect(ok).toMatchObject({ ok: true });
+  });
+
   it("two items racing for the same slot: exactly one wins, the loser gets a 409", async () => {
     const campaign = `IT-RACE-${Date.now()}`;
     const a = await newItem("a", "email");
@@ -280,6 +297,33 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } });
     expect(item.status).not.toBe("live");
     expect(item.liveVersionId).toBeNull();
+  });
+
+  it("setCheckState: a non-reviewer gets 403 and the check is NOT modified", async () => {
+    const r = await newItem();
+    const check = await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `Manual: IT-${Date.now()}`, state: "open", source: "manual" },
+    });
+    const nonReviewer = { tenantId: 1, kind: "user" as const, userId: userC };
+    const res = await service.setCheckState(nonReviewer, check.id, "resolved", "válasz");
+    expect(res).toMatchObject({ ok: false, status: 403 });
+
+    const row = await db.contentCheck.findUniqueOrThrow({ where: { id: check.id } });
+    expect(row.state).toBe("open");
+    expect(row.answer).toBeNull();
+  });
+
+  it("setCheckState: a reviewer succeeds", async () => {
+    const r = await newItem();
+    const check = await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `Manual: IT-${Date.now()}`, state: "open", source: "manual" },
+    });
+    const res = await service.setCheckState(actorA(), check.id, "resolved", "megválaszolva");
+    expect(res).toMatchObject({ ok: true });
+
+    const row = await db.contentCheck.findUniqueOrThrow({ where: { id: check.id } });
+    expect(row.state).toBe("resolved");
+    expect(row.answer).toBe("megválaszolva");
   });
 
   it("rewrite request → claim → app version cycle", async () => {
@@ -504,6 +548,37 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     expect(count).toBe(inbox.mine.length);
   });
 
+  it("countOpenDecisions and getDecisionQueue exclude a source: rule check — nobody can action it — but keep manual/decision/import ones", async () => {
+    const { countOpenDecisions, getDecisionQueue } = await import("./queries");
+    const before = await countOpenDecisions(1);
+
+    const r = await newItem();
+    await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `Szabály: IT-${Date.now()}`, state: "open", source: "rule" },
+    });
+    // A rule-only open check must NOT count as an open decision.
+    expect(await countOpenDecisions(1)).toBe(before);
+    const queueAfterRuleOnly = await getDecisionQueue(1);
+    expect(queueAfterRuleOnly.total).toBe(
+      queueAfterRuleOnly.aron.length + queueAfterRuleOnly.peter.length + queueAfterRuleOnly.either.length,
+    );
+    expect(
+      [...queueAfterRuleOnly.aron, ...queueAfterRuleOnly.peter, ...queueAfterRuleOnly.either]
+        .some((row) => row.item.id === r.itemId),
+    ).toBe(false);
+
+    // A manual check on the same item DOES count.
+    await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `Kézi: IT-${Date.now()}`, state: "open", source: "manual" },
+    });
+    expect(await countOpenDecisions(1)).toBe(before + 1);
+    const queueAfterManual = await getDecisionQueue(1);
+    expect(
+      [...queueAfterManual.aron, ...queueAfterManual.peter, ...queueAfterManual.either]
+        .some((row) => row.item.id === r.itemId),
+    ).toBe(true);
+  });
+
   it("the same external_ref created concurrently yields one item", async () => {
     const ref = `it-ref-${Date.now()}`;
     const mk = () => service.createItem(appActor, {
@@ -662,5 +737,88 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId }, select: { status: true } });
     expect(item.status).toBe("in_review");
     await db.tenant.update({ where: { id: 1 }, data: { settings: saved as never } });
+  });
+
+  it("posting a version with internal: true corrects a wrongly-set item and resolves the rules it wrongly fired", async () => {
+    const body = "Az ár 250 000 Ft. A méréshez röntgent használunk.";
+    const created = await service.createItem(appActor, {
+      title: title(), body, category: "script", channel: "other", contentType: "other",
+      source: "it", internal: false,
+    });
+    if (!created.ok) throw new Error("setup");
+    createdItemIds.push(created.itemId);
+    expect(created.status).toBe("rewrite_requested");
+    const openBefore = await db.contentCheck.findMany({
+      where: { itemId: created.itemId, source: "rule", state: "open" },
+    });
+    expect(openBefore.length).toBeGreaterThan(0);
+
+    const corrected = await service.createVersion(actorA(), created.itemId, {
+      body, changeNote: "internal was set wrong at intake", basedOnVersionId: created.versionId!,
+      internal: true,
+    });
+    expect(corrected.ok).toBe(true);
+    if (!corrected.ok) return;
+    expect(corrected.violations).toEqual([]);
+
+    const item = await db.contentItem.findUniqueOrThrow({
+      where: { id: created.itemId }, select: { internal: true, status: true },
+    });
+    expect(item.internal).toBe(true);
+    expect(item.status).toBe("in_review");
+    const openAfter = await db.contentCheck.count({
+      where: { itemId: created.itemId, source: "rule", state: "open" },
+    });
+    expect(openAfter).toBe(0);
+  });
+
+  it("omitting internal on a version leaves the item's internal flag unchanged", async () => {
+    const created = await service.createItem(appActor, {
+      title: title(), body: "internal reference text", category: "other", channel: "other",
+      contentType: "other", source: "it", internal: true,
+    });
+    if (!created.ok) throw new Error("setup");
+    createdItemIds.push(created.itemId);
+
+    const v2 = await service.createVersion(actorA(), created.itemId, {
+      body: "internal reference text v2", changeNote: null, basedOnVersionId: created.versionId!,
+    });
+    expect(v2.ok).toBe(true);
+
+    const item = await db.contentItem.findUniqueOrThrow({ where: { id: created.itemId }, select: { internal: true } });
+    expect(item.internal).toBe(true);
+  });
+
+  // "Élő anyagok" is the SENDABLE library and round-one outreach is hand-sent
+  // from its copy button, so an internal item appearing there is a route to a
+  // real recipient — the same class of hole as the outreach slot (Vanda F1).
+  // An internal item is also the one item the claim rules never check, which
+  // is exactly why it must not be one click from a paste into Gmail.
+  it("the live library never lists an internal item", async () => {
+    const queries = await import("./queries");
+    // A unique format scopes the assertion to just these two rows: the shared
+    // fixture DB carries far more live items than one 50-row library page.
+    const fmt = `it-lib-${Date.now()}`;
+    const mk = async (internal: boolean) => {
+      const c = await service.createItem(appActor, {
+        title: title(), body: "library body", category: "other", channel: "other",
+        contentType: "other", source: "it", internal, format: fmt,
+      });
+      if (!c.ok) throw new Error("setup");
+      createdItemIds.push(c.itemId);
+      // Straight to live: the library keys off liveVersionId, not the path taken.
+      await db.contentItem.update({
+        where: { id: c.itemId },
+        data: { liveVersionId: c.versionId, status: "live", wasLive: true },
+      });
+      return c.itemId;
+    };
+    const internalId = await mk(true);
+    const publicId = await mk(false);
+
+    const { rows } = await queries.getLibrary(1, { format: fmt });
+    const ids = rows.map((r) => r.id);
+    expect(ids).toContain(publicId);
+    expect(ids).not.toContain(internalId);
   });
 });

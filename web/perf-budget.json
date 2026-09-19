@@ -7,6 +7,7 @@
     "/marketing/live": { "maxKB": 606 },
     "/outreach": { "maxKB": 926 },
     "/drive": { "maxKB": 387 },
-    "/leads": { "maxKB": 947 }
+    "/leads": { "maxKB": 947 },
+    "/marketing/decisions": { "maxKB": 606 }
   }
 }

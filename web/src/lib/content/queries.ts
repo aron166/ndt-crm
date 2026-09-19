@@ -25,6 +25,8 @@ export interface InboxRow {
   needsHumanAsset: boolean;
   /** §6c: open ⚠ questions (blocks live) and whether it may be hard-deleted. */
   openChecks: number;
+  /** True when a hard-rule (not a person) bounced this item and the bounce is still open. */
+  bouncedByRule: boolean;
   wasLive: boolean;
   /** Submitting agent's own confidence on the current version (display only). */
   selfScore: number | null;
@@ -62,7 +64,12 @@ const ROW_SELECT = {
   id: true, title: true, category: true, format: true, purpose: true, status: true,
   needsHumanAsset: true, liveVersionId: true, wasLive: true,
   campaign: { select: { id: true, name: true } },
-  _count: { select: { checks: { where: { state: "open" } } } },
+  // Loaded (not _count) so toRow can also see WHICH checks are open, to derive
+  // bouncedByRule — still one relation load, no second query. Capped like
+  // getQueue's own checks load, for the same reason: an unbounded relation
+  // load here is 50 items x N checks. openChecks is therefore a CAPPED count
+  // (at most 50), not a true count, once an item has 50+ open checks.
+  checks: { where: { state: "open" }, select: { source: true }, take: 50 },
   currentVersion: {
     select: {
       number: true, createdAt: true, selfScore: true,
@@ -82,7 +89,9 @@ function toRow(r: Row, reviewers: { id: number; name: string }[], now: number): 
     waitingSince: since?.toISOString() ?? null,
     overdue: r.status === "in_review" && since !== null && now - since.getTime() > STALE_REVIEW_MS,
     needsHumanAsset: r.needsHumanAsset,
-    openChecks: r._count.checks,
+    openChecks: r.checks.length,
+    bouncedByRule: (r.status === "rewrite_requested" || r.status === "changes_requested")
+      && r.checks.some((c) => c.source === "rule"),
     selfScore: r.currentVersion?.selfScore ?? null,
     wasLive: r.wasLive,
     verdicts: reviewers.map((u) => ({
@@ -138,8 +147,16 @@ export async function getInbox(tenantId: number, userId: number, filter: InboxFi
   const oldestFirst = (a: InboxRow, b: InboxRow) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "");
 
   const inReview = all.filter((r) => r.status === "in_review" || r.status === "draft");
+  // A rule bounce hides nothing: the default "only mine" filter used to hide the
+  // one status that most needs a human, because `mine` only looked at
+  // in_review|draft. A rule-bounced item has no verdict to wait on — the
+  // machine bounced it, not a person — so it belongs in `mine` unconditionally.
+  const mineBase = isReviewer ? inReview.filter((r) => myVerdict(r) === null) : [];
+  const bounced = all.filter((r) => r.bouncedByRule);
+  const mineIds = new Set(mineBase.map((r) => r.id));
+  const mine = [...mineBase, ...bounced.filter((r) => !mineIds.has(r.id))].sort(oldestFirst);
   return {
-    mine: isReviewer ? inReview.filter((r) => myVerdict(r) === null).sort(oldestFirst) : [],
+    mine,
     otherReviewer: inReview.filter((r) => !isReviewer || myVerdict(r) !== null).sort(oldestFirst),
     aiWorking: all.filter((r) => r.status === "ai_working"),
     changesRequested: all.filter((r) => r.status === "changes_requested" || r.status === "rewrite_requested"),
@@ -161,11 +178,37 @@ export function pendingForReviewerWhere(tenantId: number, userId: number): Prism
   };
 }
 
-/** Nav badge + dashboard tile: current versions I have not judged yet. */
+/**
+ * A rule-bounced item: the machine sent it back, so there is no verdict
+ * pending on it, but it still sits in the reviewer's `mine` section because
+ * somebody has to know it exists. Kept next to pendingForReviewerWhere so the
+ * two stay in step.
+ */
+export function bouncedByRuleWhere(tenantId: number): Prisma.ContentItemWhereInput {
+  return {
+    tenantId,
+    status: { in: ["rewrite_requested", "changes_requested"] },
+    checks: { some: { state: "open", source: "rule" } },
+  };
+}
+
+/**
+ * Nav badge + dashboard tile. Counts exactly what `getInbox(...).mine` shows:
+ * versions I have not judged, PLUS rule-bounced items. The badge and the "Rám
+ * vár" section must agree — a badge reading 16 over a list of 22 is its own
+ * small lie, and this screen has already cost us two "why can't I see it"
+ * threads.
+ *
+ * The DIGEST deliberately does NOT include bounced items (it still uses
+ * pendingForReviewerWhere): its sentence is "N anyag vár Önre", and a bounced
+ * item is waiting on a text fix, not on the reviewer's judgement.
+ */
 export async function countPendingForReviewer(tenantId: number, userId: number): Promise<number> {
   const reviewers = await getContentReviewers(tenantId);
   if (!reviewers.includes(userId)) return 0;
-  return db.contentItem.count({ where: pendingForReviewerWhere(tenantId, userId) });
+  return db.contentItem.count({
+    where: { OR: [pendingForReviewerWhere(tenantId, userId), bouncedByRuleWhere(tenantId)] },
+  });
 }
 
 export interface ReviewPageData {
@@ -284,6 +327,10 @@ export async function getLibrary(tenantId: number, filter: InboxFilter = {}): Pr
       tenantId,
       liveVersionId: { not: null },
       status: { not: "archived" },
+      // "Élő anyagok" is the SENDABLE library; an internal item is by
+      // definition not sendable, and it is the one item the claim rules no
+      // longer check (see rules.ts isCustomerFacingCopy).
+      internal: false,
       ...(filter.category ? { category: filter.category } : {}),
       ...(filter.format ? { format: filter.format } : {}),
       ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
@@ -317,6 +364,92 @@ export async function getLibrary(tenantId: number, filter: InboxFilter = {}): Pr
         assets: r.liveVersion!.assets, usedBy: [],
       })),
   };
+}
+
+export interface DecisionRow {
+  checkId: number;
+  question: string;
+  /** rule | decision | import | manual — where the question came from. */
+  source: string;
+  createdAt: string; // ISO
+  daysWaiting: number; // whole days, floor, never negative
+  item: { id: number; title: string; category: string; status: string };
+}
+export interface DecisionQueue {
+  aron: DecisionRow[];
+  peter: DecisionRow[];
+  either: DecisionRow[];
+  total: number;
+  /** True when the queue was capped at 200 rows (more open decisions exist than shown). */
+  truncated: boolean;
+}
+
+const DECISION_ROW_SELECT = {
+  id: true, question: true, source: true, forWhom: true, createdAt: true,
+  item: { select: { id: true, title: true, category: true, status: true } },
+} satisfies Prisma.ContentCheckSelect;
+type DecisionRawRow = Prisma.ContentCheckGetPayload<{ select: typeof DECISION_ROW_SELECT }>;
+
+/**
+ * Pure: groups already-fetched open checks into the three answer buckets,
+ * oldest first. `rows` may carry one extra row past the 200 the page shows
+ * (see getDecisionQueue's take: 201) — that extra row signals `truncated`
+ * and is sliced off before grouping, never shown.
+ */
+export function groupDecisions(rows: DecisionRawRow[], now: Date): DecisionQueue {
+  const truncated = rows.length > 200;
+  const shown = truncated ? rows.slice(0, 200) : rows;
+  const toDecisionRow = (r: DecisionRawRow): DecisionRow => ({
+    checkId: r.id, question: r.question, source: r.source, createdAt: r.createdAt.toISOString(),
+    daysWaiting: Math.max(0, Math.floor((now.getTime() - r.createdAt.getTime()) / 86_400_000)),
+    item: r.item,
+  });
+  const aron: DecisionRow[] = [];
+  const peter: DecisionRow[] = [];
+  const either: DecisionRow[] = [];
+  for (const r of shown) {
+    const bucket = r.forWhom === "aron" ? aron : r.forWhom === "peter" ? peter : either;
+    bucket.push(toDecisionRow(r));
+  }
+  return { aron, peter, either, total: aron.length + peter.length + either.length, truncated };
+}
+
+// A source: "rule" check is code, not prose: setCheckState hard-403s it, and
+// it is cleared only by a new version that passes the rule (see service.ts).
+// An action queue must not list a row nobody can action, and the daily digest
+// must not count one forever. A rule bounce is surfaced where it belongs
+// instead: the board card's "Szabály dobta vissza" badge and the item's
+// presence in the `mine` section. Imported ⚠ questions and manual questions
+// STAY in the queue — they are answerable and they belong there.
+function openDecisionsWhere(tenantId: number): Prisma.ContentCheckWhereInput {
+  return { tenantId, state: "open", source: { not: "rule" }, item: { status: { not: "archived" } } };
+}
+
+// ponytail: one list shape; a decision item with no check would not appear,
+// which intake makes impossible. Every decision-category item gets one
+// addressed open check at intake (the API does that), so listing open checks
+// lists every unanswered decision — no second list shape, no new table.
+export async function getDecisionQueue(tenantId: number, now: Date = new Date()): Promise<DecisionQueue> {
+  const rows = await db.contentCheck.findMany({
+    where: openDecisionsWhere(tenantId),
+    orderBy: { createdAt: "asc" },
+    // One more than the 200 shown: the extra row (if it comes back) is the
+    // truncation signal groupDecisions slices off, so the page and the
+    // uncapped countOpenDecisions digest never disagree silently.
+    take: 201,
+    select: DECISION_ROW_SELECT,
+  });
+  return groupDecisions(rows, now);
+}
+
+/** Digest count: open decisions for a reviewer, optionally narrowed to who must answer. */
+export async function countOpenDecisions(tenantId: number, forWhom?: string): Promise<number> {
+  return db.contentCheck.count({
+    where: {
+      ...openDecisionsWhere(tenantId),
+      ...(forWhom ? { forWhom: { in: [forWhom, "either"] } } : {}),
+    },
+  });
 }
 
 export async function getFilterOptions(tenantId: number) {

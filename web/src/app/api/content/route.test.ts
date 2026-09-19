@@ -62,12 +62,12 @@ describe("POST /api/content", () => {
   it("201s and derives category from content_type on a new item", async () => {
     (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
     (createItem as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true, itemId: 10, versionId: 20, existed: false,
+      ok: true, itemId: 10, versionId: 20, existed: false, status: "in_review", ruleChecks: 0,
     });
     const res = await POST(req(VALID_BODY));
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body).toMatchObject({ ok: true, contentItemId: 10, versionId: 20, status: "in_review" });
+    expect(body).toMatchObject({ ok: true, contentItemId: 10, versionId: 20, status: "in_review", checksCreated: 0, ruleChecks: 0 });
     expect(createItem).toHaveBeenCalledWith(
       { tenantId: 7, kind: "app", appSlug: "content-factory" },
       expect.objectContaining({ category: "email" }),
@@ -80,7 +80,7 @@ describe("POST /api/content", () => {
   it("import: true extracts ⚠ warnings into checks after commit, returns checksCreated", async () => {
     (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
     (createItem as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true, itemId: 10, versionId: 20, existed: false,
+      ok: true, itemId: 10, versionId: 20, existed: false, status: "in_review", ruleChecks: 0,
     });
     (addChecks as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, created: 2 });
     const res = await POST(req({ ...VALID_BODY, body: "⚠️ Áron dönti el.\n⚠️ Péter dönti el.", import: true }));
@@ -100,7 +100,7 @@ describe("POST /api/content", () => {
   it("addChecks failure does not fail the request (item already created)", async () => {
     (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
     (createItem as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true, itemId: 10, versionId: 20, existed: false,
+      ok: true, itemId: 10, versionId: 20, existed: false, status: "in_review", ruleChecks: 0,
     });
     (addChecks as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("db down"));
     const res = await POST(req({ ...VALID_BODY, body: "⚠️ Áron dönti el.", import: true }));
@@ -109,15 +109,42 @@ describe("POST /api/content", () => {
     expect(body.checksCreated).toBe(0);
   });
 
+  it("category: decision creates one addressed open check from the title", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    (createItem as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true, itemId: 10, versionId: 20, existed: false, status: "in_review", ruleChecks: 0,
+    });
+    (addChecks as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, created: 1 });
+    const res = await POST(req({ ...VALID_BODY, category: "decision", title: "Melyik csomagot indítsuk?", decided_by: "peter" }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.checksCreated).toBe(1);
+    expect(addChecks).toHaveBeenCalledWith(
+      { tenantId: 7, kind: "app", appSlug: "content-factory" },
+      10,
+      [{ question: "Melyik csomagot indítsuk?", forWhom: "peter", source: "decision" }],
+    );
+  });
+
+  it("category: decision with an INVALID decided_by is a 400 for the whole intake (zod rejects it; it does NOT default to 'either')", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    const res = await POST(req({
+      ...VALID_BODY, category: "decision", title: "Melyik csomagot indítsuk?", decided_by: "valaki-mas",
+    }));
+    expect(res.status).toBe(400);
+    expect(createItem).not.toHaveBeenCalled();
+    expect(addChecks).not.toHaveBeenCalled();
+  });
+
   it("existed → 200, no asset write", async () => {
     (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
     (createItem as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true, itemId: 10, versionId: 20, existed: true,
+      ok: true, itemId: 10, versionId: 20, existed: true, status: "in_review",
     });
     const res = await POST(req({ ...VALID_BODY, assets: [{ kind: "image", url: "https://x/y.png" }], external_ref: "ref-1" }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ ok: true, contentItemId: 10, versionId: 20, existed: true });
+    expect(body).toMatchObject({ ok: true, contentItemId: 10, versionId: 20, existed: true, status: "in_review" });
     expect(tx.contentAsset.createMany).not.toHaveBeenCalled();
     expect(tx.appEvent.create).not.toHaveBeenCalled();
   });

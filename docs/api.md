@@ -538,7 +538,25 @@ item to `live`.
 
 Statuses: `draft | in_review | changes_requested | rewrite_requested |
 ai_working | live | archived`. Categories: `script | email | ad | lead_magnet |
-landing | video | image | other`.
+landing | video | image | decision | other`. `decision` is not customer-facing
+copy — it's a question for Áron or Péter (see the intake section below).
+
+**Claim rules only fire on customer-facing copy.** The seven forbidden-claim
+rules (price, depth, report time, throughput, tolerance, X-ray, reference) run
+only when an item is `internal: false`, its category is `email | script | ad`,
+and its format isn't a non-copy format (currently just `process_doc`). An
+internal price-objection doc or a note explaining why we never say "röntgen"
+is the opposite of a violation, so it's never claim-checked. `forbidden_price`
+itself only fires when a price word (ár/díj/árajánlat) sits within ~40
+characters of a digit on the same line — a bare mention of "árajánlat" with no
+number nearby is not a price claim.
+
+`internal` means our own material — never customer-facing, never claim-checked,
+never sendable (it cannot fill an outreach campaign step), and never listed in
+the live library (`GET /api/content/live`). `POST /api/content/:id/versions`
+(below) accepts `internal` too: posting a new version is how a wrongly-set
+value gets corrected, since the create path above is idempotent on
+`external_ref` and won't touch an existing item.
 
 ### `POST /api/content` — submit a new item (v1, straight into review)
 
@@ -546,7 +564,7 @@ landing | video | image | other`.
 curl -X POST $CRM/api/content \
   -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{ "channel": "blog", "content_type": "email", "title": "…", "body": "…", "purpose": "Q4 cold email, step 1" }'
-# → 201 { "ok": true, "contentItemId": 10, "versionId": 20, "status": "in_review" }
+# → 201 { "ok": true, "contentItemId": 10, "versionId": 20, "status": "in_review", "checksCreated": 0, "ruleChecks": 0 }
 ```
 
 Creates the item and its version 1 through `lib/content/service.ts` (the one
@@ -556,15 +574,30 @@ from before. New optional fields: `category` (defaults from `content_type`:
 e.g. `plain_text_email`, `9x16_video`), `purpose` (≤ 300), `external_ref`
 (≤ 500 — traceback to the source file/row), `change_note` (≤ 4000 — why v1
 exists), `import` (boolean — `true` authors the version as `import` instead
-of `ai`, for migrating existing material).
+of `ai`, for migrating existing material), `decided_by` (`aron | peter |
+either`, `category: "decision"` only — who the answer is needed from;
+defaults to `either`).
 
 Idempotent on `external_ref`: an item with the same ref already existing
-returns `200 { "ok": true, "contentItemId", "versionId", "existed": true, "bodyHash" }`
+returns `200 { "ok": true, "contentItemId", "versionId", "existed": true, "status", "bodyHash" }`
 (`bodyHash` is a sha256 of the item's CURRENT version body, so an importer can
 tell a changed source file from an unchanged one and post a new version instead
 of skipping it: that is what `scripts/import-content.mjs --refresh` does)
 and writes **no** new assets, no `content.submitted` app event — the caller
 already has an item, nothing is duplicated.
+
+**The response is honest about what happened.** `status` is the item's REAL
+status after the hard content rules ran — `"rewrite_requested"` if a rule
+fired (the item bounced straight to the AI queue), otherwise `"in_review"`.
+`checksCreated` is the total number of blocking checks now open on the item
+(imported `⚠` warnings + rule violations + the one decision check, see
+below); `ruleChecks` breaks out just the rule-violation count, so a caller can
+tell WHY it was bounced without parsing check questions. Before this, the 201
+body hardcoded `status: "in_review"` and undercounted `checksCreated` even
+when a hard rule had already sent the item back — the submitting agent had no
+way to know it had been bounced (2026-09-19 incident: a 12 KB internal doc
+tripped `forbidden_price`/`forbidden_xray` 116 ms after create and the
+response still claimed success).
 
 **Warning-marker checks (spec §6c).** On a newly-created item (not `existed`),
 the body is scanned for `⚠`/`⚠️` markers via `lib/content/warnings.ts`; each
@@ -574,18 +607,31 @@ runs when `extract_warnings` is `true`, or — if `extract_warnings` is omitted 
 when `import` is `true`; a normal AI-authored post (`import` unset) gets no
 checks unless it opts in with `extract_warnings: true`. It happens **after**
 the create transaction commits, so a checklist failure never loses the item —
-it's logged via `reportError` and the response still succeeds. The response
-gains `checksCreated` (number, `0` when nothing was extracted or the write
-failed). **An item with an `open` check cannot go live** — the checklist is
-enforced at the live-transition, not at intake.
+it's logged via `reportError` and the response still succeeds. **An item with
+an `open` check cannot go live** — the checklist is enforced at the
+live-transition, not at intake.
 
-### `GET /api/content/queue?status=changes_requested,rewrite_requested`
+**`category: "decision"` — post a question, read back the answer.** A
+`decision` item is not copy, it's a question: the `title` IS the question,
+the `body` carries the context and the options, and the answer arrives as a
+resolved check. At intake, exactly one open `ContentCheck` is created
+(`question`: the item title, `forWhom`: `decided_by` or `either`,
+`source: "decision"`), counted into `checksCreated`, in the same
+after-commit/never-lose-the-item block as the warning-marker checks above.
+An agent can then poll `GET /api/content/queue?status=in_review&category=decision`
+— the per-item `checks` payload carries `state` and `answer`, so once a human
+resolves the check the agent sees the answer without anyone relaying it.
+
+### `GET /api/content/queue?status=changes_requested,rewrite_requested&category=`
 
 Items the `content-revise` skill should pick up: current version body, assets,
 category/format/purpose, and every reviewer comment across the version
 history (so the AI sees why earlier versions failed). `status` is a
 comma-separated list validated against the status enum above; an unknown
-value is `400`. Defaults to `changes_requested,rewrite_requested`.
+value is `400`. Defaults to `changes_requested,rewrite_requested`. `category`
+is optional, validated against the category enum above (`400` with
+`{ allowed: CONTENT_CATEGORIES }` on an unknown value) — this is the read half
+of the decision loop above, e.g. `?status=in_review&category=decision`.
 `200 { "ok": true, "items": [...] }`.
 
 ### `GET /api/content/live?category=&campaign=&format=`
@@ -616,7 +662,11 @@ Posts the app's rewrite as a new, immutable version. `body` (1-50000),
 `change_note` (1-4000, required), `based_on_version_id` (positive int,
 required); a Zod failure is `400 { error, details }`. Optional
 `needs_human_asset` flags that the change needs an image/video a human must
-produce (the skill doesn't regenerate media).
+produce (the skill doesn't regenerate media). Optional `internal` corrects a
+wrongly-set flag on the item (see the Content section above): the new version
+is evaluated against the corrected value, so a version posted with
+`internal: true` is exempt from the claim rules and resolves any rule checks
+that had wrongly fired. Omitted → the item's current `internal` is unchanged.
 
 **Race rule (409):** the app must hold a live claim on the item and
 `based_on_version_id` must equal the item's current version — if a human

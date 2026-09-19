@@ -55,6 +55,8 @@ export async function POST(request: Request) {
   const sourceApp = key.appSlug.trim();
   const actor = { tenantId, kind: "app" as const, appSlug: sourceApp };
 
+  const category = input.category ?? defaultCategory(input.content_type);
+
   try {
     const result = await db.$transaction(async (tx) => {
       // 1. Resolve / auto-create the campaign (by slug, tenant-scoped).
@@ -105,7 +107,7 @@ export async function POST(request: Request) {
         {
           title: input.title,
           body: input.body,
-          category: input.category ?? defaultCategory(input.content_type),
+          category,
           channel: input.channel,
           contentType: input.content_type,
           format: input.format ?? null,
@@ -126,7 +128,10 @@ export async function POST(request: Request) {
       );
       if (!created.ok) return created;
       if (created.existed) {
-        return { ok: true as const, contentItemId: created.itemId, versionId: created.versionId, existed: true };
+        return {
+          ok: true as const, contentItemId: created.itemId, versionId: created.versionId, existed: true,
+          status: created.status,
+        };
       }
 
       // 3. Assets (URL/path only — no upload in this phase), attached to v1.
@@ -154,7 +159,10 @@ export async function POST(request: Request) {
         },
       });
 
-      return { ok: true as const, contentItemId: created.itemId, versionId: created.versionId, existed: false };
+      return {
+        ok: true as const, contentItemId: created.itemId, versionId: created.versionId, existed: false,
+        status: created.status, ruleChecks: created.ruleChecks,
+      };
     });
 
     if (!result.ok) return json({ error: result.error }, result.status);
@@ -166,24 +174,39 @@ export async function POST(request: Request) {
         : null;
       const bodyHash = current ? createHash("sha256").update(current.body).digest("hex") : null;
       return json(
-        { ok: true, contentItemId: result.contentItemId, versionId: result.versionId, existed: true, bodyHash },
+        { ok: true, contentItemId: result.contentItemId, versionId: result.versionId, existed: true, status: result.status, bodyHash },
         200,
       );
     }
 
     // Extract ⚠ checks AFTER commit — addChecks uses the global db client, not
     // this tx, and a checklist failure must never lose the item itself.
-    let checksCreated = 0;
+    let checksCreated = result.ruleChecks ?? 0;
     const shouldExtract = input.extract_warnings ?? input.import;
     if (shouldExtract) {
       const warnings = extractWarnings(input.body);
       if (warnings.length) {
         try {
           const res = await addChecks(actor, result.contentItemId, warnings.map((w) => ({ ...w, source: "import" as const })));
-          if (res.ok) checksCreated = res.created;
+          if (res.ok) checksCreated += res.created;
         } catch (err) {
           reportError("api.content.addChecks", err, { tenantId, itemId: result.contentItemId });
         }
+      }
+    }
+
+    // A `decision` item is a question: the title IS the question, the body
+    // carries the context and the options, and the answer arrives as a
+    // resolved check. One open check is created at intake so the agent can
+    // read back whether it was answered (GET /api/content/queue?category=decision).
+    if (category === "decision") {
+      try {
+        const res = await addChecks(actor, result.contentItemId, [
+          { question: input.title, forWhom: input.decided_by ?? "either", source: "decision" as const },
+        ]);
+        if (res.ok) checksCreated += res.created;
+      } catch (err) {
+        reportError("api.content.addChecks.decision", err, { tenantId, itemId: result.contentItemId });
       }
     }
 
@@ -192,8 +215,9 @@ export async function POST(request: Request) {
         ok: true,
         contentItemId: result.contentItemId,
         versionId: result.versionId,
-        status: "in_review",
+        status: result.status,
         checksCreated,
+        ruleChecks: result.ruleChecks,
       },
       201,
     );

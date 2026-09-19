@@ -138,6 +138,64 @@ describe("CONTENT_RULES table: one violating + one clean input per rule", () => 
     ).not.toContain("duplicate_hook");
   });
 
+  it("forbidden_price: a bare price word with no number nearby passes", () => {
+    expect(violationRules(ctx({ body: "Az árajánlat elküldése után jelentkezünk." }))).not.toContain(
+      "forbidden_price",
+    );
+  });
+
+  it("forbidden_price: a price word with a number nearby fires", () => {
+    expect(violationRules(ctx({ body: "Az árajánlatunk 120 000 Ft." }))).toContain("forbidden_price");
+    expect(violationRules(ctx({ body: "A díj 5%." }))).toContain("forbidden_price");
+  });
+
+  it("forbidden_price: the price word and the number split across a line break in the same paragraph still fires", () => {
+    expect(
+      violationRules(ctx({ body: "Az ár nálunk nagyon kedvező.\n500 000 forintért elvégezzük." })),
+    ).toContain("forbidden_price");
+  });
+
+  it("forbidden_price: the spelled-out currency (forint) fires without ft/huf/eur", () => {
+    expect(violationRules(ctx({ body: "Ez 500 000 forintba kerül." }))).toContain("forbidden_price");
+  });
+
+  it("forbidden_price: magnitude word (millió) fires", () => {
+    expect(violationRules(ctx({ body: "Ez 1,5 millió forintba kerül." }))).toContain("forbidden_price");
+  });
+
+  it("forbidden_price: trailing comma-dash (500.000,- Ft) fires", () => {
+    expect(violationRules(ctx({ body: "A díj 500.000,- Ft." }))).toContain("forbidden_price");
+  });
+
+  it("forbidden_price: spelled-out magnitude shorthand (150e Ft) fires", () => {
+    expect(violationRules(ctx({ body: "Ez 150e Ft." }))).toContain("forbidden_price");
+  });
+
+  it("forbidden_price: a long document with a price word but no number nearby, across paragraphs, still does not fire", () => {
+    const filler = "Lorem ipsum dolor sit amet consectetur adipiscing elit. ".repeat(200);
+    const body = `${filler}\n\nAz árajánlat elküldése után jelentkezünk.\n\n${filler}`;
+    expect(violationRules(ctx({ body }))).not.toContain("forbidden_price");
+  });
+
+  it("claim rules never fire on internal items, even with a blatant claim", () => {
+    const body = "Az ár 500 000 Ft. Röntgennel dolgozunk.";
+    expect(violationRules(ctx({ body, internal: true }))).toEqual([]);
+  });
+
+  it("a process_doc format no longer exempts a script from the claim rules: internal is the only gate", () => {
+    const body = "röntgennel átvilágítjuk a födémet";
+    expect(
+      violationRules(ctx({ body, category: "script", format: "process_doc", internal: false })),
+    ).toContain("forbidden_xray");
+  });
+
+  it("the same process_doc body is clean once internal: true", () => {
+    const body = "röntgennel átvilágítjuk a födémet";
+    expect(
+      violationRules(ctx({ body, category: "script", format: "process_doc", internal: true })),
+    ).toEqual([]);
+  });
+
   it("every rule id is covered above", () => {
     const ids = CONTENT_RULES.map((r) => r.id).sort();
     expect(ids).toEqual(

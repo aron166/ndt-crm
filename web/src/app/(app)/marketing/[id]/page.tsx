@@ -5,6 +5,7 @@ import { getReviewPage } from "@/lib/content/queries";
 import { signedViewUrls } from "@/lib/content/storage";
 import { listOutreachCampaignKeys } from "@/app/actions/content";
 import { ReviewClient } from "./ReviewClient";
+import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
 const TENANT_ID = 1;
 
@@ -35,6 +36,7 @@ export default async function ContentReviewPage({
   // No `mount` animation here: its transform would break the fixed phone action bar.
   return (
     <div>
+      <RefreshOnFocus />
       <div style={{ marginBottom: 16 }}>
         <Link
           href="/marketing"
