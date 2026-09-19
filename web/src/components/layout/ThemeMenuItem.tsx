@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import { Moon, Sun } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { setTheme } from "@/app/actions/theme";
@@ -12,6 +12,14 @@ const LABEL: Record<Theme, string> = {
   light: "Sötét mód",
 };
 
+// Read <html data-theme> after hydration without a mismatch — the same
+// useSyncExternalStore idiom the login page uses for its ?denied flag. The
+// attribute never changes on its own, so there is nothing to subscribe to.
+const noSubscribe = () => () => {};
+const readDom = (): Theme =>
+  document.documentElement.dataset.theme === "light" ? "light" : "dark";
+const readServer = (): Theme => "dark";
+
 /**
  * Theme toggle in the user menu.
  *
@@ -22,24 +30,24 @@ const LABEL: Record<Theme, string> = {
  * which is what carries the choice to the next device.
  */
 export function ThemeMenuItem() {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const domTheme = useSyncExternalStore(noSubscribe, readDom, readServer);
+  // Set only from the click handler, so the menu label follows the flip
+  // before the server action lands.
+  const [override, setOverride] = useState<Theme | null>(null);
   const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setThemeState(document.documentElement.dataset.theme === "light" ? "light" : "dark");
-  }, []);
+  const theme = override ?? domTheme;
 
   function toggle() {
     const next: Theme = theme === "light" ? "dark" : "light";
     document.documentElement.dataset.theme = next;
-    setThemeState(next);
+    setOverride(next);
     startTransition(async () => {
       const res = await setTheme(next);
-      if (res && "error" in res) {
+      if ("error" in res) {
         // Persisting failed; don't leave the user looking at a theme that
         // will be gone on the next load.
         document.documentElement.dataset.theme = theme;
-        setThemeState(theme);
+        setOverride(theme);
       }
     });
   }
