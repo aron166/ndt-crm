@@ -1107,7 +1107,7 @@ model ContentItem {
   metrics          Json? // impressions, reactions, comments, clicks, leads (manual)
   reviewNote       String?   @map("review_note") // legacy (pre-versions) rejection note
   // What it is and what it is for (spec §1).
-  category         String    @default("other") // script | email | ad | lead_magnet | landing | video | image | other
+  category         String    @default("other") // script | email | ad | lead_magnet | landing | video | image | decision | other
   format           String? // plain_text_email | pdf | 9x16_video | 16x9_video | phone_script | meta_ad | …
   purpose          String? // "Q4 cold email, step 1"
   externalRef      String?   @map("external_ref") // source file / consumer, e.g. growth/…/a-hid.md#touch-1
@@ -1246,7 +1246,7 @@ model ContentCheck {
   answer           String?
   resolvedByUserId Int?     @map("resolved_by_user_id")
   /**
-   * Where it came from: import | manual.
+   * Where it came from: import | manual | rule | decision.
    */
   source           String   @default("manual")
   createdAt        DateTime @default(now()) @map("created_at")

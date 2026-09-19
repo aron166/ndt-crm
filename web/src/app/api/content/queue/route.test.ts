@@ -47,6 +47,13 @@ describe("GET /api/content/queue", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects an empty ?category= with 400 instead of silently returning every category", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    const res = await GET(req("?category="));
+    expect(res.status).toBe(400);
+    expect(getQueue).not.toHaveBeenCalled();
+  });
+
   it("passes a valid category through to getQueue (agent read-back of a decision)", async () => {
     (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
     (getQueue as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: 2 }]);

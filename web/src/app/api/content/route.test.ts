@@ -126,6 +126,16 @@ describe("POST /api/content", () => {
     );
   });
 
+  it("category: decision with an INVALID decided_by is a 400 for the whole intake (zod rejects it; it does NOT default to 'either')", async () => {
+    (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
+    const res = await POST(req({
+      ...VALID_BODY, category: "decision", title: "Melyik csomagot indítsuk?", decided_by: "valaki-mas",
+    }));
+    expect(res.status).toBe(400);
+    expect(createItem).not.toHaveBeenCalled();
+    expect(addChecks).not.toHaveBeenCalled();
+  });
+
   it("existed → 200, no asset write", async () => {
     (validateAppKey as ReturnType<typeof vi.fn>).mockResolvedValue(KEY);
     (createItem as ReturnType<typeof vi.fn>).mockResolvedValue({

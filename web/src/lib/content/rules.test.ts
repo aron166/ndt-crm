@@ -149,6 +149,22 @@ describe("CONTENT_RULES table: one violating + one clean input per rule", () => 
     expect(violationRules(ctx({ body: "A díj 5%." }))).toContain("forbidden_price");
   });
 
+  it("forbidden_price: the price word and the number split across a line break in the same paragraph still fires", () => {
+    expect(
+      violationRules(ctx({ body: "Az ár nálunk nagyon kedvező.\n500 000 forintért elvégezzük." })),
+    ).toContain("forbidden_price");
+  });
+
+  it("forbidden_price: the spelled-out currency (forint) fires without ft/huf/eur", () => {
+    expect(violationRules(ctx({ body: "Ez 500 000 forintba kerül." }))).toContain("forbidden_price");
+  });
+
+  it("forbidden_price: a long document with a price word but no number nearby, across paragraphs, still does not fire", () => {
+    const filler = "Lorem ipsum dolor sit amet consectetur adipiscing elit. ".repeat(200);
+    const body = `${filler}\n\nAz árajánlat elküldése után jelentkezünk.\n\n${filler}`;
+    expect(violationRules(ctx({ body }))).not.toContain("forbidden_price");
+  });
+
   it("claim rules never fire on internal items, even with a blatant claim", () => {
     const body = "Az ár 500 000 Ft. Röntgennel dolgozunk.";
     expect(violationRules(ctx({ body, internal: true }))).toEqual([]);
@@ -159,6 +175,13 @@ describe("CONTENT_RULES table: one violating + one clean input per rule", () => 
     // category: "script" (not "email") so the email-only rules (no_personal_hook
     // etc.) stay out of this claim-rules-only assertion.
     expect(violationRules(ctx({ body, category: "script", format: "process_doc" }))).toEqual([]);
+  });
+
+  it("process_doc does NOT rescue an email: format never switches off the claim rules for category: email", () => {
+    const body = "Az ár 500 000 Ft. Röntgennel dolgozunk.";
+    const violations = violationRules(ctx({ body, category: "email", format: "process_doc" }));
+    expect(violations).toContain("forbidden_price");
+    expect(violations).toContain("forbidden_xray");
   });
 
   it("every rule id is covered above", () => {

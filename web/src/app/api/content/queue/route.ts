@@ -45,9 +45,12 @@ export async function GET(request: Request) {
   // Optional category filter: an agent that posted a `decision` question
   // reads back whether it was answered without a human relaying it (the
   // per-item `checks` payload already carries `state` and `answer`).
-  const rawCategory = new URL(request.url).searchParams.get("category");
+  const queryParams = new URL(request.url).searchParams;
   let category: string | undefined;
-  if (rawCategory) {
+  // `.has` (not the value's truthiness): an empty `?category=` is falsy and
+  // would otherwise skip validation, silently returning every category.
+  if (queryParams.has("category")) {
+    const rawCategory = queryParams.get("category") ?? "";
     if (!(CONTENT_CATEGORIES as readonly string[]).includes(rawCategory)) {
       return json({ error: "Invalid category", details: { allowed: CONTENT_CATEGORIES } }, 400);
     }

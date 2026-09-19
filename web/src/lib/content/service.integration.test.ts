@@ -244,6 +244,23 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     expect(row.outreachStep).toBeNull();
   });
 
+  it("setOutreachSlot: an internal item is refused a slot; a non-internal email item still gets one", async () => {
+    const campaign = `IT-INTERNAL-${Date.now()}`;
+    const internal = await service.createItem(appActor, {
+      title: title(), body: "internal reference copy", category: "email", channel: "email",
+      contentType: "email", source: "it", internal: true,
+    });
+    if (!internal.ok) throw new Error("setup");
+    createdItemIds.push(internal.itemId);
+    const notInternal = await newItem("outbound copy", "email");
+
+    const refused = await service.setOutreachSlot(actorA(), internal.itemId, { campaign, step: 1 });
+    expect(refused).toMatchObject({ ok: false, status: 400, error: "Belső anyag nem tölthet be kampánylépést" });
+
+    const ok = await service.setOutreachSlot(actorA(), notInternal.itemId, { campaign, step: 1 });
+    expect(ok).toMatchObject({ ok: true });
+  });
+
   it("two items racing for the same slot: exactly one wins, the loser gets a 409", async () => {
     const campaign = `IT-RACE-${Date.now()}`;
     const a = await newItem("a", "email");
@@ -280,6 +297,33 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     const item = await db.contentItem.findUniqueOrThrow({ where: { id: r.itemId } });
     expect(item.status).not.toBe("live");
     expect(item.liveVersionId).toBeNull();
+  });
+
+  it("setCheckState: a non-reviewer gets 403 and the check is NOT modified", async () => {
+    const r = await newItem();
+    const check = await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `Manual: IT-${Date.now()}`, state: "open", source: "manual" },
+    });
+    const nonReviewer = { tenantId: 1, kind: "user" as const, userId: userC };
+    const res = await service.setCheckState(nonReviewer, check.id, "resolved", "válasz");
+    expect(res).toMatchObject({ ok: false, status: 403 });
+
+    const row = await db.contentCheck.findUniqueOrThrow({ where: { id: check.id } });
+    expect(row.state).toBe("open");
+    expect(row.answer).toBeNull();
+  });
+
+  it("setCheckState: a reviewer succeeds", async () => {
+    const r = await newItem();
+    const check = await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `Manual: IT-${Date.now()}`, state: "open", source: "manual" },
+    });
+    const res = await service.setCheckState(actorA(), check.id, "resolved", "megválaszolva");
+    expect(res).toMatchObject({ ok: true });
+
+    const row = await db.contentCheck.findUniqueOrThrow({ where: { id: check.id } });
+    expect(row.state).toBe("resolved");
+    expect(row.answer).toBe("megválaszolva");
   });
 
   it("rewrite request → claim → app version cycle", async () => {
@@ -502,6 +546,37 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     const count = await countPendingForReviewer(1, userA);
     const inbox = await getInbox(1, userA);
     expect(count).toBe(inbox.mine.length);
+  });
+
+  it("countOpenDecisions and getDecisionQueue exclude a source: rule check — nobody can action it — but keep manual/decision/import ones", async () => {
+    const { countOpenDecisions, getDecisionQueue } = await import("./queries");
+    const before = await countOpenDecisions(1);
+
+    const r = await newItem();
+    await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `Szabály: IT-${Date.now()}`, state: "open", source: "rule" },
+    });
+    // A rule-only open check must NOT count as an open decision.
+    expect(await countOpenDecisions(1)).toBe(before);
+    const queueAfterRuleOnly = await getDecisionQueue(1);
+    expect(queueAfterRuleOnly.total).toBe(
+      queueAfterRuleOnly.aron.length + queueAfterRuleOnly.peter.length + queueAfterRuleOnly.either.length,
+    );
+    expect(
+      [...queueAfterRuleOnly.aron, ...queueAfterRuleOnly.peter, ...queueAfterRuleOnly.either]
+        .some((row) => row.item.id === r.itemId),
+    ).toBe(false);
+
+    // A manual check on the same item DOES count.
+    await db.contentCheck.create({
+      data: { tenantId: 1, itemId: r.itemId, question: `Kézi: IT-${Date.now()}`, state: "open", source: "manual" },
+    });
+    expect(await countOpenDecisions(1)).toBe(before + 1);
+    const queueAfterManual = await getDecisionQueue(1);
+    expect(
+      [...queueAfterManual.aron, ...queueAfterManual.peter, ...queueAfterManual.either]
+        .some((row) => row.item.id === r.itemId),
+    ).toBe(true);
   });
 
   it("the same external_ref created concurrently yields one item", async () => {

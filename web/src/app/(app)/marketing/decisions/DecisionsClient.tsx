@@ -25,7 +25,6 @@ function Row({ row }: { row: DecisionRow }) {
 
   const disabled = isPending || text.trim().length < 2;
   const urgent = row.daysWaiting > 3;
-  const inputId = `decision-answer-${row.checkId}`;
 
   function submit(state: "resolved" | "waived") {
     setError(null);
@@ -60,15 +59,7 @@ function Row({ row }: { row: DecisionRow }) {
         </Link>
       </div>
 
-      {/* A rule check is code, not prose: setCheckState refuses to settle one by
-          hand (it is cleared only by a new version that passes the rule), so
-          offering an answer box here would be a button that can only 403. */}
-      {row.source === "rule" ? (
-        <p style={{ fontSize: 12, color: "var(--fg-mute)", margin: 0 }}>{UI.decisionsRuleReadOnly}</p>
-      ) : (
-      <>
       <textarea
-        id={inputId}
         aria-label={row.question}
         placeholder={UI.decisionsAnswerPlaceholder}
         value={text}
@@ -108,8 +99,6 @@ function Row({ row }: { row: DecisionRow }) {
           {UI.checkWaive}
         </button>
       </div>
-      </>
-      )}
     </li>
   );
 }

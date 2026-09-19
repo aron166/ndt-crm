@@ -150,6 +150,13 @@ export async function sendContentDigests(
   let sent = 0;
   let skipped = 0;
 
+  // ponytail: no userId -> aron|peter mapping exists in this codebase, so
+  // every reviewer gets the same tenant-wide open-decision count rather than
+  // one scoped to them; narrow with forWhom once that mapping exists. Hoisted
+  // out of the loop below: the arguments never change per reviewer, so one
+  // call covers all of them.
+  const openDecisions = await countOpenDecisions(tenantId);
+
   for (const reviewerId of reviewerIds) {
     try {
       if (optOut.includes(reviewerId)) {
@@ -169,11 +176,6 @@ export async function sendContentDigests(
         where: pendingForReviewerWhere(tenantId, reviewerId),
         select: { id: true, title: true, category: true, currentVersion: { select: { createdAt: true } } },
       });
-
-      // ponytail: no userId -> aron|peter mapping exists in this codebase, so
-      // every reviewer gets the tenant-wide open-decision count rather than
-      // one scoped to them; narrow with forWhom once that mapping exists.
-      const openDecisions = await countOpenDecisions(tenantId);
 
       const digest = buildDigest({
         reviewerId,

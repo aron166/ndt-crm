@@ -265,6 +265,19 @@ describe("sendContentDigests", () => {
     expect(sendEmail.mock.calls[0][0].subject).toBe("1 megválaszolatlan kérdés vár Önre");
   });
 
+  it("open checks exist but none are decisions (all source: rule, excluded by countOpenDecisions/openDecisionsWhere) → no decision line, no email, for a reviewer with zero pending items", async () => {
+    getContentReviewers.mockResolvedValue([1]);
+    userFindFirst.mockResolvedValue({ name: "Áron", email: "aron@example.com" });
+    contentItemFindMany.mockResolvedValue([]);
+    // Stands in for queries.ts's countOpenDecisions, which now filters out
+    // source: "rule" checks (fix A) — a tenant with only rule checks open
+    // sees 0 here, same as a tenant with no open checks at all.
+    contentCheckCount.mockResolvedValue(0);
+    const res = await sendContentDigests(1, DIGEST_TIME);
+    expect(res).toEqual({ sent: 0, skipped: 1 });
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
   it("a reviewer with neither items nor open decisions gets nothing", async () => {
     getContentReviewers.mockResolvedValue([1]);
     userFindFirst.mockResolvedValue({ name: "Áron", email: "aron@example.com" });

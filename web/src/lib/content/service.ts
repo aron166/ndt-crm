@@ -537,11 +537,20 @@ export async function setOutreachSlot(
   return db.$transaction(async (tx) => {
     const row = await tx.contentItem.findFirst({
       where: { id: itemId, tenantId: actor.tenantId },
-      select: { id: true, category: true, outreachCampaign: true, outreachStep: true },
+      select: { id: true, category: true, internal: true, outreachCampaign: true, outreachStep: true },
     });
     if (!row) return fail(404, "Nem található");
     if (slot && row.category !== "email") {
       return fail(400, "Csak e-mail tartalom tehető kampánylépésbe");
+    }
+    // `internal` means never sent to a customer — the intake schema already
+    // says "INTERNAL angles are never postable" — so enforcing it here is what
+    // makes the relaxed claim-rule gate (rules.ts isCustomerFacingCopy) safe:
+    // an internal item is exactly the one the claim rules no longer check.
+    // "live" still means approved library material, which stays legitimate —
+    // this only blocks the step that feeds the cold-email send flow.
+    if (slot && row.internal) {
+      return fail(400, "Belső anyag nem tölthet be kampánylépést"); // ⚠ HU PROPOSAL
     }
     if (slot) {
       const taken = await tx.contentItem.findFirst({
@@ -743,6 +752,12 @@ export async function setCheckState(
     return fail(400, state === "resolved" ? "Írd le a választ" : "Írd le, miért nem kell ez");
   }
   if (answer && answer.length > CHECK_ANSWER_MAX) return fail(400, "A válasz túl hosszú");
+
+  // Settling the LAST open check can take an item live (below), so this is a
+  // publish-privilege boundary, not a comment box — same class of hole as
+  // PR #104. Any CRM user must not be able to settle a check.
+  const reviewers = await getContentReviewers(actor.tenantId);
+  if (!reviewers.includes(actor.userId)) return fail(403, "Nem vagy bíráló ennél a cégnél");
 
   return db.$transaction(async (tx) => {
     const check = await tx.contentCheck.findFirst({

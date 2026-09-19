@@ -65,8 +65,11 @@ const ROW_SELECT = {
   needsHumanAsset: true, liveVersionId: true, wasLive: true,
   campaign: { select: { id: true, name: true } },
   // Loaded (not _count) so toRow can also see WHICH checks are open, to derive
-  // bouncedByRule — still one relation load, no second query.
-  checks: { where: { state: "open" }, select: { source: true } },
+  // bouncedByRule — still one relation load, no second query. Capped like
+  // getQueue's own checks load, for the same reason: an unbounded relation
+  // load here is 50 items x N checks. openChecks is therefore a CAPPED count
+  // (at most 50), not a true count, once an item has 50+ open checks.
+  checks: { where: { state: "open" }, select: { source: true }, take: 50 },
   currentVersion: {
     select: {
       number: true, createdAt: true, selfScore: true,
@@ -372,8 +375,15 @@ export function groupDecisions(rows: DecisionRawRow[], now: Date): DecisionQueue
   return { aron, peter, either, total: aron.length + peter.length + either.length };
 }
 
+// A source: "rule" check is code, not prose: setCheckState hard-403s it, and
+// it is cleared only by a new version that passes the rule (see service.ts).
+// An action queue must not list a row nobody can action, and the daily digest
+// must not count one forever. A rule bounce is surfaced where it belongs
+// instead: the board card's "Szabály dobta vissza" badge and the item's
+// presence in the `mine` section. Imported ⚠ questions and manual questions
+// STAY in the queue — they are answerable and they belong there.
 function openDecisionsWhere(tenantId: number): Prisma.ContentCheckWhereInput {
-  return { tenantId, state: "open", item: { status: { not: "archived" } } };
+  return { tenantId, state: "open", source: { not: "rule" }, item: { status: { not: "archived" } } };
 }
 
 // ponytail: one list shape; a decision item with no check would not appear,

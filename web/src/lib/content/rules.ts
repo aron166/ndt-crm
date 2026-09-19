@@ -63,12 +63,18 @@ const NON_COPY_FORMATS = new Set(["process_doc"]);
  *  (b) category is in CLAIM_CATEGORIES — `decision` never qualifies: it is a
  *      question for Áron/Péter, not copy we send;
  *  (c) format is not a NON_COPY_FORMAT — a process_doc is reference
- *      material, not something we send.
+ *      material, not something we send. This exemption applies only when the
+ *      category itself isn't "email": an email is copy we send, whatever its
+ *      free-text `format` field claims to be, so a `format: "process_doc"` on
+ *      `category: "email"` must not switch off the claim rules for something
+ *      that can still be slotted into a cold-email step.
  * An internal price-objection doc or an internal note explaining why we
  * never say "röntgen" is the OPPOSITE of a violation.
  */
 const isCustomerFacingCopy = (ctx: RuleContext) =>
-  !ctx.internal && CLAIM_CATEGORIES.has(ctx.category) && !NON_COPY_FORMATS.has(ctx.format ?? "");
+  !ctx.internal
+  && CLAIM_CATEGORIES.has(ctx.category)
+  && !(ctx.category !== "email" && NON_COPY_FORMATS.has(ctx.format ?? ""));
 
 // An internal email TEMPLATE needs no consent footer and no personal hook —
 // those rules exist for outbound copy actually sent to a customer.
@@ -98,7 +104,7 @@ const NOT_LETTER_AFTER = "(?!\\p{L})";
 
 // --- 1. forbidden_price -----------------------------------------------
 // FRAMEWORK §6: "ár bármilyen formában": price/fee, in any form.
-const PRICE_CURRENCY_RE = /\d[\d.,\s]*\s?(ft|huf|eur)(?!\p{L})|\d[\d.,\s]*\s?[€$]|[€$]\s?\d/iu;
+const PRICE_CURRENCY_RE = /\d[\d.,\s]*\s?(ft|huf|eur|forint\p{L}*)(?!\p{L})|\d[\d.,\s]*\s?[€$]|[€$]\s?\d/iu;
 // Whole-word only, so "árazniuk"/"felárral" (their pricing, not ours) don't
 // match: "ajánlat" alone is fine, only the price-compound "árajánlat*" is not.
 // A bare price word is not by itself a price CLAIM ("az árajánlat elküldése
@@ -113,15 +119,27 @@ const PRICE_WORD_RE = new RegExp(
 // unrelated number elsewhere in a long paragraph doesn't false-positive.
 const PRICE_NUMBER_PROXIMITY = 40;
 
-/** A PRICE_WORD_RE match with a digit within PRICE_NUMBER_PROXIMITY chars, on the same line. */
+/**
+ * A PRICE_WORD_RE match with a digit within PRICE_NUMBER_PROXIMITY chars, in
+ * the same PARAGRAPH (blank-line-separated, not just the current line) — a
+ * price word and its number are often split across a line break by wrapping
+ * or a manual line break, e.g. "Az ár nálunk nagyon kedvező.\n500 000
+ * forintért...". The ±40-char proximity window still applies inside the
+ * paragraph; that's what stops a bare "ár" in a 12 KB document from firing.
+ */
 function findPriceWordNearNumber(body: string): RegExpMatchArray | null {
+  // Paragraph boundaries (blank-line-separated), computed once: [start, end) pairs.
+  const breaks = [...body.matchAll(/\n\s*\n/g)];
+  const paraStarts = [0, ...breaks.map((b) => (b.index ?? 0) + b[0].length)];
+  const paraEnds = [...breaks.map((b) => b.index ?? 0), body.length];
+
   for (const m of body.matchAll(PRICE_WORD_RE)) {
     const idx = m.index ?? 0;
-    const lineStart = body.lastIndexOf("\n", idx) + 1;
-    const nextNewline = body.indexOf("\n", idx);
-    const lineEnd = nextNewline === -1 ? body.length : nextNewline;
-    const windowStart = Math.max(lineStart, idx - PRICE_NUMBER_PROXIMITY);
-    const windowEnd = Math.min(lineEnd, idx + m[0].length + PRICE_NUMBER_PROXIMITY);
+    const p = paraStarts.findIndex((start, i) => idx >= start && idx < paraEnds[i]);
+    const paraStart = p === -1 ? 0 : paraStarts[p];
+    const paraEnd = p === -1 ? body.length : paraEnds[p];
+    const windowStart = Math.max(paraStart, idx - PRICE_NUMBER_PROXIMITY);
+    const windowEnd = Math.min(paraEnd, idx + m[0].length + PRICE_NUMBER_PROXIMITY);
     if (/\d/.test(body.slice(windowStart, windowEnd))) return m;
   }
   return null;
