@@ -482,13 +482,21 @@ invalid `campaign`/`limit` (1-200, default 50) is a `400 { error, details }`.
 
 Since 2026-09-20, `campaign` can also name a real `campaigns` row (`slug`
 equals the outreach key). The response then carries an `audience` field:
-`{ viewId, name }` naming that row's target list, or `null` when the key has
-no campaign row, the row has no `audienceViewId` set, or the saved view was
-since deleted. When `audience` is set, the company set is restricted to that
-saved view's members on top of everything above. It only narrows the list,
-never widens it, so the do-not-contact guard (statuses 0 and 4) and the "F.A."
-exclusion still apply. A legacy outreach key with no campaign row gets a `null`
-audience and a `where` identical to before this field existed.
+`{ viewId, name, isArchived }` naming that row's target list, or `null` when
+the key has no campaign row or the row has no `audienceViewId` set. When
+`audience` is set, the company set is restricted to that saved view's members
+on top of everything above. It only narrows the list, never widens it, so the
+do-not-contact guard (statuses 0 and 4) and the "F.A." exclusion still apply.
+A legacy outreach key with no campaign row gets a `null` audience and a `where`
+identical to before this field existed. `isArchived` is the CAMPAIGN's flag,
+not the view's: an archived campaign still restricts targeting, and this is
+the only place that says so.
+
+A campaign whose `audienceViewId` is set but whose saved view no longer
+resolves is a `409 { error: "audience_view_missing", viewId }`, not a fallback
+to an unrestricted query. A restriction that disappears has to be louder than
+one that never existed, because `audience: null` cannot be told apart from
+"this campaign never had a target list" by the caller.
 
 > ⚠️ This does **not** return an enrichment dossier or a lead-scoring tier yet.
 > `companies.enrichment` / `closeness_score` (see **Companies & persons** above)
