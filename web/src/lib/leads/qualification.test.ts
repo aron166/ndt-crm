@@ -146,3 +146,22 @@ describe("effectiveAnswers feeds computeTier the same as a raw answer map", () =
     expect(computeTier(effectiveAnswers(sources))).toBe("A");
   });
 });
+
+describe("answerSourcesFrom is per-slug tolerant (Vanda #113)", () => {
+  it("one malformed record does not destroy the others", () => {
+    const parsed = answerSourcesFrom({
+      good: { form: { value: "fal", at: "2026-09-20T10:00:00.000Z" } },
+      broken: { form: { value: 42 } },
+      alsoGood: { setter: { value: "ceg", at: "2026-09-20T11:00:00.000Z" } },
+    });
+    expect(parsed.good?.form?.value).toBe("fal");
+    expect(parsed.alsoGood?.setter?.value).toBe("ceg");
+    expect(parsed.broken).toBeUndefined();
+  });
+
+  it("null, an array and a scalar all read as empty rather than throwing", () => {
+    for (const raw of [null, undefined, [], 7, "x"]) {
+      expect(answerSourcesFrom(raw)).toEqual({});
+    }
+  });
+});

@@ -291,10 +291,17 @@ export async function setLeadQualification(
   const sources = withAnswers(beforeSources, "setter", submitted);
   // Answers recorded before this column existed have no origin. They are still
   // the lead's answers, so they stay in the effective map.
-  const merged: Record<string, string> = {
-    ...legacyAnswers(sources, before),
-    ...effectiveAnswers(sources),
-  };
+  //
+  // Computed from the PRE-write state, and never for a slug this call submitted.
+  // Reading it off the post-write sources instead re-classified the setter's own
+  // answer as legacy the moment they blanked it: the value survived in
+  // `qualification` and then reappeared on the lead under "forrás ismeretlen".
+  // It also made a legacy answer undeletable, and silently so — both comparisons
+  // below matched, so the action returned success having written nothing.
+  // (Vanda, #113.)
+  const legacy = legacyAnswers(beforeSources, before);
+  for (const slug of Object.keys(submitted)) delete legacy[slug];
+  const merged: Record<string, string> = { ...legacy, ...effectiveAnswers(sources) };
 
   // Both are compared: a setter who confirms the form's answer word for word
   // changes no effective answer but DOES add a call-sourced record, and the
@@ -321,8 +328,8 @@ export async function setLeadQualification(
     data: { qualification: merged, answerSources: sources as Prisma.InputJsonValue, tier },
   });
   audit("lead", leadId, "update",
-    { qualification: before, tier: lead.tier },
-    { qualification: merged, tier },
+    { qualification: before, tier: lead.tier, answerSources: beforeSources },
+    { qualification: merged, tier, answerSources: sources },
     auditOpts(ctx));
   return { success: true };
 }

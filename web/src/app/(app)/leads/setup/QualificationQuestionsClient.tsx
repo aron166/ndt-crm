@@ -239,8 +239,12 @@ export function QualificationQuestionsClient({
                     ))}
                   </div>
                   {noSets && (
-                    <p className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--coral)", marginTop: 4 }}>
-                      <AlertTriangle size={12} aria-hidden="true" /> Egyik kérdéscsoportban sincs, sehol nem lesz feltéve.
+                    // Not "sehol nem lesz feltéve": questionsFromSettings puts a
+                    // set-less question back into the discovery set, so the
+                    // warning has to say what actually happens. Retiring a
+                    // question is the delete button. (Vanda, #113.)
+                    <p className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--amber)", marginTop: 4 }}>
+                      <AlertTriangle size={12} aria-hidden="true" /> Egyik kérdéscsoportban sincs: mentés után a felmérő kérdések közé kerül. Végleges eltávolításhoz töröld.
                     </p>
                   )}
                 </div>

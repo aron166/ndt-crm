@@ -441,15 +441,28 @@ const answerRecordSchema = z.object({
   by: z.string().max(200).optional(),
 });
 
-const answerSourcesSchema = z.record(
-  z.string().max(50),
-  z.object({ form: answerRecordSchema.optional(), setter: answerRecordSchema.optional() }),
-);
+const slugSourcesSchema = z.object({
+  form: answerRecordSchema.optional(),
+  setter: answerRecordSchema.optional(),
+});
 
-/** Stored provenance, tolerating a null/garbage column. */
+/**
+ * Stored provenance, tolerating a null/garbage column.
+ *
+ * Parsed PER SLUG, not as one object: an all-or-nothing schema meant a single
+ * malformed record (a hand-edited row, an over-long value) returned `{}`, and
+ * the next setter save persisted that `{}` — every other slug's provenance
+ * destroyed permanently, for one bad entry. (Vanda, #113.)
+ */
 export function answerSourcesFrom(raw: unknown): AnswerSources {
-  const parsed = answerSourcesSchema.safeParse(raw);
-  return parsed.success ? (parsed.data as AnswerSources) : {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: AnswerSources = {};
+  for (const [slug, rec] of Object.entries(raw as Record<string, unknown>)) {
+    if (slug.length > 50) continue;
+    const parsed = slugSourcesSchema.safeParse(rec);
+    if (parsed.success && (parsed.data.form || parsed.data.setter)) out[slug] = parsed.data;
+  }
+  return out;
 }
 
 /**

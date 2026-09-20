@@ -8,19 +8,33 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   ANSWER_MAX,
+  SET_DISCOVERY,
   phoneWording,
   legacyAnswers,
+  questionsInSet,
   type AnswerSources,
   type QualificationQuestion,
   type QuestionSet,
 } from "@/lib/leads/qualification";
 import { formatDateTime } from "@/lib/utils";
 
-/** The setter's own answers, one per slug — never the form's. */
-function setterAnswersFrom(sources: AnswerSources): Record<string, string> {
+/**
+ * The setter's own answers, one per slug — never the form's, and only for
+ * questions the tenant still asks.
+ *
+ * Seeding from every slug in `answer_sources` meant a question deleted at
+ * /leads/setup kept feeding its old answer into the draft, and `parseAnswers`
+ * rejects an unknown slug: the whole block became unsavable with "Ismeretlen
+ * kérdés" until the question was put back. (Vanda, #113.)
+ */
+function setterAnswersFrom(
+  sources: AnswerSources,
+  questions: QualificationQuestion[],
+): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [slug, rec] of Object.entries(sources)) {
-    if (rec.setter?.value) out[slug] = rec.setter.value;
+  for (const q of questions) {
+    const v = sources[q.slug]?.setter?.value;
+    if (v) out[q.slug] = v;
   }
   return out;
 }
@@ -76,7 +90,7 @@ function FormAnswersBlock({
     <div className="panel">
       <div className="panel-head"><div className="panel-title">Az űrlapon ezt válaszolta</div></div>
       <div className="panel-pad space-y-3">
-        {headerParts.length > 0 && (
+        {headerParts.length > 0 && formEntries.length > 0 && (
           <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>{headerParts.join(" · ")}</div>
         )}
 
@@ -133,7 +147,7 @@ function CallAnswersBlock({
   sources: AnswerSources;
 }) {
   const router = useRouter();
-  const answers = setterAnswersFrom(sources);
+  const answers = setterAnswersFrom(sources, questions);
   const [draft, setDraft] = useState<Record<string, string>>(answers);
   const [prevAnswers, setPrevAnswers] = useState(answers);
   const [error, setError] = useState<string | null>(null);
@@ -261,7 +275,14 @@ export function LeadQualificationPanel({
         receivedDate={receivedDate}
         sets={sets}
       />
-      <CallAnswersBlock leadId={leadId} questions={questions} sources={answerSources} />
+      {/* The setter asks the DISCOVERY set. Short-form-only questions are not
+          the setter's to ask again — `reach` ("hol érünk el") is wording for the
+          form, and its answer is the contact columns, not a stored answer. */}
+      <CallAnswersBlock
+        leadId={leadId}
+        questions={questionsInSet(questions, SET_DISCOVERY)}
+        sources={answerSources}
+      />
     </div>
   );
 }

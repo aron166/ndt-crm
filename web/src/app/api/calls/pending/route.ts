@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { reportError } from "@/lib/report-error";
 import { getQualificationQuestions } from "@/lib/leads/queries";
+import { questionsInSet, phoneWording, SET_DISCOVERY } from "@/lib/leads/qualification";
 
 // GET /api/calls/pending — transcripts the auto-outcome skill has not yet
 // parsed. Read-only queue, mirrors /api/content/queue. App-key auth, same
@@ -82,10 +83,15 @@ export async function GET(request: Request) {
     // call this route and /result, so without them it would emit answer slugs
     // from a hard-coded default list that a tenant can rename at /leads/setup —
     // and a wrong slug moves the lead's A-E tier.
-    const questions = (await getQualificationQuestions(key.tenantId)).map((q) => ({
-      slug: q.slug,
-      label: q.label,
-    }));
+    // The DISCOVERY set, in the PHONE wording. This is the one consumer that is
+    // literally on a call: it must read what the setter would say aloud, not the
+    // landing form's wording, and it must not be handed short-form-only
+    // questions (`reach` — "hol érünk el" — whose answer is the contact columns,
+    // not a stored answer). (Vanda, #113.)
+    const questions = questionsInSet(
+      await getQualificationQuestions(key.tenantId),
+      SET_DISCOVERY,
+    ).map((q) => ({ slug: q.slug, label: phoneWording(q) }));
 
     return json({ ok: true, items, questions }, 200);
   } catch (err) {

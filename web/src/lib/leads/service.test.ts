@@ -178,6 +178,48 @@ describe("setLeadQualification keeps a placed tier when the new answer doesn't r
     expect(call.data.tier).toBe("C");
   });
 
+  it("blanking a setter answer with NO form answer clears it, it does not resurrect as legacy", async () => {
+    // Vanda #113: computing `legacy` from the POST-write sources re-labelled the
+    // setter's own text as an origin-less answer the moment they deleted it, so
+    // the value survived in `qualification` AND reappeared on the lead under
+    // "forrás ismeretlen".
+    mockDb.lead.findFirst.mockResolvedValue({
+      qualification: { size: "300" },
+      answerSources: { size: { setter: { value: "300", at: "2026-09-20T11:00:00.000Z" } } },
+      tier: "B",
+    });
+    const res = await setLeadQualification(10, { size: "" }, ctx);
+    expect(res).toEqual({ success: true });
+    const call = written();
+    expect(call.data.qualification).toEqual({});
+    expect(call.data.answerSources.size).toBeUndefined();
+  });
+
+  it("a legacy answer (no provenance at all) can be cleared, and the write actually happens", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({
+      qualification: { size: "200" },
+      answerSources: null,
+      tier: "B",
+    });
+    const res = await setLeadQualification(10, { size: "" }, ctx);
+    expect(res).toEqual({ success: true });
+    const call = written();
+    expect(call.data.qualification).toEqual({});
+  });
+
+  it("a legacy answer on an UNSUBMITTED slug survives a save to another slug", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({
+      qualification: { size: "200" },
+      answerSources: null,
+      tier: null,
+    });
+    const res = await setLeadQualification(10, { situation: "szakember" }, ctx);
+    expect(res).toEqual({ success: true });
+    const call = written();
+    expect(call.data.qualification).toEqual({ size: "200", situation: "szakember" });
+    expect(call.data.tier).toBe("C");
+  });
+
   it("a blank setter answer falls back to the form answer, it does not clear it", async () => {
     mockDb.lead.findFirst.mockResolvedValue({
       qualification: { situation: "szakember" },
