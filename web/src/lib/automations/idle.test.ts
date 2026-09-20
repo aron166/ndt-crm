@@ -76,6 +76,33 @@ describe("runIdleAutomations", () => {
     });
   });
 
+  it("does not stamp lastRunAt when the rule matched nothing", async () => {
+    // lastRunAt means "this rule DID something". A cron rule that never fires
+    // used to refresh its timestamp on every pass, which reads as working.
+    mockDb.automationRule.findMany.mockResolvedValue([idleRule()]);
+    mockDb.deal.findMany.mockResolvedValue([]);
+
+    const res = await runIdleAutomations(new Date("2026-06-07T00:00:00.000Z"));
+
+    expect(res).toEqual({ rulesEvaluated: 1, tasksCreated: 0 });
+    expect(mockDb.automationRule.update).not.toHaveBeenCalled();
+  });
+
+  it("does not stamp lastRunAt when every matching deal is deduped away", async () => {
+    // The deal matched, but the firing already existed (P2002), so nothing
+    // actually happened. Matching a row is not the same as doing something.
+    mockDb.automationRule.findMany.mockResolvedValue([idleRule()]);
+    mockDb.deal.findMany.mockResolvedValue([idleDeal()]);
+    mockDb.$transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "7" }),
+    );
+
+    const res = await runIdleAutomations(new Date("2026-06-07T00:00:00.000Z"));
+
+    expect(res).toEqual({ rulesEvaluated: 1, tasksCreated: 0 });
+    expect(mockDb.automationRule.update).not.toHaveBeenCalled();
+  });
+
   it("scopes the deal query by stage + idle cutoff", async () => {
     mockDb.automationRule.findMany.mockResolvedValue([idleRule({ triggerConfig: { idleDays: 10, stageId: 4 } })]);
     mockDb.deal.findMany.mockResolvedValue([]);

@@ -38,6 +38,7 @@ export async function runIdleAutomations(now: Date = new Date()): Promise<IdleRu
       continue;
     }
     try {
+      let firedForRule = 0;
       const tc = (rule.triggerConfig ?? {}) as TriggerConfig;
       const idleDays = Number(tc.idleDays);
       if (!Number.isFinite(idleDays) || idleDays <= 0) continue;
@@ -90,6 +91,7 @@ export async function runIdleAutomations(now: Date = new Date()): Promise<IdleRu
             return tx.task.create({ data, select: { id: true } });
           });
           tasksCreated++;
+          firedForRule++;
           if (task?.id) await auditRuleTask(task.id, data, rule.id, rule.tenantId);
         } catch (err) {
           // Unique (rule, deal, stageEnteredAt) violation = already fired for this
@@ -99,7 +101,7 @@ export async function runIdleAutomations(now: Date = new Date()): Promise<IdleRu
         }
       }
 
-      await db.automationRule.update({ where: { id: rule.id }, data: { lastRunAt: now } });
+      if (firedForRule > 0) await stampRun(rule.id, now);
     } catch (err) {
       reportError("automations.idle", err, { ruleId: rule.id });
     }
@@ -109,6 +111,22 @@ export async function runIdleAutomations(now: Date = new Date()): Promise<IdleRu
 }
 
 type Rule = Awaited<ReturnType<typeof db.automationRule.findMany>>[number];
+
+/**
+ * `lastRunAt` means "the last time this rule DID something", not "the last time
+ * the cron looked at it". The three write sites used to disagree: the engine
+ * (engine.ts) stamped only after an action fired, while both idle paths stamped
+ * on every pass, including one that matched nothing. A cron rule that has never
+ * fired would therefore show a timestamp refreshed every run, which is the one
+ * reading that is actively misleading: it says the rule is working.
+ *
+ * ponytail: nothing renders this column yet (AutomationsClient types it and
+ * never shows it). If it ever has to answer "is the cron alive", that is a
+ * different question and wants its own field, not a second meaning for this one.
+ */
+async function stampRun(ruleId: number, now: Date): Promise<void> {
+  await db.automationRule.update({ where: { id: ruleId }, data: { lastRunAt: now } });
+}
 
 /**
  * lead_idle: open, unconverted leads (optionally in one status) whose last
@@ -139,12 +157,7 @@ async function runLeadIdleRule(rule: Rule, now: Date): Promise<number> {
     },
     take: 500, // ponytail: cron batch cap; the rest is picked up next run
   });
-  if (leads.length === 0) {
-    // Stamp anyway — the rule DID run, it just matched nothing. Matches what the
-    // deal_idle_in_stage path does after an empty query.
-    await db.automationRule.update({ where: { id: rule.id }, data: { lastRunAt: now } });
-    return 0;
-  }
+  if (leads.length === 0) return 0;
 
   const extras = await getLeadExtras(
     rule.tenantId,
@@ -185,6 +198,6 @@ async function runLeadIdleRule(rule: Rule, now: Date): Promise<number> {
       reportError("automations.lead_idle", err, { ruleId: rule.id, leadId: lead.id });
     }
   }
-  await db.automationRule.update({ where: { id: rule.id }, data: { lastRunAt: now } });
+  if (fired > 0) await stampRun(rule.id, now);
   return fired;
 }

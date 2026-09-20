@@ -539,13 +539,25 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     expect(assets).toHaveLength(0);
   });
 
-  it("countPendingForReviewer equals the length of getInbox(...).mine for the same reviewer", async () => {
+  it("countPendingForReviewer counts the same items getInbox(...).mine shows", async () => {
     const { countPendingForReviewer, getInbox } = await import("./queries");
+    const before = await countPendingForReviewer(1, userA);
     await newItem();
     await newItem();
     const count = await countPendingForReviewer(1, userA);
+    // The pollution-proof half: two fresh items nobody has judged are exactly
+    // two more pending, whatever else the database is already carrying.
+    expect(count).toBe(before + 2);
+
     const inbox = await getInbox(1, userA);
-    expect(count).toBe(inbox.mine.length);
+    // `mine` is a filtered slice of ONE 50-row page; `count` is uncapped. They
+    // can only be equal while that page has not capped, so asserting equality
+    // unconditionally passed on CI's clean database and failed on any fixture
+    // database that had accumulated rows. The invariant worth pinning is that
+    // the two agree on WHICH items are pending, not that a paged list and a
+    // total are the same number.
+    expect(count).toBeGreaterThanOrEqual(inbox.mine.length);
+    if (!inbox.hasMore) expect(count).toBe(inbox.mine.length);
   });
 
   it("countOpenDecisions and getDecisionQueue exclude a source: rule check — nobody can action it — but keep manual/decision/import ones", async () => {
