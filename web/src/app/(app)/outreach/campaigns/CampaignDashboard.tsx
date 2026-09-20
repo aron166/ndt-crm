@@ -172,6 +172,10 @@ export default function CampaignDashboard({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
           <Card title="Megkeresett cégek">
             <Row label="Cégek" value={`${stats.companiesContacted} / ${stats.targetsTotal}`} />
+            {stats.audienceTotal != null && (
+              // PROPOSAL (unreviewed HU)
+              <Row label="Célközönség" value={stats.audienceTotal} />
+            )}
           </Card>
 
           <Card title="Elküldött érintések">

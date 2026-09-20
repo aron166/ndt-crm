@@ -5,8 +5,9 @@ import { audit } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
 import { ingestLead } from "@/lib/leads/ingest";
 import { threadKeyFor } from "@/lib/outreach/drafts";
-import { campaignBySlug } from "@/lib/outreach/registry";
-import { audienceWhere, countAudience } from "@/lib/marketing/audience-query";
+import { campaignBySlug, resolveAudience } from "@/lib/outreach/registry";
+import { countAudience } from "@/lib/marketing/audience-query";
+import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
 import {
   listSenders, setCampaignTarget, markDraftSentManually, markDraftReplied,
   getDueTouches, listCampaignKeys, getCampaignStats,
@@ -18,8 +19,8 @@ vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/leads/ingest", () => ({ ingestLead: vi.fn() }));
-vi.mock("@/lib/outreach/registry", () => ({ campaignBySlug: vi.fn() }));
-vi.mock("@/lib/marketing/audience-query", () => ({ audienceWhere: vi.fn(), countAudience: vi.fn() }));
+vi.mock("@/lib/outreach/registry", () => ({ campaignBySlug: vi.fn(), resolveAudience: vi.fn() }));
+vi.mock("@/lib/marketing/audience-query", () => ({ countAudience: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   db: {
     user: { findMany: vi.fn() },
@@ -54,7 +55,7 @@ const mockIngestLead = ingestLead as unknown as M;
 const mockRunAutomations = runAutomations as unknown as M;
 const mockAudit = audit as unknown as M;
 const mockCampaignBySlug = campaignBySlug as unknown as M;
-const mockAudienceWhere = audienceWhere as unknown as M;
+const mockResolveAudience = resolveAudience as unknown as M;
 const mockCountAudience = countAudience as unknown as M;
 
 beforeEach(() => {
@@ -65,6 +66,7 @@ beforeEach(() => {
   // Default: campaign key is unregistered (legacy free string) - keeps every
   // existing test's expectations unchanged unless it opts into a registration.
   mockCampaignBySlug.mockResolvedValue(null);
+  mockResolveAudience.mockResolvedValue({ kind: "none" });
   mockDb.campaign.findMany.mockResolvedValue([]);
 });
 
@@ -320,8 +322,8 @@ describe("listCampaignKeys", () => {
   });
 });
 
-describe("getCampaignStats targetsTotal", () => {
-  it("unscoped + registered campaign with an audience view: live audience count", async () => {
+describe("getCampaignStats targetsTotal / audienceTotal", () => {
+  it("unscoped + registered campaign with an audience view: targetsTotal STAYS companyIds.length, audienceTotal gets the CALLABLE-restricted live count", async () => {
     mockDb.emailDraft.findMany.mockResolvedValue([
       { companyId: 10, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 2, wave: 1 },
     ]);
@@ -331,17 +333,23 @@ describe("getCampaignStats targetsTotal", () => {
       id: 1, name: "Campaign", slug: "c1", senderUserId: null, currentWave: null,
       audienceViewId: 5, isArchived: false,
     });
-    mockDb.savedView.findFirst.mockResolvedValue({ filters: { pipeline_status: "1" } });
-    mockAudienceWhere.mockResolvedValue({ pipelineStatus: 1 });
+    mockResolveAudience.mockResolvedValue({
+      kind: "ok", viewId: 5, name: "Segment", isArchived: false, where: { pipelineStatus: 1 },
+    });
     mockCountAudience.mockResolvedValue(42);
 
-    const res = await getCampaignStats({ campaign: "c1" });
+    const res = await getCampaignStats({ campaign: "c1" }) as { targetsTotal: number; audienceTotal: number | null };
 
-    expect(mockCountAudience).toHaveBeenCalledWith({ pipelineStatus: 1 });
-    expect((res as { targetsTotal: number }).targetsTotal).toBe(42);
+    // The audience where is ANDed with the same CALLABLE_STATUSES the targets
+    // route enforces - countAudience alone doesn't exclude KUKA / "Nem érdekelt".
+    expect(mockCountAudience).toHaveBeenCalledWith({
+      AND: [{ pipelineStatus: 1 }, { pipelineStatus: { in: [...CALLABLE_STATUSES] } }],
+    });
+    expect(res.targetsTotal).toBe(1);
+    expect(res.audienceTotal).toBe(42);
   });
 
-  it("unregistered campaign (legacy free string): keeps companyIds.length", async () => {
+  it("unregistered campaign (legacy free string): targetsTotal keeps companyIds.length, audienceTotal is null", async () => {
     mockDb.emailDraft.findMany.mockResolvedValue([
       { companyId: 10, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 2, wave: 1 },
       { companyId: 20, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 3, wave: 1 },
@@ -349,14 +357,16 @@ describe("getCampaignStats targetsTotal", () => {
     mockDb.lead.findMany.mockResolvedValue([]);
     mockDb.interaction.findMany.mockResolvedValue([]);
     mockCampaignBySlug.mockResolvedValue(null);
+    mockResolveAudience.mockResolvedValue({ kind: "none" });
 
-    const res = await getCampaignStats({ campaign: "TESZT" });
+    const res = await getCampaignStats({ campaign: "TESZT" }) as { targetsTotal: number; audienceTotal: number | null };
 
     expect(mockCountAudience).not.toHaveBeenCalled();
-    expect((res as { targetsTotal: number }).targetsTotal).toBe(2);
+    expect(res.targetsTotal).toBe(2);
+    expect(res.audienceTotal).toBeNull();
   });
 
-  it("registered with an audience view but sender/wave filter applied: keeps companyIds.length, not the live count", async () => {
+  it("registered with an audience view but sender/wave filter applied: targetsTotal keeps companyIds.length, audienceTotal null (not computed when scoped)", async () => {
     mockDb.emailDraft.findMany.mockResolvedValue([
       { companyId: 10, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 2, wave: 1 },
       { companyId: 20, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 3, wave: 1 },
@@ -368,11 +378,13 @@ describe("getCampaignStats targetsTotal", () => {
       audienceViewId: 5, isArchived: false,
     });
 
-    const res = await getCampaignStats({ campaign: "c1", senderUserId: 2 });
+    const res = await getCampaignStats({ campaign: "c1", senderUserId: 2 }) as { targetsTotal: number; audienceTotal: number | null };
 
     expect(mockCampaignBySlug).not.toHaveBeenCalled();
+    expect(mockResolveAudience).not.toHaveBeenCalled();
     expect(mockCountAudience).not.toHaveBeenCalled();
-    expect((res as { targetsTotal: number }).targetsTotal).toBe(1);
+    expect(res.targetsTotal).toBe(1);
+    expect(res.audienceTotal).toBeNull();
   });
 });
 

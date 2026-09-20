@@ -19,19 +19,22 @@ export default async function CampaignDetailPage({
   if (!/^\d+$/.test(id)) notFound();
   const campaignId = parseInt(id, 10);
 
-  const campaign = await db.campaign.findFirst({
-    where: { id: campaignId, tenantId: TENANT_ID },
-    include: {
-      audienceView: { select: { id: true, name: true, filters: true } },
-      contentItems: {
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, title: true, channel: true, status: true, updatedAt: true },
+  // Independent reads on a force-dynamic page - fold into one round trip
+  // instead of awaiting them one after another.
+  const [campaign, senders] = await Promise.all([
+    db.campaign.findFirst({
+      where: { id: campaignId, tenantId: TENANT_ID },
+      include: {
+        audienceView: { select: { id: true, name: true, filters: true } },
+        contentItems: {
+          orderBy: { updatedAt: "desc" },
+          select: { id: true, title: true, channel: true, status: true, updatedAt: true },
+        },
       },
-    },
-  });
+    }),
+    listSenders(),
+  ]);
   if (!campaign) notFound();
-
-  const senders = await listSenders();
 
   // Resolve the audience segment to a live count + a small preview.
   let audienceCount = 0;

@@ -4,8 +4,7 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
-import { campaignBySlug } from "@/lib/outreach/registry";
-import { audienceWhere } from "@/lib/marketing/audience-query";
+import { campaignBySlug, resolveAudience } from "@/lib/outreach/registry";
 
 // Outreach targeting: which companies in this tenant still need a first (or
 // next) draft written for a given campaign. Addendum item 1 — the drafting
@@ -60,22 +59,21 @@ export async function GET(request: Request) {
     // Feature E2: a registered campaign may scope its targets to a saved
     // company view (the audience). An audience only NARROWS who is callable -
     // it is ANDed on top of the do-not-contact guards below, never used in
-    // place of them. No campaign row, or a row with no audience view, or the
-    // saved view having been deleted since: `audience` stays null and the
-    // `where` below is byte-identical to before this feature existed.
+    // place of them. No campaign row, or a row with no audience view: `audience`
+    // stays null and the `where` below is byte-identical to before this feature
+    // existed. But a view that WAS set and has since been deleted must not fail
+    // open - the drafting agent can't tell that apart from "never had an
+    // audience" once it's coming back as null, so that case is refused outright
+    // instead of silently handing back an unrestricted query (Vanda, #112).
     const reg = await campaignBySlug(key.tenantId, campaign);
-    let audience: { viewId: number; name: string } | null = null;
-    let audienceAnd: Awaited<ReturnType<typeof audienceWhere>> | null = null;
-    if (reg?.audienceViewId != null) {
-      const view = await db.savedView.findFirst({
-        where: { id: reg.audienceViewId, tenantId: key.tenantId },
-        select: { id: true, name: true, filters: true },
-      });
-      if (view) {
-        audience = { viewId: view.id, name: view.name };
-        audienceAnd = await audienceWhere(view.filters, key.tenantId);
-      }
+    const resolution = await resolveAudience(key.tenantId, reg);
+    if (resolution.kind === "missing") {
+      return json({ error: "audience_view_missing", viewId: resolution.viewId }, 409);
     }
+    const audience = resolution.kind === "ok"
+      ? { viewId: resolution.viewId, name: resolution.name, isArchived: resolution.isArchived }
+      : null;
+    const audienceAnd = resolution.kind === "ok" ? resolution.where : null;
 
     // Same do-not-contact guard the call cockpit uses (CALLABLE_STATUSES in
     // lib/outreach/queue.ts): status 0 (KUKA) and 4 (Nem érdekelt) are people who
