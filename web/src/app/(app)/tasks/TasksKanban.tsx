@@ -271,10 +271,14 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
     startTransition(async () => {
       const res = await moveTask(id, colKey);
       router.refresh();
-      // A denied move wrote nothing. The optimistic card above already snapped
-      // to the new column, so the refresh is what puts it back; prompting on
-      // top of that would ask about a stage change that never happened.
-      if (res && "error" in res) return;
+      // A denied move wrote nothing, so put the optimistic card back ourselves:
+      // `tasks` is local state seeded once from `initialTasks` and never
+      // re-syncs from props, so `router.refresh()` alone leaves the card in
+      // the wrong column until a full reload.
+      if (res && "error" in res) {
+        setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: task.status } : t));
+        return;
+      }
       // Offer to log the interaction when a comms task is newly marked done.
       if (colKey === "done" && !wasDone) {
         const personName = task.person

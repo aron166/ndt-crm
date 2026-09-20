@@ -82,11 +82,12 @@ export async function getTechnologyWordCounts(tenantId: number, days = 365): Pro
       technologyWord: { not: null },
       occurredAt: { gte: since },
       // A correction writes a NEW interaction that supersedes the old one
-      // (interactions are append-only, decisions.md #2), and the setter
-      // normally re-types the same word on it. Counting both would inflate
-      // every corrected call. getScriptStats does not do this yet, which is a
-      // pre-existing overcount in the A/B table, not something this change
-      // introduces.
+      // (interactions are append-only, decisions.md #2). CallOutcomeModal
+      // never re-prompts for the word in correction mode, so correctCallOutcome
+      // carries it forward from the superseded row onto the new one. Counting
+      // both here would double it. getScriptStats does not do this yet, which
+      // is a pre-existing overcount in the A/B table, not something this
+      // change introduces.
       supersededBy: { none: {} },
     },
     _count: true,

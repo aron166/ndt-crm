@@ -153,7 +153,6 @@ export default async function PersonsPage({
           )}
           {persons.map((p, idx) => {
             const state = employerState(p.contacts);
-            const currentContact = p.contacts.find((c) => !c.endedAt);
             const initials = [p.lastName?.[0], p.firstName?.[0]].filter(Boolean).join("").toUpperCase() || "?";
             return (
               <tr
@@ -182,9 +181,9 @@ export default async function PersonsPage({
                   <Link href={`/persons/${p.id}`} className="tbl-link" style={{ fontSize: 14 }}>
                     {p.lastName} {p.firstName}
                   </Link>
-                  {currentContact?.role && (
+                  {state.kind === "current" && state.role && (
                     <span style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: 8 }}>
-                      {currentContact.role}
+                      {state.role}
                     </span>
                   )}
                 </td>

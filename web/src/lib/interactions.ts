@@ -73,6 +73,32 @@ export function shouldPromptLeadStageOnComplete(task: { leadId?: number | null }
   return task.leadId != null;
 }
 
+export type CompletionPrompt = "log" | "stage";
+
+/**
+ * Which prompt(s) a completed task raises, in order, per the completion
+ * behaviour table (see the comment above useTaskCompletion). A lead-linked
+ * `call` skips the log prompt outright, because the lead's own "Hívás
+ * eredménye" modal (opened from the stage prompt) is the richer place to log
+ * that call. Every other lead-linked, loggable type has no such richer path,
+ * so it gets the log prompt first, then the stage prompt, sequential rather
+ * than stacked. A task with no lead falls back to the plain log-or-nothing
+ * rule.
+ */
+export function completionPromptsFor(task: {
+  type: string | null;
+  companyId: number | null;
+  personId: number | null;
+  leadId?: number | null;
+}): CompletionPrompt[] {
+  const loggable = shouldLogInteractionOnComplete(task);
+  if (shouldPromptLeadStageOnComplete(task)) {
+    if (loggable && task.type !== "call") return ["log", "stage"];
+    return ["stage"];
+  }
+  return loggable ? ["log"] : [];
+}
+
 export interface LogInteractionInput {
   type?: string;
   notes?: string;
