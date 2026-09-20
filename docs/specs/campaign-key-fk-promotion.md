@@ -41,7 +41,9 @@ the code surface listed below, not the rows.
    matching `campaigns.slug` (today, just `TESZT`) gets a real `campaigns` row
    created for it. Rollback: delete the created rows, nothing else changed yet.
 2. **Add nullable `campaign_id`** to all four tables, FK to `campaigns.id`,
-   `ON DELETE SET NULL`. Additive, no reads change. Rollback: drop the column.
+   `ON DELETE RESTRICT` on `email_drafts` (a nulled campaign_id would break the
+   touch-identity key in step 6) and `ON DELETE SET NULL` on the other three.
+   Additive, no reads change. Rollback: drop the column.
 3. **Dual-write.** Every write path that sets the string also resolves and
    sets `campaign_id` (via `campaignBySlug`-style lookup, creating a row if
    the slug is new). Rollback: revert the dual-write commit; `campaign_id`

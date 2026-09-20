@@ -11,7 +11,7 @@ import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 // leads.campaign / interactions.campaign.
 //
 // Every action checks the CRM user itself. A server action is callable by id,
-// so the (app) layout's login redirect is not an authorization check — these
+// so the (app) layout's login redirect is not an authorization check. These
 // four had no check at all before 2026-09-20.
 
 const TENANT_ID = 1;
@@ -60,7 +60,7 @@ function revalidate(id?: number) {
 
 /**
  * Outreach fields shared by create and setCampaignOutreach. `wave` is capped
- * at 52 to match setCampaignTarget in actions/outreach-campaigns.ts — the two
+ * at 52 to match setCampaignTarget in actions/outreach-campaigns.ts: the two
  * write the same concept and must not disagree on what a valid wave is.
  */
 const outreachSchema = z.object({
@@ -116,7 +116,7 @@ export async function createCampaign(input: {
 /**
  * The two values stamped on NEW drafts of this campaign whose payload omits
  * them (POST /api/outreach/drafts). Changing them never rewrites a draft that
- * already exists — history and rows already queued keep what they were given.
+ * already exists. History and rows already queued keep what they were given.
  */
 export async function setCampaignOutreach(id: number, input: {
   senderUserId?: number | null;

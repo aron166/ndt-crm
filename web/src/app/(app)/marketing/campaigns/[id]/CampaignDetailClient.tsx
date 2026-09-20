@@ -122,7 +122,7 @@ export function CampaignDetailClient({
 
       {error && <p className="text-sm text-red-600" style={{ marginBottom: 12 }}>{error}</p>}
 
-      {/* ── Kiküldés (sender + wave) — PROPOSAL (unreviewed HU) ── */}
+      {/* ── Kiküldés (sender + wave). PROPOSAL (unreviewed HU) ── */}
       <section style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", marginBottom: 12 }}>
           {/* PROPOSAL (unreviewed HU) */}
@@ -145,8 +145,11 @@ export function CampaignDetailClient({
             type="number" min={1} max={52}
             defaultValue={campaign.currentWave ?? ""}
             onBlur={(e) => {
-              const v = e.target.value;
-              pickOutreach({ currentWave: v ? Number(v) : null });
+              // A blur fires whether or not anything changed. Without this the
+              // page would write and audit the same wave on every tab-out.
+              const next = e.target.value ? Number(e.target.value) : null;
+              if (next === (campaign.currentWave ?? null)) return;
+              pickOutreach({ currentWave: next });
             }}
             disabled={isPending}
             style={{ width: 90 }}
@@ -184,9 +187,14 @@ export function CampaignDetailClient({
           )}
         </div>
 
-        {/* PROPOSAL (unreviewed HU) */}
+        {/* PROPOSAL (unreviewed HU). Two sentences, because the claim only holds
+            once a segment is set: with none, every megkereshető company is a
+            target and promising otherwise would be wrong on the screen that
+            decides who gets cold-emailed. */}
         <p style={{ fontSize: 14, color: "var(--fg-faint)", marginBottom: 10 }}>
-          Ez a szegmens egyben a kimenő lista is: csak ezekhez a cégekhez készül piszkozat ebben a kampányban.
+          {campaign.audienceViewId !== null
+            ? "Ez a szegmens egyben a kimenő lista is: csak ezekhez a cégekhez készül piszkozat ebben a kampányban."
+            : "Amíg nincs szegmens, minden megkereshető cég célpont ebben a kampányban."}
         </p>
 
         <div className="flex flex-wrap items-center gap-2" style={{ marginBottom: 14 }}>

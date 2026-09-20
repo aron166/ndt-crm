@@ -74,8 +74,23 @@ export async function POST(request: Request) {
       })
     : [];
   const validPairs = new Set(validContacts.map((c) => `${c.personId}:${c.companyId}`));
+  // Registered campaign's sender/wave default a NEW draft when the payload
+  // didn't state one - looked up once per distinct campaign string, never
+  // once per item. A key with no campaigns row (still true of "TESZT" in
+  // prod) resolves to null and every item behaves exactly as before.
+  const distinctCampaigns = [...new Set(items.map((d) => d.campaign))];
+  const registrations = new Map<string, CampaignRegistration | null>(
+    await Promise.all(distinctCampaigns.map(async (c) => [c, await campaignBySlug(key.tenantId, c)] as const)),
+  );
+
   // senderUserId must be a user of THIS tenant; anything else is dropped to null.
-  const wantedSenders = [...new Set(items.map((d) => d.senderUserId).filter((u): u is number => typeof u === "number"))];
+  // The campaign defaults are candidates too: without them in this set,
+  // trackingFor would drop every defaulted sender straight back to null and
+  // the "pick a sender before any draft exists" feature would silently no-op.
+  const wantedSenders = [...new Set([
+    ...items.map((d) => d.senderUserId),
+    ...[...registrations.values()].map((r) => r?.senderUserId),
+  ].filter((u): u is number => typeof u === "number"))];
   const validSenders = new Set(
     wantedSenders.length
       ? (await db.user.findMany({ where: { tenantId: key.tenantId, id: { in: wantedSenders } }, select: { id: true } })).map((u) => u.id)
@@ -99,15 +114,6 @@ export async function POST(request: Request) {
   }
   const templateFor = (item: { templateVersionId?: number | null; campaign: string; step: number }) =>
     validTemplateVersion(item.templateVersionId, allowedTemplates, item.campaign, item.step);
-
-  // Registered campaign's sender/wave default a NEW draft when the payload
-  // didn't state one - looked up once per distinct campaign string, never
-  // once per item. A key with no campaigns row (still true of "TESZT" in
-  // prod) resolves to null and every item behaves exactly as before.
-  const distinctCampaigns = [...new Set(items.map((d) => d.campaign))];
-  const registrations = new Map<string, CampaignRegistration | null>(
-    await Promise.all(distinctCampaigns.map(async (c) => [c, await campaignBySlug(key.tenantId, c)] as const)),
-  );
 
   const trackingFor = (item: { senderUserId?: number | null; wave?: number | null; dueAt?: Date | null }) => ({
     ...(item.senderUserId !== undefined ? { senderUserId: item.senderUserId != null && validSenders.has(item.senderUserId) ? item.senderUserId : null } : {}),
