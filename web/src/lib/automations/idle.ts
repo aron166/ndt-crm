@@ -113,16 +113,13 @@ export async function runIdleAutomations(now: Date = new Date()): Promise<IdleRu
 type Rule = Awaited<ReturnType<typeof db.automationRule.findMany>>[number];
 
 /**
- * `lastRunAt` means "the last time this rule DID something", not "the last time
- * the cron looked at it". The three write sites used to disagree: the engine
- * (engine.ts) stamped only after an action fired, while both idle paths stamped
- * on every pass, including one that matched nothing. A cron rule that has never
- * fired would therefore show a timestamp refreshed every run, which is the one
- * reading that is actively misleading: it says the rule is working.
+ * `lastRunAt` means "the last time this rule DID something" (see the schema
+ * column). The engine and both idle paths used to disagree; they no longer do.
  *
- * ponytail: nothing renders this column yet (AutomationsClient types it and
- * never shows it). If it ever has to answer "is the cron alive", that is a
- * different question and wants its own field, not a second meaning for this one.
+ * One honest gap: here the counter is incremented as soon as the task row
+ * exists, before `auditRuleTask`, so a failing audit write still stamps. The
+ * engine does not stamp in that case. Kept deliberately: the task genuinely
+ * exists and the rule genuinely acted, whatever the audit trail says.
  */
 async function stampRun(ruleId: number, now: Date): Promise<void> {
   await db.automationRule.update({ where: { id: ruleId }, data: { lastRunAt: now } });

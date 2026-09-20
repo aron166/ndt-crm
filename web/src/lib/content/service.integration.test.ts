@@ -539,25 +539,43 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     expect(assets).toHaveLength(0);
   });
 
-  it("countPendingForReviewer counts the same items getInbox(...).mine shows", async () => {
-    const { countPendingForReviewer, getInbox } = await import("./queries");
-    const before = await countPendingForReviewer(1, userA);
-    await newItem();
-    await newItem();
-    const count = await countPendingForReviewer(1, userA);
-    // The pollution-proof half: two fresh items nobody has judged are exactly
-    // two more pending, whatever else the database is already carrying.
-    expect(count).toBe(before + 2);
+  it("countPendingForReviewer and getInbox(...).mine agree on WHICH items are pending", async () => {
+    const { countPendingForReviewer, getInbox, pendingForReviewerWhere, bouncedByRuleWhere } =
+      await import("./queries");
+
+    // The badge and the "Rám vár" list must never disagree about an item. The
+    // old version of this test compared a COUNT with a LIST LENGTH, which is
+    // only equal while getInbox's 50-row page has not capped: it passed on CI's
+    // clean database and failed on any fixture database carrying rows, and it
+    // was flaky against a sibling integration file writing tenant 1 in
+    // parallel. Cardinality was never the invariant. Membership is, and it is
+    // immune to both paging and whatever else the database is holding.
+    const plain = await newItem();
+    const bounced = await newItem();
+    await db.contentCheck.create({
+      data: { tenantId: 1, itemId: bounced.itemId, question: `Szabály: IT-${Date.now()}`, state: "open", source: "rule" },
+    });
+    await db.contentItem.update({ where: { id: bounced.itemId }, data: { status: "rewrite_requested" } });
 
     const inbox = await getInbox(1, userA);
-    // `mine` is a filtered slice of ONE 50-row page; `count` is uncapped. They
-    // can only be equal while that page has not capped, so asserting equality
-    // unconditionally passed on CI's clean database and failed on any fixture
-    // database that had accumulated rows. The invariant worth pinning is that
-    // the two agree on WHICH items are pending, not that a paged list and a
-    // total are the same number.
+    const mineIds = inbox.mine.map((r) => r.id);
+    // One awaiting a verdict, one the machine bounced. Both belong to `mine`.
+    expect(mineIds).toContain(plain.itemId);
+    expect(mineIds).toContain(bounced.itemId);
+
+    // ...and the badge's `where` has to match those same two rows. This is the
+    // half that catches a change to either where-builder: narrow one of them
+    // and the item the list still shows stops being counted.
+    for (const id of [plain.itemId, bounced.itemId]) {
+      const counted = await db.contentItem.count({
+        where: { id, OR: [pendingForReviewerWhere(1, userA), bouncedByRuleWhere(1)] },
+      });
+      expect(counted).toBe(1);
+    }
+
+    // A count can never be smaller than the page it is the total for.
+    const count = await countPendingForReviewer(1, userA);
     expect(count).toBeGreaterThanOrEqual(inbox.mine.length);
-    if (!inbox.hasMore) expect(count).toBe(inbox.mine.length);
   });
 
   it("countOpenDecisions and getDecisionQueue exclude a source: rule check — nobody can action it — but keep manual/decision/import ones", async () => {

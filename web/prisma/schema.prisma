@@ -961,6 +961,11 @@ model AutomationRule {
   conditions    Json? // [{ field, op, value }] AND-ed; empty/null = always
   actionType    String    @map("action_type") // create_task | send_email | change_lead_status | assign_lead | webhook_out
   actionConfig  Json      @map("action_config") // { titleTemplate, type, category, dueInDays, descriptionTemplate, assignedToId? }
+  /// The last time this rule DID something, NOT the last time the cron looked
+  /// at it. A rule that has never fired keeps a null here however often it is
+  /// evaluated, which is the whole point: a refreshed timestamp on a rule that
+  /// never acts reads as working. Cron liveness is answered by the run result
+  /// in api/cron/automations, not by this column.
   lastRunAt     DateTime? @map("last_run_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
