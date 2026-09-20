@@ -4,9 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { LeadStatusSetupClient } from "./LeadStatusSetupClient";
 import { QualificationQuestionsClient } from "./QualificationQuestionsClient";
 import { ScriptVariantsClient } from "./ScriptVariantsClient";
+import { TechnologyWordsClient } from "./TechnologyWordsClient";
 import { getQuestionModel, getRawScriptVariants } from "@/lib/leads/queries";
 import { getIntroMaterialUrl } from "@/lib/leads/intro";
 import { getScriptStats } from "@/lib/leads/script-stats";
+import { getTechnologyWordCounts } from "@/lib/leads/technology-words";
 
 const TENANT_ID = 1;
 
@@ -26,6 +28,7 @@ export default async function LeadStatusSetupPage() {
   // Stats only key off `key`, so the raw list is fine here too — no need for
   // the live-resolved bodies just to look up call outcomes.
   const scriptStats = await getScriptStats(TENANT_ID, scriptVariants);
+  const technologyWords = await getTechnologyWordCounts(TENANT_ID);
 
   return (
     <div className="mount">
@@ -53,6 +56,7 @@ export default async function LeadStatusSetupPage() {
       <LeadStatusSetupClient statuses={statuses} />
       <QualificationQuestionsClient questions={questionModel.questions} sets={questionModel.sets} introUrl={introUrl} />
       <ScriptVariantsClient variants={scriptVariants} stats={scriptStats} />
+      <TechnologyWordsClient words={technologyWords} />
     </div>
   );
 }

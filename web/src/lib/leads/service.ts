@@ -434,6 +434,7 @@ export async function logLeadCallOutcome(
         type: "call", direction: "outbound", outcome: input.outcome, notes: input.note,
         occurredAt: input.occurredAt ?? now,
         scriptVariant: input.scriptVariant ?? null,
+        technologyWord: input.technologyWord ?? null,
         campaign: lead.campaign,
         transcript: input.transcript ?? null,
         autoConfidence: input.autoConfidence ?? null,
