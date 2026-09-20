@@ -14,9 +14,17 @@ const TENANT_ID = 1;
 // delete-any-task-in-tenant-1 primitive, and `completeTask`/`moveTask` could
 // settle anyone's work queue. Same gate as saved-views (#114) and the lead
 // actions. Tenant scope was already on every query and stays.
-async function requireUser(): Promise<{ error: string } | null> {
+//
+// It returns the MESSAGE, not a `{ error }` object, and each caller builds its
+// own literal. That is not style. These actions return object literals only,
+// so TypeScript normalises their union into
+// `{ error: string; success?: undefined } | { success: boolean; error?: undefined }`,
+// and every call site reads `result?.error` off it. Returning a non-fresh
+// `{ error: string }` from here kills that normalisation and turns
+// `result?.error` into a compile error at every consumer (TaskModal caught it).
+async function requireUser(): Promise<string | null> {
   const { userId } = await getActor(TENANT_ID);
-  return userId == null ? { error: NOT_A_CRM_USER } : null;
+  return userId == null ? NOT_A_CRM_USER : null;
 }
 
 /**
@@ -41,7 +49,7 @@ function parseCostFields(formData: FormData) {
 
 export async function createTask(formData: FormData) {
   const denied = await requireUser();
-  if (denied) return denied;
+  if (denied) return { error: denied };
   const title = formData.get("title") as string;
   if (!title?.trim()) return { error: "Cím kötelező" };
 
@@ -83,7 +91,7 @@ export async function createTask(formData: FormData) {
 
 export async function updateTask(id: number, formData: FormData) {
   const denied = await requireUser();
-  if (denied) return denied;
+  if (denied) return { error: denied };
   const title = formData.get("title") as string;
   if (!title?.trim()) return { error: "Cím kötelező" };
 
@@ -141,7 +149,7 @@ export async function updateTask(id: number, formData: FormData) {
 
 export async function completeTask(id: number) {
   const denied = await requireUser();
-  if (denied) return denied;
+  if (denied) return { error: denied };
   const before = await db.task.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { status: true, companyId: true, personId: true },
@@ -158,7 +166,7 @@ export async function completeTask(id: number) {
 
 export async function reopenTask(id: number) {
   const denied = await requireUser();
-  if (denied) return denied;
+  if (denied) return { error: denied };
   const before = await db.task.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { status: true, companyId: true, personId: true },
@@ -175,7 +183,7 @@ export async function reopenTask(id: number) {
 
 export async function moveTask(id: number, newStatus: string) {
   const denied = await requireUser();
-  if (denied) return denied;
+  if (denied) return { error: denied };
   const task = await db.task.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { status: true, companyId: true, personId: true },
@@ -198,7 +206,7 @@ export async function moveTask(id: number, newStatus: string) {
 
 export async function deleteTask(id: number) {
   const denied = await requireUser();
-  if (denied) return denied;
+  if (denied) return { error: denied };
   const task = await db.task.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { title: true, status: true },

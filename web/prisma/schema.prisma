@@ -684,7 +684,7 @@ model Interaction {
    * The customer's OWN WORD for the technology, as they said it on the call
    * (BACKLOG item 6, B5). Free text on purpose: this is the market's
    * vocabulary, not ours, and it feeds copy and positioning. Never validated
-   * against a list — an unknown value here is the data, not a typo.
+   * against a list. An unknown value here is the data, not a typo.
    */
   technologyWord          String?  @map("technology_word")
   // Campaign tag (campaign tracking, 2026-09-17): the free-string campaign key

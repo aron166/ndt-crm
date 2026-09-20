@@ -75,7 +75,11 @@ export default async function PersonsPage({
           // handful of jobs, not hundreds.
           include: { company: { select: { id: true, name: true } } },
           take: 20,
-          orderBy: [{ endedAt: "asc" }, { startedAt: "desc" }],
+          // nulls "first" is load-bearing, not cosmetic: `endedAt: "asc"` alone puts
+          // NULLs (the OPEN contact) LAST in Postgres, so a person with more than
+          // `take` rows would have their current employer cut off and read as
+          // "former". Open contacts first, then most recently ended.
+          orderBy: [{ endedAt: { sort: "desc", nulls: "first" } }, { startedAt: "desc" }],
         },
       },
     }),

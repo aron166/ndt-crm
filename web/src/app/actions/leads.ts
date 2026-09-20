@@ -489,7 +489,7 @@ export async function saveScriptVariants(text: string) {
 /**
  * What the "melyik fázisba kerüljön?" prompt needs, fetched lazily when the
  * modal opens (not on every task render). Returns null when the task serves no
- * lead — the caller then shows no prompt at all.
+ * lead, and the caller then shows no prompt at all.
  *
  * Any lead-linked task asks, not only call tasks (BACKLOG item 6 / raw42 #3).
  * The demo booking `logLeadCallOutcome` creates is a `meeting` task, and the

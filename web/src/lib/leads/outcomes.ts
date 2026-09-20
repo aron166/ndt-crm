@@ -95,7 +95,7 @@ export const callOutcomeSchema = z
     /**
      * The customer's OWN word for the technology, what they called it on the
      * phone (e.g. "anyagvizsgálat", "roncsolásmentes", "falvastagságmérés").
-     * Free text, deliberately NEVER validated against a known-value list — the
+     * Free text, deliberately NEVER validated against a known-value list. The
      * whole point is to capture wording we do not already have a slug for.
      */
     technologyWord: z.string().trim().min(1).max(TECHNOLOGY_WORD_MAX).optional(),

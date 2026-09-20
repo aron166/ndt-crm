@@ -15,7 +15,7 @@ interface TechnologyWordRow {
 /**
  * Fold rows into one entry per word, case-insensitively. The DISPLAY spelling
  * is the most frequent original variant (ties broken by whichever was used
- * more recently) — the customer's own wording varies in casing far more than
+ * more recently). The customer's own wording varies in casing far more than
  * in substance, and forcing a single lowercase form would lose that.
  *
  * ponytail: folding in JS is fine while the distinct words stay in the dozens
@@ -70,14 +70,25 @@ export function foldTechnologyWords(rows: TechnologyWordRow[]): TechnologyWordCo
 
 /**
  * Counts of the customer's own words for the technology, over the last `days`.
- * Free text (see lib/leads/outcomes.ts `technologyWord`) — case folded here,
+ * Free text (see lib/leads/outcomes.ts `technologyWord`) and case folded here,
  * never validated against a known list.
  */
 export async function getTechnologyWordCounts(tenantId: number, days = 365): Promise<TechnologyWordCount[]> {
   const since = new Date(Date.now() - days * 86_400_000);
   const groups = await db.interaction.groupBy({
     by: ["technologyWord"],
-    where: { tenantId, technologyWord: { not: null }, occurredAt: { gte: since } },
+    where: {
+      tenantId,
+      technologyWord: { not: null },
+      occurredAt: { gte: since },
+      // A correction writes a NEW interaction that supersedes the old one
+      // (interactions are append-only, decisions.md #2), and the setter
+      // normally re-types the same word on it. Counting both would inflate
+      // every corrected call. getScriptStats does not do this yet, which is a
+      // pre-existing overcount in the A/B table, not something this change
+      // introduces.
+      supersededBy: { none: {} },
+    },
     _count: true,
     _max: { occurredAt: true },
   });

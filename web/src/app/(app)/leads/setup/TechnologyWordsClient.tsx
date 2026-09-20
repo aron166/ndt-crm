@@ -1,6 +1,6 @@
 import type { TechnologyWordCount } from "@/lib/leads/technology-words";
 
-// Read-only counts view — no interactivity, so this is a plain server-rendered
+// Read-only counts view, no interactivity, so this is a plain server-rendered
 // component (unlike ScriptVariantsClient, which needs "use client" for its
 // editable textarea + save button).
 export function TechnologyWordsClient({ words }: { words: TechnologyWordCount[] }) {
