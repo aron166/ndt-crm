@@ -322,6 +322,11 @@ model Lead {
   // question LIST is tenant config (tenants.settings.qualificationQuestions),
   // so changing the questions never needs a migration.
   qualification   Json?
+  // Per-slug provenance for those answers: { slug: { form: {...}, setter: {...} } }.
+  // `qualification` above stays the EFFECTIVE map (setter outranks form) — every
+  // statistic and computeTier() read that one and are untouched by this column.
+  // NULL for leads that predate it; their answers show as unknown-origin.
+  answerSources   Json?     @map("answer_sources")
   // Derived tier (A|B|C|D|E) from those answers — lib/leads/tier.ts. Nullable:
   // "not placeable yet". Recomputed on every qualification write, never typed in.
   tier            String?

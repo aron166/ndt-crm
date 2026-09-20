@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { LeadIntake } from "./schema";
-import { normalizeIntakeAnswers } from "./qualification";
+import { normalizeIntakeAnswers, withAnswers, effectiveAnswers } from "./qualification";
 import { computeTier, type LeadTier } from "./tier";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
@@ -256,6 +256,15 @@ export async function ingestLead(
   // real column so the board can filter and count on it; the answers stay JSON.
   const answers = normalizeIntakeAnswers(input.qualification);
   const hasAnswers = Object.keys(answers).length > 0;
+  // Provenance: everything arriving here came off a FORM, so it is recorded as
+  // such with the set and campaign it came on. A setter's later answer to the
+  // same slug outranks this one without erasing it (see setLeadQualification).
+  const answerSources = hasAnswers
+    ? withAnswers({}, "form", answers, {
+        set: input.question_set ?? undefined,
+        campaign: input.campaign ?? draft?.campaign ?? undefined,
+      })
+    : {};
   // A derived tier wins whenever the answers actually place the lead; the
   // caller's pre-tier (cold-outreach leads, tiered by research before any
   // answers exist) is the fallback. A setter filling answers later takes over,
@@ -280,7 +289,12 @@ export async function ingestLead(
       message: input.message ?? null,
       serviceInterest: input.service_interest ?? null,
       receivedDate: new Date(),
-      ...(hasAnswers ? { qualification: answers as Prisma.InputJsonValue } : {}),
+      ...(hasAnswers
+        ? {
+            qualification: effectiveAnswers(answerSources) as Prisma.InputJsonValue,
+            answerSources: answerSources as Prisma.InputJsonValue,
+          }
+        : {}),
       ...(tier ? { tier } : {}),
       ...(Object.keys(customFields).length > 0
         ? { customFields: customFields as Prisma.InputJsonValue }

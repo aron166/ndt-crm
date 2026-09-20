@@ -1,3 +1,4 @@
+import type { AnswerSources } from "./qualification";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { db } from "@/lib/db";
 import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, setLeadQualification, type LeadCtx } from "./service";
@@ -133,24 +134,108 @@ describe("task → card: logging a call cannot leave two open callback tasks", (
 });
 
 describe("setLeadQualification keeps a placed tier when the new answer doesn't re-place it", () => {
+  /** The `data` of the one lead.updateMany the call made. */
+  function written() {
+    expect(mockDb.lead.updateMany).toHaveBeenCalledTimes(1);
+    return mockDb.lead.updateMany.mock.calls[0][0] as {
+      where: object;
+      data: { qualification: Record<string, string>; tier: string; answerSources: AnswerSources };
+    };
+  }
+
   it("keeps tier A when the derived tier is null (not yet placeable)", async () => {
-    mockDb.lead.findFirst.mockResolvedValue({ qualification: {}, tier: "A" });
+    mockDb.lead.findFirst.mockResolvedValue({ qualification: {}, answerSources: null, tier: "A" });
     const res = await setLeadQualification(10, { hook: "erdekel a technologia" }, ctx);
     expect(res).toEqual({ success: true });
-    expect(mockDb.lead.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, tenantId: 1 },
-      data: { qualification: { hook: "erdekel a technologia" }, tier: "A" },
-    });
+    const call = written();
+    expect(call.where).toEqual({ id: 10, tenantId: 1 });
+    expect(call.data.qualification).toEqual({ hook: "erdekel a technologia" });
+    expect(call.data.tier).toBe("A");
   });
 
   it("overwrites tier A with C when the new answer derives a tier", async () => {
-    mockDb.lead.findFirst.mockResolvedValue({ qualification: {}, tier: "A" });
+    mockDb.lead.findFirst.mockResolvedValue({ qualification: {}, answerSources: null, tier: "A" });
     const res = await setLeadQualification(10, { situation: "szakember" }, ctx);
     expect(res).toEqual({ success: true });
-    expect(mockDb.lead.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, tenantId: 1 },
-      data: { qualification: { situation: "szakember" }, tier: "C" },
+    const call = written();
+    expect(call.data.qualification).toEqual({ situation: "szakember" });
+    expect(call.data.tier).toBe("C");
+  });
+
+  it("records the answer as the SETTER's and leaves the form's answer intact", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({
+      qualification: { situation: "ceg" },
+      answerSources: { situation: { form: { value: "ceg", at: "2026-09-20T10:00:00.000Z", set: "rovid" } } },
+      tier: "B",
     });
+    const res = await setLeadQualification(10, { situation: "szakember" }, ctx);
+    expect(res).toEqual({ success: true });
+    const call = written();
+    // The form said "ceg" and still does; the setter's answer is the current one.
+    expect(call.data.answerSources.situation?.form?.value).toBe("ceg");
+    expect(call.data.answerSources.situation?.setter?.value).toBe("szakember");
+    expect(call.data.qualification).toEqual({ situation: "szakember" });
+    expect(call.data.tier).toBe("C");
+  });
+
+  it("blanking a setter answer with NO form answer clears it, it does not resurrect as legacy", async () => {
+    // Vanda #113: computing `legacy` from the POST-write sources re-labelled the
+    // setter's own text as an origin-less answer the moment they deleted it, so
+    // the value survived in `qualification` AND reappeared on the lead under
+    // "forrás ismeretlen".
+    mockDb.lead.findFirst.mockResolvedValue({
+      qualification: { size: "300" },
+      answerSources: { size: { setter: { value: "300", at: "2026-09-20T11:00:00.000Z" } } },
+      tier: "B",
+    });
+    const res = await setLeadQualification(10, { size: "" }, ctx);
+    expect(res).toEqual({ success: true });
+    const call = written();
+    expect(call.data.qualification).toEqual({});
+    expect(call.data.answerSources.size).toBeUndefined();
+  });
+
+  it("a legacy answer (no provenance at all) can be cleared, and the write actually happens", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({
+      qualification: { size: "200" },
+      answerSources: null,
+      tier: "B",
+    });
+    const res = await setLeadQualification(10, { size: "" }, ctx);
+    expect(res).toEqual({ success: true });
+    const call = written();
+    expect(call.data.qualification).toEqual({});
+  });
+
+  it("a legacy answer on an UNSUBMITTED slug survives a save to another slug", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({
+      qualification: { size: "200" },
+      answerSources: null,
+      tier: null,
+    });
+    const res = await setLeadQualification(10, { situation: "szakember" }, ctx);
+    expect(res).toEqual({ success: true });
+    const call = written();
+    expect(call.data.qualification).toEqual({ size: "200", situation: "szakember" });
+    expect(call.data.tier).toBe("C");
+  });
+
+  it("a blank setter answer falls back to the form answer, it does not clear it", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({
+      qualification: { situation: "szakember" },
+      answerSources: {
+        situation: {
+          form: { value: "ceg", at: "2026-09-20T10:00:00.000Z" },
+          setter: { value: "szakember", at: "2026-09-20T11:00:00.000Z" },
+        },
+      },
+      tier: "C",
+    });
+    const res = await setLeadQualification(10, { situation: "" }, ctx);
+    expect(res).toEqual({ success: true });
+    const call = written();
+    expect(call.data.answerSources.situation?.setter).toBeUndefined();
+    expect(call.data.qualification).toEqual({ situation: "ceg" });
   });
 });
 

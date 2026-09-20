@@ -9,7 +9,9 @@ import {
   callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
   RECALL_STATUS, bookingIssue, type LeadOutcome,
 } from "./outcomes";
-import { parseAnswers, answersFrom } from "./qualification";
+import {
+  parseAnswers, answersFrom, answerSourcesFrom, withAnswers, effectiveAnswers, legacyAnswers,
+} from "./qualification";
 import { computeTier } from "./tier";
 import { reportError } from "@/lib/report-error";
 import { DEFAULT_BOOKING_MINUTES, conflictsFor } from "@/lib/booking/conflicts";
@@ -268,7 +270,7 @@ export async function setLeadQualification(
 ): Promise<Result> {
   const lead = await db.lead.findFirst({
     where: { id: leadId, tenantId: ctx.tenantId },
-    select: { qualification: true, tier: true },
+    select: { qualification: true, answerSources: true, tier: true },
   });
   if (!lead) return { error: "Lead nem található" };
 
@@ -277,11 +279,39 @@ export async function setLeadQualification(
   if ("error" in parsed) return { error: parsed.error };
 
   const before = answersFrom(lead.qualification);
-  const merged: Record<string, string> = { ...before };
-  for (const slug of Object.keys(answers)) delete merged[slug];
-  Object.assign(merged, parsed);
+  // Submitted-but-blank clears that slug, so every submitted key is passed
+  // through (parseAnswers drops the blanks, withAnswers needs to see them).
+  const submitted: Record<string, string> = {};
+  for (const slug of Object.keys(answers)) submitted[slug] = parsed[slug] ?? "";
 
-  if (JSON.stringify(before) === JSON.stringify(merged)) return { success: true };
+  // The setter layer, written WITHOUT touching what the form said. An answer
+  // the setter gives outranks the form answer for tier purposes; the form
+  // answer stays visible on the lead with its own timestamp.
+  const beforeSources = answerSourcesFrom(lead.answerSources);
+  const sources = withAnswers(beforeSources, "setter", submitted);
+  // Answers recorded before this column existed have no origin. They are still
+  // the lead's answers, so they stay in the effective map.
+  //
+  // Computed from the PRE-write state, and never for a slug this call submitted.
+  // Reading it off the post-write sources instead re-classified the setter's own
+  // answer as legacy the moment they blanked it: the value survived in
+  // `qualification` and then reappeared on the lead under "forrás ismeretlen".
+  // It also made a legacy answer undeletable, and silently so — both comparisons
+  // below matched, so the action returned success having written nothing.
+  // (Vanda, #113.)
+  const legacy = legacyAnswers(beforeSources, before);
+  for (const slug of Object.keys(submitted)) delete legacy[slug];
+  const merged: Record<string, string> = { ...legacy, ...effectiveAnswers(sources) };
+
+  // Both are compared: a setter who confirms the form's answer word for word
+  // changes no effective answer but DOES add a call-sourced record, and the
+  // lead page exists to show that it was confirmed on the phone.
+  if (
+    JSON.stringify(before) === JSON.stringify(merged) &&
+    JSON.stringify(beforeSources) === JSON.stringify(sources)
+  ) {
+    return { success: true };
+  }
 
   // The tier is derived, so it is recomputed HERE — the one write path for
   // setter answers (panel + PATCH /api/leads/:id both land here). Never stored
@@ -295,11 +325,11 @@ export async function setLeadQualification(
 
   await db.lead.updateMany({
     where: { id: leadId, tenantId: ctx.tenantId },
-    data: { qualification: merged, tier },
+    data: { qualification: merged, answerSources: sources as Prisma.InputJsonValue, tier },
   });
   audit("lead", leadId, "update",
-    { qualification: before, tier: lead.tier },
-    { qualification: merged, tier },
+    { qualification: before, tier: lead.tier, answerSources: beforeSources },
+    { qualification: merged, tier, answerSources: sources },
     auditOpts(ctx));
   return { success: true };
 }

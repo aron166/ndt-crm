@@ -78,6 +78,12 @@ export const leadIntakeSchema = z
     // Deliberately open (z.record) — adding a question must never need a deploy,
     // and an answer must never be dropped because a slug was renamed.
     qualification: answersRecordSchema.optional(),
+    // Which named question set the form asked (tenants.settings.qualificationSets,
+    // seeded `rovid` and `felmeres`). OPTIONAL and additive — a form that does
+    // not say is recorded without one, exactly as before. (Contract note for
+    // Lars: never required, never validated against the tenant's set list, so
+    // renaming a set on our side cannot start rejecting the landing page.)
+    question_set: z.preprocess(emptyToUndef, z.string().trim().max(50).optional()),
     // Optional pre-tier from a caller that already knows it (e.g. cold-outreach
     // research, which tiers a prospect before any qualification answers exist).
     // A derived tier always wins when there are answers to derive from — see

@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
-  DEFAULT_QUALIFICATION_QUESTIONS, questionsFromSettings, parseQuestionLines,
-  questionsToLines, parseAnswers, answersFrom, QUESTION_MAX, ANSWER_MAX,
+  DEFAULT_QUALIFICATION_QUESTIONS, questionsFromSettings, setsFromSettings, parseQuestionList,
+  parseAnswers, answersFrom, answerSourcesFrom, withAnswers, effectiveAnswers, legacyAnswers,
+  SET_DISCOVERY, QUESTION_MAX, ANSWER_MAX,
 } from "./qualification";
+import { computeTier } from "./tier";
 
 const Q = [{ slug: "a", label: "A?" }, { slug: "b", label: "B?" }];
 
@@ -13,9 +15,22 @@ describe("questionsFromSettings — a bad settings row must never take the page 
       expect(questionsFromSettings(bad)).toEqual(DEFAULT_QUALIFICATION_QUESTIONS);
     }
   });
+  it("never throws on garbage", () => {
+    for (const bad of [42, "x", [], () => {}]) {
+      expect(() => questionsFromSettings(bad)).not.toThrow();
+      expect(questionsFromSettings(bad)).toEqual(DEFAULT_QUALIFICATION_QUESTIONS);
+    }
+  });
+  it("old-shape rows (no sets) put every question in the discovery set, slugs/labels intact", () => {
+    expect(questionsFromSettings({ qualificationQuestions: Q })).toEqual([
+      { slug: "a", label: "A?", sets: [SET_DISCOVERY] },
+      { slug: "b", label: "B?", sets: [SET_DISCOVERY] },
+    ]);
+  });
   it("takes a valid list and drops duplicate slugs (they'd share one answer)", () => {
-    expect(questionsFromSettings({ qualificationQuestions: Q })).toEqual(Q);
-    expect(questionsFromSettings({ qualificationQuestions: [...Q, { slug: "a", label: "again" }] })).toEqual(Q);
+    const withSets = Q.map((q) => ({ ...q, sets: [SET_DISCOVERY] }));
+    expect(questionsFromSettings({ qualificationQuestions: withSets })).toEqual(withSets);
+    expect(questionsFromSettings({ qualificationQuestions: [...withSets, { slug: "a", label: "again" }] })).toEqual(withSets);
   });
   it("refuses an unbounded list", () => {
     const many = Array.from({ length: QUESTION_MAX + 1 }, (_, i) => ({ slug: `q${i}`, label: `Q${i}` }));
@@ -23,19 +38,33 @@ describe("questionsFromSettings — a bad settings row must never take the page 
   });
 });
 
-describe("parseQuestionLines — the /leads/setup editor", () => {
-  it("slug|label, bare label, comments and blanks", () => {
-    expect(parseQuestionLines("a|A?\n\n# note\nMekkora a felület?")).toEqual([
-      { slug: "a", label: "A?" },
-      { slug: "mekkora_a_felulet", label: "Mekkora a felület?" },
-    ]);
+describe("setsFromSettings", () => {
+  it("a question referencing an unknown set still gets a set entry back", () => {
+    const questions = [{ slug: "a", label: "A?", sets: ["ghost"] }];
+    const sets = setsFromSettings(null, questions);
+    expect(sets.find((s) => s.key === "ghost")).toEqual({ key: "ghost", label: "ghost" });
   });
-  it("round-trips through questionsToLines", () => {
-    expect(parseQuestionLines(questionsToLines(Q))).toEqual(Q);
+});
+
+describe("parseQuestionList — the /leads/setup editor", () => {
+  it("preserves a submitted slug verbatim (re-wording keeps the statistics bucket)", () => {
+    const out = parseQuestionList([{ slug: "size", label: "Új szöveg a mérethez?" }]);
+    expect(out).toEqual([{ slug: "size", label: "Új szöveg a mérethez?" }]);
   });
-  it("rejects an empty list and colliding slugs", () => {
-    expect(parseQuestionLines("  \n# only a comment")).toEqual({ error: "Legalább egy kérdés kell" });
-    expect(parseQuestionLines("Mit? \nmit|Más szöveg")).toMatchObject({ error: expect.stringContaining("azonos azonosítót") });
+  it("slugifies only when no slug was submitted", () => {
+    const out = parseQuestionList([{ label: "Mekkora a felület?" }]);
+    expect(out).toEqual([{ slug: "mekkora_a_felulet", label: "Mekkora a felület?" }]);
+  });
+  it("rejects duplicate slugs", () => {
+    expect(parseQuestionList([{ slug: "a", label: "A?" }, { slug: "a", label: "Más A?" }]))
+      .toMatchObject({ error: expect.stringContaining("azonos azonosítót") });
+  });
+  it("rejects an empty list", () => {
+    expect(parseQuestionList([])).toEqual({ error: "Legalább egy kérdés kell" });
+  });
+  it("rejects a choice question with no options", () => {
+    expect(parseQuestionList([{ slug: "a", label: "A?", type: "choice" }]))
+      .toMatchObject({ error: expect.stringContaining("Válaszlehetőség nélküli") });
   });
 });
 
@@ -57,5 +86,82 @@ describe("answersFrom tolerates whatever is in the column", () => {
     expect(answersFrom(null)).toEqual({});
     expect(answersFrom([1, 2])).toEqual({});
     expect(answersFrom({ a: "x", b: 3, c: "  " })).toEqual({ a: "x" });
+  });
+});
+
+describe("answerSourcesFrom tolerates whatever is in the column", () => {
+  it("null / garbage never throws, returns {}", () => {
+    for (const bad of [null, undefined, "x", 42, [1, 2], { a: { form: { value: 5 } } }]) {
+      expect(() => answerSourcesFrom(bad)).not.toThrow();
+      expect(answerSourcesFrom(bad)).toEqual({});
+    }
+  });
+});
+
+describe("withAnswers + effectiveAnswers — provenance", () => {
+  it("a form answer then a setter answer for the same slug: both retained, setter wins", () => {
+    let sources = withAnswers({}, "form", { size: "200 m2" });
+    sources = withAnswers(sources, "setter", { size: "nagyobb, kb 300" });
+    expect(sources.size.form?.value).toBe("200 m2");
+    expect(sources.size.setter?.value).toBe("nagyobb, kb 300");
+    expect(effectiveAnswers(sources)).toEqual({ size: "nagyobb, kb 300" });
+  });
+
+  it("a blank setter answer removes the setter record, falls back to the form answer", () => {
+    let sources = withAnswers({}, "form", { size: "200 m2" });
+    sources = withAnswers(sources, "setter", { size: "nagyobb" });
+    sources = withAnswers(sources, "setter", { size: "" });
+    expect(sources.size.setter).toBeUndefined();
+    expect(sources.size.form?.value).toBe("200 m2");
+    expect(effectiveAnswers(sources)).toEqual({ size: "200 m2" });
+  });
+
+  it("only touches the slugs submitted — an untouched slug keeps both records", () => {
+    let sources = withAnswers({}, "form", { size: "200 m2", postcode: "9024" });
+    sources = withAnswers(sources, "setter", { size: "nagyobb" });
+    sources = withAnswers(sources, "setter", { postcode: "9025" });
+    expect(sources.size.form?.value).toBe("200 m2");
+    expect(sources.size.setter?.value).toBe("nagyobb");
+    expect(sources.postcode.form?.value).toBe("9024");
+    expect(sources.postcode.setter?.value).toBe("9025");
+  });
+});
+
+describe("legacyAnswers", () => {
+  it("returns exactly the qualification entries with no record in sources", () => {
+    const sources = withAnswers({}, "form", { size: "200 m2" });
+    const qualification = { size: "200 m2", postcode: "9024", timing: "this_week" };
+    expect(legacyAnswers(sources, qualification)).toEqual({ postcode: "9024", timing: "this_week" });
+  });
+});
+
+describe("effectiveAnswers feeds computeTier the same as a raw answer map", () => {
+  it("pins that provenance does not change tiering", () => {
+    const raw = {
+      gate: "task", situation: "company", concrete: "wall", goal: "condition",
+      size: "200 m2", postcode: "9024", timing: "this_week", own_device: "maybe",
+    };
+    const sources = withAnswers({}, "form", raw);
+    expect(computeTier(effectiveAnswers(sources))).toBe(computeTier(raw));
+    expect(computeTier(effectiveAnswers(sources))).toBe("A");
+  });
+});
+
+describe("answerSourcesFrom is per-slug tolerant (Vanda #113)", () => {
+  it("one malformed record does not destroy the others", () => {
+    const parsed = answerSourcesFrom({
+      good: { form: { value: "fal", at: "2026-09-20T10:00:00.000Z" } },
+      broken: { form: { value: 42 } },
+      alsoGood: { setter: { value: "ceg", at: "2026-09-20T11:00:00.000Z" } },
+    });
+    expect(parsed.good?.form?.value).toBe("fal");
+    expect(parsed.alsoGood?.setter?.value).toBe("ceg");
+    expect(parsed.broken).toBeUndefined();
+  });
+
+  it("null, an array and a scalar all read as empty rather than throwing", () => {
+    for (const raw of [null, undefined, [], 7, "x"]) {
+      expect(answerSourcesFrom(raw)).toEqual({});
+    }
   });
 });

@@ -11,7 +11,7 @@ import {
 import type { LeadOutcome } from "@/lib/leads/outcomes";
 import { userLeadCtx } from "@/lib/actor";
 import { setTenantSettings } from "@/lib/tenant-settings";
-import { parseQuestionLines } from "@/lib/leads/qualification";
+import { parseQuestionList, parseQuestionSets } from "@/lib/leads/qualification";
 import { parseScriptBlocks } from "@/lib/leads/scripts";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { deleteCompany } from "@/app/actions/companies";
@@ -412,30 +412,52 @@ export async function saveLeadQualification(leadId: number, answers: Record<stri
 }
 
 /**
- * Replace the tenant's setter question list (one `slug|label` per line) and the
- * intro-material link. Both live in tenants.settings, so they save together.
+ * Replace the tenant's question model — the named sets, the questions, and the
+ * intro-material link. All three live in tenants.settings, so they save
+ * together in one write.
+ *
+ * Re-wording, reordering, adding and removing questions all come through here
+ * and NONE of them touches a stored answer: answers are keyed by `slug`, the
+ * editor round-trips the slug it was given, and a removed question's answers
+ * stay on the lead (they simply stop being rendered).
  */
-export async function saveQualificationQuestions(text: string, introUrl?: string) {
+export async function saveQualificationQuestions(
+  questions: unknown,
+  sets: unknown,
+  introUrl?: string,
+) {
   // Server actions are callable by id — the (app) layout's session redirect
   // gates RENDERING, not this POST. Tenant config needs the same gate as every
   // other lead mutation.
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
 
-  const parsed = parseQuestionLines(text);
+  const parsed = parseQuestionList(questions);
   if ("error" in parsed) return parsed;
+  const parsedSets = parseQuestionSets(sets);
+  if ("error" in parsedSets) return parsedSets;
+
+  // A question pointing at a set that does not exist would never be asked
+  // anywhere and would be invisible in the editor.
+  const setKeys = new Set(parsedSets.map((s) => s.key));
+  for (const q of parsed) {
+    for (const key of q.sets ?? []) {
+      if (!setKeys.has(key)) return { error: `Ismeretlen kérdéscsoport: ${key}` };
+    }
+  }
 
   const url = (introUrl ?? "").trim();
   // https-only, same rule as webhook_out: this link goes out in customer email.
   if (url && !/^https:\/\//i.test(url)) return { error: "A termékismertető linkje https:// címmel kezdődjön" };
   if (url.length > 500) return { error: "A link túl hosszú" };
 
-  const before = await setTenantSettings(TENANT_ID, {
+  const next = {
     qualificationQuestions: parsed,
+    qualificationSets: parsedSets,
     introMaterialUrl: url || null,
-  });
-  await audit("tenant", TENANT_ID, "update", before,
-    { qualificationQuestions: parsed, introMaterialUrl: url || null });
+  };
+  const before = await setTenantSettings(TENANT_ID, next);
+  await audit("tenant", TENANT_ID, "update", before, next);
 
   revalidatePath("/leads/setup");
   revalidatePath("/leads");
