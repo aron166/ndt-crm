@@ -2,7 +2,10 @@
 // stays import-safe for client components (it has no db dependency).
 import { db } from "@/lib/db";
 import { DEFAULT_LEAD_STATUSES, type LeadStatusDef } from "./statuses";
-import { questionsFromSettings, type QualificationQuestion } from "./qualification";
+import {
+  questionsFromSettings, setsFromSettings,
+  type QualificationQuestion, type QuestionSet,
+} from "./qualification";
 import { scriptVariantsFromSettings, type ScriptVariant } from "./scripts";
 import { getLive } from "@/lib/content/service";
 
@@ -45,6 +48,19 @@ export async function getInitialLeadStatusKey(tenantId: number): Promise<string>
 export async function getQualificationQuestions(tenantId: number): Promise<QualificationQuestion[]> {
   const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
   return questionsFromSettings(tenant?.settings);
+}
+
+/**
+ * The question list AND the named sets it is organised into, from ONE settings
+ * read — /leads/setup and the lead page both need the pair, and two calls here
+ * were two identical queries.
+ */
+export async function getQuestionModel(
+  tenantId: number,
+): Promise<{ questions: QualificationQuestion[]; sets: QuestionSet[] }> {
+  const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  const questions = questionsFromSettings(tenant?.settings);
+  return { questions, sets: setsFromSettings(tenant?.settings, questions) };
 }
 
 /**
