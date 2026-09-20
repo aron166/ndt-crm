@@ -4,19 +4,19 @@ import { ArrowLeft } from "lucide-react";
 import { LeadStatusSetupClient } from "./LeadStatusSetupClient";
 import { QualificationQuestionsClient } from "./QualificationQuestionsClient";
 import { ScriptVariantsClient } from "./ScriptVariantsClient";
-import { getQualificationQuestions, getRawScriptVariants } from "@/lib/leads/queries";
+import { getQuestionModel, getRawScriptVariants } from "@/lib/leads/queries";
 import { getIntroMaterialUrl } from "@/lib/leads/intro";
 import { getScriptStats } from "@/lib/leads/script-stats";
 
 const TENANT_ID = 1;
 
 export default async function LeadStatusSetupPage() {
-  const [statuses, questions, introUrl, scriptVariants] = await Promise.all([
+  const [statuses, questionModel, introUrl, scriptVariants] = await Promise.all([
     db.leadStatus.findMany({
       where: { tenantId: TENANT_ID },
       orderBy: { position: "asc" },
     }),
-    getQualificationQuestions(TENANT_ID),
+    getQuestionModel(TENANT_ID),
     getIntroMaterialUrl(TENANT_ID),
     // RAW (unresolved) variants — this page edits stored scripts, not the
     // live-resolved ones (that would overwrite a linked variant's stored body
@@ -51,7 +51,7 @@ export default async function LeadStatusSetupPage() {
       </div>
 
       <LeadStatusSetupClient statuses={statuses} />
-      <QualificationQuestionsClient questions={questions} introUrl={introUrl} />
+      <QualificationQuestionsClient questions={questionModel.questions} sets={questionModel.sets} introUrl={introUrl} />
       <ScriptVariantsClient variants={scriptVariants} stats={scriptStats} />
     </div>
   );
