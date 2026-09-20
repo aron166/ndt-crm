@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { draftsUpsertSchema, canEdit, type DraftStatus } from "@/lib/outreach/drafts";
 import { validTemplateVersion } from "@/lib/outreach/template";
+import { campaignBySlug, outreachDefaults, type CampaignRegistration } from "@/lib/outreach/registry";
 
 // Bulk draft upsert for the outreach drafting agent skill (addendum item 1).
 // Can only ever create/update rows in `draft` status — approving and sending
@@ -99,6 +100,15 @@ export async function POST(request: Request) {
   const templateFor = (item: { templateVersionId?: number | null; campaign: string; step: number }) =>
     validTemplateVersion(item.templateVersionId, allowedTemplates, item.campaign, item.step);
 
+  // Registered campaign's sender/wave default a NEW draft when the payload
+  // didn't state one - looked up once per distinct campaign string, never
+  // once per item. A key with no campaigns row (still true of "TESZT" in
+  // prod) resolves to null and every item behaves exactly as before.
+  const distinctCampaigns = [...new Set(items.map((d) => d.campaign))];
+  const registrations = new Map<string, CampaignRegistration | null>(
+    await Promise.all(distinctCampaigns.map(async (c) => [c, await campaignBySlug(key.tenantId, c)] as const)),
+  );
+
   const trackingFor = (item: { senderUserId?: number | null; wave?: number | null; dueAt?: Date | null }) => ({
     ...(item.senderUserId !== undefined ? { senderUserId: item.senderUserId != null && validSenders.has(item.senderUserId) ? item.senderUserId : null } : {}),
     ...(item.wave !== undefined ? { wave: item.wave } : {}),
@@ -136,6 +146,10 @@ export async function POST(request: Request) {
       });
 
       if (!existing) {
+        // Fallback ONLY on create - a re-run of the drafting skill must not
+        // retro-stamp rows that already exist (that's the update branch below,
+        // which calls trackingFor(item) untouched).
+        const withDefaults = { ...item, ...outreachDefaults(registrations.get(item.campaign) ?? null, item) };
         const row = await db.emailDraft.create({
           data: {
             tenantId: key.tenantId,
@@ -148,7 +162,7 @@ export async function POST(request: Request) {
             toEmail: item.toEmail ?? null,
             status: "draft",
             templateVersionId: templateFor(item),
-            ...trackingFor(item),
+            ...trackingFor(withDefaults),
           },
         });
         audit(

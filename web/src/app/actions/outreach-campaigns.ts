@@ -17,6 +17,8 @@ import {
 } from "@/lib/outreach/campaign";
 import { ingestLead } from "@/lib/leads/ingest";
 import { leadIntakeSchema } from "@/lib/leads/schema";
+import { campaignBySlug } from "@/lib/outreach/registry";
+import { audienceWhere, countAudience } from "@/lib/marketing/audience-query";
 
 // Campaign tracking (Kai/Áron P0, 2026-09-17). Round one is sent BY HAND from
 // Gmail; these actions are how the CRM is told. Every action checks the CRM
@@ -333,12 +335,17 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
 export async function listCampaignKeys(): Promise<string[]> {
   const me = await requireUser();
   if ("ok" in me) return [];
-  const [d, l, i] = await Promise.all([
+  const [d, l, i, c] = await Promise.all([
     db.emailDraft.findMany({ where: { tenantId: TENANT_ID }, distinct: ["campaign"], select: { campaign: true } }),
     db.lead.findMany({ where: { tenantId: TENANT_ID, campaign: { not: null } }, distinct: ["campaign"], select: { campaign: true } }),
     db.interaction.findMany({ where: { tenantId: TENANT_ID, campaign: { not: null } }, distinct: ["campaign"], select: { campaign: true } }),
+    // A campaign created in the UI has a slug before any draft/lead/interaction
+    // ever names it - without this a fresh campaign would be invisible in the
+    // dashboard picker until the first touch went out. Archived ones don't
+    // clutter a picker meant for active outreach.
+    db.campaign.findMany({ where: { tenantId: TENANT_ID, isArchived: false }, select: { slug: true } }),
   ]);
-  return [...new Set([...d, ...l, ...i].map((r) => r.campaign!).filter(Boolean))].sort();
+  return [...new Set([...d, ...l, ...i].map((r) => r.campaign!).filter(Boolean).concat(c.map((r) => r.slug)))].sort();
 }
 
 export interface CampaignStats extends CampaignFunnel {
@@ -405,10 +412,26 @@ export async function getCampaignStats(input: {
     db.interaction.findMany({ where: interactionWhere, select: { type: true, outcome: true } }).then((rows) => rows.map((r) => ({ type: r.type ?? "", outcome: r.outcome }))),
   ]);
 
+  // targetsTotal is the denominator for the funnel rate. Unfiltered, it should
+  // read as "how big is the audience", not "how many companies happen to have
+  // a draft yet" - so a registered campaign with a live audience view reports
+  // the LIVE count. A sender/wave filter keeps the old companyIds.length: the
+  // audience isn't split by sender or wave, so it can't answer "how many
+  // targets does THIS sender/wave have" - the drafted set is the only honest
+  // denominator there.
+  let targetsTotal = companyIds.length;
+  if (!scoped) {
+    const reg = await campaignBySlug(TENANT_ID, campaign);
+    if (reg?.audienceViewId != null) {
+      const view = await db.savedView.findFirst({ where: { id: reg.audienceViewId, tenantId: TENANT_ID }, select: { filters: true } });
+      if (view) targetsTotal = await countAudience(await audienceWhere(view.filters, TENANT_ID));
+    }
+  }
+
   return {
     campaign,
     waves,
-    targetsTotal: companyIds.length,
+    targetsTotal,
     ...buildFunnel(drafts, leads, interactions),
   };
 }

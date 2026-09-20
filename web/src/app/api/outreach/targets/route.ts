@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
+import { campaignBySlug } from "@/lib/outreach/registry";
+import { audienceWhere } from "@/lib/marketing/audience-query";
 
 // Outreach targeting: which companies in this tenant still need a first (or
 // next) draft written for a given campaign. Addendum item 1 — the drafting
@@ -54,21 +56,42 @@ export async function GET(request: Request) {
   if (!q.success) return json({ error: "Validation failed", details: q.error.flatten() }, 400);
   const { campaign, limit } = q.data;
 
-  // Same do-not-contact guard the call cockpit uses (CALLABLE_STATUSES in
-  // lib/outreach/queue.ts): status 0 (KUKA) and 4 (Nem érdekelt) are people who
-  // already said no. Filtering only on deletedAt + "F.A." would have handed the
-  // drafting agent exactly those companies to cold-email. (Vanda, #88.)
-  const where = {
-    tenantId: key.tenantId,
-    deletedAt: null,
-    pipelineStatus: { in: [...CALLABLE_STATUSES] },
-    NOT: [
-      { name: { contains: "F.A." } },
-      { emailDrafts: { some: { tenantId: key.tenantId, campaign } } },
-    ],
-  };
-
   try {
+    // Feature E2: a registered campaign may scope its targets to a saved
+    // company view (the audience). An audience only NARROWS who is callable -
+    // it is ANDed on top of the do-not-contact guards below, never used in
+    // place of them. No campaign row, or a row with no audience view, or the
+    // saved view having been deleted since: `audience` stays null and the
+    // `where` below is byte-identical to before this feature existed.
+    const reg = await campaignBySlug(key.tenantId, campaign);
+    let audience: { viewId: number; name: string } | null = null;
+    let audienceAnd: Awaited<ReturnType<typeof audienceWhere>> | null = null;
+    if (reg?.audienceViewId != null) {
+      const view = await db.savedView.findFirst({
+        where: { id: reg.audienceViewId, tenantId: key.tenantId },
+        select: { id: true, name: true, filters: true },
+      });
+      if (view) {
+        audience = { viewId: view.id, name: view.name };
+        audienceAnd = await audienceWhere(view.filters, key.tenantId);
+      }
+    }
+
+    // Same do-not-contact guard the call cockpit uses (CALLABLE_STATUSES in
+    // lib/outreach/queue.ts): status 0 (KUKA) and 4 (Nem érdekelt) are people who
+    // already said no. Filtering only on deletedAt + "F.A." would have handed the
+    // drafting agent exactly those companies to cold-email. (Vanda, #88.)
+    const where = {
+      tenantId: key.tenantId,
+      deletedAt: null,
+      pipelineStatus: { in: [...CALLABLE_STATUSES] },
+      NOT: [
+        { name: { contains: "F.A." } },
+        { emailDrafts: { some: { tenantId: key.tenantId, campaign } } },
+      ],
+      ...(audienceAnd ? { AND: [audienceAnd] } : {}),
+    };
+
     const [companies, total] = await Promise.all([
       db.company.findMany({
         where,
@@ -118,7 +141,7 @@ export async function GET(request: Request) {
       return { ...company, contacts: mappedContacts };
     });
 
-    return json({ ok: true, items, campaign, limit, total_remaining: total }, 200);
+    return json({ ok: true, items, campaign, limit, total_remaining: total, audience }, 200);
   } catch (err) {
     reportError("api.outreach.targets", err, { tenantId: key.tenantId, campaign });
     return json({ error: "Internal error" }, 500);
