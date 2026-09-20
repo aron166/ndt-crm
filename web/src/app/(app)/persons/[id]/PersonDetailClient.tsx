@@ -126,11 +126,19 @@ export function PersonDetailClient({
 
   const currentContact = contacts.find((c) => !c.endedAt);
 
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+
   function handleLeftConfirm() {
     if (!currentContact) return;
     if (!confirm(`Biztosan kilépett innen: ${currentContact.company.name}? A munkahely ezután ismeretlen lesz, az előzmények megmaradnak.`)) return;
-    startLeave(() => {
-      personLeftCompany(currentContact.id, currentContact.companyId, person.id).then(() => router.refresh());
+    setLeaveError(null);
+    startLeave(async () => {
+      // The action is auth-gated, so it can come back denied. Refreshing on a
+      // rejection would redraw the unchanged employment and read as a no-op
+      // that the user cannot explain.
+      const res = await personLeftCompany(currentContact.id, currentContact.companyId, person.id);
+      if (res && "error" in res && res.error) { setLeaveError(res.error); return; }
+      router.refresh();
     });
   }
   const signalLabel = signalLevel >= 5 ? "Aktív: 7 napon belül érintkezés"
@@ -416,6 +424,9 @@ export function PersonDetailClient({
                       </button>
                     )}
                   </div>
+                  {leaveError && (
+                    <div style={{ marginBottom: 12, fontSize: 13, color: "var(--coral)" }}>{leaveError}</div>
+                  )}
                   {employerState(contacts).kind === "unknown" && (
                     <div style={{ marginBottom: 12, fontSize: 13, color: "var(--fg-mute)" }}>
                       Jelenlegi munkahely ismeretlen.

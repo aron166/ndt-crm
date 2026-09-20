@@ -728,7 +728,6 @@ model Interaction {
   @@unique([tenantId, callId])
   @@index([tenantId, leadId])
   @@index([tenantId, scriptVariant])
-  @@index([tenantId, technologyWord])
   @@index([tenantId, campaign])
   @@index([supersedesInteractionId])
   @@map("interactions")

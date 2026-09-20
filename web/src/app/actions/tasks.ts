@@ -15,13 +15,11 @@ const TENANT_ID = 1;
 // settle anyone's work queue. Same gate as saved-views (#114) and the lead
 // actions. Tenant scope was already on every query and stays.
 //
-// It returns the MESSAGE, not a `{ error }` object, and each caller builds its
-// own literal. That is not style. These actions return object literals only,
-// so TypeScript normalises their union into
-// `{ error: string; success?: undefined } | { success: boolean; error?: undefined }`,
-// and every call site reads `result?.error` off it. Returning a non-fresh
-// `{ error: string }` from here kills that normalisation and turns
-// `result?.error` into a compile error at every consumer (TaskModal caught it).
+// It returns the MESSAGE, not an `{ error }` object, and each action builds its
+// own literal. These actions return object literals only, so TypeScript unions
+// them with `?: undefined` fillers and call sites read `result?.error` off it.
+// One non-fresh `{ error: string }` in that union kills the normalisation and
+// stops every consumer compiling. TaskModal caught it.
 async function requireUser(): Promise<string | null> {
   const { userId } = await getActor(TENANT_ID);
   return userId == null ? NOT_A_CRM_USER : null;

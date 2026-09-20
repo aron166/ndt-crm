@@ -3,8 +3,11 @@
 -- point is to capture the vocabulary the market actually uses, so it feeds copy
 -- and positioning later. Additive and nullable: every existing row stays valid
 -- and no write path is required to set it.
+--
+-- One ALTER, nothing else. script_variant got a matching index; this does not,
+-- deliberately. No query uses one: the counts view is a grouped scan with an
+-- occurred_at window and a NOT EXISTS, which plans as a sequential scan at any
+-- size this table will reach soon. A second object means a second lock on
+-- `interactions` days before a live send, to buy nothing. Add it in its own
+-- migration if the counts view ever measures slow.
 ALTER TABLE "interactions" ADD COLUMN "technology_word" TEXT;
-
--- The counts view groups by this column within a tenant.
-CREATE INDEX "interactions_tenant_id_technology_word_idx"
-  ON "interactions" ("tenant_id", "technology_word");
