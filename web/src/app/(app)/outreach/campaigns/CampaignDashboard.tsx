@@ -80,13 +80,17 @@ export default function CampaignDashboard({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div className="page-head">
+      <div className="page-head flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">Kampány dashboard</h1>
           <Link href="/outreach" className="page-sub" style={{ color: "var(--fg-mute)" }}>
             ← Outreach
           </Link>
         </div>
+        {/* PROPOSAL (unreviewed HU) */}
+        <Link href="/marketing/campaigns" style={{ fontSize: 14, color: "var(--indigo)" }}>
+          Kampányok kezelése
+        </Link>
       </div>
 
       <div className="panel panel-pad" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>

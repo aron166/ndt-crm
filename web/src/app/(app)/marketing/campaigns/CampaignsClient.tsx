@@ -18,15 +18,26 @@ interface CampaignRow {
   name: string;
   description: string | null;
   isArchived: boolean;
+  slug: string;
+  senderName: string | null;
+  currentWave: number | null;
   audienceName: string | null;
   contentCount: number;
 }
 
-export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
+export function CampaignsClient({
+  campaigns, senders,
+}: {
+  campaigns: CampaignRow[];
+  senders: { id: number; name: string }[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [slug, setSlug] = useState("");
+  const [senderUserId, setSenderUserId] = useState("");
+  const [currentWave, setCurrentWave] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -38,6 +49,9 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
     setOpen(false);
     setName("");
     setDescription("");
+    setSlug("");
+    setSenderUserId("");
+    setCurrentWave("");
     setError(null);
   }
 
@@ -45,11 +59,20 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const res = await createCampaign({ name, description });
+      const res = await createCampaign({
+        name,
+        description,
+        slug: slug || undefined,
+        senderUserId: senderUserId ? Number(senderUserId) : null,
+        currentWave: currentWave ? Number(currentWave) : null,
+      });
       if (res?.error) { setError(res.error); return; }
       setOpen(false);
       setName("");
       setDescription("");
+      setSlug("");
+      setSenderUserId("");
+      setCurrentWave("");
       if (res?.id) router.push(`/marketing/campaigns/${res.id}`);
       else router.refresh();
     });
@@ -109,6 +132,35 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignRow[] }) {
             <FormField label="Leírás">
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcionális" rows={3} />
             </FormField>
+            {/* PROPOSAL (unreviewed HU) */}
+            <FormField
+              label="Kimenő kulcs (slug)"
+              hint="Ez kerül rá minden ehhez a kampányhoz tartozó hideg e-mailre. Üresen hagyva a névből képezzük."
+            >
+              <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="Opcionális" />
+            </FormField>
+            {/* PROPOSAL (unreviewed HU) */}
+            <FormField label="Küldő">
+              <select
+                value={senderUserId}
+                onChange={(e) => setSenderUserId(e.target.value)}
+                className="input-ds"
+                style={{ width: "100%", padding: "8px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)" }}
+              >
+                {/* PROPOSAL (unreviewed HU) */}
+                <option value="">Nincs még küldő</option>
+                {senders.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </FormField>
+            {/* PROPOSAL (unreviewed HU) */}
+            <FormField label="Hullám">
+              <Input
+                type="number" min={1} max={52}
+                value={currentWave}
+                onChange={(e) => setCurrentWave(e.target.value)}
+                placeholder="Opcionális"
+              />
+            </FormField>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>Mégse</Button>
@@ -147,6 +199,11 @@ function CampaignGroup({ rows }: { rows: CampaignRow[] }) {
                 {c.description}
               </div>
             )}
+            <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 2 }}>
+              {c.slug}
+              {c.senderName && ` · ${c.senderName}`}
+              {c.currentWave != null && ` · ${c.currentWave}. hullám`}
+            </div>
           </div>
           <div className="flex items-center gap-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", whiteSpace: "nowrap" }}>
             <span className="flex items-center gap-1" title="Célközönség">

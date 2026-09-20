@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { getSavedViews } from "@/app/actions/saved-views";
+import { listSenders } from "@/app/actions/outreach-campaigns";
 import { audienceWhere, countAudience, listAudience } from "@/lib/marketing/audience-query";
 import { AUDIENCE_PREVIEW_LIMIT } from "@/lib/marketing/audience";
 import { CampaignDetailClient } from "./CampaignDetailClient";
@@ -30,6 +31,8 @@ export default async function CampaignDetailPage({
   });
   if (!campaign) notFound();
 
+  const senders = await listSenders();
+
   // Resolve the audience segment to a live count + a small preview.
   let audienceCount = 0;
   let preview: Awaited<ReturnType<typeof listAudience>> = [];
@@ -50,6 +53,9 @@ export default async function CampaignDetailPage({
         name: campaign.name,
         description: campaign.description,
         isArchived: campaign.isArchived,
+        slug: campaign.slug,
+        senderUserId: campaign.senderUserId,
+        currentWave: campaign.currentWave,
         audienceViewId: campaign.audienceView?.id ?? null,
         audienceName: campaign.audienceView?.name ?? null,
       }}
@@ -72,6 +78,7 @@ export default async function CampaignDetailPage({
         updatedAt: i.updatedAt.toISOString(),
       }))}
       companyViews={companyViews.map((v) => ({ id: v.id, name: v.name }))}
+      senders={senders}
     />
   );
 }
