@@ -205,6 +205,41 @@ describe("ingestLead", () => {
     expect(data.tier).toBe("C");
   });
 
+  it("records intake answers as FORM answers, with the set and campaign", async () => {
+    const input = parse({
+      company_name: "Acme",
+      contact_phone: "+36301234567",
+      campaign: "meta-q4-01",
+      question_set: "rovid",
+      qualification: { situation: "ceg", intent_path: "task" },
+    });
+    const { tx } = makeTx({});
+    await ingestLead(input, ctx, tx);
+    const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    // The map every statistic reads is byte-identical to what it was before
+    // provenance existed — `intent_path` still lands as `gate`.
+    expect(data.qualification).toEqual({ situation: "ceg", gate: "task" });
+    expect(data.answerSources.situation.form).toMatchObject({
+      value: "ceg", set: "rovid", campaign: "meta-q4-01",
+    });
+    expect(typeof data.answerSources.situation.form.at).toBe("string");
+    // Nothing was recorded as a setter answer: nobody has called yet.
+    expect(data.answerSources.situation.setter).toBeUndefined();
+  });
+
+  it("a form that sends no question_set is recorded without one, not rejected", async () => {
+    const input = parse({
+      company_name: "Acme",
+      contact_phone: "+36301234567",
+      qualification: { situation: "ceg" },
+    });
+    const { tx } = makeTx({});
+    await ingestLead(input, ctx, tx);
+    const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(data.qualification).toEqual({ situation: "ceg" });
+    expect(data.answerSources.situation.form.set).toBeUndefined();
+  });
+
   it("keeps the pre-tier when answers are present but place nothing", async () => {
     const input = parse({
       company_name: "Acme",
