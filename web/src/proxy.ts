@@ -3,6 +3,23 @@ import { isCrmUserEmail } from "@/lib/crm-user";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
+ * THIS FILE IS THE MIDDLEWARE. There is no `middleware.ts` in this repo and
+ * there is not meant to be one: this Next version names it `proxy.ts`, and the
+ * `config.matcher` at the bottom is what makes it run.
+ *
+ * Its absence is therefore NOT evidence that a route is unauthenticated. Every
+ * path runs through the session gate below unless `isServiceApiPath` lists it,
+ * so an app route or an `/api/...` route that is NOT on that list already
+ * requires a Supabase session AND a `users` row: no session redirects to
+ * /login, a session without a row gets 403 on /api and a redirect elsewhere.
+ *
+ * Written down because a reviewer concluded "no middleware.ts, so
+ * /api/search/persons is public" and filed it as a finding (PR #116). It is
+ * not public; `curl` without a cookie gets a 307 to /login. Check this list
+ * before reporting a route as unauthenticated.
+ */
+
+/**
  * Paths that authenticate themselves (app key, CRON_SECRET) instead of a
  * session cookie, so the session gate must not redirect them to /login.
  * Exported so the list is testable — a route that silently falls off it is

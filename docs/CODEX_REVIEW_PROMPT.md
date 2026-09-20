@@ -9,6 +9,15 @@ software is meant to be sold later. The next 4 weeks are about a sales pipeline
 Read `CLAUDE.md`, `ADR/`, `prisma/schema.prisma`, `src/lib/`, `src/app/actions/`,
 `src/app/api/`, and the tests before writing anything.
 
+**Before reporting any route as unauthenticated, read `web/src/proxy.ts`.** That
+file IS the middleware: this Next version names it `proxy.ts`, not
+`middleware.ts`, and its `config.matcher` is what runs it on every request. The
+absence of a `middleware.ts` is not evidence of anything. A route is only
+outside the session gate if `isServiceApiPath` in that file lists it; everything
+else already requires a Supabase session and a `users` row. A reviewer got this
+wrong once (PR #116, `/api/search/persons`, which returns 307 to /login without
+a cookie), so verify with a request before filing the finding.
+
 ## What I want from you
 A ranked list of findings, most severe first. For each: `file:line`, severity
 (critical / high / medium / low), what is wrong, the concrete failure scenario, and
