@@ -466,7 +466,7 @@ update rows already sitting in `draft` status.
 ```bash
 curl "$CRM/api/outreach/targets?campaign=BirdsView%20Q4&limit=50" \
   -H "Authorization: Bearer $KEY"
-# → 200 { "ok": true, "items": [...], "campaign": "BirdsView Q4", "limit": 50, "total_remaining": 214 }
+# → 200 { "ok": true, "items": [...], "campaign": "BirdsView Q4", "limit": 50, "total_remaining": 214, "audience": null }
 ```
 
 Returns companies with no `email_drafts` row yet for that campaign (any step),
@@ -479,6 +479,16 @@ scopeOfActivity, notes, ndtMethods, lat, lng`) plus up to 3 current `contacts`
 (`{ personId, name, role, email, phone }`). `total_remaining` is the full
 undrafted count, not capped by `limit`. `campaign` is required; a missing or
 invalid `campaign`/`limit` (1-200, default 50) is a `400 { error, details }`.
+
+Since 2026-09-20, `campaign` can also name a real `campaigns` row (`slug`
+equals the outreach key). The response then carries an `audience` field:
+`{ viewId, name }` naming that row's target list, or `null` when the key has
+no campaign row, the row has no `audienceViewId` set, or the saved view was
+since deleted. When `audience` is set, the company set is restricted to that
+saved view's members on top of everything above. It only narrows the list,
+never widens it, so the do-not-contact guard (statuses 0 and 4) and the "F.A."
+exclusion still apply. A legacy outreach key with no campaign row gets a `null`
+audience and a `where` identical to before this field existed.
 
 > ⚠️ This does **not** return an enrichment dossier or a lead-scoring tier yet.
 > `companies.enrichment` / `closeness_score` (see **Companies & persons** above)
@@ -547,6 +557,17 @@ sends the touch; must be a user of the key's tenant, otherwise stored as `null`)
 `dueAt` is the wave's send morning. Later touches are rescheduled when the
 previous one is marked sent in `/outreach` (cadence day 1/4/8/15 from the real
 send of touch 1). Leave a field out to keep its stored value.
+
+**Sender/wave defaulting (2026-09-20).** When the campaign key names a real
+`campaigns` row, that row's `senderUserId` and `currentWave` are the defaults
+for these two fields on a NEWLY CREATED draft. Precedence: a value present in
+the payload always wins, including an explicit `null` (it is stored as `null`,
+the campaign default does not override a stated null); only a field left out of
+the payload entirely falls back to the campaign's default; no campaign row, or
+a row with the field unset, leaves the field unset exactly as before. This
+defaulting never applies on the update branch. A re-run of the drafting skill
+that omits `senderUserId`/`wave` leaves an existing draft's values untouched,
+it does not re-stamp them from the campaign.
 
 `personId` is accepted but **verified, not trusted**: it is kept only when that
 person holds a `Contact` at that company in the key's tenant, and silently
