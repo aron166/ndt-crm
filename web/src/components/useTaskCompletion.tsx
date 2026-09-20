@@ -48,7 +48,7 @@ export function useTaskCompletion() {
   const [logTask, setLogTask] = useState<CompletableTask | null>(null);
   const [stageTaskId, setStageTaskId] = useState<number | null>(null);
   // Set when the log modal must be followed by the stage modal (see
-  // completionPromptsFor's ["log", "stage"] case) — read by the log modal's
+  // completionPromptsFor's ["log", "stage"] case), read by the log modal's
   // onClose so the two never stack.
   const [pendingStageTaskId, setPendingStageTaskId] = useState<number | null>(null);
 
@@ -80,7 +80,7 @@ export function useTaskCompletion() {
 
   /**
    * Surface the log-interaction and/or stage prompt without completing the
-   * task — for surfaces that mark a task done through another path (e.g.
+   * task, for surfaces that mark a task done through another path (e.g.
    * Kanban drag-to-done via `moveTask`). No-op for a task that raises neither.
    */
   const promptLog = useCallback(

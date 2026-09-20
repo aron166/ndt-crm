@@ -25,8 +25,16 @@ vi.mock("@/lib/audit", () => ({ audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db", () => ({ db }));
 vi.mock("@/app/actions/companies", () => ({ createCompany }));
+// Every action in contacts.ts is auth-gated now, and getActor reads the request
+// cookies. Unmocked it throws "cookies() was called outside a request scope"
+// and every case below dies before it reaches the logic it is testing.
+vi.mock("@/lib/actor", () => ({ getActor: vi.fn(), NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
+vi.mock("@/lib/enrichment/recompute", () => ({ recomputeCloseness: vi.fn() }));
 
-import { setCurrentEmployer } from "@/app/actions/contacts";
+import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { setCurrentEmployer, personLeftCompany, closeContact } from "@/app/actions/contacts";
+
+const mockGetActor = getActor as unknown as ReturnType<typeof vi.fn>;
 
 function fd(entries: Record<string, string>): FormData {
   const f = new FormData();
@@ -40,6 +48,7 @@ beforeEach(() => {
   Object.values(db).forEach((model) =>
     Object.values(model).forEach((fn) => (fn as ReturnType<typeof vi.fn>).mockReset())
   );
+  mockGetActor.mockResolvedValue({ userId: 2, email: "aron@example.com" });
   db.person.findFirst.mockResolvedValue({ id: 5, firstName: "András", lastName: "Pikó" });
   db.contact.create.mockResolvedValue({ id: 200 });
   db.interaction.create.mockResolvedValue({ id: 300 });
@@ -120,5 +129,34 @@ describe("setCurrentEmployer", () => {
     const res = await setCurrentEmployer(fd({ personId: "5" }));
     expect(res).toMatchObject({ error: expect.any(String) });
     expect(db.contact.create).not.toHaveBeenCalled();
+  });
+});
+
+// The gate itself. Ending an employment is what removes a person from every
+// outreach contact picker (they all filter endedAt: null), so an ungated
+// closeContact/personLeftCompany was a drop-anyone-from-the-send primitive.
+describe("every contacts action rejects a signed-in-but-not-a-CRM-user actor", () => {
+  beforeEach(() => {
+    mockGetActor.mockResolvedValue({ userId: null, email: "stranger@example.com" });
+  });
+
+  it("setCurrentEmployer refuses and writes nothing", async () => {
+    const res = await setCurrentEmployer(fd({ personId: "5", companyId: "42" }));
+    expect(res).toEqual({ error: NOT_A_CRM_USER });
+    expect(db.contact.create).not.toHaveBeenCalled();
+    expect(db.contact.update).not.toHaveBeenCalled();
+    expect(db.interaction.create).not.toHaveBeenCalled();
+  });
+
+  it("personLeftCompany refuses and writes nothing", async () => {
+    const res = await personLeftCompany(100, 7, 5);
+    expect(res).toEqual({ error: NOT_A_CRM_USER });
+    expect(db.contact.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("closeContact refuses and writes nothing", async () => {
+    const res = await closeContact(100, 7, 5);
+    expect(res).toEqual({ error: NOT_A_CRM_USER });
+    expect(audit).not.toHaveBeenCalled();
   });
 });
