@@ -126,7 +126,7 @@ export function QualificationQuestionsClient({
               <div key={i} className="rounded-xl p-4 space-y-2" style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)" }}>
                 <div className="flex items-center justify-between">
                   <div style={{ fontSize: 11, color: "var(--fg-mute)" }}>
-                    azonosító: <code>{q.slug || "— új, mentéskor kapja —"}</code> (statisztikai kulcs, soha nem változik)
+                    azonosító: <code>{q.slug || "(új, mentéskor kapja)"}</code> (statisztikai kulcs, soha nem változik)
                   </div>
                   <div className="flex items-center gap-1">
                     <button type="button" onClick={() => moveInSet(i, -1)} disabled={pos === 0}
@@ -151,7 +151,7 @@ export function QualificationQuestionsClient({
                   <Input value={q.label} maxLength={LABEL_MAX} onChange={(e) => patch(i, { label: e.target.value })} />
                 </div>
                 <div>
-                  <label className="field-label">Kérdés szövege (telefon) — üresen az űrlap szövege hangzik el</label>
+                  <label className="field-label">Kérdés szövege (telefon), üresen az űrlap szövege hangzik el</label>
                   <Input value={q.phoneLabel ?? ""} maxLength={LABEL_MAX} onChange={(e) => patch(i, { phoneLabel: e.target.value || undefined })} />
                 </div>
 
@@ -212,12 +212,12 @@ export function QualificationQuestionsClient({
                 )}
 
                 <div className="flex gap-4 text-sm flex-wrap" style={{ color: "var(--fg-soft)" }}>
-                  {q.type === "choice" && (
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={q.allowOther ?? false} onChange={(e) => patch(i, { allowOther: e.target.checked })} />
-                      Egyéb szabad szöveg engedélyezve
-                    </label>
-                  )}
+                  {/* Not choice-only: a free-text question is exactly where the
+                      "egyéb" answers are meant to accumulate (raw46 D11). */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={q.allowOther ?? false} onChange={(e) => patch(i, { allowOther: e.target.checked })} />
+                    Egyéb szabad szöveg engedélyezve
+                  </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={q.required ?? false} onChange={(e) => patch(i, { required: e.target.checked })} />
                     Kötelező
@@ -240,7 +240,7 @@ export function QualificationQuestionsClient({
                   </div>
                   {noSets && (
                     <p className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--coral)", marginTop: 4 }}>
-                      <AlertTriangle size={12} aria-hidden="true" /> Egyik kérdéscsoportban sincs — sehol nem lesz feltéve.
+                      <AlertTriangle size={12} aria-hidden="true" /> Egyik kérdéscsoportban sincs, sehol nem lesz feltéve.
                     </p>
                   )}
                 </div>

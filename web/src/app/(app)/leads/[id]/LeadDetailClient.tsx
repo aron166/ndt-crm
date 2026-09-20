@@ -9,7 +9,7 @@ import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
-import type { QualificationQuestion, AnswerSources } from "@/lib/leads/qualification";
+import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/leads/qualification";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
@@ -96,6 +96,7 @@ export function LeadDetailClient({
   questions,
   qualification,
   answerSources,
+  questionSets,
   scriptVariants,
 }: {
   lead: Lead;
@@ -107,6 +108,7 @@ export function LeadDetailClient({
   questions: QualificationQuestion[];
   qualification: Record<string, string>;
   answerSources: AnswerSources;
+  questionSets: QuestionSet[];
   scriptVariants: ScriptVariant[];
 }) {
   const router = useRouter();
@@ -433,6 +435,7 @@ export function LeadDetailClient({
             answerSources={answerSources}
             campaign={lead.campaign}
             receivedDate={lead.receivedDate}
+            sets={questionSets}
           />
 
           <div className="panel">

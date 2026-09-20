@@ -12,6 +12,7 @@ import {
   legacyAnswers,
   type AnswerSources,
   type QualificationQuestion,
+  type QuestionSet,
 } from "@/lib/leads/qualification";
 import { formatDateTime } from "@/lib/utils";
 
@@ -43,12 +44,14 @@ function FormAnswersBlock({
   qualification,
   campaign,
   receivedDate,
+  sets,
 }: {
   questions: QualificationQuestion[];
   sources: AnswerSources;
   qualification: Record<string, string>;
   campaign: string | null;
   receivedDate: string | Date | null;
+  sets: QuestionSet[];
 }) {
   const bySlug = new Map(questions.map((q) => [q.slug, q]));
   const formEntries = Object.entries(sources).filter(([, rec]) => rec.form);
@@ -63,7 +66,9 @@ function FormAnswersBlock({
 
   const headerParts = [
     campaign ? `kampány: ${campaign}` : null,
-    setKey ? `kérdéscsoport: ${setKey}` : null,
+    // The stored value is the set KEY; show the tenant's name for it, falling
+    // back to the key when the set has since been renamed away.
+    setKey ? `kérdéscsoport: ${sets.find((x) => x.key === setKey)?.label ?? setKey}` : null,
     when ? formatDateTime(when) : null,
   ].filter(Boolean);
 
@@ -167,7 +172,9 @@ function CallAnswersBlock({
       <div className="panel-pad space-y-3">
         {questions.map((q) => {
           const rec = sources[q.slug];
-          const InputComp = q.type === "choice" || q.type === "text" || q.type === "contact" ? Input : Textarea;
+          // A one-line answer gets a one-line field; number/postcode and
+          // anything longer keep the textarea the setter has today.
+          const oneLine = q.type === "choice" || q.type === "text" || q.type === "contact";
           return (
             <div key={q.slug}>
               <label className="field-label">
@@ -177,7 +184,7 @@ function CallAnswersBlock({
                 )}
                 {q.draft && <DraftChip />}
               </label>
-              {InputComp === Input ? (
+              {oneLine ? (
                 <Input
                   maxLength={ANSWER_MAX}
                   value={draft[q.slug] ?? ""}
@@ -207,7 +214,9 @@ function CallAnswersBlock({
                   Űrlapon: «{rec.form.value}» · {formatDateTime(rec.form.at)}
                 </div>
               )}
-              {rec?.setter && (
+              {rec?.setter && rec?.form && (
+                // Only where there is a form answer to outrank — on a slug the
+                // form never answered, "ez az érvényes" says nothing.
                 <div style={{ fontSize: 11, color: "var(--mint)", marginTop: 2 }}>ez az érvényes</div>
               )}
             </div>
@@ -232,6 +241,7 @@ export function LeadQualificationPanel({
   qualification,
   campaign,
   receivedDate,
+  sets,
 }: {
   leadId: number;
   questions: QualificationQuestion[];
@@ -239,6 +249,7 @@ export function LeadQualificationPanel({
   qualification: Record<string, string>;
   campaign: string | null;
   receivedDate: string | Date | null;
+  sets: QuestionSet[];
 }) {
   return (
     <div className="space-y-4">
@@ -248,6 +259,7 @@ export function LeadQualificationPanel({
         qualification={qualification}
         campaign={campaign}
         receivedDate={receivedDate}
+        sets={sets}
       />
       <CallAnswersBlock leadId={leadId} questions={questions} sources={answerSources} />
     </div>
