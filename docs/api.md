@@ -64,6 +64,7 @@ curl -X POST $CRM/api/leads \
 | `campaign` | free text tag |
 | `utm_*`, `referrer`, `landing_variant`, `lead_score`, `priority` | stored on `custom_fields` |
 | `qualification` | optional `{ slug: answer }` — the locked qualification model, see below |
+| `question_set` | **optional** — which named question set the form asked (`rovid` \| `felmeres` \| whatever the tenant named). Recorded with the answers; never validated against our set list, never required |
 | `send_intro` | optional bool — send the termékismertető now (see below) |
 
 Company is deduped by name (case-insensitive), person by email. The lead lands in
@@ -344,12 +345,43 @@ interaction row, so re-wording or deleting a script never rewrites history.
 Any earlier open callback task for the lead is marked done (the call happened).
 A closed lead (`won`/`lost`) rejects with `400` — re-open it first via PATCH.
 
-### Setter qualification questions
+### Question sets and the setter question list
 
-The **answers** live on the lead (`qualification`); the **question list** is tenant
-config (`tenants.settings.qualificationQuestions`, an ordered `{ slug, label }[]`,
-edited at `/leads/setup`). They are split on purpose: re-wording a question keeps
-the answers attached, and removing one does not destroy what was already captured.
+The **answers** live on the lead (`qualification`); the **question model** is tenant
+config, edited at `/leads/setup`. They are split on purpose: re-wording a question
+keeps the answers attached, and removing one does not destroy what was already
+captured.
+
+The model is two lists in `tenants.settings`:
+
+| key | shape |
+|---|---|
+| `qualificationSets` | ordered `{ key, label }[]` — the named sets. Seeded `rovid` (the short form that runs in ads) and `felmeres` (the discovery questions) |
+| `qualificationQuestions` | ordered questions. `{ slug, label, phoneLabel?, type?, options?, allowOther?, required?, branch?, audience?, sets? }` |
+
+`label` is the **form** wording, `phoneLabel` the wording the setter reads on the
+phone — the same question asked two ways, one slug, one statistics bucket.
+`type` is `choice · text · number · postcode · contact` (default `text`);
+`options` applies to `choice`, `allowOther` says an "egyéb" free text is accepted;
+`branch` is `task · curious` and `audience` is `company · private`, both absent
+meaning "asked of everyone". `sets` lists the set keys the question is asked in —
+**a question may be in several**, which is exactly how the long form and the phone
+call ask the same thing.
+
+A question stored before sets existed (`{ slug, label }` only) is read as a
+`felmeres` question. Nothing about the answer side changed.
+
+### Answer provenance — form vs call
+
+`leads.answer_sources` records, per slug, what the **form** said and what the
+**setter** said, each with its own timestamp (and, for a form answer, the
+`question_set` and `campaign` it arrived on).
+
+`leads.qualification` is unchanged: it is still the flat `{ slug: answer }` map,
+and it is still what `computeTier` and every statistic read. It now holds the
+**effective** answer per slug — the setter's when there is one, the form's
+otherwise. A setter answer therefore never overwrites a form answer; it outranks
+it, and both stay visible on the lead with their source and time.
 
 ```bash
 curl -X PATCH $CRM/api/leads/12 \
