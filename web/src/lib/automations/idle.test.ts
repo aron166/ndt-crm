@@ -76,6 +76,60 @@ describe("runIdleAutomations", () => {
     });
   });
 
+  it("does not stamp lastRunAt when the rule matched nothing", async () => {
+    // lastRunAt means "this rule DID something". A cron rule that never fires
+    // used to refresh its timestamp on every pass, which reads as working.
+    mockDb.automationRule.findMany.mockResolvedValue([idleRule()]);
+    mockDb.deal.findMany.mockResolvedValue([]);
+
+    const res = await runIdleAutomations(new Date("2026-06-07T00:00:00.000Z"));
+
+    expect(res).toEqual({ rulesEvaluated: 1, tasksCreated: 0 });
+    expect(mockDb.automationRule.update).not.toHaveBeenCalled();
+  });
+
+  it("does not stamp lastRunAt when every matching deal is deduped away", async () => {
+    // The deal matched, but the firing already existed (P2002), so nothing
+    // actually happened. Matching a row is not the same as doing something.
+    mockDb.automationRule.findMany.mockResolvedValue([idleRule()]);
+    mockDb.deal.findMany.mockResolvedValue([idleDeal()]);
+    mockDb.$transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "7" }),
+    );
+
+    const res = await runIdleAutomations(new Date("2026-06-07T00:00:00.000Z"));
+
+    expect(res).toEqual({ rulesEvaluated: 1, tasksCreated: 0 });
+    expect(mockDb.automationRule.update).not.toHaveBeenCalled();
+  });
+
+  it("does not stamp lastRunAt when the rule matched nothing", async () => {
+    // lastRunAt means "this rule DID something". A cron rule that never fires
+    // used to refresh its timestamp on every pass, which reads as working.
+    mockDb.automationRule.findMany.mockResolvedValue([idleRule()]);
+    mockDb.deal.findMany.mockResolvedValue([]);
+
+    const res = await runIdleAutomations(new Date("2026-06-07T00:00:00.000Z"));
+
+    expect(res).toEqual({ rulesEvaluated: 1, tasksCreated: 0 });
+    expect(mockDb.automationRule.update).not.toHaveBeenCalled();
+  });
+
+  it("does not stamp lastRunAt when every matching deal is deduped away", async () => {
+    // The deal matched, but the firing already existed (P2002), so nothing
+    // actually happened. Matching a row is not the same as doing something.
+    mockDb.automationRule.findMany.mockResolvedValue([idleRule()]);
+    mockDb.deal.findMany.mockResolvedValue([idleDeal()]);
+    mockDb.$transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "7" }),
+    );
+
+    const res = await runIdleAutomations(new Date("2026-06-07T00:00:00.000Z"));
+
+    expect(res).toEqual({ rulesEvaluated: 1, tasksCreated: 0 });
+    expect(mockDb.automationRule.update).not.toHaveBeenCalled();
+  });
+
   it("scopes the deal query by stage + idle cutoff", async () => {
     mockDb.automationRule.findMany.mockResolvedValue([idleRule({ triggerConfig: { idleDays: 10, stageId: 4 } })]);
     mockDb.deal.findMany.mockResolvedValue([]);
@@ -147,6 +201,14 @@ describe("lead_idle", () => {
     expect(res.tasksCreated).toBe(1);
     expect(m.automationFiring.create).toHaveBeenCalledWith({ data: { tenantId: 1, ruleId: 3, leadId: 42, stageEnteredAt: lead.createdAt } });
     expect(m.task.create.mock.calls[0][0].data).toMatchObject({ leadId: 42, title: "Kövesd: Acme" });
+    expect(m.automationRule.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { lastRunAt: now } });
+  });
+
+  it("does not stamp lastRunAt when no lead matched at all", async () => {
+    m.lead.findMany.mockResolvedValue([]);
+    const res = await runIdleAutomations(now);
+    expect(res.tasksCreated).toBe(0);
+    expect(m.automationRule.update).not.toHaveBeenCalled();
   });
 
   it("skips a lead contacted recently", async () => {
@@ -155,6 +217,9 @@ describe("lead_idle", () => {
     const res = await runIdleAutomations(now);
     expect(res.tasksCreated).toBe(0);
     expect(m.automationFiring.create).not.toHaveBeenCalled();
+    // Matched the query, rejected by the idle cutoff: nothing happened, so the
+    // rule must not claim it ran. This is the site that used to stamp anyway.
+    expect(m.automationRule.update).not.toHaveBeenCalled();
   });
 
   it("a duplicate firing claim (P2002) skips without creating a task", async () => {
@@ -163,5 +228,6 @@ describe("lead_idle", () => {
     const res = await runIdleAutomations(now);
     expect(res.tasksCreated).toBe(0);
     expect(m.task.create).not.toHaveBeenCalled();
+    expect(m.automationRule.update).not.toHaveBeenCalled();
   });
 });
