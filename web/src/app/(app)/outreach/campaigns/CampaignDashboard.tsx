@@ -80,13 +80,17 @@ export default function CampaignDashboard({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div className="page-head">
+      <div className="page-head flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">Kampány dashboard</h1>
           <Link href="/outreach" className="page-sub" style={{ color: "var(--fg-mute)" }}>
             ← Outreach
           </Link>
         </div>
+        {/* PROPOSAL (unreviewed HU) */}
+        <Link href="/marketing/campaigns" style={{ fontSize: 14, color: "var(--indigo)" }}>
+          Kampányok kezelése
+        </Link>
       </div>
 
       <div className="panel panel-pad" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
@@ -168,6 +172,10 @@ export default function CampaignDashboard({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
           <Card title="Megkeresett cégek">
             <Row label="Cégek" value={`${stats.companiesContacted} / ${stats.targetsTotal}`} />
+            {stats.audienceTotal != null && (
+              // PROPOSAL (unreviewed HU)
+              <Row label="Célközönség" value={stats.audienceTotal} />
+            )}
           </Card>
 
           <Card title="Elküldött érintések">

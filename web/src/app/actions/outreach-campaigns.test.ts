@@ -5,6 +5,9 @@ import { audit } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
 import { ingestLead } from "@/lib/leads/ingest";
 import { threadKeyFor } from "@/lib/outreach/drafts";
+import { campaignBySlug, resolveAudience } from "@/lib/outreach/registry";
+import { countAudience } from "@/lib/marketing/audience-query";
+import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
 import {
   listSenders, setCampaignTarget, markDraftSentManually, markDraftReplied,
   getDueTouches, listCampaignKeys, getCampaignStats,
@@ -16,6 +19,8 @@ vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/leads/ingest", () => ({ ingestLead: vi.fn() }));
+vi.mock("@/lib/outreach/registry", () => ({ campaignBySlug: vi.fn(), resolveAudience: vi.fn() }));
+vi.mock("@/lib/marketing/audience-query", () => ({ countAudience: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   db: {
     user: { findMany: vi.fn() },
@@ -24,6 +29,8 @@ vi.mock("@/lib/db", () => ({
     lead: { findFirst: vi.fn(), findMany: vi.fn() },
     interaction: { findMany: vi.fn() },
     company: { updateMany: vi.fn() },
+    campaign: { findMany: vi.fn() },
+    savedView: { findFirst: vi.fn() },
     // §6b template gate: no slot configured means the gate passes.
     contentItem: { findFirst: vi.fn().mockResolvedValue(null) },
     $transaction: vi.fn(),
@@ -38,6 +45,8 @@ const mockDb = db as unknown as {
   lead: { findFirst: M; findMany: M };
   interaction: { findMany: M };
   company: { updateMany: M };
+  campaign: { findMany: M };
+  savedView: { findFirst: M };
   contentItem: { findFirst: M };
   $transaction: M;
 };
@@ -45,12 +54,20 @@ const mockGetActor = getActor as unknown as M;
 const mockIngestLead = ingestLead as unknown as M;
 const mockRunAutomations = runAutomations as unknown as M;
 const mockAudit = audit as unknown as M;
+const mockCampaignBySlug = campaignBySlug as unknown as M;
+const mockResolveAudience = resolveAudience as unknown as M;
+const mockCountAudience = countAudience as unknown as M;
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetActor.mockResolvedValue({ userId: 2, email: "u@x.com" });
   // Default: no template configured for the step, so the §6b gate passes.
   mockDb.contentItem.findFirst.mockResolvedValue(null);
+  // Default: campaign key is unregistered (legacy free string) - keeps every
+  // existing test's expectations unchanged unless it opts into a registration.
+  mockCampaignBySlug.mockResolvedValue(null);
+  mockResolveAudience.mockResolvedValue({ kind: "none" });
+  mockDb.campaign.findMany.mockResolvedValue([]);
 });
 
 describe("every action rejects a signed-in-but-not-a-CRM-user actor", () => {
@@ -285,6 +302,89 @@ describe("getCampaignStats", () => {
       where: { tenantId: 1, campaign: "c3", type: { not: "email" }, id: -1 },
       select: { type: true, outcome: true },
     });
+  });
+});
+
+describe("listCampaignKeys", () => {
+  it("unions draft/lead/interaction campaigns with non-archived campaigns rows, deduped and sorted", async () => {
+    mockDb.emailDraft.findMany.mockResolvedValue([{ campaign: "b-drafted" }]);
+    mockDb.lead.findMany.mockResolvedValue([{ campaign: "a-lead" }]);
+    mockDb.interaction.findMany.mockResolvedValue([{ campaign: "b-drafted" }]);
+    mockDb.campaign.findMany.mockResolvedValue([{ slug: "c-registered-only" }]);
+
+    const res = await listCampaignKeys();
+
+    expect(mockDb.campaign.findMany).toHaveBeenCalledWith({
+      where: { tenantId: 1, isArchived: false },
+      select: { slug: true },
+    });
+    expect(res).toEqual(["a-lead", "b-drafted", "c-registered-only"]);
+  });
+});
+
+describe("getCampaignStats targetsTotal / audienceTotal", () => {
+  it("unscoped + registered campaign with an audience view: targetsTotal STAYS companyIds.length, audienceTotal gets the CALLABLE-restricted live count", async () => {
+    mockDb.emailDraft.findMany.mockResolvedValue([
+      { companyId: 10, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 2, wave: 1 },
+    ]);
+    mockDb.lead.findMany.mockResolvedValue([]);
+    mockDb.interaction.findMany.mockResolvedValue([]);
+    mockCampaignBySlug.mockResolvedValue({
+      id: 1, name: "Campaign", slug: "c1", senderUserId: null, currentWave: null,
+      audienceViewId: 5, isArchived: false,
+    });
+    mockResolveAudience.mockResolvedValue({
+      kind: "ok", viewId: 5, name: "Segment", isArchived: false, where: { pipelineStatus: 1 },
+    });
+    mockCountAudience.mockResolvedValue(42);
+
+    const res = await getCampaignStats({ campaign: "c1" }) as { targetsTotal: number; audienceTotal: number | null };
+
+    // The audience where is ANDed with the same CALLABLE_STATUSES the targets
+    // route enforces - countAudience alone doesn't exclude KUKA / "Nem érdekelt".
+    expect(mockCountAudience).toHaveBeenCalledWith({
+      AND: [{ pipelineStatus: 1 }, { pipelineStatus: { in: [...CALLABLE_STATUSES] } }],
+    });
+    expect(res.targetsTotal).toBe(1);
+    expect(res.audienceTotal).toBe(42);
+  });
+
+  it("unregistered campaign (legacy free string): targetsTotal keeps companyIds.length, audienceTotal is null", async () => {
+    mockDb.emailDraft.findMany.mockResolvedValue([
+      { companyId: 10, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 2, wave: 1 },
+      { companyId: 20, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 3, wave: 1 },
+    ]);
+    mockDb.lead.findMany.mockResolvedValue([]);
+    mockDb.interaction.findMany.mockResolvedValue([]);
+    mockCampaignBySlug.mockResolvedValue(null);
+    mockResolveAudience.mockResolvedValue({ kind: "none" });
+
+    const res = await getCampaignStats({ campaign: "TESZT" }) as { targetsTotal: number; audienceTotal: number | null };
+
+    expect(mockCountAudience).not.toHaveBeenCalled();
+    expect(res.targetsTotal).toBe(2);
+    expect(res.audienceTotal).toBeNull();
+  });
+
+  it("registered with an audience view but sender/wave filter applied: targetsTotal keeps companyIds.length, audienceTotal null (not computed when scoped)", async () => {
+    mockDb.emailDraft.findMany.mockResolvedValue([
+      { companyId: 10, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 2, wave: 1 },
+      { companyId: 20, step: 1, status: "sent", sentAt: new Date(), replyType: null, senderUserId: 3, wave: 1 },
+    ]);
+    mockDb.lead.findMany.mockResolvedValue([]);
+    mockDb.interaction.findMany.mockResolvedValue([]);
+    mockCampaignBySlug.mockResolvedValue({
+      id: 1, name: "Campaign", slug: "c1", senderUserId: null, currentWave: null,
+      audienceViewId: 5, isArchived: false,
+    });
+
+    const res = await getCampaignStats({ campaign: "c1", senderUserId: 2 }) as { targetsTotal: number; audienceTotal: number | null };
+
+    expect(mockCampaignBySlug).not.toHaveBeenCalled();
+    expect(mockResolveAudience).not.toHaveBeenCalled();
+    expect(mockCountAudience).not.toHaveBeenCalled();
+    expect(res.targetsTotal).toBe(1);
+    expect(res.audienceTotal).toBeNull();
   });
 });
 

@@ -280,6 +280,7 @@ model User {
   assignedDeals      Deal[]           @relation("DealAssignee")
   emailDrafts        EmailDraft[]     @relation("DraftCreator")
   sentEmailDrafts    EmailDraft[]     @relation("DraftSender")
+  senderCampaigns    Campaign[]       @relation("CampaignSender")
   contentVersions    ContentVersion[]
   contentReviews     ContentReview[]
   resolvedChecks     ContentCheck[]
@@ -1071,16 +1072,30 @@ model Campaign {
   isArchived     Boolean  @default(false) @map("is_archived")
   // Feature E2: the target AUDIENCE = a saved company view (segment). Resolved
   // live (no membership snapshot) so the audience tracks the underlying data.
+  // This is ALSO the outreach target list: /api/outreach/targets restricts to
+  // it when the campaign whose `slug` equals the outreach key sets one.
   audienceViewId Int?     @map("audience_view_id")
+  // Outreach defaults (2026-09-20). `slug` IS the outreach campaign key stored
+  // in email_drafts.campaign / leads.campaign / interactions.campaign, so one
+  // campaign row now names both the content queue and the cold-email batch.
+  // These two are the values stamped on NEW drafts whose payload omits them,
+  // which is what lets a human pick a wave and a sender BEFORE any draft row
+  // exists. Both nullable: a legacy outreach key with no campaign row keeps
+  // behaving exactly as it did.
+  senderUserId   Int?     @map("sender_user_id")
+  currentWave    Int?     @map("current_wave")
   createdAt      DateTime @default(now()) @map("created_at")
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   contentItems ContentItem[]
   audienceView SavedView?    @relation("CampaignAudience", fields: [audienceViewId], references: [id], onDelete: SetNull)
+  // SetNull: losing a user must never delete a campaign.
+  sender       User?         @relation("CampaignSender", fields: [senderUserId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([audienceViewId])
+  @@index([senderUserId])
   @@map("campaigns")
 }
 

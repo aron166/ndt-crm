@@ -14,7 +14,7 @@ import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { CHANNEL_LABELS, STATUS_LABELS, type ContentChannel, type ContentStatus } from "@/lib/marketing/types";
 import { formatRelativeTime } from "@/lib/utils";
 import {
-  updateCampaign, setCampaignAudience, setCampaignArchived,
+  updateCampaign, setCampaignAudience, setCampaignArchived, setCampaignOutreach,
 } from "@/app/actions/campaigns";
 import { FormField } from "@/components/ui/FormField";
 
@@ -23,6 +23,9 @@ interface Campaign {
   name: string;
   description: string | null;
   isArchived: boolean;
+  slug: string;
+  senderUserId: number | null;
+  currentWave: number | null;
   audienceViewId: number | null;
   audienceName: string | null;
 }
@@ -34,12 +37,13 @@ interface Audience {
 interface ContentRow { id: number; title: string; channel: string; status: string; updatedAt: string; }
 
 export function CampaignDetailClient({
-  campaign, audience, contentItems, companyViews,
+  campaign, audience, contentItems, companyViews, senders,
 }: {
   campaign: Campaign;
   audience: Audience;
   contentItems: ContentRow[];
   companyViews: { id: number; name: string }[];
+  senders: { id: number; name: string }[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -47,6 +51,7 @@ export function CampaignDetailClient({
   const [name, setName] = useState(campaign.name);
   const [description, setDescription] = useState(campaign.description ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [outreachError, setOutreachError] = useState<string | null>(null);
 
   function saveEdit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,6 +68,15 @@ export function CampaignDetailClient({
     startTransition(async () => {
       const res = await setCampaignAudience(campaign.id, viewId);
       if (res?.error) { setError(res.error); return; }
+      router.refresh();
+    });
+  }
+
+  function pickOutreach(input: { senderUserId?: number | null; currentWave?: number | null }) {
+    setOutreachError(null);
+    startTransition(async () => {
+      const res = await setCampaignOutreach(campaign.id, input);
+      if (res?.error) { setOutreachError(res.error); return; }
       router.refresh();
     });
   }
@@ -108,12 +122,60 @@ export function CampaignDetailClient({
 
       {error && <p className="text-sm text-red-600" style={{ marginBottom: 12 }}>{error}</p>}
 
+      {/* ── Kiküldés (sender + wave). PROPOSAL (unreviewed HU) ── */}
+      <section style={{ marginBottom: 28 }}>
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", marginBottom: 12 }}>
+          {/* PROPOSAL (unreviewed HU) */}
+          Kiküldés
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <label style={{ fontSize: 14, color: "var(--fg-faint)" }}>Küldő:</label>
+          <select
+            value={campaign.senderUserId ?? ""}
+            onChange={(e) => pickOutreach({ senderUserId: e.target.value ? Number(e.target.value) : null })}
+            disabled={isPending}
+            style={{ padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none", minWidth: 160 }}
+          >
+            {/* PROPOSAL (unreviewed HU) */}
+            <option value="">Nincs még küldő</option>
+            {senders.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <label style={{ fontSize: 14, color: "var(--fg-faint)" }}>Hullám:</label>
+          <Input
+            type="number" min={1} max={52}
+            defaultValue={campaign.currentWave ?? ""}
+            onBlur={(e) => {
+              // A blur fires whether or not anything changed. Without this the
+              // page would write and audit the same wave on every tab-out.
+              const next = e.target.value ? Number(e.target.value) : null;
+              if (next === (campaign.currentWave ?? null)) return;
+              pickOutreach({ currentWave: next });
+            }}
+            disabled={isPending}
+            style={{ width: 90 }}
+          />
+        </div>
+        {outreachError && <p className="text-sm text-red-600" style={{ marginTop: 8 }}>{outreachError}</p>}
+      </section>
+
       {/* ── Célközönség (audience) ── */}
       <section style={{ marginBottom: 28 }}>
         <div className="flex items-center justify-between gap-3" style={{ marginBottom: 12 }}>
           <h2 className="flex items-center gap-2" style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>
             <Users className="size-4" /> Célközönség
           </h2>
+          {campaign.slug && (
+            <div className="flex items-center gap-3 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+              {/* PROPOSAL (unreviewed HU) */}
+              <Link href={`/outreach/campaigns?campaign=${campaign.slug}`} style={{ color: "var(--indigo)" }}>
+                Outreach dashboard
+              </Link>
+              {/* PROPOSAL (unreviewed HU) */}
+              <Link href={`/outreach?campaign=${campaign.slug}`} style={{ color: "var(--indigo)" }}>
+                Piszkozat sor
+              </Link>
+            </div>
+          )}
           {campaign.audienceViewId !== null && audience.count > 0 && (
             <a
               href={`/marketing/campaigns/${campaign.id}/export`}
@@ -124,6 +186,16 @@ export function CampaignDetailClient({
             </a>
           )}
         </div>
+
+        {/* PROPOSAL (unreviewed HU). Two sentences, because the claim only holds
+            once a segment is set: with none, every megkereshető company is a
+            target and promising otherwise would be wrong on the screen that
+            decides who gets cold-emailed. */}
+        <p style={{ fontSize: 14, color: "var(--fg-faint)", marginBottom: 10 }}>
+          {campaign.audienceViewId !== null
+            ? "Ez a szegmens egyben a kimenő lista is: csak ezekhez a cégekhez készül piszkozat ebben a kampányban."
+            : "Amíg nincs szegmens, minden megkereshető cég célpont ebben a kampányban."}
+        </p>
 
         <div className="flex flex-wrap items-center gap-2" style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 14, color: "var(--fg-faint)" }}>Szegmens:</label>

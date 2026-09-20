@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { getSavedViews } from "@/app/actions/saved-views";
+import { listSenders } from "@/app/actions/outreach-campaigns";
 import { audienceWhere, countAudience, listAudience } from "@/lib/marketing/audience-query";
 import { AUDIENCE_PREVIEW_LIMIT } from "@/lib/marketing/audience";
 import { CampaignDetailClient } from "./CampaignDetailClient";
@@ -18,16 +19,21 @@ export default async function CampaignDetailPage({
   if (!/^\d+$/.test(id)) notFound();
   const campaignId = parseInt(id, 10);
 
-  const campaign = await db.campaign.findFirst({
-    where: { id: campaignId, tenantId: TENANT_ID },
-    include: {
-      audienceView: { select: { id: true, name: true, filters: true } },
-      contentItems: {
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, title: true, channel: true, status: true, updatedAt: true },
+  // Independent reads on a force-dynamic page - fold into one round trip
+  // instead of awaiting them one after another.
+  const [campaign, senders] = await Promise.all([
+    db.campaign.findFirst({
+      where: { id: campaignId, tenantId: TENANT_ID },
+      include: {
+        audienceView: { select: { id: true, name: true, filters: true } },
+        contentItems: {
+          orderBy: { updatedAt: "desc" },
+          select: { id: true, title: true, channel: true, status: true, updatedAt: true },
+        },
       },
-    },
-  });
+    }),
+    listSenders(),
+  ]);
   if (!campaign) notFound();
 
   // Resolve the audience segment to a live count + a small preview.
@@ -50,6 +56,9 @@ export default async function CampaignDetailPage({
         name: campaign.name,
         description: campaign.description,
         isArchived: campaign.isArchived,
+        slug: campaign.slug,
+        senderUserId: campaign.senderUserId,
+        currentWave: campaign.currentWave,
         audienceViewId: campaign.audienceView?.id ?? null,
         audienceName: campaign.audienceView?.name ?? null,
       }}
@@ -72,6 +81,7 @@ export default async function CampaignDetailPage({
         updatedAt: i.updatedAt.toISOString(),
       }))}
       companyViews={companyViews.map((v) => ({ id: v.id, name: v.name }))}
+      senders={senders}
     />
   );
 }

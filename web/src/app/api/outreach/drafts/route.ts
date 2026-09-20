@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { draftsUpsertSchema, canEdit, type DraftStatus } from "@/lib/outreach/drafts";
 import { validTemplateVersion } from "@/lib/outreach/template";
+import { campaignsBySlugs, outreachDefaults } from "@/lib/outreach/registry";
 
 // Bulk draft upsert for the outreach drafting agent skill (addendum item 1).
 // Can only ever create/update rows in `draft` status — approving and sending
@@ -73,8 +74,24 @@ export async function POST(request: Request) {
       })
     : [];
   const validPairs = new Set(validContacts.map((c) => `${c.personId}:${c.companyId}`));
+  // Registered campaign's sender/wave default a NEW draft when the payload
+  // didn't state one - looked up ONCE for every distinct campaign string in the
+  // payload (a single query, not one per string - MAX_BULK_DRAFTS is 200 and
+  // `campaign` is free text, so a naive per-string lookup fires up to 200
+  // concurrent queries on the pool inside the request that writes the wave). A
+  // slug with no campaigns row (still true of "TESZT" in prod) has no entry in
+  // the Map and every item behaves exactly as before.
+  const distinctCampaigns = [...new Set(items.map((d) => d.campaign))];
+  const registrations = await campaignsBySlugs(key.tenantId, distinctCampaigns);
+
   // senderUserId must be a user of THIS tenant; anything else is dropped to null.
-  const wantedSenders = [...new Set(items.map((d) => d.senderUserId).filter((u): u is number => typeof u === "number"))];
+  // The campaign defaults are candidates too: without them in this set,
+  // trackingFor would drop every defaulted sender straight back to null and
+  // the "pick a sender before any draft exists" feature would silently no-op.
+  const wantedSenders = [...new Set([
+    ...items.map((d) => d.senderUserId),
+    ...[...registrations.values()].map((r) => r.senderUserId),
+  ].filter((u): u is number => typeof u === "number"))];
   const validSenders = new Set(
     wantedSenders.length
       ? (await db.user.findMany({ where: { tenantId: key.tenantId, id: { in: wantedSenders } }, select: { id: true } })).map((u) => u.id)
@@ -136,6 +153,10 @@ export async function POST(request: Request) {
       });
 
       if (!existing) {
+        // Fallback ONLY on create - a re-run of the drafting skill must not
+        // retro-stamp rows that already exist (that's the update branch below,
+        // which calls trackingFor(item) untouched).
+        const withDefaults = { ...item, ...outreachDefaults(registrations.get(item.campaign) ?? null, item) };
         const row = await db.emailDraft.create({
           data: {
             tenantId: key.tenantId,
@@ -148,7 +169,7 @@ export async function POST(request: Request) {
             toEmail: item.toEmail ?? null,
             status: "draft",
             templateVersionId: templateFor(item),
-            ...trackingFor(item),
+            ...trackingFor(withDefaults),
           },
         });
         audit(

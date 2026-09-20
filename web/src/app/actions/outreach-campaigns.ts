@@ -17,6 +17,9 @@ import {
 } from "@/lib/outreach/campaign";
 import { ingestLead } from "@/lib/leads/ingest";
 import { leadIntakeSchema } from "@/lib/leads/schema";
+import { campaignBySlug, resolveAudience } from "@/lib/outreach/registry";
+import { countAudience } from "@/lib/marketing/audience-query";
+import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
 
 // Campaign tracking (Kai/Áron P0, 2026-09-17). Round one is sent BY HAND from
 // Gmail; these actions are how the CRM is told. Every action checks the CRM
@@ -333,18 +336,25 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
 export async function listCampaignKeys(): Promise<string[]> {
   const me = await requireUser();
   if ("ok" in me) return [];
-  const [d, l, i] = await Promise.all([
+  const [d, l, i, c] = await Promise.all([
     db.emailDraft.findMany({ where: { tenantId: TENANT_ID }, distinct: ["campaign"], select: { campaign: true } }),
     db.lead.findMany({ where: { tenantId: TENANT_ID, campaign: { not: null } }, distinct: ["campaign"], select: { campaign: true } }),
     db.interaction.findMany({ where: { tenantId: TENANT_ID, campaign: { not: null } }, distinct: ["campaign"], select: { campaign: true } }),
+    // A campaign created in the UI has a slug before any draft/lead/interaction
+    // ever names it - without this a fresh campaign would be invisible in the
+    // dashboard picker until the first touch went out. Archived ones don't
+    // clutter a picker meant for active outreach.
+    db.campaign.findMany({ where: { tenantId: TENANT_ID, isArchived: false }, select: { slug: true } }),
   ]);
-  return [...new Set([...d, ...l, ...i].map((r) => r.campaign!).filter(Boolean))].sort();
+  return [...new Set([...d, ...l, ...i].map((r) => r.campaign!).filter(Boolean).concat(c.map((r) => r.slug)))].sort();
 }
 
 export interface CampaignStats extends CampaignFunnel {
   campaign: string;
   waves: number[];
   targetsTotal: number;
+  /** Live size of the campaign's target segment, null when it has none. */
+  audienceTotal: number | null;
 }
 
 /**
@@ -405,10 +415,36 @@ export async function getCampaignStats(input: {
     db.interaction.findMany({ where: interactionWhere, select: { type: true, outcome: true } }).then((rows) => rows.map((r) => ({ type: r.type ?? "", outcome: r.outcome }))),
   ]);
 
+  // targetsTotal is the denominator rendered right next to companiesContacted
+  // (companiesContacted / targetsTotal), so it has to count the same kind of
+  // thing companiesContacted does: companies that actually got a touch, in
+  // this filtered view. It is NEVER the live audience count - countAudience
+  // doesn't apply CALLABLE_STATUSES at all, so it would count KUKA / "Nem
+  // érdekelt" companies the targets route will never draft, and an already-
+  // contacted campaign with a small segment attached would render a lie like
+  // 8/3 (Vanda, #118).
+  const targetsTotal = companyIds.length;
+
+  // audienceTotal is a SEPARATE, honest number: how big the campaign's live
+  // target segment is right now, restricted to the same CALLABLE_STATUSES the
+  // targets route enforces. Only meaningful unfiltered - a sender/wave filter
+  // doesn't split a segment definition, so there's nothing to compute there.
+  let audienceTotal: number | null = null;
+  if (!scoped) {
+    const reg = await campaignBySlug(TENANT_ID, campaign);
+    const resolution = await resolveAudience(TENANT_ID, reg);
+    if (resolution.kind === "ok") {
+      audienceTotal = await countAudience({
+        AND: [resolution.where, { pipelineStatus: { in: [...CALLABLE_STATUSES] } }],
+      });
+    }
+  }
+
   return {
     campaign,
     waves,
-    targetsTotal: companyIds.length,
+    targetsTotal,
+    audienceTotal,
     ...buildFunnel(drafts, leads, interactions),
   };
 }

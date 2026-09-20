@@ -8,6 +8,9 @@
     "/outreach": { "maxKB": 926 },
     "/drive": { "maxKB": 387 },
     "/leads": { "maxKB": 947 },
-    "/marketing/decisions": { "maxKB": 606 }
+    "/marketing/decisions": { "maxKB": 606 },
+    "/marketing/campaigns": { "maxKB": 642 },
+    "/marketing/campaigns/[id]": { "maxKB": 648 },
+    "/outreach/campaigns": { "maxKB": 605 }
   }
 }
