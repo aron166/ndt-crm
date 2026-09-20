@@ -53,6 +53,26 @@ export function shouldLogInteractionOnComplete(task: {
   );
 }
 
+/**
+ * After completing a task, must we ASK which stage the lead is in now?
+ *
+ * Péter's rule (BRIEFING addendum 2026-09-07 P0 #4, restated as BACKLOG item 6
+ * / raw42 #3): ticking a task off must never advance the card by itself, it is
+ * ambiguous, so it asks. Nothing in the code advances a lead when a task is
+ * completed, and that stays true; this decides where the QUESTION appears.
+ *
+ * Any task that serves a lead qualifies, not just call tasks. The case that
+ * was missing: `logLeadCallOutcome` creates the demo booking as a `meeting`
+ * task, and the demo happening is exactly the moment the card should move.
+ * Ticking it off asked nothing, so the lead sat in `demo_aron` forever.
+ *
+ * A task with no lead has no stage to ask about, and falls through to
+ * `shouldLogInteractionOnComplete` instead.
+ */
+export function shouldPromptLeadStageOnComplete(task: { leadId?: number | null }): boolean {
+  return task.leadId != null;
+}
+
 export interface LogInteractionInput {
   type?: string;
   notes?: string;

@@ -269,8 +269,12 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
     setDraggingId(null); setHoverCol(null);
     const wasDone = task.status === "done";
     startTransition(async () => {
-      await moveTask(id, colKey);
+      const res = await moveTask(id, colKey);
       router.refresh();
+      // A denied move wrote nothing. The optimistic card above already snapped
+      // to the new column, so the refresh is what puts it back; prompting on
+      // top of that would ask about a stage change that never happened.
+      if (res && "error" in res) return;
       // Offer to log the interaction when a comms task is newly marked done.
       if (colKey === "done" && !wasDone) {
         const personName = task.person

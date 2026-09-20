@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { completeTask } from "@/app/actions/tasks";
 import {
   shouldLogInteractionOnComplete,
+  shouldPromptLeadStageOnComplete,
   taskTypeToInteractionType,
 } from "@/lib/interactions";
 import { LogInteractionModal } from "./LogInteractionModal";
@@ -21,16 +22,12 @@ export interface CompletableTask {
   personName?: string;
 }
 
-/**
- * A completed CALL task that serves a lead asks which stage the lead is in now
- * (Péter, 2026-09-07): ticking it off is ambiguous, so it must never advance the
- * card by itself. This takes precedence over the log-interaction prompt — the
- * lead's own "Hívás eredménye" modal is the richer way to log that call, and two
- * stacked dialogs on one click is worse than either.
- */
-function shouldPromptStage(task: CompletableTask): boolean {
-  return task.leadId != null && task.type === "call";
-}
+// Which prompt a completed task raises is one rule, in lib/interactions.ts, so
+// the two surfaces that tick tasks (this hook, and the Kanban's drag-to-done)
+// cannot drift. The lead-stage question takes precedence over the
+// log-interaction prompt: the lead's own "Hívás eredménye" modal is the richer
+// way to log that call, and two stacked dialogs on one click is worse than
+// either.
 
 /**
  * Completing a communication-type task (call/email/meeting/field_visit) tied to
@@ -52,12 +49,16 @@ export function useTaskCompletion() {
 
   const complete = useCallback(
     async (task: CompletableTask) => {
-      await completeTask(task.id);
+      const res = await completeTask(task.id);
+      // A denied action wrote nothing, so there is nothing to prompt about.
+      // Without this the stage dialog opened over an untouched task and its
+      // "Áthelyezés" would have been the only thing that took effect.
+      if (res && "error" in res) return res;
       // The refresh is a full RSC round trip. Outside a transition it blocked the
       // click that ticked the task off, and delayed the follow-up modal behind it.
-      // The task IS done before the modal opens either way — only the re-render moves.
+      // The task IS done before the modal opens either way - only the re-render moves.
       startTransition(() => router.refresh());
-      if (shouldPromptStage(task)) {
+      if (shouldPromptLeadStageOnComplete(task)) {
         setStageTaskId(task.id);
       } else if (shouldLogInteractionOnComplete(task)) {
         setLogTask(task);
@@ -72,7 +73,7 @@ export function useTaskCompletion() {
    * drag-to-done via `moveTask`). No-op for non-interaction tasks.
    */
   const promptLog = useCallback((task: CompletableTask) => {
-    if (shouldPromptStage(task)) {
+    if (shouldPromptLeadStageOnComplete(task)) {
       setStageTaskId(task.id);
     } else if (shouldLogInteractionOnComplete(task)) {
       setLogTask(task);

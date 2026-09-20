@@ -108,7 +108,7 @@ export async function assignLeadAction(leadId: number, assignedToId: number | nu
 export async function logLeadCall(leadId: number, input: {
   outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
   bookingAt?: string | null; bookingKind?: string | null;
-  lostReason?: string | null; scriptVariant?: string | null;
+  lostReason?: string | null; scriptVariant?: string | null; technologyWord?: string | null;
 }) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
@@ -123,6 +123,7 @@ export async function logLeadCall(leadId: number, input: {
       ...(input.bookingKind ? { bookingKind: input.bookingKind } : {}),
       ...(input.lostReason ? { lostReason: input.lostReason } : {}),
       ...(input.scriptVariant ? { scriptVariant: input.scriptVariant } : {}),
+      ...(input.technologyWord ? { technologyWord: input.technologyWord } : {}),
     },
     ctx,
   );
@@ -487,8 +488,13 @@ export async function saveScriptVariants(text: string) {
 
 /**
  * What the "melyik fázisba kerüljön?" prompt needs, fetched lazily when the
- * modal opens (not on every task render). Returns null when the task is not a
- * lead call task — the caller then shows no prompt at all.
+ * modal opens (not on every task render). Returns null when the task serves no
+ * lead — the caller then shows no prompt at all.
+ *
+ * Any lead-linked task asks, not only call tasks (BACKLOG item 6 / raw42 #3).
+ * The demo booking `logLeadCallOutcome` creates is a `meeting` task, and the
+ * demo happening is exactly when the card should move; while this was gated on
+ * `type === "call"` ticking that task off asked nothing at all.
  */
 export async function getLeadStagePrompt(taskId: number) {
   // Server actions are publicly callable by id — this one reads lead/contact
@@ -498,9 +504,9 @@ export async function getLeadStagePrompt(taskId: number) {
 
   const task = await db.task.findFirst({
     where: { id: taskId, tenantId: TENANT_ID },
-    select: { leadId: true, type: true },
+    select: { leadId: true },
   });
-  if (!task?.leadId || task.type !== "call") return null;
+  if (!task?.leadId) return null;
 
   const lead = await db.lead.findFirst({
     where: { id: task.leadId, tenantId: TENANT_ID },
