@@ -9,7 +9,7 @@ import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
-import type { QualificationQuestion } from "@/lib/leads/qualification";
+import type { QualificationQuestion, AnswerSources } from "@/lib/leads/qualification";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
@@ -95,6 +95,7 @@ export function LeadDetailClient({
   openTasks,
   questions,
   qualification,
+  answerSources,
   scriptVariants,
 }: {
   lead: Lead;
@@ -105,6 +106,7 @@ export function LeadDetailClient({
   openTasks: OpenTask[];
   questions: QualificationQuestion[];
   qualification: Record<string, string>;
+  answerSources: AnswerSources;
   scriptVariants: ScriptVariant[];
 }) {
   const router = useRouter();
@@ -424,7 +426,14 @@ export function LeadDetailClient({
             </div>
           )}
 
-          <LeadQualificationPanel leadId={lead.id} questions={questions} answers={qualification} />
+          <LeadQualificationPanel
+            leadId={lead.id}
+            questions={questions}
+            qualification={qualification}
+            answerSources={answerSources}
+            campaign={lead.campaign}
+            receivedDate={lead.receivedDate}
+          />
 
           <div className="panel">
             <div className="panel-head"><div className="panel-title">Hívások és interakciók · {interactions.length}</div></div>

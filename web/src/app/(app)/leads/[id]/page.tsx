@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { serializeDates } from "@/lib/serialize";
 import { getEntityHistory } from "@/app/actions/audit";
 import { getLeadStatuses, getQualificationQuestions, getScriptVariants } from "@/lib/leads/queries";
-import { answersFrom } from "@/lib/leads/qualification";
+import { answersFrom, answerSourcesFrom } from "@/lib/leads/qualification";
 import { LeadDetailClient } from "./LeadDetailClient";
 
 const TENANT_ID = 1;
@@ -97,6 +97,7 @@ export default async function LeadDetailPage({
         openTasks={serializeDates(openTasks)}
         questions={questions}
         qualification={answersFrom(lead.qualification)}
+        answerSources={answerSourcesFrom(lead.answerSources)}
         scriptVariants={scriptVariants}
       />
     </div>
