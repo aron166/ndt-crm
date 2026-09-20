@@ -53,6 +53,27 @@ async function uniqueSlug(base: string): Promise<string> {
   }
 }
 
+/**
+ * The outreach key as it is actually stored, when one equal to `typed` apart
+ * from case already exists on a draft. Returns null when the key is new, in
+ * which case the caller slugifies as usual. Only drafts are consulted: they
+ * are the rows whose `campaign` value a campaign has to match to mean anything.
+ */
+async function existingOutreachKey(typed: string): Promise<string | null> {
+  const row = await db.emailDraft.findFirst({
+    where: { tenantId: TENANT_ID, campaign: { equals: typed, mode: "insensitive" } },
+    select: { campaign: true },
+  });
+  if (!row) return null;
+  const taken = await db.campaign.findFirst({
+    where: { tenantId: TENANT_ID, slug: row.campaign },
+    select: { id: true },
+  });
+  // Already adopted by another campaign: fall through to the normal path
+  // rather than throwing a raw unique violation out of the action.
+  return taken ? null : row.campaign;
+}
+
 function revalidate(id?: number) {
   revalidatePath("/marketing/campaigns");
   if (id) revalidatePath(`/marketing/campaigns/${id}`);
@@ -94,10 +115,18 @@ export async function createCampaign(input: {
   const senderError = await checkSender(outreach.data.senderUserId);
   if (senderError) return { error: senderError };
 
-  // An explicit slug is slugified too: it becomes the campaign key written into
+  // An explicit slug is slugified: it becomes the campaign key written into
   // email_drafts.campaign, and a key with a space or a slash would be a URL and
   // query-param hazard on every outreach screen.
-  const slug = await uniqueSlug(slugify(input.slug?.trim() || name));
+  //
+  // The exception is adoption. Slugs compare case-sensitively in Postgres, so
+  // slugifying "TESZT" to "teszt" would bind the campaign to nothing: the 8
+  // drafts already carrying "TESZT" would keep no sender and no wave, and the
+  // dashboard picker would list TESZT and teszt as two campaigns. When the
+  // typed key already exists as an outreach key, adopt it verbatim.
+  const typed = input.slug?.trim();
+  const adopted = typed ? await existingOutreachKey(typed) : null;
+  const slug = adopted ?? (await uniqueSlug(slugify(typed || name)));
   const data = {
     tenantId: TENANT_ID,
     name,
@@ -106,11 +135,21 @@ export async function createCampaign(input: {
     senderUserId: outreach.data.senderUserId ?? null,
     currentWave: outreach.data.currentWave ?? null,
   };
-  const campaign = await db.campaign.create({ data, select: { id: true } });
+  // uniqueSlug reads then writes, so two creates of the same name in the same
+  // moment can both resolve the same candidate. The table is the real arbiter;
+  // the loser retries once instead of throwing P2002 into the error boundary.
+  let campaign: { id: number };
+  try {
+    campaign = await db.campaign.create({ data, select: { id: true } });
+  } catch {
+    const retrySlug = await uniqueSlug(slugify(typed || name));
+    data.slug = retrySlug;
+    campaign = await db.campaign.create({ data, select: { id: true } });
+  }
   audit("campaign", campaign.id, "create", null,
-    { name, slug, senderUserId: data.senderUserId, currentWave: data.currentWave });
+    { name, slug: data.slug, senderUserId: data.senderUserId, currentWave: data.currentWave });
   revalidate(campaign.id);
-  return { success: true, id: campaign.id, slug };
+  return { success: true, id: campaign.id, slug: data.slug };
 }
 
 /**

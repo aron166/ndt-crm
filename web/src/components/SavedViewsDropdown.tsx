@@ -38,6 +38,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const activeView = views.find((v) => isActiveView(v, currentParams));
@@ -61,7 +62,11 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
 
   function handleDelete(id: number) {
     startTransition(async () => {
-      await deleteSavedView(id);
+      // A view used as a campaign's outreach target list refuses to delete.
+      // Swallowing that would look like the delete worked and leave the view
+      // on screen with no reason given.
+      const res = await deleteSavedView(id);
+      if (res?.error) setDeleteError(res.error);
     });
   }
 
@@ -94,7 +99,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
           {/* Backdrop */}
           <div
             style={{ position: "fixed", inset: 0, zIndex: 49 }}
-            onClick={() => { setOpen(false); setSaving(false); }}
+            onClick={() => { setOpen(false); setSaving(false); setDeleteError(null); }}
           />
           {/* Dropdown */}
           <div
@@ -137,6 +142,11 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
                     </div>
                   );
                 })}
+                {deleteError && (
+                  <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "var(--coral)" }}>
+                    {deleteError}
+                  </div>
+                )}
                 <div style={{ borderTop: "1px solid var(--line-soft)", margin: "4px 0" }} />
               </>
             )}
