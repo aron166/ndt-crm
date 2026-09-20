@@ -19,6 +19,8 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { Mail, Phone, MapPin, Trash2, Loader2 } from "lucide-react";
 import { updatePerson, deletePerson, restorePerson } from "@/app/actions/persons";
+import { personLeftCompany } from "@/app/actions/contacts";
+import { employerState } from "@/lib/persons/employer";
 
 interface Contact {
   id: number; companyId: number; role: string | null;
@@ -102,6 +104,7 @@ export function PersonDetailClient({
   const [restoring, startRestore] = useTransition();
   const isDeleted = !!person.deletedAt;
   const [enriching, startEnrich] = useTransition();
+  const [leaving, startLeave] = useTransition();
   const [enrichmentProposals, setEnrichmentProposals] = useState<Awaited<ReturnType<typeof getProposalsByRun>> | null>(null);
 
   function handleDelete() {
@@ -122,6 +125,14 @@ export function PersonDetailClient({
   }
 
   const currentContact = contacts.find((c) => !c.endedAt);
+
+  function handleLeftConfirm() {
+    if (!currentContact) return;
+    if (!confirm(`Biztosan kilépett innen: ${currentContact.company.name}? A munkahely ezután ismeretlen lesz, az előzmények megmaradnak.`)) return;
+    startLeave(() => {
+      personLeftCompany(currentContact.id, currentContact.companyId, person.id).then(() => router.refresh());
+    });
+  }
   const signalLabel = signalLevel >= 5 ? "Aktív: 7 napon belül érintkezés"
     : signalLevel >= 3 ? "Stabil: negyedéves kapcsolattartás"
     : "Hideg: 90+ nap inaktivitás";
@@ -399,7 +410,17 @@ export function PersonDetailClient({
                     <button className="btn" style={{ marginLeft: "auto" }} onClick={() => setEmployerOpen(true)}>
                       + Munkahelyváltás
                     </button>
+                    {currentContact && (
+                      <button className="btn" disabled={leaving} onClick={handleLeftConfirm}>
+                        Kilépett
+                      </button>
+                    )}
                   </div>
+                  {employerState(contacts).kind === "unknown" && (
+                    <div style={{ marginBottom: 12, fontSize: 13, color: "var(--fg-mute)" }}>
+                      Jelenlegi munkahely ismeretlen.
+                    </div>
+                  )}
                   <div className="tl">
                     {contacts.map((c, i) => (
                       <div key={c.id} className="tl-item" style={{ "--accent": c.endedAt ? "var(--fg-mute)" : "var(--indigo)" } as React.CSSProperties}>
