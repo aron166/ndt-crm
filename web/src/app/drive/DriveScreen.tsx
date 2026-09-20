@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { logLeadCall } from "@/app/actions/leads";
 import { queueCallTranscript } from "@/app/actions/calls";
 import { AUTO_OUTCOME_LABELS } from "@/lib/calls/auto-outcome";
-import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
@@ -68,6 +68,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   const [pending, startTransition] = useTransition();
   const submitting = useRef(false);
   const [scriptKey, setScriptKey] = useState("");
+  const [technologyWord, setTechnologyWord] = useState("");
   const [scriptOpen, setScriptOpen] = useState(false);
 
   // A fresh queue arrives (router.refresh() re-runs the server component and
@@ -104,7 +105,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   function resetFields() {
     setNote(""); setSelectedOutcome(null); setCallbackAt("");
     setDemoWith("aron"); setBookingAt(""); setBookingKind(""); setLostReason(""); setExpanded(false); setError(null);
-    setQueuedMessage(null);
+    setQueuedMessage(null); setTechnologyWord("");
     // scriptKey is NOT reset here: `lead` still points at the OLD lead in this
     // closure, so defaultScriptKey would be the old lead's default. The
     // useEffect above recomputes it once the new `lead` is rendered.
@@ -133,6 +134,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
           lostReason: isLostCallOutcome(outcome) ? lostReason : null,
           scriptVariant: scriptKey || undefined,
+          technologyWord: technologyWord.trim() || undefined,
         });
         if ("error" in res) { setError(res.error); return; }
         if (res.bookingConflicts?.length > 0) setConflictNotice(res.bookingConflicts);
@@ -306,6 +308,20 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           )}
         </div>
       )}
+
+      <div>
+        <div style={{ fontSize: 12, color: "var(--fg-mute)", marginBottom: 4 }}>Ügyfél szava a technológiára</div>
+        <input
+          style={inputStyle}
+          value={technologyWord}
+          onChange={(e) => setTechnologyWord(e.target.value)}
+          maxLength={TECHNOLOGY_WORD_MAX}
+          placeholder="pl. anyagvizsgálat"
+        />
+        <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--fg-mute)" }}>
+          Amit az ügyfél mondott, szó szerint. Opcionális.
+        </p>
+      </div>
 
       <textarea
         value={note}

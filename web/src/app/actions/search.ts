@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { employerState, employerLabel } from "@/lib/persons/employer";
 
 const TENANT_ID = 1;
 const LIMIT = 5; // results per group
@@ -32,14 +33,24 @@ export async function globalSearch(query: string): Promise<SearchResults> {
           { firstName: { contains: q, mode: "insensitive" } },
           { lastName:  { contains: q, mode: "insensitive" } },
           { email:     { contains: q, mode: "insensitive" } },
+          // Find the person by the company they work at, or used to.
+          { contacts: { some: { company: { name: { contains: q, mode: "insensitive" } } } } },
         ],
       },
       select: {
         id: true, firstName: true, lastName: true, email: true,
         contacts: {
-          where: { endedAt: null },
-          select: { company: { select: { name: true } } },
-          take: 1,
+          // Not scoped to the open contact any more: we need the whole history
+          // to tell "left, unknown employer" apart from "never had one" (see
+          // employerState). take: 20 + this orderBy bound it - a person has a
+          // handful of jobs, not hundreds.
+          select: { companyId: true, role: true, startedAt: true, endedAt: true, company: { select: { name: true } } },
+          take: 20,
+          // nulls "first" is load-bearing, not cosmetic: `endedAt: "asc"` alone puts
+          // NULLs (the OPEN contact) LAST in Postgres, so a person with more than
+          // `take` rows would have their current employer cut off and read as
+          // "former". Open contacts first, then most recently ended.
+          orderBy: [{ endedAt: { sort: "desc", nulls: "first" } }, { startedAt: "desc" }],
         },
       },
       take: LIMIT,
@@ -83,7 +94,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
       firstName: p.firstName,
       lastName: p.lastName,
       email: p.email,
-      company: p.contacts[0]?.company.name ?? null,
+      company: employerLabel(employerState(p.contacts)),
     })),
     deals: deals.map((d) => ({
       id: d.id,

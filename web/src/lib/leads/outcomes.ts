@@ -48,6 +48,7 @@ export const CALL_OUTCOMES_NEEDING_DETAIL: readonly CallOutcomeKey[] = [
 /** Shortest reason we accept anywhere. "x" is not a reason. */
 export const LOST_REASON_MIN = 3;
 export const LOST_REASON_MAX = 500;
+export const TECHNOLOGY_WORD_MAX = 120;
 const CALL_OUTCOME_KEYS = CALL_OUTCOMES.map((o) => o.key) as [CallOutcomeKey, ...CallOutcomeKey[]];
 
 export function callOutcomeLabel(key: string | null): string {
@@ -91,6 +92,13 @@ export const callOutcomeSchema = z
      * write into a statistics bucket nobody is looking at.
      */
     scriptVariant: z.string().trim().min(1).max(SCRIPT_KEY_MAX).optional(),
+    /**
+     * The customer's OWN word for the technology, what they called it on the
+     * phone (e.g. "anyagvizsgálat", "roncsolásmentes", "falvastagságmérés").
+     * Free text, deliberately NEVER validated against a known-value list. The
+     * whole point is to capture wording we do not already have a slug for.
+     */
+    technologyWord: z.string().trim().min(1).max(TECHNOLOGY_WORD_MAX).optional(),
     /**
      * Auto-outcome provenance, written on the SAME interaction insert (trust
      * ladder, 2026-09-18). Interactions are append-only — decisions.md #2 — so

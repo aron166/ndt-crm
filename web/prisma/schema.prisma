@@ -680,6 +680,13 @@ model Interaction {
   // Which call-script variant this call used — the key only; the definitions
   // live in tenants.settings.scriptVariants (lib/leads/scripts.ts).
   scriptVariant           String?  @map("script_variant")
+  /**
+   * The customer's OWN WORD for the technology, as they said it on the call
+   * (BACKLOG item 6, B5). Free text on purpose: this is the market's
+   * vocabulary, not ours, and it feeds copy and positioning. Never validated
+   * against a list. An unknown value here is the data, not a typo.
+   */
+  technologyWord          String?  @map("technology_word")
   // Campaign tag (campaign tracking, 2026-09-17): the free-string campaign key
   // shared with email_drafts.campaign / leads.campaign. Stamped from the lead
   // on lead-linked writes, so a non-email campaign (calls, meetings) counts on

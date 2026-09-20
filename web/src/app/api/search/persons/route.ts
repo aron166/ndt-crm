@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { employerState, employerLabel } from "@/lib/persons/employer";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,6 +14,8 @@ export async function GET(request: Request) {
         { firstName: { contains: q, mode: "insensitive" } },
         { lastName:  { contains: q, mode: "insensitive" } },
         { email:     { contains: q, mode: "insensitive" } },
+        // Find the person by the company they work at, or used to.
+        { contacts: { some: { company: { name: { contains: q, mode: "insensitive" } } } } },
       ],
     },
     select: {
@@ -21,18 +24,29 @@ export async function GET(request: Request) {
       lastName: true,
       email: true,
       contacts: {
-        where: { endedAt: null },
-        select: { company: { select: { name: true } } },
-        take: 1,
+        // Not scoped to the open contact any more: we need the whole history
+        // to tell "left, unknown employer" apart from "never had one" (see
+        // employerState). take: 20 + this orderBy bound it - a person has a
+        // handful of jobs, not hundreds.
+        select: { companyId: true, role: true, startedAt: true, endedAt: true, company: { select: { name: true } } },
+        take: 20,
+        // nulls "first" is load-bearing, not cosmetic: `endedAt: "asc"` alone puts
+        // NULLs (the OPEN contact) LAST in Postgres, so a person with more than
+        // `take` rows would have their current employer cut off and read as
+        // "former". Open contacts first, then most recently ended.
+        orderBy: [{ endedAt: { sort: "desc", nulls: "first" } }, { startedAt: "desc" }],
       },
     },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     take: 10,
   });
-  const mapped = results.map((p) => ({
-    id: p.id,
-    label: [p.lastName, p.firstName].filter(Boolean).join(" ") || p.email || String(p.id),
-    sub: p.contacts[0]?.company.name ?? p.email ?? undefined,
-  }));
+  const mapped = results.map((p) => {
+    const state = employerState(p.contacts);
+    return {
+      id: p.id,
+      label: [p.lastName, p.firstName].filter(Boolean).join(" ") || p.email || String(p.id),
+      sub: state.kind === "unknown" && p.email ? p.email : employerLabel(state),
+    };
+  });
   return NextResponse.json(mapped);
 }

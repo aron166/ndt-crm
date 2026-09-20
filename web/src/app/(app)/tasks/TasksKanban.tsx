@@ -269,8 +269,16 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
     setDraggingId(null); setHoverCol(null);
     const wasDone = task.status === "done";
     startTransition(async () => {
-      await moveTask(id, colKey);
+      const res = await moveTask(id, colKey);
       router.refresh();
+      // A denied move wrote nothing, so put the optimistic card back ourselves:
+      // `tasks` is local state seeded once from `initialTasks` and never
+      // re-syncs from props, so `router.refresh()` alone leaves the card in
+      // the wrong column until a full reload.
+      if (res && "error" in res) {
+        setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: task.status } : t));
+        return;
+      }
       // Offer to log the interaction when a comms task is newly marked done.
       if (colKey === "done" && !wasDone) {
         const personName = task.person

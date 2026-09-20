@@ -64,18 +64,27 @@ export async function queueCallTranscript(leadId: number, transcript: string) {
 export async function correctCallOutcome(interactionId: number, leadId: number, input: {
   outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
   bookingAt?: string | null; bookingKind?: string | null;
-  lostReason?: string | null; scriptVariant?: string | null;
+  lostReason?: string | null; scriptVariant?: string | null; technologyWord?: string | null;
 }) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
 
   const original = await db.interaction.findFirst({
     where: { id: interactionId, tenantId: TENANT_ID },
-    select: { leadId: true },
+    select: { leadId: true, technologyWord: true, scriptVariant: true },
   });
   if (!original) return { error: "Interakció nem található" };
   if (!original.leadId) return { error: "Az interakcióhoz nincs lead társítva" };
   if (original.leadId !== leadId) return { error: "Az interakció más leadhez tartozik" };
+
+  // CallOutcomeModal prefills nothing in correction mode, so a correction that
+  // doesn't explicitly re-supply these fields would otherwise send null.
+  // getTechnologyWordCounts and getScriptStats both exclude the superseded row
+  // from their counts, so whatever isn't carried forward onto the new
+  // interaction is simply destroyed by the correction. An explicit value on
+  // `input` always wins over the carried-forward one.
+  const technologyWord = input.technologyWord ?? original.technologyWord ?? undefined;
+  const scriptVariant = input.scriptVariant ?? original.scriptVariant ?? undefined;
 
   const res = await logLeadCallOutcome(
     leadId,
@@ -88,7 +97,8 @@ export async function correctCallOutcome(interactionId: number, leadId: number, 
       ...(input.bookingAt ? { bookingAt: input.bookingAt } : {}),
       ...(input.bookingKind ? { bookingKind: input.bookingKind } : {}),
       ...(input.lostReason ? { lostReason: input.lostReason } : {}),
-      ...(input.scriptVariant ? { scriptVariant: input.scriptVariant } : {}),
+      ...(scriptVariant ? { scriptVariant } : {}),
+      ...(technologyWord ? { technologyWord } : {}),
     },
     ctx,
   );

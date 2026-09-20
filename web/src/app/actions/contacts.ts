@@ -5,10 +5,27 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { createCompany } from "@/app/actions/companies";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
+import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 
 const TENANT_ID = 1;
 
+// Every export here is a server action, and a server action is callable by id
+// by anything that can reach the deployment, whatever the (app) layout does.
+// These had no auth check: closeContact and personLeftCompany end an employment
+// by bare contact id, and ending an employment is what removes a person from
+// every outreach contact picker (they all filter endedAt: null). So this was a
+// drop-anyone-from-the-send primitive. Same gate as tasks and saved-views.
+//
+// Returns the MESSAGE rather than an `{ error }` object, for the reason spelled
+// out above the same helper in actions/tasks.ts.
+async function requireUser(): Promise<string | null> {
+  const { userId } = await getActor(TENANT_ID);
+  return userId == null ? NOT_A_CRM_USER : null;
+}
+
 export async function addContact(formData: FormData) {
+  const denied = await requireUser();
+  if (denied) return { error: denied };
   const personId  = parseInt(formData.get("personId") as string, 10);
   const companyId = parseInt(formData.get("companyId") as string, 10);
   const role      = (formData.get("role") as string)?.trim() || null;
@@ -31,6 +48,8 @@ export async function addContact(formData: FormData) {
 }
 
 export async function createPersonAndLink(formData: FormData) {
+  const denied = await requireUser();
+  if (denied) return { error: denied };
   const companyId = parseInt(formData.get("companyId") as string, 10);
   const firstName = (formData.get("firstName") as string)?.trim();
   const lastName  = (formData.get("lastName")  as string)?.trim();
@@ -77,6 +96,8 @@ export async function createPersonAndLink(formData: FormData) {
  * (`newCompanyName` [+ optional vat/city]) which create the company first.
  */
 export async function setCurrentEmployer(formData: FormData) {
+  const denied = await requireUser();
+  if (denied) return { error: denied };
   const personId = parseInt(formData.get("personId") as string, 10);
   const role     = (formData.get("role") as string)?.trim() || null;
   const startedAtRaw = (formData.get("startedAt") as string)?.trim();
@@ -164,6 +185,8 @@ export async function setCurrentEmployer(formData: FormData) {
 }
 
 export async function closeContact(contactId: number, companyId: number, personId: number) {
+  const denied = await requireUser();
+  if (denied) return { error: denied };
   await db.contact.updateMany({
     where: { id: contactId, tenantId: TENANT_ID },
     data: { endedAt: new Date() },
@@ -171,10 +194,13 @@ export async function closeContact(contactId: number, companyId: number, personI
   await audit("contact", contactId, "update", { endedAt: null }, { endedAt: new Date().toISOString() });
   revalidatePath(`/companies/${companyId}`);
   revalidatePath(`/persons/${personId}`);
+  return { success: true };
 }
 
 // "Person left company" — close contact + auto-create a follow-up task
 export async function personLeftCompany(contactId: number, companyId: number, personId: number, endedAt?: Date) {
+  const denied = await requireUser();
+  if (denied) return { error: denied };
   const [contact] = await Promise.all([
     db.contact.findFirst({
       where: { id: contactId, tenantId: TENANT_ID },

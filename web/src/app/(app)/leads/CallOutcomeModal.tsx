@@ -8,7 +8,7 @@ import { logLeadCall } from "@/app/actions/leads";
 import { correctCallOutcome } from "@/app/actions/calls";
 import { proposeBookingSlots } from "@/app/actions/bookings";
 import type { BookingConflictInfo } from "@/lib/leads/service";
-import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { FormField } from "@/components/ui/FormField";
 import type { ScriptVariant } from "@/lib/leads/scripts";
@@ -63,6 +63,7 @@ export function CallOutcomeModal({
   const [bookingAt, setBookingAt] = useState("");
   const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
+  const [technologyWord, setTechnologyWord] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [slotsPending, startSlotsTransition] = useTransition();
@@ -79,7 +80,7 @@ export function CallOutcomeModal({
   function reset() {
     setOutcome("no_answer"); setNote(""); setCallbackAt(""); setDemoWith("aron"); setLostReason(""); setError(null);
     setBookingAt(""); setBookingKind(""); setSlotProposals([]); setSlotError(null); setSavedConflicts(null);
-    setScriptKey(defaultScriptKey);
+    setScriptKey(defaultScriptKey); setTechnologyWord("");
   }
   // The call is already saved while the conflict notice shows — closing then
   // must still refresh the parent, same as "Rendben".
@@ -98,6 +99,7 @@ export function CallOutcomeModal({
         bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
         lostReason: isLostCallOutcome(outcome) ? lostReason : null,
         scriptVariant: scriptKey || undefined,
+        technologyWord: technologyWord.trim() || undefined,
       };
       const res = correctsInteractionId
         ? await correctCallOutcome(correctsInteractionId, leadId, payload)
@@ -150,6 +152,15 @@ export function CallOutcomeModal({
             )}
           </FormField>
         )}
+        <FormField label="Ügyfél szava a technológiára" hint="Amit az ügyfél mondott, szó szerint. Opcionális.">
+          <input
+            style={inputStyle}
+            value={technologyWord}
+            onChange={(e) => setTechnologyWord(e.target.value)}
+            maxLength={TECHNOLOGY_WORD_MAX}
+            placeholder="pl. anyagvizsgálat"
+          />
+        </FormField>
         {savedConflicts ? (
           <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
             <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve: de ütközik a naptárban:</p>

@@ -5,6 +5,7 @@ import { CreatePersonButton } from "@/components/CreatePersonButton";
 import { TagFilter } from "@/components/tags/TagFilter";
 import { SavedViewsDropdown } from "@/components/SavedViewsDropdown";
 import { getSavedViews } from "@/app/actions/saved-views";
+import { employerState } from "@/lib/persons/employer";
 
 const PAGE_SIZE = 30;
 const TENANT_ID = 1;
@@ -53,6 +54,8 @@ export default async function PersonsPage({
             { lastName:  { contains: search, mode: "insensitive" as const } },
             { email:     { contains: search, mode: "insensitive" as const } },
             { phone:     { contains: search, mode: "insensitive" as const } },
+            // Find the person by the company they work at, or used to.
+            { contacts: { some: { company: { name: { contains: search, mode: "insensitive" as const } } } } },
           ],
         }
       : {}),
@@ -66,10 +69,17 @@ export default async function PersonsPage({
       take: PAGE_SIZE,
       include: {
         contacts: {
-          where: { endedAt: null },
+          // Not scoped to the open contact any more: we need the whole history
+          // to tell "left, unknown employer" apart from "never had one" (see
+          // employerState). take: 20 + this orderBy bound it - a person has a
+          // handful of jobs, not hundreds.
           include: { company: { select: { id: true, name: true } } },
-          take: 1,
-          orderBy: { startedAt: "desc" },
+          take: 20,
+          // nulls "first" is load-bearing, not cosmetic: `endedAt: "asc"` alone puts
+          // NULLs (the OPEN contact) LAST in Postgres, so a person with more than
+          // `take` rows would have their current employer cut off and read as
+          // "former". Open contacts first, then most recently ended.
+          orderBy: [{ endedAt: { sort: "desc", nulls: "first" } }, { startedAt: "desc" }],
         },
       },
     }),
@@ -142,7 +152,7 @@ export default async function PersonsPage({
             </tr>
           )}
           {persons.map((p, idx) => {
-            const currentContact = p.contacts[0];
+            const state = employerState(p.contacts);
             const initials = [p.lastName?.[0], p.firstName?.[0]].filter(Boolean).join("").toUpperCase() || "?";
             return (
               <tr
@@ -171,21 +181,27 @@ export default async function PersonsPage({
                   <Link href={`/persons/${p.id}`} className="tbl-link" style={{ fontSize: 14 }}>
                     {p.lastName} {p.firstName}
                   </Link>
-                  {currentContact?.role && (
+                  {state.kind === "current" && state.role && (
                     <span style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: 8 }}>
-                      {currentContact.role}
+                      {state.role}
                     </span>
                   )}
                 </td>
 
                 {/* Current company */}
                 <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)" }}>
-                  {currentContact ? (
-                    <Link href={`/companies/${currentContact.company.id}`} className="tbl-link-muted" style={{ fontSize: 14 }}>
-                      {currentContact.company.name}
+                  {state.kind === "current" && (
+                    <Link href={`/companies/${state.companyId}`} className="tbl-link-muted" style={{ fontSize: 14 }}>
+                      {state.companyName}
                     </Link>
-                  ) : (
-                    <span style={{ color: "var(--fg-faint)", fontSize: 14 }}>-</span>
+                  )}
+                  {state.kind === "former" && (
+                    <span style={{ fontSize: 14, color: "var(--fg-mute)" }}>
+                      Volt: <Link href={`/companies/${state.companyId}`} className="tbl-link-muted">{state.companyName}</Link>
+                    </span>
+                  )}
+                  {state.kind === "unknown" && (
+                    <span style={{ color: "var(--fg-faint)", fontSize: 14 }}>Munkahely ismeretlen</span>
                   )}
                 </td>
 
