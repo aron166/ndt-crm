@@ -743,6 +743,33 @@ the content rules run, reviews reset, and a post is rejected with `409` while
 the AI holds a claim (status `ai_working`) so a refresh can never overwrite a
 rewrite in flight.
 
+**Correcting an item you posted wrongly.** An agent that submitted an item with
+the wrong metadata — most importantly a wrong `internal` — corrects it by
+posting a new version with `"from_source": true`, NOT by re-posting to
+`POST /api/content` (that call is idempotent on `external_ref` and returns the
+existing row without updating it). `from_source` needs no claim, which matters
+because an item sitting in `in_review` cannot be claimed at all:
+`POST /api/content/:id/claim` only accepts `changes_requested` and
+`rewrite_requested`. Without it there is no API path to fix a mislabelled item,
+only a human in the UI.
+
+```bash
+curl -X POST $CRM/api/content/18/versions \
+  -H "Authorization: Bearer $APP_KEY" -H "Content-Type: application/json" \
+  -d '{"body":"<the same body>","change_note":"internal: true — belso dokumentum",
+       "based_on_version_id":18,"from_source":true,"internal":true}'
+```
+
+This works only for an item that HAS a source file (`external_ref` set, or
+`source: "import"`). An item a human authored inside the app has neither, and
+an app key is refused with `409 This item has no source file to refresh from` —
+an app may restate what it imported, never overwrite someone's own work. The
+race rule is unchanged: `based_on_version_id` must still be the current
+version, so a human edit made after the agent read the item wins with a `409`.
+Posting `internal: true` re-runs the content rules against the CORRECTED value,
+so rule checks that had wrongly fired resolve themselves and the item returns
+to `in_review`.
+
 ## Ecosystem hub
 
 ### `POST /api/events` — append an app event

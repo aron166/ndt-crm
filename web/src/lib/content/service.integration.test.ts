@@ -819,6 +819,45 @@ describe.skipIf(!enabled)("content service (integration)", () => {
     expect(item.internal).toBe(true);
   });
 
+  // Item 18 (2026-09-20): an app posted an item with a wrong `internal` and
+  // could not correct it — `in_review` is not claimable, and re-POSTing to
+  // /api/content is idempotent on external_ref. The product already has the
+  // answer: `from_source: true` skips the claim for an item that HAS a source
+  // file, which is exactly a re-import. Guarded better than "the app owns it":
+  // an item authored by a human in the app (no externalRef, source != import)
+  // is still refused. The stale-base 409 remains the race rule, so a human
+  // edit after the app's read still wins.
+  it("an app corrects a wrongly-set internal on an in_review item it imported, without a claim", async () => {
+    const created = await service.createItem(appActor, {
+      title: title(), body: "A folyamat, egyszeruen", category: "other", channel: "other",
+      contentType: "other", source: "campaign_test", internal: false,
+      externalRef: `it-src-${Date.now()}.md`,
+    });
+    if (!created.ok) throw new Error("setup");
+    createdItemIds.push(created.itemId);
+    expect(created.status).toBe("in_review");
+
+    // Without from_source this is refused: in_review is not claimable.
+    const noClaim = await service.createVersion(appActor, created.itemId, {
+      body: "A folyamat, egyszeruen", changeNote: "correct internal",
+      basedOnVersionId: created.versionId!, internal: true,
+    });
+    expect(noClaim.ok).toBe(false);
+
+    // With from_source it goes through, and the flag is corrected.
+    const fixed = await service.createVersion(appActor, created.itemId, {
+      body: "A folyamat, egyszeruen", changeNote: "correct internal",
+      basedOnVersionId: created.versionId!, internal: true, fromSource: true,
+    });
+    expect(fixed.ok).toBe(true);
+
+    const item = await db.contentItem.findUniqueOrThrow({
+      where: { id: created.itemId }, select: { internal: true, status: true },
+    });
+    expect(item.internal).toBe(true);
+    expect(item.status).toBe("in_review");
+  });
+
   // "Élő anyagok" is the SENDABLE library and round-one outreach is hand-sent
   // from its copy button, so an internal item appearing there is a route to a
   // real recipient — the same class of hole as the outreach slot (Vanda F1).
