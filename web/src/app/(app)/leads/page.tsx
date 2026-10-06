@@ -209,12 +209,11 @@ export default async function LeadsPage({
   );
   const leads = perColumn.flatMap((c) => c.rows);
   const columnTotals = Object.fromEntries(perColumn.map((c) => [c.key, c.total]));
-  const extras = await getLeadExtras(
-    TENANT_ID,
-    leads.map((l) => ({ id: l.id, companyId: l.companyId, personId: l.contact?.person?.id ?? null, createdAt: l.createdAt })),
-  );
-
-  const firstContacts = await firstContactByLead(TENANT_ID, leads.map((l) => l.id));
+  const leadRefs = leads.map((l) => ({ id: l.id, companyId: l.companyId, personId: l.contact?.person?.id ?? null, createdAt: l.createdAt }));
+  const [extras, firstContacts] = await Promise.all([
+    getLeadExtras(TENANT_ID, leadRefs),
+    firstContactByLead(TENANT_ID, leadRefs),
+  ]);
   const now = new Date();
 
   const leadsForClient = leads.map((l) => ({

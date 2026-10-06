@@ -75,7 +75,7 @@ export default async function LeadDetailPage({
 
   const firstContactMin = minutesToFirstContact(
     lead.createdAt,
-    (await firstContactByLead(TENANT_ID, [leadId])).get(leadId) ?? null,
+    (await firstContactByLead(TENANT_ID, [{ id: leadId, companyId: lead.companyId, personId, createdAt: lead.createdAt }])).get(leadId) ?? null,
   );
 
   return (

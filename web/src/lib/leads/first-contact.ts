@@ -5,6 +5,22 @@ export const FIRST_CONTACT_TYPES = ["call", "email", "meeting", "site_visit", "f
 
 export const TIER_A_CALL_WINDOW_MIN = 60;
 
+type LeadKey = { id: number; companyId: number | null; personId: number | null; createdAt: Date };
+type ContactRow = { leadId: number | null; companyId: number | null; personId: number | null; occurredAt: Date };
+
+/** Earliest contact on/after lead creation tied to the lead, its company or its person. */
+export function firstContactFor(lead: LeadKey, rows: ContactRow[]): Date | null {
+  let min: Date | null = null;
+  for (const r of rows) {
+    const match =
+      r.leadId === lead.id ||
+      (r.companyId != null && r.companyId === lead.companyId) ||
+      (r.personId != null && r.personId === lead.personId);
+    if (match && r.occurredAt >= lead.createdAt && (!min || r.occurredAt < min)) min = r.occurredAt;
+  }
+  return min;
+}
+
 export function minutesToFirstContact(leadCreatedAt: Date, firstContactAt: Date | null): number | null {
   if (!firstContactAt) return null;
   return Math.max(0, Math.floor((firstContactAt.getTime() - leadCreatedAt.getTime()) / 60000));
