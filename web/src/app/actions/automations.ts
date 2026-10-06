@@ -95,6 +95,17 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
       const n = Number(actionConfig.dueInDays);
       if (!Number.isFinite(n) || n < 0) return { error: "A határidő (nap) érvénytelen" };
     }
+    if (actionConfig.dueInMinutes != null) {
+      const m = Number(actionConfig.dueInMinutes);
+      if (!Number.isInteger(m) || m < 1) return { error: "A határidő (perc) érvénytelen" };
+    }
+    if (actionConfig.assignedToId != null) {
+      const uid = Number(actionConfig.assignedToId);
+      if (!Number.isInteger(uid) || uid <= 0) return { error: "Érvénytelen felelős" };
+      const u = await db.user.findFirst({ where: { id: uid, tenantId: TENANT_ID }, select: { id: true } });
+      if (!u) return { error: "Ismeretlen felelős" };
+      actionConfig.assignedToId = uid;
+    }
   }
 
   const condParsed = parseJson<unknown[]>(formData.get("conditions"));
