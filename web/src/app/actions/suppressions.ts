@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
-import { normalizeDomain, normalizeEmail } from "@/lib/suppression";
+import { isSuppressed, normalizeDomain, normalizeEmail } from "@/lib/suppression";
 
 const TENANT_ID = 1;
 const CHANNELS = ["email", "phone", "linkedin", "in_person"];
@@ -23,7 +23,8 @@ export async function addSuppression(formData: FormData) {
   const target = ((formData.get("target") as string) || "").trim();
   let email: string | null = null;
   let domain: string | null = null;
-  if (target.indexOf("@") > 0) {
+  const hasLocal = /^(?:[^<]*<)?(?:mailto:)?[^@\s<>]+@/i.test(target);
+  if (hasLocal) {
     email = normalizeEmail(target);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { error: "Érvénytelen email cím." };
   } else {
@@ -60,6 +61,25 @@ export async function addSuppression(formData: FormData) {
   }
 
   await audit("suppression", row.id, "create", null, { email, domain, requestedAt, channel, source });
+
+  // Queued drafts to the new entry must not go out: cancel them now.
+  const queued = await db.emailDraft.findMany({
+    where: { tenantId: TENANT_ID, status: { in: ["draft", "approved", "failed"] }, toEmail: { not: null } },
+    select: { id: true, status: true, toEmail: true },
+  });
+  const set = { emails: new Set(email ? [email] : []), domains: new Set(domain ? [domain] : []) };
+  let cancelled = 0;
+  for (const d of queued) {
+    if (!isSuppressed(d.toEmail, set)) continue;
+    const res = await db.emailDraft.updateMany({
+      where: { id: d.id, tenantId: TENANT_ID, status: d.status },
+      data: { status: "cancelled" },
+    });
+    if (res.count === 0) continue;
+    cancelled += 1;
+    await audit("email_draft", d.id, "update", { status: d.status }, { status: "cancelled", reason: "suppressed" });
+  }
+
   revalidatePath("/settings/suppressions");
-  return { success: true as const };
+  return { success: true as const, cancelled };
 }

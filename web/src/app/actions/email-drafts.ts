@@ -163,9 +163,10 @@ export async function getDraftBody(id: number): Promise<{ ok: true; body: string
   if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({
     where: { id, tenantId: TENANT_ID },
-    select: { body: true, campaign: true, step: true },
+    select: { body: true, campaign: true, step: true, toEmail: true },
   });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
+  if (await isAddressSuppressed(TENANT_ID, row.toEmail)) return { ok: false, error: SUPPRESSED_ERROR };
   // §6b: a draft whose step has an unapproved template may not be copied out
   // of the CRM. An empty slot passes - round one predates templates.
   const gate = await gateDraft(TENANT_ID, row.campaign, row.step);

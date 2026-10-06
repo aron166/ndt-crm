@@ -6,13 +6,23 @@ export interface SuppressionSet {
   domains: Set<string>;
 }
 
+/** Pasted junk off an address: "Név <A@b.hu>", "mailto:a@b.hu", "a@b.hu;", "a@b.hu.". */
+function clean(v: string): string {
+  let s = v.trim();
+  const angle = s.match(/<([^<>]*)>/);
+  if (angle) s = angle[1].trim();
+  return s.replace(/^mailto:/i, "").replace(/[;,.\s]+$/, "").toLowerCase();
+}
+
 export function normalizeEmail(v: string): string {
-  return v.trim().toLowerCase();
+  const s = clean(v);
+  const at = s.lastIndexOf("@");
+  return at < 0 ? s : s.slice(0, at + 1) + s.slice(at + 1).replace(/\.+$/, "");
 }
 
 /** "a@b.hu" -> "b.hu"; "@b.hu" or "b.hu" -> "b.hu"; anything else -> null. */
 export function normalizeDomain(v: string): string | null {
-  const d = v.trim().toLowerCase().replace(/^.*@/, "");
+  const d = clean(v).replace(/^.*@/, "").replace(/\.+$/, "");
   return /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d) ? d : null;
 }
 
@@ -25,9 +35,12 @@ export function isSuppressed(email: string | null | undefined, set: SuppressionS
   if (!email) return false;
   const e = normalizeEmail(email);
   if (!e) return false;
-  if (set.emails.has(e)) return true;
   const at = e.lastIndexOf("@");
+  if (set.emails.has(e)) return true;
   if (at < 0) return false;
+  // "a+tag@d" is the same mailbox as "a@d".
+  const plus = e.indexOf("+");
+  if (plus > 0 && plus < at && set.emails.has(e.slice(0, plus) + e.slice(at))) return true;
   const labels = e.slice(at + 1).split(".");
   for (let i = 0; i < labels.length - 1; i++) {
     if (set.domains.has(labels.slice(i).join("."))) return true;

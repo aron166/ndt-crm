@@ -17,6 +17,7 @@ const { db } = vi.hoisted(() => ({
     company: { findMany: vi.fn() },
     contact: { findMany: vi.fn() },
     campaign: { findMany: vi.fn() },
+    suppression: { findMany: vi.fn() },
     user: { findMany: vi.fn() },
     contentVersion: { findMany: vi.fn() },
     emailDraft: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
@@ -58,6 +59,7 @@ beforeEach(() => {
   db.contact.findMany.mockResolvedValue([]);
   db.contentVersion.findMany.mockResolvedValue([]);
   db.campaign.findMany.mockResolvedValue([]);
+  db.suppression.findMany.mockResolvedValue([]);
   db.user.findMany.mockResolvedValue([]);
   db.emailDraft.findUnique.mockResolvedValue(null);
   db.emailDraft.create.mockResolvedValue({ id: 1, companyId: COMPANY_ID, campaign: "wave1", step: 1, status: "draft" });
@@ -178,5 +180,14 @@ describe("POST /api/outreach/drafts campaign sender/wave defaulting", () => {
     expect(db.emailDraft.create).toHaveBeenNthCalledWith(3,
       expect.objectContaining({ data: expect.objectContaining({ wave: 5 }) }),
     );
+  });
+
+  it("skips a suppressed toEmail and writes nothing", async () => {
+    db.suppression.findMany.mockResolvedValue([{ email: null, domain: "tilos.hu" }]);
+    const res = await POST(req([draft({ toEmail: "x@tilos.hu" })]));
+    const body = await res.json();
+    expect(body.created).toBe(0);
+    expect(body.skipped[0].reason).toBe("suppressed");
+    expect(db.emailDraft.create).not.toHaveBeenCalled();
   });
 });
