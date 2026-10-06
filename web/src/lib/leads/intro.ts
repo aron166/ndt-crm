@@ -67,7 +67,7 @@ export async function sendIntroMaterial(args: {
   try {
     // Do-not-contact: no email and no "send by hand" task either.
     if (to && (await isAddressSuppressed(tenantId, to))) {
-      reportError("leads.intro.suppressed", new Error("recipient is on the suppression list"), { leadId });
+      console.info("[leads.intro] skipped: recipient on suppression list", { leadId });
       return "skipped";
     }
     const url = await getIntroMaterialUrl(tenantId);
