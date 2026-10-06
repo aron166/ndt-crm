@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import {
@@ -59,6 +60,8 @@ export interface CallSegment {
 
 /** Company saved views, offered as ready-made calling rounds (marketing → calls). */
 export async function getCallSegments(): Promise<CallSegment[]> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const views = await db.savedView.findMany({
     where: { tenantId: TENANT_ID, entityType: "company" },
     select: { id: true, name: true },
@@ -73,6 +76,8 @@ export async function getCallSegments(): Promise<CallSegment[]> {
  * callable set — so a marketing segment becomes a calling round.
  */
 export async function getCallQueue(viewId?: number | null): Promise<CallCard[]> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   let where: Prisma.CompanyWhereInput = CALLABLE_WHERE;
 
   if (viewId) {
@@ -166,6 +171,8 @@ export interface CallStartInput {
 export async function startCall(
   input: CallStartInput,
 ): Promise<{ callId: string } | { error: string }> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const url = process.env.CALL_WEBHOOK_URL;
   if (!url) return { error: "Hívás webhook nincs beállítva (CALL_WEBHOOK_URL)" };
 
@@ -175,6 +182,14 @@ export async function startCall(
     select: { id: true, name: true },
   });
   if (!company) return { error: "Cég nem található" };
+
+  if (input.personId != null) {
+    const person = await db.person.findFirst({
+      where: { id: input.personId, tenantId: TENANT_ID },
+      select: { id: true },
+    });
+    if (!person) return { error: "Személy nem található" };
+  }
 
   const callId = crypto.randomUUID();
   const payload = {
@@ -225,6 +240,8 @@ export interface RecordCallResult {
 export async function recordCall(
   input: RecordCallInput,
 ): Promise<RecordCallResult | { error: string }> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   if (!isCallOutcome(input.outcome)) return { error: "Ismeretlen kimenetel" };
 
   const company = await db.company.findFirst({
@@ -232,6 +249,14 @@ export async function recordCall(
     select: { id: true, name: true, pipelineStatus: true },
   });
   if (!company) return { error: "Cég nem található" };
+
+  if (input.personId != null) {
+    const person = await db.person.findFirst({
+      where: { id: input.personId, tenantId: TENANT_ID },
+      select: { id: true },
+    });
+    if (!person) return { error: "Személy nem található" };
+  }
 
   const meta = outcomeMeta(input.outcome)!;
   const newStatus = nextStatusFor(input.outcome, company.pipelineStatus);

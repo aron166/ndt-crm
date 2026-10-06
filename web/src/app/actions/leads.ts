@@ -64,6 +64,8 @@ export async function moveLead(leadId: number, newStatus: string) {
 }
 
 export async function updateLeadStatus(leadId: number, newStatus: string) {
+  const ctx = await userLeadCtx(TENANT_ID);
+  if ("error" in ctx) return ctx;
   return moveLead(leadId, newStatus);
 }
 

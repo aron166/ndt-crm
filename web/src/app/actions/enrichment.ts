@@ -1,11 +1,13 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import Groq from "groq-sdk";
 
 const TENANT_ID = 1;
+
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const FETCH_TIMEOUT_MS = 8000;
 
@@ -388,6 +390,8 @@ export async function triggerBulkEnrichment(
   entityType: "company" | "person",
   entityIds: number[],
 ): Promise<number> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const cappedIds = entityIds.slice(0, 20);
 
   const run = await db.enrichmentRun.create({
@@ -442,7 +446,7 @@ export async function triggerBulkEnrichment(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const fallbackName = entityType === "company"
-        ? ((await db.company.findFirst({ where: { id: entityId }, select: { name: true } }))?.name ?? String(entityId))
+        ? ((await db.company.findFirst({ where: { id: entityId, tenantId: TENANT_ID }, select: { name: true } }))?.name ?? String(entityId))
         : String(entityId);
       await db.enrichmentProposal.create({
         data: {
@@ -468,6 +472,8 @@ export async function triggerBulkEnrichment(
 // ─── Apply proposal ───────────────────────────────────────────────────────────
 
 export async function applyProposal(proposalId: number, approvedFields: string[]): Promise<void> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const proposal = await db.enrichmentProposal.findFirst({
     where: { id: proposalId, tenantId: TENANT_ID },
   });
@@ -483,6 +489,7 @@ export async function applyProposal(proposalId: number, approvedFields: string[]
   if (Object.keys(updateData).length > 0) {
     if (proposal.entityType === "company") {
       const before = await db.company.findFirst({ where: { id: proposal.entityId, tenantId: TENANT_ID } });
+      if (!before) throw new Error(`Company ${proposal.entityId} not found`);
       await db.company.update({ where: { id: proposal.entityId }, data: updateData });
       audit("company", proposal.entityId, "update",
         before as unknown as Record<string, unknown>,
@@ -490,6 +497,7 @@ export async function applyProposal(proposalId: number, approvedFields: string[]
       revalidatePath(`/companies/${proposal.entityId}`);
     } else {
       const before = await db.person.findFirst({ where: { id: proposal.entityId, tenantId: TENANT_ID } });
+      if (!before) throw new Error(`Person ${proposal.entityId} not found`);
       await db.person.update({ where: { id: proposal.entityId }, data: updateData });
       audit("person", proposal.entityId, "update",
         before as unknown as Record<string, unknown>,
@@ -520,6 +528,8 @@ export async function applyProposal(proposalId: number, approvedFields: string[]
 // ─── Data fetchers ────────────────────────────────────────────────────────────
 
 export async function getProposalsByRun(runId: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   return db.enrichmentProposal.findMany({
     where: { tenantId: TENANT_ID, runId },
     orderBy: { createdAt: "desc" },
@@ -527,6 +537,8 @@ export async function getProposalsByRun(runId: number) {
 }
 
 export async function getEnrichmentRuns() {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   return db.enrichmentRun.findMany({
     where: { tenantId: TENANT_ID },
     orderBy: { createdAt: "desc" },
@@ -536,6 +548,8 @@ export async function getEnrichmentRuns() {
 }
 
 export async function getPendingProposals() {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   return db.enrichmentProposal.findMany({
     where: { tenantId: TENANT_ID, overallStatus: { in: ["pending", "rejected"] } },
     orderBy: { createdAt: "desc" },

@@ -4,8 +4,13 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { audit } from "@/lib/audit";
+import { requireCrmUser } from "@/lib/actor";
+
+const TENANT_ID = 1;
 
 export async function upsertCustomField(formData: FormData) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const pipelineId = parseInt(formData.get("pipelineId") as string);
   const fieldId    = formData.get("fieldId") as string | null;
   const label      = (formData.get("label") as string)?.trim();
@@ -27,10 +32,11 @@ export async function upsertCustomField(formData: FormData) {
 
   if (fieldId) {
     const id = parseInt(fieldId);
-    const before = await db.pipelineCustomField.findUnique({
-      where: { id },
+    const before = await db.pipelineCustomField.findFirst({
+      where: { id, pipeline: { tenantId: TENANT_ID } },
       select: { label: true, type: true, required: true, position: true },
     });
+    if (!before) return { error: "Mező nem található" };
     await db.pipelineCustomField.update({
       where: { id },
       data: {
@@ -40,6 +46,11 @@ export async function upsertCustomField(formData: FormData) {
     });
     audit("custom_field", id, "update", before, { label, type, required, position });
   } else {
+    const pipeline = await db.pipeline.findFirst({
+      where: { id: pipelineId, tenantId: TENANT_ID },
+      select: { id: true },
+    });
+    if (!pipeline) return { error: "Pipeline nem található" };
     const field = await db.pipelineCustomField.create({
       data: {
         pipelineId, key, label, type, required, position,
@@ -55,14 +66,17 @@ export async function upsertCustomField(formData: FormData) {
 }
 
 export async function deleteCustomField(fieldId: number) {
-  const before = await db.pipelineCustomField.findUnique({
-    where: { id: fieldId },
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
+  const before = await db.pipelineCustomField.findFirst({
+    where: { id: fieldId, pipeline: { tenantId: TENANT_ID } },
     select: { pipelineId: true, key: true, label: true, type: true },
   });
+  if (!before) return;
 
   await db.pipelineCustomField.delete({ where: { id: fieldId } });
 
-  if (before) audit("custom_field", fieldId, "delete", before, null);
+  audit("custom_field", fieldId, "delete", before, null);
   revalidatePath("/deals/setup");
   revalidatePath("/deals");
 }

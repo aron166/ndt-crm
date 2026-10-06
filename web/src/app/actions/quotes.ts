@@ -7,6 +7,7 @@ import { audit } from "@/lib/audit";
 import { quoteTotals, lineAmount } from "@/lib/quotes/calc";
 import { nextQuoteNumber } from "@/lib/quotes/number";
 import { QUOTE_STATUSES, type QuoteStatus } from "@/lib/quotes/status";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
 
@@ -157,7 +158,18 @@ function toDTO(q: {
   };
 }
 
+// Person, lead and deal ids from input must belong to this tenant.
+async function linkedIdError(input: QuoteInput): Promise<string | null> {
+  const { personId, leadId, dealId } = input;
+  if (personId != null && !(await db.person.findFirst({ where: { id: personId, tenantId: TENANT_ID }, select: { id: true } }))) return "Személy nem található";
+  if (leadId != null && !(await db.lead.findFirst({ where: { id: leadId, tenantId: TENANT_ID }, select: { id: true } }))) return "Lead nem található";
+  if (dealId != null && !(await db.deal.findFirst({ where: { id: dealId, tenantId: TENANT_ID }, select: { id: true } }))) return "Üzlet nem található";
+  return null;
+}
+
 export async function getQuotes(): Promise<QuoteListItem[]> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const rows = await db.quote.findMany({
     where: { tenantId: TENANT_ID },
     include: { company: { select: { name: true } } },
@@ -178,6 +190,8 @@ export async function getQuotes(): Promise<QuoteListItem[]> {
 }
 
 export async function getQuote(id: number): Promise<QuoteDTO | null> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const q = await db.quote.findFirst({
     where: { id, tenantId: TENANT_ID },
     include: quoteInclude,
@@ -188,6 +202,8 @@ export async function getQuote(id: number): Promise<QuoteDTO | null> {
 export async function createQuote(
   input: QuoteInput,
 ): Promise<{ id: number } | { error: string }> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const err = validateInput(input);
   if (err) return { error: err };
 
@@ -196,6 +212,8 @@ export async function createQuote(
     select: { id: true },
   });
   if (!company) return { error: "Cég nem található" };
+  const linkErr = await linkedIdError(input);
+  if (linkErr) return { error: linkErr };
 
   const year = new Date().getFullYear();
   const lines = prepareLines(input.lines);
@@ -247,6 +265,8 @@ export async function updateQuote(
   id: number,
   input: QuoteInput,
 ): Promise<{ success: true } | { error: string }> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const err = validateInput(input);
   if (err) return { error: err };
 
@@ -255,6 +275,8 @@ export async function updateQuote(
     select: { id: true, grossAmount: true },
   });
   if (!existing) return { error: "Árajánlat nem található" };
+  const linkErr = await linkedIdError(input);
+  if (linkErr) return { error: linkErr };
 
   const lines = prepareLines(input.lines);
   const totals = quoteTotals(lines, input.vatRate);
@@ -291,6 +313,8 @@ export async function setQuoteStatus(
   id: number,
   status: QuoteStatus,
 ): Promise<{ success: true } | { error: string }> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   if (!QUOTE_STATUSES.includes(status)) return { error: "Ismeretlen állapot" };
 
   const existing = await db.quote.findFirst({
@@ -320,6 +344,8 @@ export async function setQuoteStatus(
 export async function searchCompaniesForQuote(
   query: string,
 ): Promise<Array<{ id: number; name: string; city: string | null }>> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const q = query.trim();
   if (q.length < 1) return [];
   return db.company.findMany({
@@ -331,6 +357,8 @@ export async function searchCompaniesForQuote(
 }
 
 export async function deleteQuote(id: number): Promise<{ success: true } | { error: string }> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const existing = await db.quote.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { quoteNumber: true },

@@ -5,10 +5,14 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { encrypt } from "@/lib/crypto";
 import { audit } from "@/lib/audit";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
 
 export async function saveIntegrationCredential(slug: string, credentials: Record<string, string>) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
+
   if (!slug || Object.keys(credentials).length === 0) return { error: "Hiányzó adatok" };
 
   // Encrypt every value before storing — keys stay as plaintext labels
@@ -44,6 +48,9 @@ export async function saveIntegrationCredential(slug: string, credentials: Recor
 }
 
 export async function disconnectIntegration(slug: string) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
+
   const existing = await db.integrationCredential.findUnique({
     where: { tenantId_integrationSlug: { tenantId: TENANT_ID, integrationSlug: slug } },
     select: { id: true, isActive: true },

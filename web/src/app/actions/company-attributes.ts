@@ -2,6 +2,7 @@
 
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import {
@@ -12,6 +13,8 @@ const TENANT_ID = 1;
 
 /** All metadata rows (current + history) for a company, tenant-scoped. */
 export async function getCompanyAttributes(companyId: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   return db.companyAttribute.findMany({
     where: { tenantId: TENANT_ID, companyId },
     orderBy: [{ attrType: "asc" }, { isPrimary: "desc" }, { validFrom: "desc" }],
@@ -35,6 +38,8 @@ function denormUpdate(def: (typeof COMPANY_ATTR_DEFS)[CompanyAttrType], value: s
 export async function setPrimaryCompanyAttribute(
   companyId: number, attrType: string, value: string, label?: string,
 ) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   if (!isCompanyAttrType(attrType)) return { error: "Ismeretlen attribútum típus" };
   const v = value.trim();
   if (!v) return { error: "Az érték kötelező" };
@@ -90,6 +95,8 @@ export async function setPrimaryCompanyAttribute(
 export async function addSecondaryCompanyAttribute(
   companyId: number, attrType: string, value: string, label?: string,
 ) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   if (!isCompanyAttrType(attrType)) return { error: "Ismeretlen attribútum típus" };
   const def = COMPANY_ATTR_DEFS[attrType];
   if (!def.multi) return { error: "Ehhez a típushoz csak egy érték tartozhat" };
@@ -121,6 +128,8 @@ export async function addSecondaryCompanyAttribute(
  * left without a current primary.
  */
 export async function endCompanyAttribute(attrId: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const attr = await db.companyAttribute.findFirst({
     where: { id: attrId, tenantId: TENANT_ID, validTo: null },
   });

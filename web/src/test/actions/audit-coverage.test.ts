@@ -23,13 +23,16 @@ const { audit, db } = vi.hoisted(() => ({
       upsert: vi.fn(),
       updateMany: vi.fn(),
     },
+    pipeline: { findFirst: vi.fn() },
+    pipelineStage: { findFirst: vi.fn() },
     pipelineCustomField: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
-    tag: { upsert: vi.fn() },
+    company: { findFirst: vi.fn() },
+    tag: { upsert: vi.fn(), findFirst: vi.fn() },
     tagging: { upsert: vi.fn(), findUnique: vi.fn(), deleteMany: vi.fn() },
   },
 }));
@@ -38,6 +41,11 @@ vi.mock("@/lib/audit", () => ({ audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/crypto", () => ({ encrypt: (v: string) => `enc(${v})` }));
 vi.mock("@/lib/db", () => ({ db }));
+vi.mock("@/lib/actor", () => {
+  const getActor = async (_t?: number) => ({ userId: 1, email: "a@b.c" });
+  return { getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
+};
+});
 
 import { createDeal, updateDeal, deleteDeal } from "@/app/actions/deals";
 import { saveIntegrationCredential, disconnectIntegration } from "@/app/actions/integrations";
@@ -61,6 +69,8 @@ describe("deals audit coverage", () => {
   it("createDeal logs a 'deal' create (not 'task')", async () => {
     db.deal.aggregate.mockResolvedValue({ _max: { position: null } });
     db.deal.create.mockResolvedValue({ id: 10, stageId: 2 });
+    db.company.findFirst.mockResolvedValue({ id: 1 });
+    db.pipelineStage.findFirst.mockResolvedValue({ id: 2 });
 
     await createDeal(fd({ title: "ACME audit", companyId: "1", stageId: "2" }));
 
@@ -125,6 +135,7 @@ describe("integration credential audit coverage", () => {
 
 describe("custom field audit coverage", () => {
   it("upsertCustomField logs a create for a new field", async () => {
+    db.pipeline.findFirst.mockResolvedValue({ id: 1 });
     db.pipelineCustomField.create.mockResolvedValue({ id: 5 });
 
     await upsertCustomField(fd({ pipelineId: "1", label: "Risk", type: "text" }));
@@ -134,7 +145,7 @@ describe("custom field audit coverage", () => {
   });
 
   it("upsertCustomField logs an update for an existing field", async () => {
-    db.pipelineCustomField.findUnique.mockResolvedValue({ label: "Risk", type: "text", required: false, position: 0 });
+    db.pipelineCustomField.findFirst.mockResolvedValue({ label: "Risk", type: "text", required: false, position: 0 });
     db.pipelineCustomField.update.mockResolvedValue({ id: 5 });
 
     await upsertCustomField(fd({ pipelineId: "1", fieldId: "5", key: "risk", label: "Risk level", type: "text" }));
@@ -144,7 +155,7 @@ describe("custom field audit coverage", () => {
   });
 
   it("deleteCustomField logs a delete", async () => {
-    db.pipelineCustomField.findUnique.mockResolvedValue({ pipelineId: 1, key: "risk", label: "Risk", type: "text" });
+    db.pipelineCustomField.findFirst.mockResolvedValue({ pipelineId: 1, key: "risk", label: "Risk", type: "text" });
     db.pipelineCustomField.delete.mockResolvedValue({ id: 5 });
 
     await deleteCustomField(5);
@@ -156,6 +167,7 @@ describe("custom field audit coverage", () => {
 
 describe("tagging audit coverage", () => {
   it("addTag logs a tagging create", async () => {
+    db.company.findFirst.mockResolvedValue({ id: 1 });
     db.tag.upsert.mockResolvedValue({ id: 1, name: "vip" });
     db.tagging.upsert.mockResolvedValue({ id: 99 });
 
@@ -166,6 +178,8 @@ describe("tagging audit coverage", () => {
   });
 
   it("removeTag logs a tagging delete", async () => {
+    db.company.findFirst.mockResolvedValue({ id: 1 });
+    db.tag.findFirst.mockResolvedValue({ id: 1 });
     db.tagging.findUnique.mockResolvedValue({ id: 99 });
     db.tagging.deleteMany.mockResolvedValue({ count: 1 });
 

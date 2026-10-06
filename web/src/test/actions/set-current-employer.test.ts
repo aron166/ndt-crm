@@ -28,7 +28,11 @@ vi.mock("@/app/actions/companies", () => ({ createCompany }));
 // Every action in contacts.ts is auth-gated now, and getActor reads the request
 // cookies. Unmocked it throws "cookies() was called outside a request scope"
 // and every case below dies before it reaches the logic it is testing.
-vi.mock("@/lib/actor", () => ({ getActor: vi.fn(), NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
+vi.mock("@/lib/actor", () => {
+  const getActor = vi.fn();
+  return { getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
+};
+});
 vi.mock("@/lib/enrichment/recompute", () => ({ recomputeCloseness: vi.fn() }));
 
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";

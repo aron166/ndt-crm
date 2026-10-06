@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 
+import { requireCrmUser } from "@/lib/actor";
+
 const TENANT_ID = 1;
 
 export async function createPerson(data: {
@@ -14,6 +16,8 @@ export async function createPerson(data: {
   linkedinUrl?: string;
   notes?: string;
 }) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const firstName = data.firstName.trim();
   const lastName  = data.lastName.trim();
   if (!firstName && !lastName) return { error: "A személy neve kötelező" };
@@ -46,6 +50,8 @@ export async function updatePerson(
     notes?: string;
   }
 ) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const person = await db.person.findFirst({
     where: { id, tenantId: TENANT_ID, deletedAt: null },
   });
@@ -77,6 +83,8 @@ export async function updatePerson(
 }
 
 export async function deletePerson(id: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const person = await db.person.findFirst({
     where: { id, tenantId: TENANT_ID, deletedAt: null },
     select: { firstName: true, lastName: true },
@@ -91,6 +99,8 @@ export async function deletePerson(id: number) {
 }
 
 export async function restorePerson(id: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const person = await db.person.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { firstName: true, lastName: true, deletedAt: true },

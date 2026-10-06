@@ -15,7 +15,11 @@ vi.mock("@/lib/db", () => ({ db }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/leads/queries", () => ({ getLeadStatuses: vi.fn().mockResolvedValue([]) }));
-vi.mock("@/lib/actor", () => ({ getActor: vi.fn(), NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
+vi.mock("@/lib/actor", () => {
+  const getActor = vi.fn();
+  return { getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
+};
+});
 
 import { getActor } from "@/lib/actor";
 import { createAutomation, updateAutomation, toggleAutomation, deleteAutomation } from "@/app/actions/automations";

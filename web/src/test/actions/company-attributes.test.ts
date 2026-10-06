@@ -19,6 +19,11 @@ const { audit, db } = vi.hoisted(() => {
 vi.mock("@/lib/audit", () => ({ audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db", () => ({ db }));
+vi.mock("@/lib/actor", () => {
+  const getActor = async (_t?: number) => ({ userId: 1, email: "a@b.c" });
+  return { getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
+};
+});
 
 import {
   setPrimaryCompanyAttribute, addSecondaryCompanyAttribute, endCompanyAttribute,

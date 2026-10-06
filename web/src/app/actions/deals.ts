@@ -6,10 +6,26 @@ import { audit } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
 
+// Foreign ids taken from input must belong to this tenant before they are
+// written onto a deal. Returns an error message or null.
+async function foreignIdError(ids: {
+  companyId?: number | null; personId?: number | null; pipelineId?: number | null; stageId?: number | null;
+}): Promise<string | null> {
+  const { companyId, personId, pipelineId, stageId } = ids;
+  if (companyId != null && !(await db.company.findFirst({ where: { id: companyId, tenantId: TENANT_ID }, select: { id: true } }))) return "Cég nem található";
+  if (personId != null && !(await db.person.findFirst({ where: { id: personId, tenantId: TENANT_ID }, select: { id: true } }))) return "Személy nem található";
+  if (pipelineId != null && !(await db.pipeline.findFirst({ where: { id: pipelineId, tenantId: TENANT_ID }, select: { id: true } }))) return "Pipeline nem található";
+  if (stageId != null && !(await db.pipelineStage.findFirst({ where: { id: stageId, pipeline: { tenantId: TENANT_ID } }, select: { id: true } }))) return "Szakasz nem található";
+  return null;
+}
+
 export async function createDeal(formData: FormData) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const title      = (formData.get("title") as string)?.trim();
   const companyIdStr = formData.get("companyId") as string;
   const pipelineIdStr = formData.get("pipelineId") as string;
@@ -26,6 +42,14 @@ export async function createDeal(formData: FormData) {
   for (const [k, v] of formData.entries()) {
     if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
   }
+
+  const refErr = await foreignIdError({
+    companyId: parseInt(companyIdStr),
+    personId: personIdStr ? parseInt(personIdStr) : null,
+    pipelineId: pipelineIdStr ? parseInt(pipelineIdStr) : null,
+    stageId: stageIdStr ? parseInt(stageIdStr) : null,
+  });
+  if (refErr) return { error: refErr };
 
   // position = max existing + 1
   const maxPos = await db.deal.aggregate({
@@ -56,6 +80,8 @@ export async function createDeal(formData: FormData) {
 }
 
 export async function updateDeal(id: number, formData: FormData) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const title     = (formData.get("title") as string)?.trim();
   if (!title) return { error: "Cím kötelező" };
 
@@ -68,6 +94,12 @@ export async function updateDeal(id: number, formData: FormData) {
   for (const [k, v] of formData.entries()) {
     if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
   }
+
+  const refErr = await foreignIdError({
+    personId: personIdStr ? parseInt(personIdStr) : null,
+    stageId: stageIdStr ? parseInt(stageIdStr) : null,
+  });
+  if (refErr) return { error: refErr };
 
   const before = await db.deal.findFirst({
     where: { id, tenantId: TENANT_ID },
@@ -97,6 +129,8 @@ export async function moveDeal(
   newStageId: number,
   newPosition: number
 ) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const deal = await db.deal.findFirst({
     where: { id: dealId, tenantId: TENANT_ID },
     select: {
@@ -106,10 +140,11 @@ export async function moveDeal(
     },
   });
 
-  const newStage = await db.pipelineStage.findUnique({
-    where: { id: newStageId },
+  const newStage = await db.pipelineStage.findFirst({
+    where: { id: newStageId, pipeline: { tenantId: TENANT_ID } },
     select: { name: true },
   });
+  if (!newStage) throw new Error("Szakasz nem található");
 
   // Only a real stage change resets the idle clock (drags within the same
   // column reorder but keep the deal in its stage).
@@ -154,6 +189,8 @@ export async function deleteDeal(
   // recoverable (deletedAt + restore), so this stays non-destructive.
   cascade?: { company?: boolean; person?: boolean },
 ) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const before = await db.deal.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { title: true, stageId: true, value: true, companyId: true, personId: true },
@@ -172,6 +209,8 @@ export async function deleteDeal(
 // ── Pipeline management ────────────────────────────────────────
 
 export async function createPipeline(formData: FormData) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const name = (formData.get("name") as string)?.trim();
   if (!name) return { error: "Név kötelező" };
 
@@ -183,6 +222,8 @@ export async function createPipeline(formData: FormData) {
 }
 
 export async function upsertStage(formData: FormData) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const pipelineId  = parseInt(formData.get("pipelineId") as string);
   const stageIdStr  = formData.get("stageId") as string | null;
   const name        = (formData.get("name") as string)?.trim();
@@ -195,11 +236,16 @@ export async function upsertStage(formData: FormData) {
   if (!name) return { error: "Név kötelező" };
 
   if (stageIdStr) {
-    await db.pipelineStage.update({
-      where: { id: parseInt(stageIdStr) },
+    await db.pipelineStage.updateMany({
+      where: { id: parseInt(stageIdStr), pipeline: { tenantId: TENANT_ID } },
       data: { name, color, probability, position, isTerminalWon, isTerminalLost },
     });
   } else {
+    const pipeline = await db.pipeline.findFirst({
+      where: { id: pipelineId, tenantId: TENANT_ID },
+      select: { id: true },
+    });
+    if (!pipeline) return { error: "Pipeline nem található" };
     await db.pipelineStage.create({
       data: { pipelineId, name, color, probability, position, isTerminalWon, isTerminalLost },
     });
@@ -210,6 +256,8 @@ export async function upsertStage(formData: FormData) {
 }
 
 export async function reorderStages(pipelineId: number, orderedIds: number[]) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   // Verify the pipeline belongs to this tenant before touching its stages —
   // app-level scoping is the only multi-tenant guard (ADR/002).
   const pipeline = await db.pipeline.findFirst({
@@ -234,6 +282,14 @@ export async function reorderStages(pipelineId: number, orderedIds: number[]) {
 }
 
 export async function deleteStage(stageId: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
+  const stage = await db.pipelineStage.findFirst({
+    where: { id: stageId, pipeline: { tenantId: TENANT_ID } },
+    select: { id: true },
+  });
+  if (!stage) return;
+
   // Move deals in this stage to null stage first
   await db.deal.updateMany({
     where: { stageId, tenantId: TENANT_ID },

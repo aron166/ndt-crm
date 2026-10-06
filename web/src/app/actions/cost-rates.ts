@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { COST_CODES } from "@/lib/tasks/costing";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
 
@@ -15,6 +16,9 @@ export interface CostRateEntry {
 
 /** The full rate card: one entry per cost code, in canonical order (defaults null). */
 export async function getCostRates(): Promise<CostRateEntry[]> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
+
   const rows = await db.costRate.findMany({ where: { tenantId: TENANT_ID } });
   const byCode = new Map(rows.map((r) => [r.code, r]));
   return COST_CODES.map((c) => {
@@ -28,6 +32,9 @@ export async function getCostRates(): Promise<CostRateEntry[]> {
 }
 
 export async function upsertCostRate(code: string, unit: string, unitRate: string) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
+
   if (!COST_CODES.some((c) => c.value === code)) return { error: "Ismeretlen költségkód" };
   const trimmed = unitRate.trim();
   const rate = trimmed ? Number(trimmed.replace(",", ".")) : null;

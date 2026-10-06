@@ -17,10 +17,9 @@ const TENANT_ID = 1;
  * (rule 5 — RLS is not enforced).
  */
 export async function setTheme(theme: Theme) {
-  if (theme !== "light" && theme !== "dark") return { error: "Ismeretlen téma" };
-
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
+  if (theme !== "light" && theme !== "dark") return { error: "Ismeretlen téma" };
 
   const rows = await db.$executeRaw`
     UPDATE "users"

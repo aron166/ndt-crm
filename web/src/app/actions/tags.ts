@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 
@@ -14,14 +15,32 @@ function revalidateEntity(type: TaggableType, id: number) {
   if (type === "task")     revalidatePath(`/tasks/${id}`);
 }
 
+// Taggings carry no tenantId: the tag is tenant-scoped (tenantId_name), and the
+// tagged entity is verified here before anything is linked or unlinked.
+async function entityInTenant(type: TaggableType, id: number): Promise<boolean> {
+  const where = { id, tenantId: TENANT_ID };
+  const select = { id: true };
+  switch (type) {
+    case "company": return !!(await db.company.findFirst({ where, select }));
+    case "person": return !!(await db.person.findFirst({ where, select }));
+    case "deal": return !!(await db.deal.findFirst({ where, select }));
+    case "task": return !!(await db.task.findFirst({ where, select }));
+    case "interaction": return !!(await db.interaction.findFirst({ where, select }));
+    default: return false;
+  }
+}
+
 export async function addTag(
   taggableType: TaggableType,
   taggableId: number,
   name: string,
   color?: string
 ) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const trimmed = name.trim();
   if (!trimmed) return { error: "Üres tag" };
+  if (!(await entityInTenant(taggableType, taggableId))) return { error: "Nem található" };
 
   const tag = await db.tag.upsert({
     where: { tenantId_name: { tenantId: TENANT_ID, name: trimmed } },
@@ -48,6 +67,11 @@ export async function removeTag(
   taggableId: number,
   tagId: number
 ) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
+  const tag = await db.tag.findFirst({ where: { id: tagId, tenantId: TENANT_ID }, select: { id: true } });
+  if (!tag || !(await entityInTenant(taggableType, taggableId))) return { error: "Nem található" };
+
   const existing = await db.tagging.findUnique({
     where: { tagId_taggableType_taggableId: { tagId, taggableType, taggableId } },
     select: { id: true },
@@ -61,11 +85,15 @@ export async function removeTag(
     audit("tagging", existing.id, "delete", { tagId, taggableType, taggableId }, null);
   }
   revalidateEntity(taggableType, taggableId);
+  return { success: true };
 }
 
 export async function getTagsForEntity(type: TaggableType, id: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
+  if (!(await entityInTenant(type, id))) return [];
   const taggings = await db.tagging.findMany({
-    where: { taggableType: type, taggableId: id },
+    where: { taggableType: type, taggableId: id, tag: { tenantId: TENANT_ID } },
     include: { tag: true },
     orderBy: { createdAt: "asc" },
   });
@@ -73,6 +101,8 @@ export async function getTagsForEntity(type: TaggableType, id: number) {
 }
 
 export async function searchByTag(tagName: string) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const tag = await db.tag.findFirst({
     where: { tenantId: TENANT_ID, name: { equals: tagName, mode: "insensitive" } },
     include: { taggings: true },
@@ -83,9 +113,9 @@ export async function searchByTag(tagName: string) {
     tag.taggings.filter((t) => t.taggableType === type).map((t) => t.taggableId);
 
   const [companies, persons, tasks] = await Promise.all([
-    db.company.findMany({ where: { id: { in: ids("company") } }, select: { id: true, name: true } }),
-    db.person.findMany({  where: { id: { in: ids("person") } },  select: { id: true, firstName: true, lastName: true } }),
-    db.task.findMany({    where: { id: { in: ids("task") } },    select: { id: true, title: true, status: true } }),
+    db.company.findMany({ where: { tenantId: TENANT_ID, id: { in: ids("company") } }, select: { id: true, name: true } }),
+    db.person.findMany({  where: { tenantId: TENANT_ID, id: { in: ids("person") } },  select: { id: true, firstName: true, lastName: true } }),
+    db.task.findMany({    where: { tenantId: TENANT_ID, id: { in: ids("task") } },    select: { id: true, title: true, status: true } }),
   ]);
 
   return { companies, persons, tasks, deals: [] };

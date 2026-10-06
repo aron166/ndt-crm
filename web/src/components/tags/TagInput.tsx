@@ -69,7 +69,7 @@ export function TagInput({ taggableType, taggableId, initialTags }: TagInputProp
 
   function handleRemove(tagId: number) {
     setTags((prev) => prev.filter((t) => t.id !== tagId));
-    startTransition(() => removeTag(taggableType, taggableId, tagId));
+    startTransition(async () => { await removeTag(taggableType, taggableId, tagId); });
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {

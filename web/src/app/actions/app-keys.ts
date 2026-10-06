@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { generateAppKey, hashAppKey } from "@/lib/app-key-auth";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
 
@@ -17,6 +18,9 @@ export interface AppKeyRow {
 }
 
 export async function listAppApiKeys(): Promise<AppKeyRow[]> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
+
   const keys = await db.appApiKey.findMany({
     where: { tenantId: TENANT_ID },
     orderBy: { createdAt: "desc" },
@@ -34,6 +38,9 @@ export async function listAppApiKeys(): Promise<AppKeyRow[]> {
  * stored — only its SHA-256 hash is persisted.
  */
 export async function createAppApiKey(appSlug: string, label?: string) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
+
   const slug = appSlug?.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
   if (!slug) return { error: "App azonosító kötelező" };
 
@@ -60,6 +67,9 @@ export async function createAppApiKey(appSlug: string, label?: string) {
 }
 
 export async function revokeAppApiKey(id: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
+
   const key = await db.appApiKey.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { id: true, appSlug: true, isActive: true },

@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { geocode } from "@/lib/integrations/google_maps";
 import { audit } from "@/lib/audit";
 
+import { requireCrmUser } from "@/lib/actor";
+
 const TENANT_ID = 1;
 
 export async function createCompany(data: {
@@ -19,6 +21,8 @@ export async function createCompany(data: {
   country?: string;
   website?: string;
 }) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const name = data.name.trim();
   if (!name) return { error: "A cég neve kötelező" };
 
@@ -69,6 +73,8 @@ export async function updateCompany(
     pipelineStatus?: string;
   }
 ) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const company = await db.company.findFirst({
     where: { id, tenantId: TENANT_ID, deletedAt: null },
   });
@@ -102,6 +108,8 @@ export async function updateCompany(
 }
 
 export async function deleteCompany(id: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const company = await db.company.findFirst({
     where: { id, tenantId: TENANT_ID, deletedAt: null },
     select: { name: true },
@@ -116,6 +124,8 @@ export async function deleteCompany(id: number) {
 }
 
 export async function restoreCompany(id: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const company = await db.company.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { name: true, deletedAt: true },
@@ -132,6 +142,8 @@ export async function restoreCompany(id: number) {
 }
 
 export async function geocodeCompany(companyId: number) {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
   const company = await db.company.findFirst({
     where: { id: companyId, tenantId: TENANT_ID },
     select: { address: true, city: true, zipCode: true, county: true, country: true },

@@ -1,9 +1,11 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { requireCrmUser } from "@/lib/actor";
 import { employerState, employerLabel } from "@/lib/persons/employer";
 
 const TENANT_ID = 1;
+
 const LIMIT = 5; // results per group
 
 export interface SearchResults {
@@ -15,6 +17,8 @@ export interface SearchResults {
 }
 
 export async function globalSearch(query: string): Promise<SearchResults> {
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) throw new Error(denied);
   const q = query.trim();
   if (q.length < 1) return { companies: [], persons: [], deals: [], tasks: [], tags: [] };
 
