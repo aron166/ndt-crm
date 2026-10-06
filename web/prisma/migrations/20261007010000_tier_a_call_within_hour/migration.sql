@@ -40,7 +40,8 @@ SET "conditions" = '[{"field":"tier","op":"ne","value":"A"}]'::jsonb,
     "updated_at" = CURRENT_TIMESTAMP
 WHERE "trigger_type" = 'lead_created'
   AND "action_type" = 'create_task'
-  AND "conditions" IS NULL
+  -- The editor stores "no conditions" as jsonb null (Prisma.JsonNull), not SQL NULL.
+  AND ("conditions" IS NULL OR "conditions" IN ('null'::jsonb, '[]'::jsonb))
   AND "action_config"->>'titleTemplate' = 'Lead megkeresése: {company}';
 
 -- Rollback:

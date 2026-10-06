@@ -248,7 +248,7 @@ export function AutomationsClient({
       }
       if (form.dueInMinutes !== "") {
         dueInMinutes = Number(form.dueInMinutes);
-        if (!Number.isFinite(dueInMinutes) || dueInMinutes < 1) { setError("A határidő (perc) érvénytelen"); return; }
+        if (!Number.isInteger(dueInMinutes) || dueInMinutes < 1) { setError("A határidő (perc) érvénytelen"); return; }
       }
     }
 
@@ -277,7 +277,8 @@ export function AutomationsClient({
           titleTemplate: form.titleTemplate.trim(),
           type: form.taskType || undefined,
           category: form.category || undefined,
-          dueInDays,
+          // Minutes win in the engine, so never save both: the form would show a day it ignores.
+          dueInDays: dueInMinutes != null ? undefined : dueInDays,
           dueInMinutes,
           assignedToId: Number(form.assignedToId) || undefined,
           descriptionTemplate: form.descriptionTemplate.trim() || undefined,
