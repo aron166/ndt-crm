@@ -5,6 +5,7 @@ import { saveIntegrationCredential, disconnectIntegration } from "@/app/actions/
 import { sendResendTest } from "@/app/actions/email";
 import { createAppApiKey, revokeAppApiKey, type AppKeyRow } from "@/app/actions/app-keys";
 import { CheckCircle, Circle, ExternalLink, Zap, KeyRound, Copy, Check, Trash2, Plus, AlertTriangle } from "lucide-react";
+import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils";
 
 interface Integration {
@@ -357,6 +358,7 @@ export function SettingsClient({ tenant, connectedIntegrations, appKeys }: Setti
       <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)" }}>
         Beállítások
       </h1>
+      <Link href="/settings/suppressions" className="text-sm" style={{ color: "var(--fg-mute)" }}>Tiltólista</Link>
 
       <div className="tabs-ds">
         <button className={`tab-ds ${tab === "general" ? "active" : ""}`} onClick={() => setTab("general")}>
