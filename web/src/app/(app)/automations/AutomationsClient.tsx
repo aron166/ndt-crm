@@ -103,6 +103,7 @@ interface FormState {
   taskType: string;
   category: string;
   dueInDays: string;
+  dueInMinutes: string;
   descriptionTemplate: string;
   subjectTemplate: string;
   bodyTemplate: string;
@@ -126,6 +127,7 @@ const EMPTY: FormState = {
   taskType: "call",
   category: "revenue_generating",
   dueInDays: "1",
+  dueInMinutes: "",
   descriptionTemplate: "",
   subjectTemplate: "",
   bodyTemplate: "",
@@ -166,6 +168,7 @@ function fromRule(r: RuleRow): FormState {
     taskType: ac.type ? String(ac.type) : "call",
     category: ac.category ? String(ac.category) : "revenue_generating",
     dueInDays: ac.dueInDays != null ? String(ac.dueInDays) : "",
+    dueInMinutes: ac.dueInMinutes != null ? String(ac.dueInMinutes) : "",
     descriptionTemplate: ac.descriptionTemplate ? String(ac.descriptionTemplate) : "",
     subjectTemplate: ac.subjectTemplate ? String(ac.subjectTemplate) : "",
     bodyTemplate: ac.bodyTemplate ? String(ac.bodyTemplate) : "",
@@ -233,6 +236,7 @@ export function AutomationsClient({
     const isEmail = form.actionType === "send_email";
     const isTask = form.actionType === "create_task";
     let dueInDays: number | undefined;
+    let dueInMinutes: number | undefined;
     if (isEmail) {
       if (!form.subjectTemplate.trim()) { setError("Az email tárgya kötelező"); return; }
       if (!form.bodyTemplate.trim()) { setError("Az email szövege kötelező"); return; }
@@ -241,6 +245,10 @@ export function AutomationsClient({
       if (form.dueInDays !== "") {
         dueInDays = Number(form.dueInDays);
         if (!Number.isFinite(dueInDays) || dueInDays < 0) { setError("A határidő (nap) érvénytelen"); return; }
+      }
+      if (form.dueInMinutes !== "") {
+        dueInMinutes = Number(form.dueInMinutes);
+        if (!Number.isInteger(dueInMinutes) || dueInMinutes < 1) { setError("A határidő (perc) érvénytelen"); return; }
       }
     }
 
@@ -269,7 +277,10 @@ export function AutomationsClient({
           titleTemplate: form.titleTemplate.trim(),
           type: form.taskType || undefined,
           category: form.category || undefined,
-          dueInDays,
+          // Minutes win in the engine, so never save both: the form would show a day it ignores.
+          dueInDays: dueInMinutes != null ? undefined : dueInDays,
+          dueInMinutes,
+          assignedToId: Number(form.assignedToId) || undefined,
           descriptionTemplate: form.descriptionTemplate.trim() || undefined,
         }));
 
@@ -632,6 +643,17 @@ function RuleForm({
                   <div>
                     <label className="field-label">Határidő (nap múlva)</label>
                     <input type="number" min={0} style={inputStyle} value={form.dueInDays} onChange={(e) => set("dueInDays", e.target.value)} placeholder="pl. 1" />
+                  </div>
+                  <div>
+                    <label className="field-label">Határidő (perc)</label>
+                    <input type="number" min={1} style={inputStyle} value={form.dueInMinutes} onChange={(e) => set("dueInMinutes", e.target.value)} placeholder="pl. 60" />
+                  </div>
+                  <div>
+                    <label className="field-label">Felelős</label>
+                    <select style={inputStyle} value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
+                      <option value="">Nincs</option>
+                      {users.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
+                    </select>
                   </div>
                 </div>
                 <div>

@@ -141,6 +141,41 @@ describe("buildCreateTaskData", () => {
   });
 });
 
+describe("tier A call-within-1h rule (seeded by 20261007010000)", () => {
+  // The exact conditions/config the migration seeds. If the engine stops
+  // honouring dueInMinutes or the tier condition, tier A leads stop getting
+  // their 60-minute call task, or every lead gets one.
+  const tierA = [{ field: "tier", op: "eq", value: "A" }];
+  const notTierA = [{ field: "tier", op: "ne", value: "A" }];
+  const cfg: CreateTaskActionConfig = {
+    titleTemplate: "Hívd 1 órán belül: {company}", type: "call",
+    category: "revenue_generating", dueInMinutes: 60, assignedToId: 2,
+  };
+
+  it("fires only on tier A, and the default rule fires on everything else", () => {
+    for (const tier of ["A", "B", "E", null]) {
+      const f = leadCreated({ fields: { ...leadCreated().fields, tier } }).fields;
+      expect(conditionsPass(tierA, f)).toBe(tier === "A");
+      expect(conditionsPass(notTierA, f)).toBe(tier !== "A");
+    }
+  });
+
+  it("creates a call task due in 60 minutes, assigned, linked to the lead", () => {
+    const now = new Date("2026-10-07T10:00:00.000Z");
+    const data = buildCreateTaskData(cfg, leadCreated({ leadId: 7 }), now);
+    expect((data.dueDate as Date).toISOString()).toBe("2026-10-07T11:00:00.000Z");
+    expect(data.assignedToId).toBe(2);
+    expect(data.leadId).toBe(7);
+    expect(data.type).toBe("call");
+  });
+
+  it("dueInMinutes wins over dueInDays", () => {
+    const now = new Date("2026-10-07T10:00:00.000Z");
+    const data = buildCreateTaskData({ ...cfg, dueInDays: 1 }, leadCreated(), now);
+    expect((data.dueDate as Date).toISOString()).toBe("2026-10-07T11:00:00.000Z");
+  });
+});
+
 describe("runAutomations (orchestrator)", () => {
   const mockDb = db as unknown as {
     automationRule: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };

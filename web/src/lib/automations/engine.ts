@@ -125,7 +125,9 @@ export function buildCreateTaskData(
   now: Date = new Date(),
 ): Prisma.TaskUncheckedCreateInput {
   const dueDate =
-    cfg.dueInDays != null ? new Date(now.getTime() + cfg.dueInDays * 86_400_000) : null;
+    cfg.dueInMinutes != null ? new Date(now.getTime() + cfg.dueInMinutes * 60_000)
+    : cfg.dueInDays != null ? new Date(now.getTime() + cfg.dueInDays * 86_400_000)
+    : null;
   return {
     tenantId: event.tenantId,
     companyId: event.companyId,

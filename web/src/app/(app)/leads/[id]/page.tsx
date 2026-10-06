@@ -6,6 +6,8 @@ import { serializeDates } from "@/lib/serialize";
 import { getEntityHistory } from "@/app/actions/audit";
 import { getLeadStatuses, getQuestionModel, getScriptVariants } from "@/lib/leads/queries";
 import { answersFrom, answerSourcesFrom } from "@/lib/leads/qualification";
+import { firstContactByLead } from "@/lib/leads/first-contact-query";
+import { minutesToFirstContact } from "@/lib/leads/first-contact";
 import { LeadDetailClient } from "./LeadDetailClient";
 
 const TENANT_ID = 1;
@@ -71,6 +73,11 @@ export default async function LeadDetailPage({
     getScriptVariants(TENANT_ID),
   ]);
 
+  const firstContactMin = minutesToFirstContact(
+    lead.createdAt,
+    (await firstContactByLead(TENANT_ID, [{ id: leadId, companyId: lead.companyId, personId, createdAt: lead.createdAt }])).get(leadId) ?? null,
+  );
+
   return (
     <div className="mount">
       <div style={{ marginBottom: 16 }}>
@@ -85,6 +92,7 @@ export default async function LeadDetailPage({
       </div>
 
       <LeadDetailClient
+        firstContactMin={firstContactMin}
         lead={serializeDates({
           ...lead,
           estimatedValue: lead.estimatedValue != null ? Number(lead.estimatedValue) : null,

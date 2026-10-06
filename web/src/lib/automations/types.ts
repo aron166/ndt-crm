@@ -63,6 +63,8 @@ export interface CreateTaskActionConfig {
   type?: string; // call, email, meeting, document, field_visit, internal
   category?: string; // revenue_generating | non_revenue
   dueInDays?: number;
+  /** Due this many minutes after the event. Wins over dueInDays (tier A: call within 60). */
+  dueInMinutes?: number;
   descriptionTemplate?: string;
   assignedToId?: number;
 }
