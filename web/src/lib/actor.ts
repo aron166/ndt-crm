@@ -40,3 +40,15 @@ export async function userLeadCtx(tenantId: number): Promise<LeadCtx | { error: 
   if (userId == null) return { error: NOT_A_CRM_USER };
   return { tenantId, userId, actor: "user" };
 }
+
+/**
+ * The server action gate. Returns the denial MESSAGE (not an `{ error }`
+ * object) so each action builds its own literal and TypeScript keeps
+ * normalising object-literal return unions (see the note in actions/tasks.ts).
+ * Every export of a "use server" file calls this (or userLeadCtx / getActor)
+ * as its FIRST statement; src/test/actions/server-action-guard.test.ts enforces it.
+ */
+export async function requireCrmUser(tenantId: number): Promise<string | null> {
+  const { userId } = await getActor(tenantId);
+  return userId == null ? NOT_A_CRM_USER : null;
+}
