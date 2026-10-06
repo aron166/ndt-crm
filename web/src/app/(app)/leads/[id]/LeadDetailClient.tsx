@@ -15,6 +15,7 @@ import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interacti
 import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
 import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { formatMinutes } from "@/lib/leads/first-contact";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
 
 interface Interaction {
@@ -88,6 +89,7 @@ const MARKETING_KEYS = [
 
 export function LeadDetailClient({
   lead,
+  firstContactMin,
   interactions,
   auditEntries,
   statuses,
@@ -100,6 +102,7 @@ export function LeadDetailClient({
   scriptVariants,
 }: {
   lead: Lead;
+  firstContactMin: number | null;
   interactions: Interaction[];
   auditEntries: AuditEntry[];
   statuses: LeadStatusDef[];
@@ -217,6 +220,8 @@ export function LeadDetailClient({
           </h1>
           <p className="page-sub">
             {lead.sourceApp || lead.source || "web"} · érkezett {formatRelativeTime(lead.receivedDate ?? lead.createdAt)}
+            {" · "}
+            {firstContactMin != null ? `Első kontakt: ${formatMinutes(firstContactMin)} a beérkezés után` : "Még nincs kontakt"}
           </p>
         </div>
         <div className="page-actions" style={{ gap: 8 }}>

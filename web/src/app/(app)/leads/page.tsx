@@ -6,6 +6,8 @@ import { LeadsKanban } from "./LeadsKanban";
 import { Settings2 } from "lucide-react";
 import { fullName, formatRelativeTime } from "@/lib/utils";
 import { getLeadExtras } from "@/lib/leads/board";
+import { firstContactByLead } from "@/lib/leads/first-contact-query";
+import { minutesToFirstContact, tierAFlag } from "@/lib/leads/first-contact";
 import { LEAD_OUTCOME_LABEL, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/outcomes";
 import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 
@@ -212,8 +214,13 @@ export default async function LeadsPage({
     leads.map((l) => ({ id: l.id, companyId: l.companyId, personId: l.contact?.person?.id ?? null, createdAt: l.createdAt })),
   );
 
+  const firstContacts = await firstContactByLead(TENANT_ID, leads.map((l) => l.id));
+  const now = new Date();
+
   const leadsForClient = leads.map((l) => ({
     ...l,
+    firstContactMin: minutesToFirstContact(l.createdAt, firstContacts.get(l.id) ?? null),
+    tierFlag: tierAFlag(l.tier, l.createdAt, firstContacts.get(l.id) ?? null, now),
     // Same normalization as colWhere, so the client renders the card in the
     // column the server counted it in.
     status: l.status && knownKeys.includes(l.status) ? l.status : initialKey,

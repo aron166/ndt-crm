@@ -13,6 +13,7 @@ import {
   LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, promptLostReason, type LeadOutcome,
 } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { formatMinutes } from "@/lib/leads/first-contact";
 import { dataInk } from "@/lib/data-color";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 
@@ -27,6 +28,8 @@ interface Lead {
   message: string | null;
   estimatedValue: number | null;
   tier: string | null;
+  firstContactMin: number | null;
+  tierFlag: "due" | "overdue" | null;
   createdAt: string | Date;
   lastContactAt: string | null;
   callbackDueAt: string | null;
@@ -136,6 +139,26 @@ function LeadCard({
         >
           {lead.tier}
         </span>
+      )}
+
+      {lead.tierFlag && (
+        <div
+          className="font-mono-ndt"
+          style={{
+            display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 3, marginLeft: 6,
+            color: lead.tierFlag === "overdue" ? "var(--bg-panel)" : TIER_COLOR.A,
+            background: lead.tierFlag === "overdue" ? TIER_COLOR.A : "var(--bg-hover)",
+            border: `1px solid ${TIER_COLOR.A}`,
+            fontWeight: lead.tierFlag === "overdue" ? 700 : 500,
+          }}
+        >
+          {lead.tierFlag === "overdue" ? "Hívás késésben" : "Hívás 1 órán belül"}
+        </div>
+      )}
+      {lead.firstContactMin != null && (
+        <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 3 }}>
+          Első kontakt: {formatMinutes(lead.firstContactMin)}
+        </div>
       )}
 
       {/* Person (headline) */}
