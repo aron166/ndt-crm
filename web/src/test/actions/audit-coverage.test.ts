@@ -41,7 +41,11 @@ vi.mock("@/lib/audit", () => ({ audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/crypto", () => ({ encrypt: (v: string) => `enc(${v})` }));
 vi.mock("@/lib/db", () => ({ db }));
-vi.mock("@/lib/actor", () => ({ getActor: async () => ({ userId: 1, email: "a@b.c" }), NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
+vi.mock("@/lib/actor", () => {
+  const getActor = async (_t?: number) => ({ userId: 1, email: "a@b.c" });
+  return { getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
+};
+});
 
 import { createDeal, updateDeal, deleteDeal } from "@/app/actions/deals";
 import { saveIntegrationCredential, disconnectIntegration } from "@/app/actions/integrations";

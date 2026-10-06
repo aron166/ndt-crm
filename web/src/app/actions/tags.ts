@@ -1,19 +1,11 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 
 const TENANT_ID = 1;
-
-// Same gate as tasks.ts / automations.ts. Returns the MESSAGE, not an
-// `{ error }` object, so each action builds its own literal (keeps TypeScript's
-// union normalisation intact for call sites).
-async function requireUser(): Promise<string | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? NOT_A_CRM_USER : null;
-}
 
 export type TaggableType = "company" | "person" | "deal" | "task" | "interaction";
 
@@ -44,7 +36,7 @@ export async function addTag(
   name: string,
   color?: string
 ) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const trimmed = name.trim();
   if (!trimmed) return { error: "Üres tag" };
@@ -75,7 +67,7 @@ export async function removeTag(
   taggableId: number,
   tagId: number
 ) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const tag = await db.tag.findFirst({ where: { id: tagId, tenantId: TENANT_ID }, select: { id: true } });
   if (!tag || !(await entityInTenant(taggableType, taggableId))) return { error: "Nem található" };
@@ -97,7 +89,7 @@ export async function removeTag(
 }
 
 export async function getTagsForEntity(type: TaggableType, id: number) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   if (!(await entityInTenant(type, id))) return [];
   const taggings = await db.tagging.findMany({
@@ -109,7 +101,7 @@ export async function getTagsForEntity(type: TaggableType, id: number) {
 }
 
 export async function searchByTag(tagName: string) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   const tag = await db.tag.findFirst({
     where: { tenantId: TENANT_ID, name: { equals: tagName, mode: "insensitive" } },

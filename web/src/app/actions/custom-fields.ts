@@ -4,21 +4,12 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
 
-// Every export is a server action, callable by id regardless of the layout
-// redirect: refuse non-CRM users before any DB access. Returns the message and
-// each action builds its own literal, so TypeScript's union normalisation of
-// object-literal returns keeps working (see tasks.ts).
-async function requireUser(): Promise<string | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? NOT_A_CRM_USER : null;
-}
-
 export async function upsertCustomField(formData: FormData) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const pipelineId = parseInt(formData.get("pipelineId") as string);
   const fieldId    = formData.get("fieldId") as string | null;
@@ -75,7 +66,7 @@ export async function upsertCustomField(formData: FormData) {
 }
 
 export async function deleteCustomField(fieldId: number) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   const before = await db.pipelineCustomField.findFirst({
     where: { id: fieldId, pipeline: { tenantId: TENANT_ID } },

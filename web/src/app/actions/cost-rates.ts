@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { COST_CODES } from "@/lib/tasks/costing";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
 
@@ -14,16 +14,9 @@ export interface CostRateEntry {
   unitRate: number | null;
 }
 
-// Same gate as tasks.ts: returns the MESSAGE (not an object) so each action builds
-// its own literal and TypeScript keeps normalising the return-type union.
-async function requireUser(): Promise<string | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? NOT_A_CRM_USER : null;
-}
-
 /** The full rate card: one entry per cost code, in canonical order (defaults null). */
 export async function getCostRates(): Promise<CostRateEntry[]> {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
 
   const rows = await db.costRate.findMany({ where: { tenantId: TENANT_ID } });
@@ -39,7 +32,7 @@ export async function getCostRates(): Promise<CostRateEntry[]> {
 }
 
 export async function upsertCostRate(code: string, unit: string, unitRate: string) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
 
   if (!COST_CODES.some((c) => c.value === code)) return { error: "Ismeretlen költségkód" };

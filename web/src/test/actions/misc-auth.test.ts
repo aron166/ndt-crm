@@ -23,7 +23,11 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("groq-sdk", () => ({ default: vi.fn() }));
 vi.mock("@/lib/marketing/audience-query", () => ({ audienceWhere: vi.fn() }));
 vi.mock("@/lib/enrichment/recompute", () => ({ recomputeCloseness: vi.fn() }));
-vi.mock("@/lib/actor", () => ({ getActor: vi.fn(), NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
+vi.mock("@/lib/actor", () => {
+  const getActor = vi.fn();
+  return { getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
+};
+});
 
 import { getActor } from "@/lib/actor";
 import * as outreach from "@/app/actions/outreach";

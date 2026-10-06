@@ -19,7 +19,11 @@ vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/integrations/google_maps", () => ({ geocode: vi.fn() }));
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn() }));
-vi.mock("@/lib/actor", () => ({ getActor: vi.fn(), NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
+vi.mock("@/lib/actor", () => {
+  const getActor = vi.fn();
+  return { getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
+};
+});
 
 import { getActor } from "@/lib/actor";
 import * as companies from "@/app/actions/companies";

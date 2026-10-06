@@ -1,18 +1,11 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 import { employerState, employerLabel } from "@/lib/persons/employer";
 
 const TENANT_ID = 1;
 
-// Same gate as tasks.ts / automations.ts. Returns the MESSAGE, not an
-// `{ error }` object, so each action builds its own literal (keeps TypeScript's
-// union normalisation intact for call sites).
-async function requireUser(): Promise<string | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? NOT_A_CRM_USER : null;
-}
 const LIMIT = 5; // results per group
 
 export interface SearchResults {
@@ -24,7 +17,7 @@ export interface SearchResults {
 }
 
 export async function globalSearch(query: string): Promise<SearchResults> {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   const q = query.trim();
   if (q.length < 1) return { companies: [], persons: [], deals: [], tasks: [], tags: [] };

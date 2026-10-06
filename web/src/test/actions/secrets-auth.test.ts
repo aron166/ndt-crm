@@ -20,11 +20,14 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/crypto", () => ({ encrypt }));
 vi.mock("@/lib/integrations/resend", () => ({ DEFAULT_TENANT_ID: 1, sendEmail, sendTestEmail }));
 vi.mock("@/lib/leads/service", () => ({ moveLead, setLeadOutcome: vi.fn() }));
-vi.mock("@/lib/actor", () => ({
-  getActor: vi.fn(),
+vi.mock("@/lib/actor", () => {
+  const getActor = vi.fn();
+  return {
+  getActor,
   userLeadCtx: vi.fn(),
-  NOT_A_CRM_USER: "NOT_A_CRM_USER",
-}));
+  NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
+};
+});
 
 import { getActor, userLeadCtx } from "@/lib/actor";
 import { saveIntegrationCredential, disconnectIntegration } from "@/app/actions/integrations";

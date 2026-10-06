@@ -1,20 +1,13 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import Groq from "groq-sdk";
 
 const TENANT_ID = 1;
 
-// Same gate as tasks.ts / automations.ts. Returns the MESSAGE, not an
-// `{ error }` object, so each action builds its own literal (keeps TypeScript's
-// union normalisation intact for call sites).
-async function requireUser(): Promise<string | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? NOT_A_CRM_USER : null;
-}
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const FETCH_TIMEOUT_MS = 8000;
 
@@ -397,7 +390,7 @@ export async function triggerBulkEnrichment(
   entityType: "company" | "person",
   entityIds: number[],
 ): Promise<number> {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   const cappedIds = entityIds.slice(0, 20);
 
@@ -479,7 +472,7 @@ export async function triggerBulkEnrichment(
 // ─── Apply proposal ───────────────────────────────────────────────────────────
 
 export async function applyProposal(proposalId: number, approvedFields: string[]): Promise<void> {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   const proposal = await db.enrichmentProposal.findFirst({
     where: { id: proposalId, tenantId: TENANT_ID },
@@ -535,7 +528,7 @@ export async function applyProposal(proposalId: number, approvedFields: string[]
 // ─── Data fetchers ────────────────────────────────────────────────────────────
 
 export async function getProposalsByRun(runId: number) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   return db.enrichmentProposal.findMany({
     where: { tenantId: TENANT_ID, runId },
@@ -544,7 +537,7 @@ export async function getProposalsByRun(runId: number) {
 }
 
 export async function getEnrichmentRuns() {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   return db.enrichmentRun.findMany({
     where: { tenantId: TENANT_ID },
@@ -555,7 +548,7 @@ export async function getEnrichmentRuns() {
 }
 
 export async function getPendingProposals() {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   return db.enrichmentProposal.findMany({
     where: { tenantId: TENANT_ID, overallStatus: { in: ["pending", "rejected"] } },

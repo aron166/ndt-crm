@@ -6,18 +6,9 @@ import { audit } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
-
-// Every export is a server action, callable by id regardless of the layout
-// redirect: refuse non-CRM users before any DB access. Returns the message and
-// each action builds its own literal, so TypeScript's union normalisation of
-// object-literal returns keeps working (see tasks.ts).
-async function requireUser(): Promise<string | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? NOT_A_CRM_USER : null;
-}
 
 // Foreign ids taken from input must belong to this tenant before they are
 // written onto a deal. Returns an error message or null.
@@ -33,7 +24,7 @@ async function foreignIdError(ids: {
 }
 
 export async function createDeal(formData: FormData) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const title      = (formData.get("title") as string)?.trim();
   const companyIdStr = formData.get("companyId") as string;
@@ -89,7 +80,7 @@ export async function createDeal(formData: FormData) {
 }
 
 export async function updateDeal(id: number, formData: FormData) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const title     = (formData.get("title") as string)?.trim();
   if (!title) return { error: "Cím kötelező" };
@@ -138,7 +129,7 @@ export async function moveDeal(
   newStageId: number,
   newPosition: number
 ) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   const deal = await db.deal.findFirst({
     where: { id: dealId, tenantId: TENANT_ID },
@@ -198,7 +189,7 @@ export async function deleteDeal(
   // recoverable (deletedAt + restore), so this stays non-destructive.
   cascade?: { company?: boolean; person?: boolean },
 ) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   const before = await db.deal.findFirst({
     where: { id, tenantId: TENANT_ID },
@@ -218,7 +209,7 @@ export async function deleteDeal(
 // ── Pipeline management ────────────────────────────────────────
 
 export async function createPipeline(formData: FormData) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const name = (formData.get("name") as string)?.trim();
   if (!name) return { error: "Név kötelező" };
@@ -231,7 +222,7 @@ export async function createPipeline(formData: FormData) {
 }
 
 export async function upsertStage(formData: FormData) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const pipelineId  = parseInt(formData.get("pipelineId") as string);
   const stageIdStr  = formData.get("stageId") as string | null;
@@ -265,7 +256,7 @@ export async function upsertStage(formData: FormData) {
 }
 
 export async function reorderStages(pipelineId: number, orderedIds: number[]) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   // Verify the pipeline belongs to this tenant before touching its stages —
   // app-level scoping is the only multi-tenant guard (ADR/002).
@@ -291,7 +282,7 @@ export async function reorderStages(pipelineId: number, orderedIds: number[]) {
 }
 
 export async function deleteStage(stageId: number) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   const stage = await db.pipelineStage.findFirst({
     where: { id: stageId, pipeline: { tenantId: TENANT_ID } },

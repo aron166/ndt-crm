@@ -5,19 +5,12 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { encrypt } from "@/lib/crypto";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
 
-// Same gate as tasks.ts: returns the MESSAGE (not an object) so each action builds
-// its own literal and TypeScript keeps normalising the return-type union.
-async function requireUser(): Promise<string | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? NOT_A_CRM_USER : null;
-}
-
 export async function saveIntegrationCredential(slug: string, credentials: Record<string, string>) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
 
   if (!slug || Object.keys(credentials).length === 0) return { error: "Hiányzó adatok" };
@@ -55,7 +48,7 @@ export async function saveIntegrationCredential(slug: string, credentials: Recor
 }
 
 export async function disconnectIntegration(slug: string) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
 
   const existing = await db.integrationCredential.findUnique({

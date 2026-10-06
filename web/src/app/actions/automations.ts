@@ -9,19 +9,9 @@ import {
   type TriggerType, type ActionType,
 } from "@/lib/automations/types";
 import { getLeadStatuses } from "@/lib/leads/queries";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 
 const TENANT_ID = 1;
-
-// These four exports had NO auth check. A server action is callable by id from
-// anywhere that reaches the deployment, so createAutomation was an anonymous
-// "add a webhook_out rule" primitive: every new lead's company, contact and
-// message POSTed to a URL of the caller's choosing. Same gate as actions/tasks.ts
-// (#116). Returns the message so each action builds its own literal.
-async function requireUser(): Promise<string | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? NOT_A_CRM_USER : null;
-}
 
 // Fail CLOSED on malformed JSON: an unparseable triggerConfig/conditions must
 // abort the write, never silently fall back to a broad (filter-less) rule.
@@ -145,7 +135,7 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
 }
 
 export async function createAutomation(formData: FormData) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const parsed = await parseRuleForm(formData);
   if ("error" in parsed) return parsed;
@@ -172,7 +162,7 @@ export async function createAutomation(formData: FormData) {
 }
 
 export async function updateAutomation(id: number, formData: FormData) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const parsed = await parseRuleForm(formData);
   if ("error" in parsed) return parsed;
@@ -204,7 +194,7 @@ export async function updateAutomation(id: number, formData: FormData) {
 }
 
 export async function toggleAutomation(id: number, isActive: boolean) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const before = await db.automationRule.findFirst({
     where: { id, tenantId: TENANT_ID },
@@ -222,7 +212,7 @@ export async function toggleAutomation(id: number, isActive: boolean) {
 }
 
 export async function deleteAutomation(id: number) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const before = await db.automationRule.findFirst({
     where: { id, tenantId: TENANT_ID },

@@ -2,7 +2,7 @@
 
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import {
@@ -11,17 +11,9 @@ import {
 
 const TENANT_ID = 1;
 
-// Same gate as tasks.ts / automations.ts. Returns the MESSAGE, not an
-// `{ error }` object, so each action builds its own literal (keeps TypeScript's
-// union normalisation intact for call sites).
-async function requireUser(): Promise<string | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? NOT_A_CRM_USER : null;
-}
-
 /** All metadata rows (current + history) for a company, tenant-scoped. */
 export async function getCompanyAttributes(companyId: number) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
   return db.companyAttribute.findMany({
     where: { tenantId: TENANT_ID, companyId },
@@ -46,7 +38,7 @@ function denormUpdate(def: (typeof COMPANY_ATTR_DEFS)[CompanyAttrType], value: s
 export async function setPrimaryCompanyAttribute(
   companyId: number, attrType: string, value: string, label?: string,
 ) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   if (!isCompanyAttrType(attrType)) return { error: "Ismeretlen attribútum típus" };
   const v = value.trim();
@@ -103,7 +95,7 @@ export async function setPrimaryCompanyAttribute(
 export async function addSecondaryCompanyAttribute(
   companyId: number, attrType: string, value: string, label?: string,
 ) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   if (!isCompanyAttrType(attrType)) return { error: "Ismeretlen attribútum típus" };
   const def = COMPANY_ATTR_DEFS[attrType];
@@ -136,7 +128,7 @@ export async function addSecondaryCompanyAttribute(
  * left without a current primary.
  */
 export async function endCompanyAttribute(attrId: number) {
-  const denied = await requireUser();
+  const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   const attr = await db.companyAttribute.findFirst({
     where: { id: attrId, tenantId: TENANT_ID, validTo: null },
