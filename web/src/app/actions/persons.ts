@@ -4,7 +4,18 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 
+import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+
 const TENANT_ID = 1;
+
+// Every export is a server action, callable by id regardless of the layout
+// redirect: refuse non-CRM users before any DB access. Returns the message and
+// each action builds its own literal, so TypeScript's union normalisation of
+// object-literal returns keeps working (see tasks.ts).
+async function requireUser(): Promise<string | null> {
+  const { userId } = await getActor(TENANT_ID);
+  return userId == null ? NOT_A_CRM_USER : null;
+}
 
 export async function createPerson(data: {
   firstName: string;
@@ -14,6 +25,8 @@ export async function createPerson(data: {
   linkedinUrl?: string;
   notes?: string;
 }) {
+  const denied = await requireUser();
+  if (denied) return { error: denied };
   const firstName = data.firstName.trim();
   const lastName  = data.lastName.trim();
   if (!firstName && !lastName) return { error: "A személy neve kötelező" };
@@ -46,6 +59,8 @@ export async function updatePerson(
     notes?: string;
   }
 ) {
+  const denied = await requireUser();
+  if (denied) return { error: denied };
   const person = await db.person.findFirst({
     where: { id, tenantId: TENANT_ID, deletedAt: null },
   });
@@ -77,6 +92,8 @@ export async function updatePerson(
 }
 
 export async function deletePerson(id: number) {
+  const denied = await requireUser();
+  if (denied) return { error: denied };
   const person = await db.person.findFirst({
     where: { id, tenantId: TENANT_ID, deletedAt: null },
     select: { firstName: true, lastName: true },
@@ -91,6 +108,8 @@ export async function deletePerson(id: number) {
 }
 
 export async function restorePerson(id: number) {
+  const denied = await requireUser();
+  if (denied) return { error: denied };
   const person = await db.person.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { firstName: true, lastName: true, deletedAt: true },
