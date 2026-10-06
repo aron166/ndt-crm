@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { requireCrmUser } from "@/lib/actor";
+import { loadSuppressionSet, isSuppressed } from "@/lib/suppression";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import {
@@ -126,8 +127,11 @@ export async function getCallQueue(viewId?: number | null): Promise<CallCard[]> 
     },
   });
 
+  const suppressed = await loadSuppressionSet(TENANT_ID);
   return rows.map((c) => {
-    const contacts: CallCardContact[] = c.contacts.map((ct) => ({
+    const contacts: CallCardContact[] = c.contacts
+      .filter((ct) => !isSuppressed(ct.email ?? ct.person.email, suppressed) && !isSuppressed(ct.person.email, suppressed))
+      .map((ct) => ({
       personId: ct.person.id,
       name: `${ct.person.lastName} ${ct.person.firstName}`.trim(),
       role: ct.role,

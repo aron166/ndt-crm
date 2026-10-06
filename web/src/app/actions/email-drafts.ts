@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
+import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import {
@@ -348,6 +349,8 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
     to = contact?.email?.trim() || contact?.person.email?.trim() || null;
   }
   if (!to) return { ok: false, error: "Ehhez a céghez nincs email cím" };
+
+  if (await isAddressSuppressed(TENANT_ID, to)) return { ok: false, error: SUPPRESSED_ERROR };
 
   // Claim it. Nothing below this line may run twice for one row.
   const claim = await db.emailDraft.updateMany({

@@ -12,6 +12,7 @@ const { db } = vi.hoisted(() => ({
     campaign: { findFirst: vi.fn() },
     savedView: { findFirst: vi.fn() },
     company: { findMany: vi.fn(), count: vi.fn() },
+    suppression: { findMany: vi.fn() },
   },
 }));
 vi.mock("@/lib/db", () => ({ db }));
@@ -36,6 +37,7 @@ beforeEach(() => {
   db.savedView.findFirst.mockResolvedValue(null);
   db.company.findMany.mockResolvedValue([]);
   db.company.count.mockResolvedValue(0);
+  db.suppression.findMany.mockResolvedValue([]);
 });
 
 describe("GET /api/outreach/targets - audience resolution", () => {
@@ -113,5 +115,20 @@ describe("GET /api/outreach/targets - audience resolution", () => {
     // Prisma ANDs every top-level key together, so pipelineStatus (CALLABLE_STATUSES)
     // and AND[0].pipelineStatus ("0") both have to hold - a KUKA company can never
     // satisfy both, so the audience clause cannot re-admit it.
+  });
+});
+
+describe("GET /api/outreach/targets - suppression", () => {
+  it("drops a contact whose domain is suppressed, keeps the other", async () => {
+    db.suppression.findMany.mockResolvedValue([{ email: null, domain: "bad.hu" }]);
+    const mk = (id: number, email: string) => ({
+      role: null, email: null, phone: null,
+      person: { id, firstName: "A", lastName: String(id), email, phone: null },
+    });
+    db.company.findMany.mockResolvedValue([{ id: 1, name: "Co", contacts: [mk(1, "x@bad.hu"), mk(2, "y@ok.hu")] }]);
+
+    const res = await GET(req("campaign=TESZT"));
+    const body = await res.json();
+    expect(body.items[0].contacts.map((c: { personId: number }) => c.personId)).toEqual([2]);
   });
 });
