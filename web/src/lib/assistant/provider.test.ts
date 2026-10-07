@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-import { AssistantError, RATE_LIMITED, assistantConfig, chatCompletion, estimateCostUsd } from "./provider";
+import { AssistantError, RATE_LIMITED, assistantConfig, chatCompletion, chatCompletionStream, estimateCostUsd } from "./provider";
 
 const cfg = { baseUrl: "https://x.test/v1", apiKey: "sk-secret", model: "m" };
 const ok = (body: unknown, status = 200) => vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status }));
@@ -86,5 +86,55 @@ describe("estimateCostUsd", () => {
     expect(estimateCostUsd(1_000_000, 1_000_000, {})).toBeCloseTo(0.75);
     expect(estimateCostUsd(1_000_000, 0, { ASSISTANT_PRICE_IN: "2" })).toBeCloseTo(2);
     expect(estimateCostUsd(1_000_000, 0, { ASSISTANT_PRICE_IN: "abc" })).toBeCloseTo(0.15);
+  });
+});
+
+describe("chatCompletionStream", () => {
+  const enc = new TextEncoder();
+  const sse = (chunks: string[]) => new Response(new ReadableStream({
+    start(c) { chunks.forEach((x) => c.enqueue(enc.encode(x))); c.close(); },
+  }), { status: 200 });
+  const delta = (s: string) => `data: ${JSON.stringify({ choices: [{ delta: { content: s } }] })}\n\n`;
+  const usage = `data: ${JSON.stringify({ choices: [], x_groq: { usage: { prompt_tokens: 7, completion_tokens: 3 } } })}\n\ndata: [DONE]\n\n`;
+  const all = delta("Sz") + delta("ia") + usage;
+  const split = (s: string, at: number) => [s.slice(0, at), s.slice(at)];
+
+  it("accumulates across mid-line splits and reads usage", async () => {
+    const f = vi.fn().mockResolvedValue(sse(split(all, 25)));
+    const seen: string[] = [];
+    const r = await chatCompletionStream(cfg, [{ role: "user", content: "hi" }], { fetchImpl: f, onText: (t) => { seen.push(t); } });
+    expect(r).toEqual({ text: "Szia", promptTokens: 7, completionTokens: 3, stopped: false, streamed: true });
+    expect(seen).toEqual(["Sz", "Szia"]);
+    expect(JSON.parse(f.mock.calls[0][1].body)).toMatchObject({ stream: true, stream_options: { include_usage: true } });
+  });
+  it("stop aborts and estimates usage", async () => {
+    const f = vi.fn().mockResolvedValue(sse([delta("abcdef"), delta("ghi"), usage]));
+    const r = await chatCompletionStream(cfg, [{ role: "user", content: "x".repeat(30) }], { fetchImpl: f, onText: () => "stop" });
+    expect(r).toMatchObject({ text: "abcdef", stopped: true, streamed: true, promptTokens: 10, completionTokens: 2 });
+    expect(f.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+  it("retries once on 429", async () => {
+    const f = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 429, headers: { "retry-after": "2" } })).mockResolvedValueOnce(sse([all]));
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const r = await chatCompletionStream(cfg, [], { fetchImpl: f, sleep, onText: () => {} });
+    expect(r.text).toBe("Szia");
+    expect(sleep).toHaveBeenCalledWith(2000);
+    const e = await chatCompletionStream(cfg, [], { fetchImpl: vi.fn().mockImplementation(async () => new Response("{}", { status: 429 })), sleep, onText: () => {} }).catch((x) => x);
+    expect(e.message).toBe(RATE_LIMITED);
+  });
+  it("400 falls back to one-shot and feeds growing prefixes", async () => {
+    const long = "a".repeat(50);
+    const f = vi.fn()
+      .mockResolvedValueOnce(new Response("no stream with schema", { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: long } }], usage: { prompt_tokens: 4, completion_tokens: 6 } })));
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const seen: number[] = [];
+    const r = await chatCompletionStream(cfg, [], { fetchImpl: f, sleep, schema: { name: "n", schema: {} }, maxTokens: 500, onText: (t) => { seen.push(t.length); } });
+    expect(r).toMatchObject({ text: long, promptTokens: 4, completionTokens: 6, stopped: false, streamed: false });
+    expect(seen).toEqual([24, 48, 50]);
+    expect(sleep).toHaveBeenCalledWith(12);
+    const body = JSON.parse(f.mock.calls[1][1].body);
+    expect(body.stream).toBeUndefined();
+    expect(body).toMatchObject({ max_tokens: 500, response_format: { type: "json_schema" } });
   });
 });

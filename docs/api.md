@@ -895,6 +895,18 @@ Definitions:
 | suppression hit | A suppression added in the window, or an email draft the suppression list cancelled (audit reason `suppressed`). Sends blocked inside `sendEmail` are not persisted, so they are not counted. |
 | company touched | Any non-superseded interaction linked to the company. |
 
+## Assistant: in-app chat (v3)
+
+### `POST /api/assistant/chat`: one chat turn, streamed
+
+Auth: the CRM session cookie (a signed-in user with a `users` row; 403 otherwise, anon is redirected by the proxy). Tenant 1. Not for app keys.
+
+Body: `{ conversationId: number | null, pathname: string (a /marketing path), itemId: number | null, message: string (1..2000) }`. `conversationId: null` starts a conversation (row in `assistant_conversations`, title = first 80 chars of the message, page and item stored and re-sent on every later turn).
+
+Response: `text/event-stream`, frames `event: <type>` + `data: <json>` (types in `web/src/lib/assistant/chat-types.ts`): `start {conversationId}`, `status {text}` (read tool running), `delta {text}` (answer text, in order), `done {answer, actions}` (validated action cards; the turn is persisted), `error {message}`. Pre-stream errors are JSON `{error}`: 400 bad body or 20 user turns reached, 403 not a CRM user, 404 conversation not found (other user, other tenant or deleted), 429 monthly token cap, 503 no `ASSISTANT_API_KEY`.
+
+The model sees the whole marketing pipeline (every stage incl. Vázlat and an Archív count, decisions, the user's pending verdicts, /patchnotes counts, weekly report headline), about 7000 chars, summarised past that (stage counts + the 20 newest items in full + compact lines). It answers with a strict JSON schema `{read_item_ids, answer, actions}`; non-empty `read_item_ids` (max 3) makes the server fetch those items tenant-scoped and ask once more. Actions (open_item, navigate, waiting, review, answer_decision, create_decision, note, ticket) are validated server-side, unknown ids dropped; nothing is written until the user presses "Végrehajtom" (server actions `executeAction`, conversations via `openAssistant` / `getConversation` / `deleteConversation`, soft delete). Every model call is logged in `assistant_calls` with `conversation_id` (purpose `chat`, `read`; conversation create/delete as purpose `conversation`).
+
 ## Assistant: call-note ingest
 
 ### `POST /api/assistant/callnote`: dictated post-call note to call outcome

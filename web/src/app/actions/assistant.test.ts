@@ -6,7 +6,7 @@ import { addChecks, createItem } from "@/lib/content/service";
 import { submitContentReview, setContentCheck } from "@/app/actions/content";
 import { loadPageData } from "@/lib/assistant/page-context";
 import {
-  openAssistant, askAssistant, draftTicket, fileTicket, addItemNote, whatsWaiting, proposeAction, executeAction,
+  openAssistant, getConversation, deleteConversation, fileTicket, addItemNote, whatsWaiting, executeAction,
 } from "./assistant";
 
 vi.mock("server-only", () => ({}));
@@ -20,6 +20,7 @@ vi.mock("@/lib/db", () => ({
     contentNote: { findMany: vi.fn(), create: vi.fn() },
     contentCheck: { findFirst: vi.fn(), create: vi.fn() },
     assistantCall: { create: vi.fn() },
+    assistantConversation: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -45,7 +46,6 @@ const mock = <T>(f: T) => f as unknown as ReturnType<typeof vi.fn>;
 type Dbm = Record<string, Record<string, ReturnType<typeof vi.fn>>>;
 const m = db as unknown as Dbm;
 
-const input = { pathname: "/marketing", itemId: null, messages: [{ role: "user" as const, content: "szia" }] };
 const draft = { title: "Hiba van", body: "Részletes leírás a hibáról", label: "bug" as const, repo: "ndt-crm" as const };
 
 beforeEach(() => {
@@ -57,13 +57,12 @@ describe("denial for a non CRM user", () => {
   it("every action returns NOT_A_CRM_USER and writes nothing", async () => {
     mock(getActor).mockResolvedValue({ userId: null, email: null });
     const results = await Promise.all([
-      openAssistant({ itemId: null }),
-      askAssistant(input),
-      draftTicket(input),
+      openAssistant({ itemId: null, conversationId: null }),
+      getConversation(1),
+      deleteConversation(1),
       fileTicket(draft),
       addItemNote({ itemId: 1, body: "x" }),
       whatsWaiting(),
-      proposeAction(input),
       executeAction({ type: "note", itemId: 1, body: "x" }),
     ]);
     for (const r of results) expect(r).toEqual({ error: "NOT_A_CRM_USER_MSG" });
@@ -149,20 +148,23 @@ describe("executeAction as a CRM user", () => {
   });
 });
 
-describe("proposeAction", () => {
-  it("fills versionId from the item's current version", async () => {
-    vi.stubEnv("ASSISTANT_API_KEY", "sk");
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ type: "review", itemId: 9, verdict: "approve", versionId: 1 }) } }] }), { status: 200 })));
-    const cap = await import("@/lib/assistant/cap");
-    mock(cap.capState).mockResolvedValue({ exceeded: false });
-    mock(getContentReviewers).mockResolvedValue([5]);
-    mock(loadPageData).mockResolvedValue({});
-    m.user.findFirst.mockResolvedValue({ role: "admin", name: "P" });
+describe("executeAction client-only and state", () => {
+  it("rejects open_item, navigate and waiting with BAD_INPUT and touches nothing", async () => {
+    for (const p of [{ type: "open_item", itemId: 1 }, { type: "navigate", path: "/marketing" }, { type: "waiting" }] as const) {
+      expect(await executeAction(p)).toEqual({ error: "Érvénytelen kérés." });
+    }
+    for (const t of Object.values(m)) if (typeof t === "object") for (const f of Object.values(t)) expect(f).not.toHaveBeenCalled();
+    expect(submitContentReview).not.toHaveBeenCalled();
+    expect(setContentCheck).not.toHaveBeenCalled();
+  });
+  it("review returns the item's status label as state after success", async () => {
+    m.contentVersion.findFirst.mockResolvedValue({ id: 4 });
+    m.contentItem.findFirst.mockResolvedValue({ status: "in_review" });
     m.assistantCall.create.mockResolvedValue({});
-    m.contentItem.findFirst.mockResolvedValue({ title: "Cím", currentVersionId: 8 });
-    const r = await proposeAction(input);
-    expect(r).toMatchObject({ ok: true, view: { proposal: { type: "review", versionId: 8 } } });
-    vi.unstubAllGlobals(); vi.unstubAllEnvs();
+    mock(submitContentReview).mockResolvedValue({ ok: true, wentLive: false });
+    const r = await executeAction({ type: "review", itemId: 9, versionId: 4, verdict: "approve" });
+    expect(r).toEqual({ ok: true, message: "Rögzítve.", href: "/marketing/9", state: "Bírálatra vár" });
+    expect(m.contentItem.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 9, tenantId: 1 } }));
   });
 });
 
@@ -180,5 +182,62 @@ describe("whatsWaiting", () => {
     mock(loadPageData).mockResolvedValue({ now: new Date(), items: [row(1), row(2)], decisions: [], mineIds: [2] });
     const r = await whatsWaiting();
     expect(r).toMatchObject({ ok: true, waiting: { items: [{ id: 2 }], decisions: [] } });
+  });
+});
+
+describe("executeAction with a stored card ref", () => {
+  const at = new Date("2026-10-07T10:00:00Z");
+  const stored = (executedAt?: string) => ({
+    updatedAt: at,
+    messages: [
+      { role: "user", content: "jegyzet", at: "x" },
+      { role: "assistant", content: "ok", at: "x", actions: [{ key: "0-note", summary: "s", proposal: { type: "note", itemId: 7, body: "TÁROLT" }, ...(executedAt ? { executedAt } : {}) }] },
+    ],
+  });
+  beforeEach(() => {
+    m.contentItem.findFirst.mockResolvedValue({ id: 7 });
+    m.contentNote.create.mockResolvedValue({ id: 1, body: "TÁROLT", createdAt: at, user: { name: "Áron" } });
+  });
+  it("runs the STORED proposal, not the client copy, and stamps executedAt with an optimistic claim", async () => {
+    m.assistantConversation.findFirst.mockResolvedValue(stored());
+    m.assistantConversation.updateMany.mockResolvedValue({ count: 1 });
+    const r = await executeAction({ type: "note", itemId: 7, body: "KLIENS" }, { conversationId: 3, key: "0-note" });
+    expect(r).toMatchObject({ ok: true });
+    expect(m.contentNote.create.mock.calls[0][0].data.body).toBe("TÁROLT");
+    const claim = m.assistantConversation.updateMany.mock.calls[0][0];
+    expect(claim.where).toMatchObject({ id: 3, tenantId: 1, userId: 5, deletedAt: null, updatedAt: at });
+    expect(JSON.stringify(claim.data.messages)).toContain("executedAt");
+  });
+  it("an already executed card is refused and nothing runs", async () => {
+    m.assistantConversation.findFirst.mockResolvedValue(stored("2026-10-07T10:01:00Z"));
+    const r = await executeAction({ type: "note", itemId: 7, body: "x" }, { conversationId: 3, key: "0-note" });
+    expect(r).toHaveProperty("error");
+    expect(m.contentNote.create).not.toHaveBeenCalled();
+    expect(m.assistantConversation.updateMany).not.toHaveBeenCalled();
+  });
+  it("a lost claim (concurrent click) runs nothing", async () => {
+    m.assistantConversation.findFirst.mockResolvedValue(stored());
+    m.assistantConversation.updateMany.mockResolvedValue({ count: 0 });
+    const r = await executeAction({ type: "note", itemId: 7, body: "x" }, { conversationId: 3, key: "0-note" });
+    expect(r).toHaveProperty("error");
+    expect(m.contentNote.create).not.toHaveBeenCalled();
+  });
+  it("a foreign or unknown conversation/card is not found", async () => {
+    m.assistantConversation.findFirst.mockResolvedValue(null);
+    expect(await executeAction({ type: "note", itemId: 7, body: "x" }, { conversationId: 99, key: "0-note" })).toEqual({ error: "Nem található" });
+    expect(m.assistantConversation.findFirst.mock.calls[0][0].where).toMatchObject({ id: 99, tenantId: 1, userId: 5, deletedAt: null });
+    expect(m.contentNote.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("executeAction stamp release on a throw", () => {
+  it("a throw after the claim releases the stamp and rethrows", async () => {
+    const at = new Date("2026-10-07T10:00:00Z");
+    m.assistantConversation.findFirst.mockResolvedValue({ updatedAt: at, messages: [{ role: "assistant", content: "ok", at: "x", actions: [{ key: "a-0-note", summary: "s", proposal: { type: "note", itemId: 7, body: "x" } }] }] });
+    m.assistantConversation.updateMany.mockResolvedValue({ count: 1 });
+    m.contentItem.findFirst.mockRejectedValue(new Error("db down"));
+    await expect(executeAction({ type: "note", itemId: 7, body: "x" }, { conversationId: 3, key: "a-0-note" })).rejects.toThrow("db down");
+    const last = m.assistantConversation.updateMany.mock.calls.at(-1)![0];
+    expect(JSON.stringify(last.data.messages)).not.toContain("executedAt");
   });
 });

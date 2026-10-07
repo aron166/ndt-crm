@@ -5,141 +5,98 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { getContentReviewers } from "@/lib/content/reviewers";
-import { AssistantError, RATE_LIMITED, assistantConfig, chatCompletion, estimateCostUsd, type ChatMessage } from "@/lib/assistant/provider";
-import { loadPageData, renderPageContext } from "@/lib/assistant/page-context";
-import { ACTION_INSTRUCTION, ActionProposalSchema, decisionBody, describeProposal, parseActionProposal, type ActionProposal } from "@/lib/assistant/actions";
+import { assistantConfig } from "@/lib/assistant/provider";
+import { loadPageData } from "@/lib/assistant/page-context";
+import { ActionProposalSchema, CLIENT_ACTIONS, decisionBody, type ActionProposal } from "@/lib/assistant/actions";
 import { submitContentReview, setContentCheck } from "@/app/actions/content";
 import { addChecks, createItem } from "@/lib/content/service";
 import { revalidatePath } from "next/cache";
-import { CAP_EXCEEDED, capState } from "@/lib/assistant/cap";
-import { buildSystemPrompt, loadItemContext, pageKind } from "@/lib/assistant/context";
-import { TICKET_INSTRUCTION, TicketDraftSchema, createGithubIssue, parseTicketDraft, type TicketDraft } from "@/lib/assistant/ticket";
+import { STATUS_LABELS } from "@/lib/marketing/types";
+import type { ContentStatus } from "@/lib/content/types";
+import { RECENT_CONVERSATIONS, type ChatTurn, type ConversationSummary, type ConversationView } from "@/lib/assistant/chat-types";
+import { TicketDraftSchema, createGithubIssue, type TicketDraft } from "@/lib/assistant/ticket";
 
 const TENANT_ID = 1;
-const NOT_CONFIGURED = "Az asszisztens nincs beállítva.";
 const NOT_FOUND = "Nem található";
-const MODEL_FAILED = "Az asszisztens most nem érhető el. Kérem, próbálja újra később.";
-const TOO_LONG = "Ebben a beszélgetésben elérte a 20 üzenetet. Kérem, kezdjen újat.";
 const BAD_INPUT = "Érvénytelen kérés.";
 const MODEL_FAILED_WRITE = "Nem sikerült menteni. Kérem, próbálja újra.";
 /** The one error the decision transaction throws on purpose (rolls the item back). */
 class CheckFail extends Error {}
 
 export type NoteView = { id: number; body: string; author: string; createdAt: string };
-export type AssistantInput = { pathname: string; itemId: number | null; messages: { role: "user" | "assistant"; content: string }[] };
 
-const validId = (v: unknown): v is number => Number.isInteger(v) && (v as number) > 0;
-
-function checkInput(input: AssistantInput): string | null {
-  if (!input || typeof input.pathname !== "string" || input.pathname.length > 200 || pageKind(input.pathname) === null) return BAD_INPUT;
-  if (input.itemId !== null && !validId(input.itemId)) return BAD_INPUT;
-  const m = input.messages;
-  if (!Array.isArray(m) || m.length < 1 || m.length > 40 || m[m.length - 1]?.role !== "user") return BAD_INPUT;
-  for (const x of m) {
-    if ((x?.role !== "user" && x?.role !== "assistant") || typeof x.content !== "string" || x.content.length < 1 || x.content.length > (x.role === "user" ? 2000 : 6000)) return BAD_INPUT;
-  }
-  if (m.filter((x) => x.role === "user").length > 20) return TOO_LONG;
-  return null;
-}
+const validId = (v: unknown): v is number => Number.isInteger(v) && (v as number) > 0 && (v as number) <= 2147483647;
 
 const noteView = (n: { id: number; body: string; createdAt: Date; user: { name: string | null } | null }): NoteView => ({
   id: n.id, body: n.body, author: n.user?.name ?? "", createdAt: n.createdAt.toISOString(),
 });
 
-type Purpose = "explain" | "ticket" | "propose";
+type OpenResult = {
+  ok: true; configured: boolean; item: { id: number; title: string } | null; notes: NoteView[];
+  conversations: ConversationSummary[]; conversation: ConversationView | null;
+};
 
-function logCall(userId: number, input: AssistantInput, purpose: Purpose, model: string, promptTokens: number, completionTokens: number) {
-  return db.assistantCall.create({
-    data: {
-      tenantId: TENANT_ID, userId, page: input.pathname, purpose, itemId: input.itemId, model,
-      promptTokens, completionTokens, costUsd: estimateCostUsd(promptTokens, completionTokens),
-    },
-  });
-}
+const CONV_SELECT = { id: true, title: true, updatedAt: true, page: true, itemId: true, messages: true } as const;
+const convView = (c: { id: number; title: string; updatedAt: Date; page: string; itemId: number | null; messages: unknown }): ConversationView => ({
+  id: c.id, title: c.title, updatedAt: c.updatedAt.toISOString(), page: c.page, itemId: c.itemId,
+  messages: Array.isArray(c.messages) ? (c.messages as ChatTurn[]) : [],
+});
+/** Owner scope for every conversation read and write: this tenant, this user, not deleted. */
+const ownConv = (userId: number, id?: number) => ({ tenantId: TENANT_ID, userId, deletedAt: null, ...(id ? { id } : {}) });
 
-/** Last 6 messages, older ones dropped further until under 4000 chars; the last (user) message always stays. */
-function trimHistory<T extends { content: string }>(ms: T[]): T[] {
-  let h = ms.slice(-6);
-  while (h.length > 1 && h.reduce((n, x) => n + x.content.length, 0) >= 4000) h = h.slice(1);
-  return h;
-}
-
-/** Shared by askAssistant, draftTicket and proposeAction: validate, cap, call, log. */
-async function run(userId: number, input: AssistantInput, purpose: Purpose): Promise<{ text: string } | { error: string }> {
-  const bad = checkInput(input);
-  if (bad) return { error: bad };
-  const cfg = assistantConfig();
-  if (!cfg) return { error: NOT_CONFIGURED };
-
-  // List pages see the whole page (items, decisions, own pending); an item page sees the item.
-  // Propose sees the page only when no item is open (an item page sends the item alone: token budget).
-  const onList = pageKind(input.pathname) !== "item";
-  const withPage = purpose === "propose" ? input.itemId === null : onList;
-  const [item, cap, user, reviewers, page] = await Promise.all([
-    input.itemId !== null ? loadItemContext(TENANT_ID, input.itemId) : Promise.resolve(null),
-    capState(TENANT_ID),
-    db.user.findFirst({ where: { id: userId, tenantId: TENANT_ID }, select: { role: true, name: true } }),
-    getContentReviewers(TENANT_ID),
-    withPage ? loadPageData(TENANT_ID, userId).then((d) => renderPageContext(d, input.itemId !== null ? { budgetChars: 3000 } : {})) : Promise.resolve(null),
-  ]);
-  if (input.itemId !== null && !item) return { error: NOT_FOUND };
-  if (cap.exceeded) return { error: CAP_EXCEEDED };
-  const extra = purpose === "ticket" ? TICKET_INSTRUCTION : purpose === "propose" ? ACTION_INSTRUCTION : null;
-  const messages: ChatMessage[] = [
-    { role: "system", content: buildSystemPrompt({ pathname: input.pathname, item, role: user?.role ?? "user", isReviewer: reviewers.includes(userId), page }) },
-    ...(extra ? [{ role: "system", content: extra } as ChatMessage] : []),
-    ...trimHistory(input.messages),
-  ];
-
-  let r;
-  try {
-    // gpt-oss reasons before it answers; the JSON purposes get headroom for that.
-    r = await chatCompletion(cfg, messages, purpose === "explain" ? { maxTokens: 1200 } : { json: true, maxTokens: 1500 });
-  } catch (e) {
-    // A 2xx with an unusable reply may still have been billed: count it against the cap.
-    if (e instanceof AssistantError && e.usage) await logCall(userId, input, purpose, cfg.model, e.usage.promptTokens, e.usage.completionTokens);
-    if (e instanceof AssistantError && e.status === 429) return { error: RATE_LIMITED };
-    return { error: MODEL_FAILED };
-  }
-  await logCall(userId, input, purpose, cfg.model, r.promptTokens, r.completionTokens);
-  return { text: r.text };
-}
-
-export async function openAssistant(input: { itemId: number | null }): Promise<{ ok: true; configured: boolean; item: { id: number; title: string } | null; notes: NoteView[] } | { error: string }> {
+/** One request per drawer open: item title, notes, recent conversations and the remembered one. */
+export async function openAssistant(input: { itemId: number | null; conversationId: number | null }): Promise<OpenResult | { error: string }> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
   if (input?.itemId !== null && !validId(input?.itemId)) return { error: BAD_INPUT };
+  if (input?.conversationId != null && !validId(input.conversationId)) return { error: BAD_INPUT };
 
-  let item: { id: number; title: string } | null = null;
-  let notes: NoteView[] = [];
-  if (input.itemId !== null) {
-    item = await db.contentItem.findFirst({ where: { id: input.itemId, tenantId: TENANT_ID }, select: { id: true, title: true } });
-    if (!item) return { error: NOT_FOUND };
-    const rows = await db.contentNote.findMany({
-      where: { tenantId: TENANT_ID, itemId: input.itemId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      select: { id: true, body: true, createdAt: true, user: { select: { name: true } } },
-    });
-    notes = rows.map(noteView);
-  }
-  return { ok: true as const, configured: assistantConfig() != null, item, notes };
+  const [item, rows, conversations, conversation] = await Promise.all([
+    input.itemId !== null ? db.contentItem.findFirst({ where: { id: input.itemId, tenantId: TENANT_ID }, select: { id: true, title: true } }) : null,
+    input.itemId !== null
+      ? db.contentNote.findMany({
+          where: { tenantId: TENANT_ID, itemId: input.itemId },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+          select: { id: true, body: true, createdAt: true, user: { select: { name: true } } },
+        })
+      : [],
+    db.assistantConversation.findMany({
+      where: ownConv(userId), orderBy: { updatedAt: "desc" }, take: RECENT_CONVERSATIONS,
+      select: { id: true, title: true, updatedAt: true },
+    }),
+    input.conversationId ? db.assistantConversation.findFirst({ where: ownConv(userId, input.conversationId), select: CONV_SELECT }) : null,
+  ]);
+  if (input.itemId !== null && !item) return { error: NOT_FOUND };
+  return {
+    ok: true as const, configured: assistantConfig() != null, item, notes: rows.map(noteView),
+    conversations: conversations.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt.toISOString() })),
+    conversation: conversation ? convView(conversation) : null,
+  };
 }
 
-export async function askAssistant(input: AssistantInput): Promise<{ ok: true; reply: string } | { error: string }> {
+export async function getConversation(id: number): Promise<{ ok: true; conversation: ConversationView } | { error: string }> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
-  const r = await run(userId, input, "explain");
-  return "error" in r ? r : { ok: true, reply: r.text };
+  if (!validId(id)) return { error: BAD_INPUT };
+  const c = await db.assistantConversation.findFirst({ where: ownConv(userId, id), select: CONV_SELECT });
+  return c ? { ok: true, conversation: convView(c) } : { error: NOT_FOUND };
 }
 
-export async function draftTicket(input: AssistantInput): Promise<{ ok: true; draft: TicketDraft } | { error: string }> {
+/** Soft delete; logged in assistant_calls (purpose conversation, action delete). */
+export async function deleteConversation(id: number): Promise<{ ok: true } | { error: string }> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
-  const r = await run(userId, input, "ticket");
-  if ("error" in r) return r;
-  const draft = parseTicketDraft(r.text);
-  return draft ? { ok: true, draft } : { error: "Nem sikerült jegyet készíteni. Kérem, fogalmazza meg másképp, mi a gond." };
+  if (!validId(id)) return { error: BAD_INPUT };
+  const r = await db.assistantConversation.updateMany({ where: ownConv(userId, id), data: { deletedAt: new Date() } });
+  if (r.count === 0) return { error: NOT_FOUND };
+  await db.assistantCall.create({
+    data: {
+      tenantId: TENANT_ID, userId, page: "/marketing", purpose: "conversation", action: "delete", conversationId: id,
+      model: "-", promptTokens: 0, completionTokens: 0, costUsd: 0,
+    },
+  });
+  return { ok: true };
 }
 
 export async function fileTicket(draft: TicketDraft): Promise<{ ok: true; url: string } | { ok: true; fallbackUrl: string } | { error: string }> {
@@ -206,41 +163,14 @@ export async function whatsWaiting(): Promise<{ ok: true; waiting: WaitingView }
   };
 }
 
-export type ProposalView = { proposal: ActionProposal; summary: string };
-
-/** The model turns the request into ONE action proposal. Nothing is written here. */
-export async function proposeAction(input: AssistantInput): Promise<{ ok: true; view: ProposalView } | { error: string }> {
-  const { userId } = await getActor(TENANT_ID);
-  if (userId == null) return { error: NOT_A_CRM_USER };
-  const r = await run(userId, input, "propose");
-  if ("error" in r) return r;
-  const p = parseActionProposal(r.text);
-  if (!p) return { error: "Nem értettem, mit tegyek. Kérem, fogalmazza meg pontosabban." };
-  // Resolve the ids the model named against the tenant so the confirm card shows real titles.
-  const names: { itemTitle?: string; question?: string } = {};
-  if (p.type === "review" || p.type === "note") {
-    const item = await db.contentItem.findFirst({ where: { id: p.itemId, tenantId: TENANT_ID }, select: { title: true, currentVersionId: true } });
-    if (!item) return { error: NOT_FOUND };
-    names.itemTitle = item.title;
-    if (p.type === "review") {
-      if (item.currentVersionId == null) return { error: NOT_FOUND };
-      p.versionId = item.currentVersionId;
-    }
-  } else if (p.type === "answer_decision") {
-    const c = await db.contentCheck.findFirst({ where: { id: p.checkId, tenantId: TENANT_ID, state: "open" }, select: { question: true } });
-    if (!c) return { error: NOT_FOUND };
-    names.question = c.question;
-  }
-  return { ok: true, view: { proposal: p, summary: describeProposal(p, names) } };
-}
-
+/** Never throws: a log failure after the write must not release a card that did run. */
 async function logExecuted(userId: number, action: string, itemId: number | null) {
   await db.assistantCall.create({
     data: {
       tenantId: TENANT_ID, userId, page: "/marketing", purpose: "execute", action, itemId,
       model: "-", promptTokens: 0, completionTokens: 0, costUsd: 0,
     },
-  });
+  }).catch((e: unknown) => reportError("assistant.logExecuted", e, { userId, action }));
 }
 
 /**
@@ -248,11 +178,60 @@ async function logExecuted(userId: number, action: string, itemId: number | null
  * existing write path (verdicts and checks through the content actions, so the
  * reviewer gate, dual approval, claims, live webhook and audit all apply).
  */
-export async function executeAction(raw: ActionProposal): Promise<{ ok: true; message: string; href?: string } | { error: string }> {
+type ExecResult = { ok: true; message: string; href?: string; state?: string } | { error: string };
+
+/** The item's stage after a write, for the panel's "new state" line. */
+async function withState(r: ExecResult, itemId: number): Promise<ExecResult> {
+  if ("error" in r) return r;
+  // Runs after the write: must never throw, or the caller would release a card that did run.
+  const it = await db.contentItem.findFirst({ where: { id: itemId, tenantId: TENANT_ID }, select: { status: true } }).catch(() => null);
+  return it ? { ...r, state: STATUS_LABELS[it.status as ContentStatus] ?? it.status } : r;
+}
+
+/**
+ * Runs a card the user CONFIRMED. With `ref` (a card stored in one of the user's
+ * conversations) the STORED proposal runs, not the client copy, and the card is stamped
+ * `executedAt` so a reload or a second click cannot run it twice.
+ */
+export async function executeAction(raw: ActionProposal, ref?: { conversationId: number; key: string }): Promise<ExecResult> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
+  if (ref === undefined) return runAction(userId, raw);
+  if (!validId(ref?.conversationId) || typeof ref.key !== "string" || ref.key.length > 40) return { error: BAD_INPUT };
+  const conv = await db.assistantConversation.findFirst({ where: ownConv(userId, ref.conversationId), select: { messages: true, updatedAt: true } });
+  const turns = Array.isArray(conv?.messages) ? (conv!.messages as ChatTurn[]) : [];
+  const card = turns.flatMap((t) => (t.role === "assistant" ? t.actions : [])).find((a) => a.key === ref.key);
+  if (!card) return { error: NOT_FOUND };
+  if (card.executedAt) return { error: "Ezt már végrehajtotta." };
+  // Claim first (optimistic on updatedAt), then run: two quick clicks cannot both pass.
+  const at = new Date().toISOString();
+  const stamped = turns.map((t) => (t.role === "assistant" ? { ...t, actions: t.actions.map((a) => (a.key === ref.key ? { ...a, executedAt: at } : a)) } : t));
+  const claim = await db.assistantConversation.updateMany({
+    where: { ...ownConv(userId, ref.conversationId), updatedAt: conv!.updatedAt },
+    data: { messages: stamped, updatedAt: new Date() },
+  });
+  if (claim.count === 0) return { error: "A beszélgetés közben változott. Kérem, próbálja újra." };
+  // Not executed (error result or a throw before the write): release the stamp so the user can retry.
+  const release = async () => {
+    const cur = await db.assistantConversation.findFirst({ where: ownConv(userId, ref.conversationId), select: { messages: true } });
+    const back = (Array.isArray(cur?.messages) ? (cur!.messages as ChatTurn[]) : []).map((t) => (t.role === "assistant" ? { ...t, actions: t.actions.map((a) => (a.key === ref.key ? { ...a, executedAt: undefined } : a)) } : t));
+    await db.assistantConversation.updateMany({ where: ownConv(userId, ref.conversationId), data: { messages: back } });
+  };
+  let r: ExecResult;
+  try {
+    r = await runAction(userId, card.proposal);
+  } catch (e) {
+    await release().catch(() => {});
+    throw e;
+  }
+  if ("error" in r) await release();
+  return r;
+}
+
+async function runAction(userId: number, raw: ActionProposal): Promise<ExecResult> {
   const parsed = ActionProposalSchema.safeParse(raw);
-  if (!parsed.success || parsed.data.type === "none") return { error: BAD_INPUT };
+  // Client-side actions (open, navigate, waiting) never reach the server.
+  if (!parsed.success || parsed.data.type === "none" || (CLIENT_ACTIONS as readonly string[]).includes(parsed.data.type)) return { error: BAD_INPUT };
   const p = parsed.data;
 
   if (p.type === "review") {
@@ -263,7 +242,7 @@ export async function executeAction(raw: ActionProposal): Promise<{ ok: true; me
     const r = await submitContentReview({ versionId: p.versionId, verdict: p.verdict, comment: p.comment, reason: p.reason });
     if (!r.ok) return { error: r.error };
     await logExecuted(userId, "review", p.itemId);
-    return { ok: true, message: r.wentLive ? "Rögzítve, az anyag élesbe került." : "Rögzítve.", href: `/marketing/${p.itemId}` };
+    return withState({ ok: true, message: r.wentLive ? "Rögzítve, az anyag élesbe került." : "Rögzítve.", href: `/marketing/${p.itemId}` }, p.itemId);
   }
   if (p.type === "answer_decision") {
     const c = await db.contentCheck.findFirst({ where: { id: p.checkId, tenantId: TENANT_ID, state: "open" }, select: { itemId: true } });
@@ -271,7 +250,7 @@ export async function executeAction(raw: ActionProposal): Promise<{ ok: true; me
     const r = await setContentCheck({ checkId: p.checkId, state: "resolved", text: p.answer });
     if (!r.ok) return { error: r.error };
     await logExecuted(userId, "answer_decision", c.itemId);
-    return { ok: true, message: "A válasz rögzítve.", href: `/marketing/${c.itemId}` };
+    return withState({ ok: true, message: "A válasz rögzítve.", href: `/marketing/${c.itemId}` }, c.itemId);
   }
   if (p.type === "create_decision") {
     // Same gate as answering: only a reviewer may put a question on the Döntések page.
@@ -295,7 +274,7 @@ export async function executeAction(raw: ActionProposal): Promise<{ ok: true; me
     await logExecuted(userId, "create_decision", created.itemId);
     revalidatePath("/marketing");
     revalidatePath("/marketing/decisions");
-    return { ok: true, message: "A döntés felkerült a Döntések oldalra.", href: `/marketing/${created.itemId}` };
+    return withState({ ok: true, message: "A döntés felkerült a Döntések oldalra.", href: `/marketing/${created.itemId}` }, created.itemId);
   }
   if (p.type === "note") {
     const r = await addItemNote({ itemId: p.itemId, body: p.body });
@@ -303,6 +282,7 @@ export async function executeAction(raw: ActionProposal): Promise<{ ok: true; me
     await logExecuted(userId, "note", p.itemId);
     return { ok: true, message: "Jegyzet mentve.", href: `/marketing/${p.itemId}` };
   }
+  if (p.type !== "ticket") return { error: BAD_INPUT };
   const r = await fileTicket(p.draft);
   if ("error" in r) return r;
   await logExecuted(userId, "ticket", null);

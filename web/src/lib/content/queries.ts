@@ -421,7 +421,7 @@ export function groupDecisions(rows: DecisionRawRow[], now: Date): DecisionQueue
 // instead: the board card's "Szabály dobta vissza" badge and the item's
 // presence in the `mine` section. Imported ⚠ questions and manual questions
 // STAY in the queue — they are answerable and they belong there.
-function openDecisionsWhere(tenantId: number): Prisma.ContentCheckWhereInput {
+export function openDecisionsWhere(tenantId: number): Prisma.ContentCheckWhereInput {
   return { tenantId, state: "open", source: { not: "rule" }, item: { status: { not: "archived" } } };
 }
 
