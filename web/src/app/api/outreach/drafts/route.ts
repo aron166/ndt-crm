@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { audit } from "@/lib/audit";
+import { resolveDraftRecipient } from "@/lib/outreach/recipient";
+import { isSuppressed, loadSuppressionSet } from "@/lib/suppression";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { draftsUpsertSchema, canEdit, type DraftStatus } from "@/lib/outreach/drafts";
 import { validTemplateVersion } from "@/lib/outreach/template";
@@ -30,7 +32,7 @@ interface SkippedItem {
   companyId: number;
   campaign: string;
   step: number;
-  reason: "already_sent" | "unknown_company" | "error";
+  reason: "already_sent" | "unknown_company" | "suppressed" | "error";
 }
 
 export async function POST(request: Request) {
@@ -125,6 +127,8 @@ export async function POST(request: Request) {
   const personFor = (item: { personId?: number | null; companyId: number }) =>
     item.personId != null && validPairs.has(`${item.personId}:${item.companyId}`) ? item.personId : null;
 
+  const suppressed = await loadSuppressionSet(key.tenantId);
+
   let created = 0;
   let updated = 0;
   const skipped: SkippedItem[] = [];
@@ -137,6 +141,12 @@ export async function POST(request: Request) {
         step: item.step,
         reason: "unknown_company",
       });
+      continue;
+    }
+
+    // A suppressed address never gets a draft the external sender could claim.
+    if (isSuppressed(await resolveDraftRecipient(key.tenantId, { toEmail: item.toEmail ?? null, personId: item.personId ?? null, companyId: item.companyId }), suppressed)) {
+      skipped.push({ companyId: item.companyId, campaign: item.campaign, step: item.step, reason: "suppressed" });
       continue;
     }
 

@@ -4,6 +4,7 @@ import { decrypt, isEncrypted } from "@/lib/crypto";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
+import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 
 // ponytail: no ctx system yet (tenant-decoupling is queued item #1), so callers
 // that genuinely have no tenant in hand still pass DEFAULT_TENANT_ID. The point
@@ -86,6 +87,10 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const subject = input.subject.trim();
   if (!to) return { ok: false, error: "Hiányzó címzett." };
   if (!subject) return { ok: false, error: "Hiányzó tárgy." };
+  // Hard block, not a picker filter: every outbound path (drafts, automations,
+  // intro material) ends here, so a do-not-contact address is refused even
+  // when a caller queried contacts directly. (SUPPRESSION_LIST_SPEC.md #2.)
+  if (await isAddressSuppressed(tenantId, to)) return { ok: false, error: SUPPRESSED_ERROR };
 
   const from = config.fromName ? `${config.fromName} <${config.fromEmail}>` : config.fromEmail;
 

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { SUPPRESSED_ERROR } from "@/lib/suppression";
 import { reportError } from "@/lib/report-error";
 import type {
   AutomationEvent,
@@ -295,6 +296,7 @@ export async function runAutomationAction(
       personId: ev.personId,
     });
     if (!result.ok) {
+      if (result.error === SUPPRESSED_ERROR) return false;
       reportError("automations.send_email", new Error(result.error), { ruleId: rule.id, trigger: ev.type });
       return false;
     }

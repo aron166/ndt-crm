@@ -46,6 +46,7 @@ model Tenant {
   automationRules        AutomationRule[]
   automationFirings      AutomationFiring[]
   automationEmailSends   AutomationEmailSend[]
+  suppressions           Suppression[]
   campaigns              Campaign[]
   contentItems           ContentItem[]
   emailDrafts            EmailDraft[]
@@ -1392,4 +1393,27 @@ model EmailDraft {
   @@index([tenantId, threadKey])
   @@index([tenantId, dueAt])
   @@map("email_drafts")
+}
+
+/// Do-not-contact list (growth/legal/SUPPRESSION_LIST_SPEC.md). One row per
+/// opt-out: an exact address OR a whole domain, never both. A separate store on
+/// purpose: it must outlive the person/lead it came from. Add-only from the app;
+/// every outreach picker and every Resend send checks it (lib/suppression.ts).
+model Suppression {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  email       String? // lowercased, trimmed
+  domain      String? // lowercased, no "@"
+  requestedAt DateTime @map("requested_at") @db.Date
+  channel     String? // email, phone, linkedin, in_person
+  source      String? // campaign or context the request came from
+  note        String?
+  createdById Int?     @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, domain])
+  @@map("suppressions")
 }

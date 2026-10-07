@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { loadSuppressionSet, isSuppressed } from "@/lib/suppression";
 import { applyEvent, isClaimStale, type ItemState } from "./transitions";
 import { getApprovalRule, getContentReviewers } from "./reviewers";
 import { runContentRules } from "./rules";
@@ -990,6 +991,7 @@ export async function getQueue(
       },
     },
   });
+  const suppressed = await loadSuppressionSet(tenantId);
   return items.map((it) => {
     const current = it.versions.find((v) => v.id === it.currentVersionId) ?? null;
     return {
@@ -1021,7 +1023,9 @@ export async function getQueue(
             city: it.company.city,
             dossier: it.company.enrichment ?? null,
             closenessScore: it.company.closenessScore ?? null,
-            contact: it.company.contacts[0]
+            contact: it.company.contacts[0] &&
+              !isSuppressed(it.company.contacts[0].email ?? it.company.contacts[0].person.email, suppressed) &&
+              !isSuppressed(it.company.contacts[0].person.email, suppressed)
               ? {
                   name: `${it.company.contacts[0].person.lastName} ${it.company.contacts[0].person.firstName}`.trim(),
                   email: it.company.contacts[0].email ?? it.company.contacts[0].person.email ?? null,

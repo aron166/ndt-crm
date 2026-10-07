@@ -22,7 +22,7 @@ export type AuditEntityType =
   | "equipment" | "integration_credential" | "custom_field"
   | "automation_rule"
   | "campaign" | "content_item" | "content_version" | "content_review" | "email_draft"
-  | "cost_rate"
+  | "cost_rate" | "suppression"
   // Tenant-level config (tenants.settings — e.g. the setter question list).
   | "tenant";
 

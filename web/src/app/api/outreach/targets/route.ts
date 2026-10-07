@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { loadSuppressionSet, isSuppressed } from "@/lib/suppression";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
@@ -128,8 +129,11 @@ export async function GET(request: Request) {
       db.company.count({ where }),
     ]);
 
+    const suppressed = await loadSuppressionSet(key.tenantId);
     const items = companies.map(({ contacts, ...company }) => {
-      const mappedContacts: TargetContact[] = contacts.map((ct) => ({
+      const mappedContacts: TargetContact[] = contacts
+        .filter((ct) => !isSuppressed(ct.email ?? ct.person.email, suppressed) && !isSuppressed(ct.person.email, suppressed))
+        .map((ct) => ({
         personId: ct.person.id,
         name: `${ct.person.firstName} ${ct.person.lastName}`.trim(),
         role: ct.role,

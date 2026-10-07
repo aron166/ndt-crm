@@ -7,7 +7,9 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
+import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import {
   type DraftStatus,
@@ -162,9 +164,10 @@ export async function getDraftBody(id: number): Promise<{ ok: true; body: string
   if (!(await isCrmUser())) return DENIED;
   const row = await db.emailDraft.findFirst({
     where: { id, tenantId: TENANT_ID },
-    select: { body: true, campaign: true, step: true },
+    select: { body: true, campaign: true, step: true, toEmail: true, personId: true, companyId: true },
   });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
+  if (await isAddressSuppressed(TENANT_ID, await resolveDraftRecipient(TENANT_ID, row))) return { ok: false, error: SUPPRESSED_ERROR };
   // §6b: a draft whose step has an unapproved template may not be copied out
   // of the CRM. An empty slot passes - round one predates templates.
   const gate = await gateDraft(TENANT_ID, row.campaign, row.step);
@@ -327,27 +330,10 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
     return { ok: false, error: "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban" };
   }
 
-  // Recipient resolution: explicit toEmail, else the linked person, else the
-  // company's first current contact. The person lookup is scoped to this
-  // tenant AND to the draft's company — `personId` arrives from an app-key
-  // payload and is not otherwise proven to belong here. (Vanda, #88.)
-  let to = row.toEmail?.trim() || null;
-  if (!to && row.personId) {
-    const contact = await db.contact.findFirst({
-      where: { personId: row.personId, companyId: row.companyId, tenantId: TENANT_ID },
-      select: { email: true, person: { select: { email: true } } },
-    });
-    to = contact?.email?.trim() || contact?.person.email?.trim() || null;
-  }
-  if (!to) {
-    const contact = await db.contact.findFirst({
-      where: { companyId: row.companyId, tenantId: TENANT_ID, endedAt: null },
-      orderBy: [{ isPrimary: "desc" }, { startedAt: "desc" }],
-      select: { email: true, person: { select: { email: true } } },
-    });
-    to = contact?.email?.trim() || contact?.person.email?.trim() || null;
-  }
+  const to = await resolveDraftRecipient(TENANT_ID, row);
   if (!to) return { ok: false, error: "Ehhez a céghez nincs email cím" };
+
+  if (await isAddressSuppressed(TENANT_ID, to)) return { ok: false, error: SUPPRESSED_ERROR };
 
   // Claim it. Nothing below this line may run twice for one row.
   const claim = await db.emailDraft.updateMany({

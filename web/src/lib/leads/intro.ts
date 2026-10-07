@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
+import { isAddressSuppressed } from "@/lib/suppression";
 import { reportError } from "@/lib/report-error";
 
 // The intro material (termékismertető) hand-off, triggered by `send_intro: true`
@@ -64,6 +65,11 @@ export async function sendIntroMaterial(args: {
 }): Promise<IntroResult> {
   const { tenantId, leadId, to, companyId, personId } = args;
   try {
+    // Do-not-contact: no email and no "send by hand" task either.
+    if (to && (await isAddressSuppressed(tenantId, to))) {
+      console.info("[leads.intro] skipped: recipient on suppression list", { leadId });
+      return "skipped";
+    }
     const url = await getIntroMaterialUrl(tenantId);
 
     // No link configured → the task branch. Emailing a customer a literal
