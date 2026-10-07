@@ -77,7 +77,7 @@ async function run(userId: number, input: AssistantInput, purpose: "explain" | "
   return { text: r.text };
 }
 
-export async function openAssistant(input: { itemId: number | null }) {
+export async function openAssistant(input: { itemId: number | null }): Promise<{ ok: true; configured: boolean; item: { id: number; title: string } | null; notes: NoteView[] } | { error: string }> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
   if (input?.itemId !== null && !validId(input?.itemId)) return { error: BAD_INPUT };
@@ -120,7 +120,10 @@ export async function fileTicket(draft: TicketDraft): Promise<{ ok: true; url: s
   if (userId == null) return { error: NOT_A_CRM_USER };
   const parsed = TicketDraftSchema.safeParse(draft);
   if (!parsed.success) return { error: BAD_INPUT };
-  const r = await createGithubIssue(parsed.data);
+  // Provenance appended server-side: the body is client-edited, the author is not.
+  const user = await db.user.findFirst({ where: { id: userId, tenantId: TENANT_ID }, select: { name: true } });
+  const body = `${parsed.data.body}\n\n---\nBeküldve a CRM asszisztensből, beküldő: ${user?.name ?? `user ${userId}`}`;
+  const r = await createGithubIssue({ ...parsed.data, body });
   return r.ok ? { ok: true, url: r.url } : { ok: true, fallbackUrl: r.fallbackUrl };
 }
 

@@ -51,7 +51,8 @@ export function AssistantLauncher() {
       >
         {A.launcher}
       </button>
-      {mounted && <AssistantDrawer open={open} itemId={itemId} onClose={() => setOpen(false)} />}
+      {/* key: a new item in view starts a new conversation, answers about item A never carry into item B. */}
+      {mounted && <AssistantDrawer key={itemId ?? "none"} open={open} itemId={itemId} onClose={() => setOpen(false)} />}
     </>
   );
 }

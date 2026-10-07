@@ -65,7 +65,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
     let live = true;
     openAssistant({ itemId }).then((res) => {
       if (!live) return;
-      if ("error" in res) { setLoadError(res.error ?? A.genericError); return; }
+      if ("error" in res) { setLoadError(res.error); return; }
       setLoadError(null);
       setConfigured(res.configured);
       setItem(res.item);
