@@ -57,7 +57,7 @@ export async function chatCompletion(
   try {
     data = JSON.parse(raw);
   } catch {
-    throw new AssistantError("Assistant returned invalid JSON", res.status, { promptTokens: 0, completionTokens: 0 });
+    throw new AssistantError("Assistant returned invalid JSON", res.status);
   }
   const promptTokens = data?.usage?.prompt_tokens ?? 0;
   const completionTokens = data?.usage?.completion_tokens ?? 0;

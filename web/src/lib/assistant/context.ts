@@ -63,7 +63,7 @@ const GUIDES: Record<PageKind, string> = {
 };
 
 /** Item fields are data inside <item>; strip angle brackets so they cannot close or open tags. */
-const clean = (s: string) => s.replace(/[<>]/g, "");
+const clean = (s: string) => s.replace(/<\/?item\b[^>]*>/gi, "");
 
 export function buildSystemPrompt(input: { pathname: string; item: ItemContext | null; role: string; isReviewer: boolean }): string {
   const kind = pageKind(input.pathname);

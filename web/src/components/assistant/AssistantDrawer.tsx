@@ -108,9 +108,9 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
     startAsk(async () => {
       try {
         const res = await askAssistant({ pathname, itemId, messages: next });
-        if ("error" in res) setAskError(res.error);
+        if ("error" in res) { setAskError(res.error); setMsgs(msgs); setInput(t); }
         else setMsgs([...next, { role: "assistant", content: res.reply }]);
-      } catch { setAskError(A.genericError); }
+      } catch { setAskError(A.genericError); setMsgs(msgs); setInput(t); }
     });
   }
 
@@ -229,7 +229,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
               />
               {noteError && <p style={errStyle}>{noteError}</p>}
               <div>
-                <button type="button" disabled={noAi || saving || !noteText.trim()} onClick={saveNote} style={{ ...btn, ...dis(noAi || saving || !noteText.trim()) }}>
+                <button type="button" disabled={saving || !noteText.trim() || !!loadError} onClick={saveNote} style={{ ...btn, ...dis(saving || !noteText.trim() || !!loadError) }}>
                   {A.noteSave}
                 </button>
               </div>
@@ -249,7 +249,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
             <>
               <label style={{ fontSize: 13, color: "var(--fg-mute)" }} htmlFor="assistant-ticket-text">{A.ticketPrompt}</label>
               <textarea
-                id="assistant-ticket-text" rows={3} value={ticketText}
+                id="assistant-ticket-text" rows={3} maxLength={2000} value={ticketText}
                 onChange={(e) => setTicketText(e.target.value)} style={{ ...field, resize: "vertical" }}
               />
               <div>
@@ -304,7 +304,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
             style={{ display: "flex", gap: 8, padding: "10px 16px calc(10px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--line-soft)" }}
           >
             <input
-              aria-label={A.askPlaceholder} placeholder={A.askPlaceholder} value={input}
+              aria-label={A.askPlaceholder} placeholder={A.askPlaceholder} value={input} maxLength={2000}
               onChange={(e) => setInput(e.target.value)} disabled={noAi || atLimit} style={{ ...field, flex: 1, ...dis(noAi || atLimit) }}
             />
             <button type="submit" disabled={noAi || atLimit || asking || !input.trim()} style={{ ...btn, ...dis(noAi || atLimit || asking || !input.trim()) }}>

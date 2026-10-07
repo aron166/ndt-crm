@@ -25,7 +25,7 @@ function checkInput(input: AssistantInput): string | null {
   if (!input || typeof input.pathname !== "string" || input.pathname.length > 200 || pageKind(input.pathname) === null) return BAD_INPUT;
   if (input.itemId !== null && !validId(input.itemId)) return BAD_INPUT;
   const m = input.messages;
-  if (!Array.isArray(m) || m.length < 1 || m.length > 40 || m[m.length - 1].role !== "user") return BAD_INPUT;
+  if (!Array.isArray(m) || m.length < 1 || m.length > 40 || m[m.length - 1]?.role !== "user") return BAD_INPUT;
   for (const x of m) {
     if ((x?.role !== "user" && x?.role !== "assistant") || typeof x.content !== "string" || x.content.length < 1 || x.content.length > (x.role === "user" ? 2000 : 6000)) return BAD_INPUT;
   }

@@ -19,6 +19,7 @@ export function AssistantLauncher() {
   // An explicit focus only holds on the page it was raised on.
   const itemId = focus && focus.path === pathname ? focus.id : m ? Number(m[1]) : null;
 
+  const close = useCallback(() => setOpen(false), []);
   const show = useCallback(() => { setMounted(true); setOpen(true); }, []);
 
   useEffect(() => {
@@ -52,7 +53,7 @@ export function AssistantLauncher() {
         {A.launcher}
       </button>
       {/* key: a new item in view starts a new conversation, answers about item A never carry into item B. */}
-      {mounted && <AssistantDrawer key={itemId ?? "none"} open={open} itemId={itemId} onClose={() => setOpen(false)} />}
+      {mounted && <AssistantDrawer key={itemId ?? "none"} open={open} itemId={itemId} onClose={close} />}
     </>
   );
 }

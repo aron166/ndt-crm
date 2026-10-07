@@ -77,6 +77,7 @@ describe("askAssistant", () => {
     expect("error" in (await askAssistant({ ...input, pathname: "/companies" }))).toBe(true);
     expect("error" in (await askAssistant({ ...input, messages: msg(2) }))).toBe(true);
     expect("error" in (await askAssistant({ ...input, messages: [] }))).toBe(true);
+    expect("error" in (await askAssistant({ ...input, messages: [null as never] }))).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it("rejects an item from another tenant", async () => {

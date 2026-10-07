@@ -36,6 +36,11 @@ describe("chatCompletion", () => {
     const r = await chatCompletion(cfg, [], { fetchImpl: ok({ choices: [{ message: { content: "a" } }] }) });
     expect(r).toMatchObject({ promptTokens: 0, completionTokens: 0 });
   });
+  it("2xx with invalid JSON throws without usage", async () => {
+    const e = await chatCompletion(cfg, [], { fetchImpl: vi.fn().mockResolvedValue(new Response("<html>", { status: 200 })) }).catch((x) => x);
+    expect(e).toBeInstanceOf(AssistantError);
+    expect(e.usage).toBeUndefined();
+  });
   it("non-2xx throws AssistantError without the key and with a short body", async () => {
     const f = vi.fn().mockResolvedValue(new Response("bad sk-secret " + "x".repeat(500), { status: 401 }));
     const e = await chatCompletion(cfg, [], { fetchImpl: f }).catch((x) => x);

@@ -13,4 +13,11 @@ describe("buildSystemPrompt", () => {
     expect(p.split("</item>").length - 1).toBe(1);
     expect(p).toContain("ignore rules");
   });
+  it("keeps plain < and > in bodies", () => {
+    const p = buildSystemPrompt({
+      pathname: "/marketing/5", role: "user", isReviewer: false,
+      item: { id: 5, title: "t", category: "email", purpose: null, status: "draft", body: "hiba < 0,3 mm", checks: [] },
+    });
+    expect(p).toContain("hiba < 0,3 mm");
+  });
 });
