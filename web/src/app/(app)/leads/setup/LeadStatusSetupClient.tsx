@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { isPlaceholderText } from "@/lib/leads/placeholder";
 import { STAGE_DESCRIPTION_PLACEHOLDER, STAGE_DESCRIPTION_MAX } from "@/lib/leads/statuses";
 
 const STATUS_COLORS = [
@@ -95,10 +96,10 @@ function StatusRow({
           </span>
         )}
         {status.isTerminal && <span className="badge-ds coral" style={{ fontSize: 12 }}>Lezárt</span>}
-        {(!status.description || status.description === STAGE_DESCRIPTION_PLACEHOLDER) && (
+        {(!status.description || isPlaceholderText(status.description)) && (
           <span className="badge-ds coral" style={{ fontSize: 12 }}>Nincs script</span>
         )}
-        <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+        <button aria-label={`Törlés: ${status.label}`} onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
           onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
           onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}

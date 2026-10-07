@@ -252,6 +252,7 @@ export function Sidebar({ collapsed, onToggle, badges, mobile }: SidebarProps) {
 
         <button
           onClick={toggle}
+          aria-label={collapsed ? "Oldalsáv kinyitása" : "Oldalsáv összecsukása"}
           className="flex items-center justify-center rounded transition-colors"
           style={{
             width: 28, height: 28, flexShrink: 0,

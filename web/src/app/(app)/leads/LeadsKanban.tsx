@@ -16,6 +16,8 @@ import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
 import { dataInk } from "@/lib/data-color";
 import type { ScriptVariant } from "@/lib/leads/scripts";
+// Hungarian copy is PROPOSAL until Áron approves.
+import { displayScriptText, isPlaceholderText } from "@/lib/leads/placeholder";
 
 interface Lead {
   id: number;
@@ -401,7 +403,10 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
                   Mit csinálunk itt?
                 </summary>
                 <div style={{ fontSize: 12, color: "var(--fg-soft)", whiteSpace: "pre-wrap", padding: "0 10px 8px", lineHeight: 1.5 }}>
-                  {status.description}
+                  {displayScriptText(status.description)}
+                  {isPlaceholderText(status.description) && (
+                    <> <Link href="/leads/setup" style={{ color: "var(--indigo)" }}>Beállítás</Link></>
+                  )}
                 </div>
               </details>
             )}

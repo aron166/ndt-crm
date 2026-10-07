@@ -129,15 +129,15 @@ export function QualificationQuestionsClient({
                     azonosító: <code>{q.slug || "(új, mentéskor kapja)"}</code> (statisztikai kulcs, soha nem változik)
                   </div>
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => moveInSet(i, -1)} disabled={pos === 0}
+                    <button type="button" aria-label="Feljebb" onClick={() => moveInSet(i, -1)} disabled={pos === 0}
                       style={{ padding: 4, color: "var(--fg-faint)", cursor: pos === 0 ? "default" : "pointer", background: "none", border: "none", opacity: pos === 0 ? 0.4 : 1 }}>
                       <ArrowUp style={{ width: 13, height: 13 }} />
                     </button>
-                    <button type="button" onClick={() => moveInSet(i, 1)} disabled={pos === visible.length - 1}
+                    <button type="button" aria-label="Lejjebb" onClick={() => moveInSet(i, 1)} disabled={pos === visible.length - 1}
                       style={{ padding: 4, color: "var(--fg-faint)", cursor: pos === visible.length - 1 ? "default" : "pointer", background: "none", border: "none", opacity: pos === visible.length - 1 ? 0.4 : 1 }}>
                       <ArrowDown style={{ width: 13, height: 13 }} />
                     </button>
-                    <button type="button" onClick={() => removeQuestion(i)}
+                    <button type="button" aria-label="Kérdés törlése" onClick={() => removeQuestion(i)}
                       style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
                       onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
                       onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}>

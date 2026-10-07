@@ -231,6 +231,7 @@ export function Topbar({ collapsed, onMenu, email, defaultPipeline, onSearchOpen
 
           {/* Bell */}
           <button
+            aria-label="Értesítések"
             className="flex items-center justify-center rounded transition-colors"
             style={{ width: 34, height: 34, color: "var(--fg-soft)", border: "1px solid transparent" }}
             onMouseOver={(e) => {
