@@ -7,7 +7,8 @@ export type ChatTurn =
   | { role: "assistant"; content: string; actions: ActionCard[]; at: string };
 
 /** A validated, server-enriched action the panel renders as a card with "Végrehajtom". */
-export type ActionCard = { key: string; summary: string; proposal: ActionProposal };
+/** executedAt is stamped server-side by executeAction(proposal, { conversationId, key }); a stamped card never runs again. */
+export type ActionCard = { key: string; summary: string; proposal: ActionProposal; executedAt?: string };
 
 export type ConversationSummary = { id: number; title: string; updatedAt: string };
 export type ConversationView = ConversationSummary & { page: string; itemId: number | null; messages: ChatTurn[] };

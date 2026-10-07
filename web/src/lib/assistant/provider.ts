@@ -145,7 +145,16 @@ export async function chatCompletionStream(
   }
   if (res.status === 429) throw new AssistantError(RATE_LIMITED, 429);
   const oneShot = async (spent: { promptTokens: number; completionTokens: number }) => {
-    const r = await chatCompletion(cfg, messages, { schema: opts.schema, maxTokens: opts.maxTokens, fetchImpl: f, sleep });
+    let r;
+    try {
+      r = await chatCompletion(cfg, messages, { schema: opts.schema, maxTokens: opts.maxTokens, fetchImpl: f, sleep });
+    } catch (e) {
+      // The streamed attempt was billed: carry its usage so the caller logs it against the cap.
+      if (e instanceof AssistantError && (spent.promptTokens || spent.completionTokens)) {
+        e.usage = { promptTokens: spent.promptTokens + (e.usage?.promptTokens ?? 0), completionTokens: spent.completionTokens + (e.usage?.completionTokens ?? 0) };
+      }
+      throw e;
+    }
     let stopped = false;
     for (let n = 24; !stopped; n += 24) {
       if (opts.onText(r.text.slice(0, n)) === "stop") stopped = true;

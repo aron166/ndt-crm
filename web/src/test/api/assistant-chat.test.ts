@@ -194,7 +194,10 @@ describe("failures", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).response_format).toBeUndefined();
     expect(ev[ev.length - 1].type).toBe("error");
     expect(ev.some((e) => e.type === "done")).toBe(false);
-    expect(db.assistantConversation.updateMany).not.toHaveBeenCalled();
+    // Nothing persisted; the empty new conversation is soft-deleted instead.
+    const calls = (db.assistantConversation.updateMany as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.every((c) => !("messages" in c[0].data))).toBe(true);
+    expect(calls.some((c) => "deletedAt" in c[0].data)).toBe(true);
   });
   it("strict fallback answer resets the streamed text and finishes", async () => {
     fetchMock.mockImplementationOnce(async () => sse('{"read_item_ids":[],"answer":"Rossz'))
@@ -211,6 +214,7 @@ describe("failures", () => {
     const ev = await events(await POST(req(ok)));
     expect(ev[ev.length - 1]).toEqual({ type: "error", message: RATE_LIMITED });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(db.assistantConversation.updateMany).not.toHaveBeenCalled();
+    const calls = (db.assistantConversation.updateMany as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.every((c) => !("messages" in c[0].data))).toBe(true);
   });
 });

@@ -186,9 +186,40 @@ async function withState(r: ExecResult, itemId: number): Promise<ExecResult> {
   return it ? { ...r, state: STATUS_LABELS[it.status as ContentStatus] ?? it.status } : r;
 }
 
-export async function executeAction(raw: ActionProposal): Promise<ExecResult> {
+/**
+ * Runs a card the user CONFIRMED. With `ref` (a card stored in one of the user's
+ * conversations) the STORED proposal runs, not the client copy, and the card is stamped
+ * `executedAt` so a reload or a second click cannot run it twice.
+ */
+export async function executeAction(raw: ActionProposal, ref?: { conversationId: number; key: string }): Promise<ExecResult> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
+  if (ref === undefined) return runAction(userId, raw);
+  if (!validId(ref?.conversationId) || typeof ref.key !== "string" || ref.key.length > 40) return { error: BAD_INPUT };
+  const conv = await db.assistantConversation.findFirst({ where: ownConv(userId, ref.conversationId), select: { messages: true, updatedAt: true } });
+  const turns = Array.isArray(conv?.messages) ? (conv!.messages as ChatTurn[]) : [];
+  const card = turns.flatMap((t) => (t.role === "assistant" ? t.actions : [])).find((a) => a.key === ref.key);
+  if (!card) return { error: NOT_FOUND };
+  if (card.executedAt) return { error: "Ezt már végrehajtotta." };
+  // Claim first (optimistic on updatedAt), then run: two quick clicks cannot both pass.
+  const at = new Date().toISOString();
+  const stamped = turns.map((t) => (t.role === "assistant" ? { ...t, actions: t.actions.map((a) => (a.key === ref.key ? { ...a, executedAt: at } : a)) } : t));
+  const claim = await db.assistantConversation.updateMany({
+    where: { ...ownConv(userId, ref.conversationId), updatedAt: conv!.updatedAt },
+    data: { messages: stamped, updatedAt: new Date() },
+  });
+  if (claim.count === 0) return { error: "A beszélgetés közben változott. Kérem, próbálja újra." };
+  const r = await runAction(userId, card.proposal);
+  if ("error" in r) {
+    // Not executed: release the stamp so the user can retry.
+    const cur = await db.assistantConversation.findFirst({ where: ownConv(userId, ref.conversationId), select: { messages: true } });
+    const back = (Array.isArray(cur?.messages) ? (cur!.messages as ChatTurn[]) : []).map((t) => (t.role === "assistant" ? { ...t, actions: t.actions.map((a) => (a.key === ref.key ? { ...a, executedAt: undefined } : a)) } : t));
+    await db.assistantConversation.updateMany({ where: ownConv(userId, ref.conversationId), data: { messages: back } });
+  }
+  return r;
+}
+
+async function runAction(userId: number, raw: ActionProposal): Promise<ExecResult> {
   const parsed = ActionProposalSchema.safeParse(raw);
   // Client-side actions (open, navigate, waiting) never reach the server.
   if (!parsed.success || parsed.data.type === "none" || (CLIENT_ACTIONS as readonly string[]).includes(parsed.data.type)) return { error: BAD_INPUT };

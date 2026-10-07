@@ -184,3 +184,48 @@ describe("whatsWaiting", () => {
     expect(r).toMatchObject({ ok: true, waiting: { items: [{ id: 2 }], decisions: [] } });
   });
 });
+
+describe("executeAction with a stored card ref", () => {
+  const at = new Date("2026-10-07T10:00:00Z");
+  const stored = (executedAt?: string) => ({
+    updatedAt: at,
+    messages: [
+      { role: "user", content: "jegyzet", at: "x" },
+      { role: "assistant", content: "ok", at: "x", actions: [{ key: "0-note", summary: "s", proposal: { type: "note", itemId: 7, body: "TÁROLT" }, ...(executedAt ? { executedAt } : {}) }] },
+    ],
+  });
+  beforeEach(() => {
+    m.contentItem.findFirst.mockResolvedValue({ id: 7 });
+    m.contentNote.create.mockResolvedValue({ id: 1, body: "TÁROLT", createdAt: at, user: { name: "Áron" } });
+  });
+  it("runs the STORED proposal, not the client copy, and stamps executedAt with an optimistic claim", async () => {
+    m.assistantConversation.findFirst.mockResolvedValue(stored());
+    m.assistantConversation.updateMany.mockResolvedValue({ count: 1 });
+    const r = await executeAction({ type: "note", itemId: 7, body: "KLIENS" }, { conversationId: 3, key: "0-note" });
+    expect(r).toMatchObject({ ok: true });
+    expect(m.contentNote.create.mock.calls[0][0].data.body).toBe("TÁROLT");
+    const claim = m.assistantConversation.updateMany.mock.calls[0][0];
+    expect(claim.where).toMatchObject({ id: 3, tenantId: 1, userId: 5, deletedAt: null, updatedAt: at });
+    expect(JSON.stringify(claim.data.messages)).toContain("executedAt");
+  });
+  it("an already executed card is refused and nothing runs", async () => {
+    m.assistantConversation.findFirst.mockResolvedValue(stored("2026-10-07T10:01:00Z"));
+    const r = await executeAction({ type: "note", itemId: 7, body: "x" }, { conversationId: 3, key: "0-note" });
+    expect(r).toHaveProperty("error");
+    expect(m.contentNote.create).not.toHaveBeenCalled();
+    expect(m.assistantConversation.updateMany).not.toHaveBeenCalled();
+  });
+  it("a lost claim (concurrent click) runs nothing", async () => {
+    m.assistantConversation.findFirst.mockResolvedValue(stored());
+    m.assistantConversation.updateMany.mockResolvedValue({ count: 0 });
+    const r = await executeAction({ type: "note", itemId: 7, body: "x" }, { conversationId: 3, key: "0-note" });
+    expect(r).toHaveProperty("error");
+    expect(m.contentNote.create).not.toHaveBeenCalled();
+  });
+  it("a foreign or unknown conversation/card is not found", async () => {
+    m.assistantConversation.findFirst.mockResolvedValue(null);
+    expect(await executeAction({ type: "note", itemId: 7, body: "x" }, { conversationId: 99, key: "0-note" })).toEqual({ error: "Nem található" });
+    expect(m.assistantConversation.findFirst.mock.calls[0][0].where).toMatchObject({ id: 99, tenantId: 1, userId: 5, deletedAt: null });
+    expect(m.contentNote.create).not.toHaveBeenCalled();
+  });
+});

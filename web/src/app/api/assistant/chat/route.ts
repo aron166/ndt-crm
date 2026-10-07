@@ -24,7 +24,9 @@ import { MAX_CONVERSATION_TURNS, type ChatEvent, type ChatTurn } from "@/lib/ass
 const TENANT_ID = 1;
 const MAX_USER_TURNS = 20;
 const READ_MAX = 3;
-const READ_BODY_MAX = 2500;
+const READ_BODY_MAX = 1200;
+/** Hub budget on the second (post-read) call: the read bodies replace most of the page summary (8K TPM). */
+const HOP_HUB_BUDGET = 1500;
 
 const bodySchema = z.object({
   conversationId: z.number().int().positive().nullable(),
@@ -113,21 +115,35 @@ export async function POST(request: Request) {
     });
   }
 
-  const system = buildChatSystemPrompt({
+  const system = (hop: 0 | 1) => buildChatSystemPrompt({
     user: { name: user.name, role: user.role, isReviewer: reviewers.includes(userId), informal: isInformal(user.settings) },
     pathname: input.pathname,
     conversationPage: conv.page !== input.pathname ? conv.page : null,
-    item,
-    hub: renderHubContext(hub, item ? { budgetChars: 4500 } : {}),
+    item: hop === 0 ? item : null,
+    hub: renderHubContext(hub, hop === 1 ? { budgetChars: HOP_HUB_BUDGET } : item ? { budgetChars: 4500 } : {}),
     now: new Date(),
   });
-  const base: ChatMessage[] = [{ role: "system", content: system }, ...history(turns), { role: "user", content: input.message }];
+  const turnMessages = (hop: 0 | 1): ChatMessage[] => [{ role: "system", content: system(hop) }, ...history(turns), { role: "user", content: input.message }];
+  const base = turnMessages(0);
   const schema = { name: "assistant_reply", schema: MODEL_RESPONSE_SCHEMA };
 
+  // A conversation created for a first turn that produced no answer is soft-deleted, so the list has no empty chats.
+  const dropIfEmpty = async () => {
+    if (existing) return;
+    await db.assistantConversation.updateMany({ where: { id: conv.id, tenantId: TENANT_ID, userId, deletedAt: null }, data: { deletedAt: new Date() } }).catch(() => {});
+  };
   const enc = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (e: ChatEvent) => controller.enqueue(enc.encode(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`));
+      // The browser may go away mid-stream (new chat, close): never throw from send, and
+      // stop the upstream call (onText returns "stop") so tokens are not burnt unseen.
+      let closed = false;
+      const gone = () => closed || request.signal.aborted;
+      const send = (e: ChatEvent) => {
+        if (gone()) return;
+        try { controller.enqueue(enc.encode(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`)); } catch { closed = true; }
+      };
+      const finish = () => { if (!closed) { closed = true; try { controller.close(); } catch { /* already closed */ } } };
       send({ type: "start", conversationId: conv.id });
       try {
         let messages = base;
@@ -139,6 +155,7 @@ export async function POST(request: Request) {
             schema, maxTokens: 1800,
             accept: (t) => parseModelResponse(t) !== null || (completeIntArrayField(t, "read_item_ids")?.length ?? 0) > 0,
             onText: (soFar) => {
+              if (gone()) return "stop";
               const ids = completeIntArrayField(soFar, "read_item_ids");
               const answer = partialStringField(soFar, "answer") ?? "";
               // Read requested before any answer text: stop this call and fetch the items.
@@ -156,15 +173,21 @@ export async function POST(request: Request) {
             const uniq = [...new Set(ids)].slice(0, READ_MAX);
             send({ type: "status", text: `Megnyitom: ${uniq.map((i) => `#${i}`).join(", ")}` });
             const loaded = (await Promise.all(uniq.map((i) => loadItemContext(TENANT_ID, i)))).filter((x): x is ItemContext => x !== null);
-            messages = [...base, { role: "system", content: loaded.length ? readBlock(loaded) : "A kért azonosítók nem találhatók. Most már válaszoljon; a read_item_ids legyen []." }];
+            messages = [...turnMessages(1), { role: "system", content: loaded.length ? readBlock(loaded) : "A kért azonosítók nem találhatók. Most már válaszoljon; a read_item_ids legyen []." }];
             continue;
           }
           await logCall(userId, input.pathname, "chat", conv.id, itemId, cfg.model, usage);
+          if (gone()) { await dropIfEmpty(); finish(); return; }
           finalText = r.text;
           break;
         }
         const res = parseModelResponse(finalText);
-        if (!res || !res.answer.trim()) { send({ type: "error", message: "Nem sikerült választ adni. Kérem, fogalmazza meg másképp." }); controller.close(); return; }
+        if (!res || !res.answer.trim()) {
+          await dropIfEmpty();
+          send({ type: "error", message: "Nem sikerült választ adni. Kérem, fogalmazza meg másképp." });
+          finish();
+          return;
+        }
         const { proposals } = toProposals(res.actions.slice(0, 3));
         const actions = await enrichProposals(TENANT_ID, proposals);
         const now = new Date().toISOString();
@@ -181,9 +204,10 @@ export async function POST(request: Request) {
       } catch (e) {
         if (e instanceof AssistantError && e.usage) await logCall(userId, input.pathname, "chat", conv.id, itemId, cfg.model, e.usage).catch(() => {});
         if (!(e instanceof AssistantError)) reportError("assistant.chat", e, { userId });
+        await dropIfEmpty();
         send({ type: "error", message: e instanceof AssistantError && e.status === 429 ? RATE_LIMITED : "Az asszisztens most nem érhető el. Kérem, próbálja újra később." });
       }
-      controller.close();
+      finish();
     },
   });
   return new Response(stream, {
