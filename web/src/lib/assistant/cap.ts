@@ -18,7 +18,7 @@ export function monthStart(now: Date): Date {
 
 export async function monthUsage(tenantId: number, now: Date = new Date()): Promise<{ calls: number; tokens: number; costUsd: number }> {
   const a = await db.assistantCall.aggregate({
-    where: { tenantId, createdAt: { gte: monthStart(now) } },
+    where: { tenantId, purpose: { not: "execute" }, createdAt: { gte: monthStart(now) } },
     _count: { _all: true },
     _sum: { promptTokens: true, completionTokens: true, costUsd: true },
   });

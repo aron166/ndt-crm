@@ -1450,9 +1450,12 @@ model PatchTestMark {
 model AssistantCall {
   id               Int      @id @default(autoincrement())
   tenantId         Int      @map("tenant_id")
-  userId           Int      @map("user_id")
-  page             String // the pathname the panel was opened on
-  purpose          String // explain | ticket
+  /// Null for app-key calls (POST /api/assistant/callnote).
+  userId           Int?     @map("user_id")
+  page             String // the pathname the panel was opened on (or the API route)
+  purpose          String // explain | ticket | propose | execute | callnote
+  /// The action type for propose/execute rows (review, answer_decision, create_decision, note, ticket), or the app slug for callnote.
+  action           String?
   itemId           Int?     @map("item_id") // content item in view, no FK: the log outlives the item
   model            String
   promptTokens     Int      @map("prompt_tokens")
@@ -1461,7 +1464,7 @@ model AssistantCall {
   createdAt        DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
-  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, createdAt])
   @@map("assistant_calls")
