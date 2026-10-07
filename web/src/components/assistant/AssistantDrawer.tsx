@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { A } from "@/lib/assistant/labels";
 import {
-  addItemNote, askAssistant, draftTicket, fileTicket, openAssistant,
-  type NoteView,
+  addItemNote, askAssistant, draftTicket, executeAction, fileTicket, openAssistant, proposeAction, whatsWaiting,
+  type NoteView, type ProposalView, type WaitingView,
 } from "@/app/actions/assistant";
 import type { TicketDraft } from "@/lib/assistant/ticket";
+import type { ActionProposal } from "@/lib/assistant/actions";
+import { VERDICT_ACTION } from "@/lib/content/labels";
+import { REVIEW_REASON_LABEL } from "@/lib/content/reasons";
 import { PATCH_REPOS } from "@/lib/patchnotes/repos";
 
 type Msg = { role: "user" | "assistant"; content: string };
-type Tab = "ask" | "note" | "ticket";
+type Tab = "ask" | "note" | "ticket" | "actions";
 type Filed = { url: string } | { fallbackUrl: string } | null;
 
 const MAX_USER = 20;
@@ -29,6 +33,34 @@ const btnQuiet: React.CSSProperties = {
 };
 const pre: React.CSSProperties = { whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 14, lineHeight: 1.45 };
 const errStyle: React.CSSProperties = { fontSize: 13, color: "var(--coral)" };
+
+const linkStyle: React.CSSProperties = { color: "var(--mint-fg)", overflowWrap: "anywhere" };
+
+function proposalRows(p: ActionProposal): [string, string][] {
+  switch (p.type) {
+    case "review": return [
+      [A.fVerdict, VERDICT_ACTION[p.verdict]],
+      ...(p.comment ? [[A.fComment, p.comment]] as [string, string][] : []),
+      ...(p.reason ? [[A.fReason, REVIEW_REASON_LABEL[p.reason]]] as [string, string][] : []),
+    ];
+    case "answer_decision": return [[A.fAnswer, p.answer]];
+    case "create_decision": return [
+      [A.fQuestion, p.question],
+      [A.fContext, p.context],
+      [A.fOptions, p.options.map((o, i) => `${i + 1}. ${o}`).join("\n")],
+      ...(p.recommendation ? [[A.fRecommendation, p.recommendation]] as [string, string][] : []),
+      ...(p.deadline ? [[A.fDeadline, p.deadline]] as [string, string][] : []),
+      [A.fDecidedBy, A.forWhom[p.decidedBy] ?? p.decidedBy],
+    ];
+    case "note": return [[A.fBody, p.body]];
+    case "ticket": return [
+      [A.fTitle, p.draft.title],
+      [A.fLabel, p.draft.label === "bug" ? A.labelBug : A.labelBacklog],
+      [A.fBody, p.draft.body],
+    ];
+    case "none": return [];
+  }
+}
 
 function dis(on: boolean): React.CSSProperties {
   return on ? { opacity: 0.5, cursor: "not-allowed" } : {};
@@ -58,6 +90,17 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
   const [ticketError, setTicketError] = useState<string | null>(null);
   const [drafting, startDraft] = useTransition();
   const [filing, startFile] = useTransition();
+
+  const [waiting, setWaiting] = useState<WaitingView | null>(null);
+  const [waitError, setWaitError] = useState<string | null>(null);
+  const [loadingWait, startWait] = useTransition();
+  const [actText, setActText] = useState("");
+  const [view, setView] = useState<ProposalView | null>(null);
+  const [reply, setReply] = useState<string | null>(null);
+  const [done, setDone] = useState<{ message: string; href?: string } | null>(null);
+  const [actError, setActError] = useState<string | null>(null);
+  const [proposing, startPropose] = useTransition();
+  const [executing, startExecute] = useTransition();
 
   // Load item context + notes on open and when the item changes.
   useEffect(() => {
@@ -152,6 +195,44 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
     });
   }
 
+  function loadWaiting() {
+    setWaitError(null);
+    startWait(async () => {
+      try {
+        const res = await whatsWaiting();
+        if ("error" in res) setWaitError(res.error);
+        else setWaiting(res.waiting);
+      } catch { setWaitError(A.genericError); }
+    });
+  }
+
+  function propose() {
+    const t = actText.trim();
+    if (!t || noAi) return;
+    setActError(null); setView(null); setReply(null); setDone(null);
+    startPropose(async () => {
+      try {
+        const res = await proposeAction({ pathname, itemId, messages: [{ role: "user", content: t }] });
+        if ("error" in res) setActError(res.error);
+        else if (res.view.proposal.type === "none") setReply(res.view.proposal.message);
+        else setView(res.view);
+      } catch { setActError(A.genericError); }
+    });
+  }
+
+  // Only ever called from the "Megerősítem" click.
+  function confirmAction() {
+    if (!view) return;
+    setActError(null);
+    startExecute(async () => {
+      try {
+        const res = await executeAction(view.proposal);
+        if ("error" in res) setActError(res.error);
+        else { setDone({ message: res.message, href: res.href }); setView(null); setActText(""); }
+      } catch { setActError(A.genericError); }
+    });
+  }
+
   function patch(p: Partial<TicketDraft>) { setDraft((d) => (d ? { ...d, ...p } : d)); }
 
   const tabBtn = (id: Tab, label: string) => (
@@ -189,7 +270,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
         </div>
 
         <div role="tablist" style={{ display: "flex", borderBottom: "1px solid var(--line-soft)" }}>
-          {tabBtn("ask", A.tabAsk)}{tabBtn("note", A.tabNote)}{tabBtn("ticket", A.tabTicket)}
+          {tabBtn("ask", A.tabAsk)}{tabBtn("note", A.tabNote)}{tabBtn("ticket", A.tabTicket)}{tabBtn("actions", A.tabActions)}
         </div>
 
         <div id="assistant-panel" role="tabpanel" aria-labelledby={`assistant-tab-${tab}`} className="panel-pad" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -294,6 +375,91 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
                 </p>
               )}
               {ticketError && <p style={errStyle}>{ticketError}</p>}
+            </>
+          )}
+          {tab === "actions" && (
+            <>
+              <div>
+                <button type="button" disabled={loadingWait} onClick={loadWaiting} style={{ ...btnQuiet, ...dis(loadingWait) }}>
+                  {loadingWait ? A.thinking : A.whatsWaiting}
+                </button>
+              </div>
+              {waitError && <p role="alert" style={errStyle}>{waitError}</p>}
+              {waiting && waiting.items.length === 0 && waiting.decisions.length === 0 && (
+                <p role="status" style={{ fontSize: 14, color: "var(--fg-mute)" }}>{A.nothingWaiting}</p>
+              )}
+              {waiting && waiting.items.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 4 }}>{A.waitingItems}</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>
+                    {waiting.items.map((i) => (
+                      <li key={i.id}>
+                        <Link href={i.href} onClick={onClose} style={linkStyle}>{i.title}</Link>
+                        {i.days != null && <span style={{ color: "var(--fg-faint)" }}> {A.daysAgo(i.days)}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {waiting && waiting.decisions.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 4 }}>{A.waitingDecisions}</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>
+                    {waiting.decisions.map((d) => (
+                      <li key={d.checkId}>
+                        <Link href={d.href} onClick={onClose} style={linkStyle}>{d.question}</Link>
+                        <span style={{ color: "var(--fg-faint)" }}>
+                          {" "}{A.fDecidedBy}: {A.forWhom[d.forWhom] ?? d.forWhom}
+                          {d.deadline ? `, ${A.fDeadline}: ${d.deadline}` : ""}, {A.daysAgo(d.days)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <hr style={{ border: 0, borderTop: "1px solid var(--line-soft)", width: "100%" }} />
+              <label style={{ fontSize: 13, color: "var(--fg-mute)" }} htmlFor="assistant-action-text">{A.actionPrompt}</label>
+              <textarea
+                id="assistant-action-text" aria-label={A.actionPrompt} rows={3} maxLength={2000} value={actText}
+                disabled={noAi} onChange={(e) => setActText(e.target.value)} style={{ ...field, resize: "vertical", ...dis(noAi) }}
+              />
+              <div>
+                <button type="button" disabled={noAi || proposing || executing || !actText.trim()} onClick={propose} style={{ ...btn, ...dis(noAi || proposing || executing || !actText.trim()) }}>
+                  {proposing ? A.thinking : A.actionPropose}
+                </button>
+              </div>
+              {reply && (
+                <div className="panel-pad" style={{ border: "1px solid var(--line-soft)", borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 4 }}>{A.assistant}</div>
+                  <div role="status" style={pre}>{reply}</div>
+                </div>
+              )}
+              {view && (
+                <div className="panel-pad" style={{ border: "1px solid var(--line-soft)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ ...pre, fontWeight: 700 }}>{view.summary}</div>
+                  <dl style={{ margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {proposalRows(view.proposal).map(([k, v]) => (
+                      <div key={k}>
+                        <dt style={{ fontSize: 12, color: "var(--fg-faint)" }}>{k}</dt>
+                        <dd style={{ ...pre, margin: 0 }}>{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" disabled={executing} onClick={confirmAction} style={{ ...btn, ...dis(executing) }}>{A.confirm}</button>
+                    <button type="button" disabled={executing} onClick={() => { setView(null); setActError(null); }} style={{ ...btnQuiet, ...dis(executing) }}>{A.cancel}</button>
+                  </div>
+                </div>
+              )}
+              {done && (
+                <p role="status" style={{ fontSize: 14 }}>{done.message}{" "}
+                  {done.href && (/^https?:\/\//.test(done.href)
+                    ? <a href={done.href} target="_blank" rel="noreferrer" style={linkStyle}>{A.open}</a>
+                    : <Link href={done.href} onClick={onClose} style={linkStyle}>{A.open}</Link>)}
+                </p>
+              )}
+              {actError && <p role="alert" style={errStyle}>{actError}</p>}
             </>
           )}
         </div>
