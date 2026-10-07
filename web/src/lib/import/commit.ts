@@ -25,7 +25,7 @@ function emptyResult(entity: ImportEntity, dryRun: boolean): ImportResult {
 /** A company-matching index built once from the tenant's existing companies. */
 async function loadCompanyIndex(tenantId: number) {
   const companies = await db.company.findMany({
-    where: { tenantId },
+    where: { tenantId, deletedAt: null },
     select: {
       id: true, name: true, notes: true,
       ...Object.fromEntries(DIFF_FIELDS.map((f) => [f, true])),
@@ -39,7 +39,8 @@ async function loadCompanyIndex(tenantId: number) {
     const vat = normalizeVat(c.vatNumber);
     if (vat) byVat.set(vat, c.id);
     const key = companyKey(c.name);
-    if (key && !byName.has(key)) byName.set(key, c.id);
+    // companies under liquidation (status fa) stay matchable by VAT only
+    if (key && c.status !== "fa" && !byName.has(key)) byName.set(key, c.id);
   }
   return { byVat, byName, byId };
 }
@@ -90,7 +91,8 @@ export async function runCompanyImport(
         pushSample(res, rowNum, "meglévő", r.name, "már létezik: kihagyva");
         continue;
       }
-      const diffs = diffCompany(r, cur);
+      const values = mapRowValues(rows[i], mapping);
+      const diffs = diffCompany(r, cur, values);
       const block = buildImportNote({
         fileName: opts.fileName ?? "ismeretlen fájl", date: budapestToday(), diffs, rowNotes: r.notes,
       });
@@ -98,16 +100,31 @@ export async function runCompanyImport(
         pushSample(res, rowNum, "meglévő", r.name, "már létezik, nincs eltérés");
         continue;
       }
-      const next = appendImportNote(cur.notes, block);
+      let next = appendImportNote(cur.notes, block);
       if (next === null) {
         pushSample(res, rowNum, "meglévő", r.name, "már létezik: az import megjegyzés már szerepel");
         continue;
       }
       if (!opts.dryRun) {
-        await db.company.update({ where: { id: existing, tenantId: opts.tenantId }, data: { notes: next } });
-        await audit("company", existing, "update", { notes: cur.notes }, { notes: next, source: "import" }, { tenantId: opts.tenantId });
-        cur.notes = next;
+        const where = { id: existing, tenantId: opts.tenantId };
+        let before = cur.notes;
+        let upd = await db.company.updateMany({ where: { ...where, notes: before }, data: { notes: next } });
+        if (upd.count === 0) {
+          // lost-update guard: someone edited the notes meanwhile; re-read and retry once
+          const fresh = await db.company.findFirst({ where: { ...where, deletedAt: null }, select: { notes: true } });
+          before = fresh?.notes ?? null;
+          next = fresh ? appendImportNote(before, block) : null;
+          upd = next === null ? { count: 0 } : await db.company.updateMany({ where: { ...where, notes: before }, data: { notes: next } });
+          if (upd.count === 0) {
+            pushSample(res, rowNum, "meglévő", r.name, next === null && fresh
+              ? "már létezik: az import megjegyzés már szerepel"
+              : "már létezik: a megjegyzés közben módosult, kihagyva");
+            continue;
+          }
+        }
+        await audit("company", existing, "update", { notes: before }, { notes: next, source: "import" }, { tenantId: opts.tenantId });
       }
+      cur.notes = next; // dry run too, so a second row for the same company sees the first block
       res.notesAppended++;
       const what = diffs.length ? ` (eltér: ${diffs.map((d) => d.field).join(", ")})` : "";
       pushSample(res, rowNum, "meglévő", r.name,
