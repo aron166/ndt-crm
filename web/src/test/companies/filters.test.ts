@@ -5,6 +5,7 @@ import {
   buildScalarCompanyWhere,
   hasActiveCompanyFilters,
   activeCompanyFilterCount,
+  NOT_FA,
   type CompanyFilters,
 } from "@/lib/companies/filters";
 
@@ -88,9 +89,19 @@ describe("buildScalarCompanyWhere", () => {
       AND: [
         { county: { in: ["Pest", "Fejér"] } },
         { warmth: { in: ["warm"] } },
-        { NOT: { name: { contains: "F.A." } } },
+        { OR: [{ status: null }, { status: { not: "fa" } }] },
       ],
     });
+  });
+
+  it("keys F.A. hiding on status, never on the company name", () => {
+    const json = JSON.stringify(buildScalarCompanyWhere({}));
+    expect(json).not.toContain("F.A.");
+    expect(buildScalarCompanyWhere({})).toEqual({ AND: [NOT_FA] });
+  });
+
+  it("an explicit status=fa facet is not cancelled by the default hiding", () => {
+    expect(buildScalarCompanyWhere({ status: ["fa"] })).toEqual({ AND: [{ status: { in: ["fa"] } }] });
   });
 
   it("matches a SECONDARY TEÁOR via the attributes relation (current rows only)", () => {

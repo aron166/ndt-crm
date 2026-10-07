@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { NOT_FA } from "@/lib/companies/filters";
 import { requireCrmUser } from "@/lib/actor";
 import { loadSuppressionSet, isSuppressed } from "@/lib/suppression";
 import { revalidatePath } from "next/cache";
@@ -22,7 +23,7 @@ const CALLABLE_WHERE: Prisma.CompanyWhereInput = {
   tenantId: TENANT_ID,
   deletedAt: null,
   pipelineStatus: { in: [...CALLABLE_STATUSES] },
-  NOT: { name: { contains: "F.A." } },
+  AND: [NOT_FA],
 };
 
 export interface CallCardContact {

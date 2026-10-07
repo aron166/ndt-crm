@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { formatRelativeTime, contactFreshness } from "@/lib/utils";
+import { NOT_FA } from "@/lib/companies/filters";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { getActor } from "@/lib/actor";
 import { countPendingForReviewer } from "@/lib/content/queries";
@@ -69,7 +70,7 @@ export default async function DashboardPage() {
         tenantId: TENANT_ID,
         OR: [{ lastInteractionDate: null }, { lastInteractionDate: { lt: new Date(now.getTime() - 90 * 86400000) } }],
         pipelineStatus: { in: ["1", "2", "3", "5"] },
-        NOT: { name: { contains: "F.A." } },
+        AND: [NOT_FA],
       },
       select: { id: true, name: true, city: true, pipelineStatus: true, lastInteractionDate: true },
       orderBy: { lastInteractionDate: "asc" },
@@ -85,7 +86,7 @@ export default async function DashboardPage() {
       GROUP BY ps.id, ps.name, ps.color, ps.position
       ORDER BY ps.position
     `,
-    db.company.count({ where: { tenantId: TENANT_ID, NOT: { name: { contains: "F.A." } } } }),
+    db.company.count({ where: { tenantId: TENANT_ID, AND: [NOT_FA] } }),
     db.deal.count({ where: { tenantId: TENANT_ID, stage: { isTerminalWon: false, isTerminalLost: false } } }),
     db.task.count({ where: { tenantId: TENANT_ID, status: { in: ["created", "in_progress"] }, parentTaskId: null } }),
     db.interaction.count({ where: { tenantId: TENANT_ID, occurredAt: { gte: weekStart } } }),

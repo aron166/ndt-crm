@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { NOT_FA } from "@/lib/companies/filters";
 import { loadSuppressionSet, isSuppressed } from "@/lib/suppression";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
@@ -84,11 +85,8 @@ export async function GET(request: Request) {
       tenantId: key.tenantId,
       deletedAt: null,
       pipelineStatus: { in: [...CALLABLE_STATUSES] },
-      NOT: [
-        { name: { contains: "F.A." } },
-        { emailDrafts: { some: { tenantId: key.tenantId, campaign } } },
-      ],
-      ...(audienceAnd ? { AND: [audienceAnd] } : {}),
+      NOT: { emailDrafts: { some: { tenantId: key.tenantId, campaign } } },
+      AND: [NOT_FA, ...(audienceAnd ? [audienceAnd] : [])],
     };
 
     const [companies, total] = await Promise.all([
