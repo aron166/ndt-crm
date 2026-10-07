@@ -901,6 +901,8 @@ Definitions:
 
 Auth: `Authorization: Bearer <app key>`, tenant from the key, same as the leads API.
 
+Provider env (shared with the in-app assistant panel): `ASSISTANT_API_KEY` (a Groq key; without it the endpoint answers 503), optional `ASSISTANT_BASE_URL` (default `https://api.groq.com/openai/v1`), `ASSISTANT_MODEL` (default `openai/gpt-oss-120b`), `ASSISTANT_PRICE_IN` / `ASSISTANT_PRICE_OUT` (USD per 1M tokens, default 0.15 / 0.60, Groq list price). Groq free tier for that model: 30 requests/min, 1K requests/day, 8K tokens/min, 200K tokens/day (console.groq.com/docs/rate-limits). A provider 429 is retried once after `retry-after` (capped at 4 s). Every model call is logged in `assistant_calls` (purpose `callnote`, action = the app slug) and counts against the monthly token cap.
+
 Body: `{ transcript (required, 1..20000 chars), lead_id?, company?, person?, occurred_at? (ISO), now? (ISO, defaults to server time, used to resolve "jovo kedd"), apply? (boolean) }`
 
 The server sends the transcript to the configured assistant provider (Groq by default) with a strict JSON schema, then validates the answer (company, outcome, `callback_at` as `YYYY-MM-DDTHH:MM` Budapest time with date and hour for `callback_requested` only, `lost_reason` 3..500 chars for `not_interested` / `disqualified`, non-blank `note`). The transcript is treated as data, never as instructions.
@@ -922,7 +924,7 @@ EOF
 # 1) dry run: proposal + payload, nothing written
 curl -sS -X POST "$NDT_CRM_BASE_URL/api/assistant/callnote" \
   -H "Authorization: Bearer $NDT_CRM_APP_KEY" -H "Content-Type: application/json" \
-  -d "{\"transcript\": $TRANSCRIPT, \"company\": \"ZMT\"}"
+  -d "{\"transcript\": $TRANSCRIPT, \"now\": \"2026-10-07T15:00:00+02:00\"}"
 # -> 200 { "ok": true, "applied": false, "lead_id": 12, "proposed": {...}, "payload": {...} }
 
 # 2) apply to a known lead
