@@ -102,7 +102,6 @@ objections: array of strings, Hungarian, objections the customer voiced, verbati
 technology_word: string|null, the exact word the customer used for the technology (e.g. radar, georadar, furas)
 lost_reason: string|null, one Hungarian line, only for not_interested or disqualified
 note: string, Hungarian, 1-3 sentences summarising the call for the CRM
-If the outcome is unclear pick null for outcome rather than guessing.
 Transcript:
 ${transcript}`;
 }

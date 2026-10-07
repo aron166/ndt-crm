@@ -49,6 +49,7 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/cron/content-digest" ||
     pathname === "/api/cron/weekly-report" ||
     pathname === "/api/reports/weekly" ||
+    pathname === "/api/assistant/callnote" ||
     pathname === "/api/health"
   );
 }
