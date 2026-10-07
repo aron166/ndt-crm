@@ -229,3 +229,15 @@ describe("executeAction with a stored card ref", () => {
     expect(m.contentNote.create).not.toHaveBeenCalled();
   });
 });
+
+describe("executeAction stamp release on a throw", () => {
+  it("a throw after the claim releases the stamp and rethrows", async () => {
+    const at = new Date("2026-10-07T10:00:00Z");
+    m.assistantConversation.findFirst.mockResolvedValue({ updatedAt: at, messages: [{ role: "assistant", content: "ok", at: "x", actions: [{ key: "a-0-note", summary: "s", proposal: { type: "note", itemId: 7, body: "x" } }] }] });
+    m.assistantConversation.updateMany.mockResolvedValue({ count: 1 });
+    m.contentItem.findFirst.mockRejectedValue(new Error("db down"));
+    await expect(executeAction({ type: "note", itemId: 7, body: "x" }, { conversationId: 3, key: "a-0-note" })).rejects.toThrow("db down");
+    const last = m.assistantConversation.updateMany.mock.calls.at(-1)![0];
+    expect(JSON.stringify(last.data.messages)).not.toContain("executedAt");
+  });
+});

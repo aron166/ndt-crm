@@ -25,7 +25,7 @@ class CheckFail extends Error {}
 
 export type NoteView = { id: number; body: string; author: string; createdAt: string };
 
-const validId = (v: unknown): v is number => Number.isInteger(v) && (v as number) > 0;
+const validId = (v: unknown): v is number => Number.isInteger(v) && (v as number) > 0 && (v as number) <= 2147483647;
 
 const noteView = (n: { id: number; body: string; createdAt: Date; user: { name: string | null } | null }): NoteView => ({
   id: n.id, body: n.body, author: n.user?.name ?? "", createdAt: n.createdAt.toISOString(),
@@ -163,13 +163,14 @@ export async function whatsWaiting(): Promise<{ ok: true; waiting: WaitingView }
   };
 }
 
+/** Never throws: a log failure after the write must not release a card that did run. */
 async function logExecuted(userId: number, action: string, itemId: number | null) {
   await db.assistantCall.create({
     data: {
       tenantId: TENANT_ID, userId, page: "/marketing", purpose: "execute", action, itemId,
       model: "-", promptTokens: 0, completionTokens: 0, costUsd: 0,
     },
-  });
+  }).catch((e: unknown) => reportError("assistant.logExecuted", e, { userId, action }));
 }
 
 /**
@@ -209,13 +210,20 @@ export async function executeAction(raw: ActionProposal, ref?: { conversationId:
     data: { messages: stamped, updatedAt: new Date() },
   });
   if (claim.count === 0) return { error: "A beszélgetés közben változott. Kérem, próbálja újra." };
-  const r = await runAction(userId, card.proposal);
-  if ("error" in r) {
-    // Not executed: release the stamp so the user can retry.
+  // Not executed (error result or a throw before the write): release the stamp so the user can retry.
+  const release = async () => {
     const cur = await db.assistantConversation.findFirst({ where: ownConv(userId, ref.conversationId), select: { messages: true } });
     const back = (Array.isArray(cur?.messages) ? (cur!.messages as ChatTurn[]) : []).map((t) => (t.role === "assistant" ? { ...t, actions: t.actions.map((a) => (a.key === ref.key ? { ...a, executedAt: undefined } : a)) } : t));
     await db.assistantConversation.updateMany({ where: ownConv(userId, ref.conversationId), data: { messages: back } });
+  };
+  let r: ExecResult;
+  try {
+    r = await runAction(userId, card.proposal);
+  } catch (e) {
+    await release().catch(() => {});
+    throw e;
   }
+  if ("error" in r) await release();
   return r;
 }
 

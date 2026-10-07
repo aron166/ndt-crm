@@ -170,7 +170,7 @@ function WaitingList({ w }: { w: WaitingView }) {
   );
 }
 
-function Card({ card, st, onRun, onDismiss }: { card: ActionCard; st: CardState; onRun: () => void; onDismiss: () => void }) {
+function Card({ card, st, onRun, onDismiss, locked }: { card: ActionCard; st: CardState; onRun: () => void; onDismiss: () => void; locked: boolean }) {
   if (st.phase === "dismissed") return null;
   const rows = proposalRows(card.proposal);
   const executed = !!card.executedAt;
@@ -195,7 +195,8 @@ function Card({ card, st, onRun, onDismiss }: { card: ActionCard; st: CardState;
       {executed && st.phase !== "done" && <p role="status" style={{ margin: 0, fontSize: 13, color: "var(--mint-fg)" }}>{A.executed}</p>}
       {!finished && (
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" disabled={running} onClick={onRun} style={{ ...btn, ...(running ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>
+          {/* locked while a reply streams: the route appends to the stored turns at the end of the stream */}
+          <button type="button" disabled={running || locked} onClick={onRun} style={{ ...btn, ...(running || locked ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>
             {running ? A.executing : A.execute}
           </button>
           <button type="button" disabled={running} onClick={onDismiss} style={btnQuiet}>{A.dismiss}</button>
@@ -207,10 +208,10 @@ function Card({ card, st, onRun, onDismiss }: { card: ActionCard; st: CardState;
 
 type RowProps = {
   m: Msg; i: number; cards: Record<string, CardState>;
-  onRun: (k: string, c: ActionCard) => void; onDismiss: (k: string) => void;
+  onRun: (k: string, c: ActionCard) => void; onDismiss: (k: string) => void; locked: boolean;
 };
 // Memoized: finished rows keep their identity while a later row streams, so they are not re-rendered or re-parsed.
-const MsgRow = memo(function MsgRow({ m, i, cards, onRun, onDismiss }: RowProps) {
+const MsgRow = memo(function MsgRow({ m, i, cards, onRun, onDismiss, locked }: RowProps) {
   return (
     <div style={m.role === "user"
       ? { justifySelf: "end", maxWidth: "85%", background: "var(--mint-soft)", borderRadius: 8, padding: "6px 10px", fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
@@ -228,7 +229,7 @@ const MsgRow = memo(function MsgRow({ m, i, cards, onRun, onDismiss }: RowProps)
           {m.actions?.map((c, j) => {
             const k = `${i}:${c.key}:${j}`;
             const st = cards[k] ?? (c.proposal.type === "waiting" ? cards[`${i}:w`] : undefined) ?? { phase: "idle" as const };
-            return <Card key={k} card={c} st={st} onRun={() => onRun(k, c)} onDismiss={() => onDismiss(k)} />;
+            return <Card key={k} card={c} st={st} onRun={() => onRun(k, c)} onDismiss={() => onDismiss(k)} locked={locked} />;
           })}
         </>
       )}
@@ -349,8 +350,15 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
     setStreaming(true);
     const ac = new AbortController();
     abortRef.current = ac;
+    const startedConv = convRef.current;
     const fail = (msg: string) => {
       setMsgs((all) => (all.length >= 2 ? all.slice(0, -2) : all)); // drop the user bubble and the pending answer; the input is restored
+      // A failed first turn: the server soft-deleted the new conversation, so forget its id.
+      if (startedConv == null && convRef.current != null) {
+        const dead = convRef.current;
+        setConv(null);
+        setRecent((r) => r.filter((c) => c.id !== dead));
+      }
       setChatError(msg);
       setInput(message);
     };
@@ -435,7 +443,7 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
   }, [router, patchCard]);
 
   function saveNote() {
-    if (item == null || !noteText.trim() || loadError) return;
+    if (item == null || item.id !== itemId || !noteText.trim() || loadError) return;
     const target = item.id;
     setNoteError(null);
     startSave(async () => {
@@ -508,7 +516,7 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
                 </div>
               )}
               {noAi && <p style={{ fontSize: 13, color: "var(--fg-mute)", margin: 0 }}>{A.notConfigured}</p>}
-              {msgs.map((m, i) => <MsgRow key={i} m={m} i={i} cards={cards} onRun={run} onDismiss={dismissCard} />)}
+              {msgs.map((m, i) => <MsgRow key={i} m={m} i={i} cards={cards} onRun={run} onDismiss={dismissCard} locked={streaming} />)}
               {chatError && <p role="alert" style={{ ...errStyle, margin: 0 }}>{chatError}</p>}
             </div>
             <form onSubmit={(e) => { e.preventDefault(); void send(input); }} style={{ display: "flex", gap: 8, padding: "8px 12px", borderTop: "1px solid var(--line-soft)" }}>

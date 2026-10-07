@@ -120,6 +120,9 @@ describe("denial paths", () => {
 describe("happy path", () => {
   it("streams start, deltas, done; creates, persists and logs", async () => {
     const message = "k".repeat(100);
+    const seen = new Date("2026-10-07T10:00:00Z");
+    // The persist step re-reads the stored turns (a card may have been stamped meanwhile).
+    db.assistantConversation.findFirst.mockResolvedValue({ messages: [{ role: "assistant", content: "régi", at: "x", actions: [{ key: "k1", summary: "s", proposal: { type: "waiting" }, executedAt: "2026-10-07T09:59:00Z" }] }], updatedAt: seen });
     const res = await POST(req({ ...ok, message }));
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("text/event-stream");
@@ -134,8 +137,11 @@ describe("happy path", () => {
 
     expect(db.assistantConversation.create.mock.calls[0][0].data).toMatchObject({ tenantId: 1, userId: 2, title: "k".repeat(80), page: "/marketing/5", itemId: 5 });
     const upd = db.assistantConversation.updateMany.mock.calls[0][0];
-    expect(upd.where).toEqual({ id: 7, tenantId: 1, userId: 2, deletedAt: null });
-    expect(upd.data.messages).toMatchObject([{ role: "user", content: message }, { role: "assistant", content: "Ez egy hírlevél.", actions: [] }]);
+    expect(upd.where).toEqual({ id: 7, tenantId: 1, userId: 2, deletedAt: null, updatedAt: seen });
+    expect(upd.data.messages).toMatchObject([
+      { role: "assistant", content: "régi", actions: [{ key: "k1", executedAt: "2026-10-07T09:59:00Z" }] },
+      { role: "user", content: message }, { role: "assistant", content: "Ez egy hírlevél.", actions: [] },
+    ]);
     expect(calls()).toHaveLength(2);
     expect(calls()[0]).toMatchObject({ purpose: "conversation", action: "create", conversationId: 7, tenantId: 1, userId: 2 });
     expect(calls()[1]).toMatchObject({ purpose: "chat", conversationId: 7, promptTokens: 100, completionTokens: 20 });
@@ -156,9 +162,11 @@ describe("happy path", () => {
     db.contentItem.findMany.mockResolvedValue([{ id: 5, title: "Hírlevél", currentVersionId: 11 }]);
     fetchMock.mockImplementation(async () => sse(reply("Jóváhagyom?", [flat({ type: "review", item_id: 5, verdict: "approve" })])));
     const ev = await events(await POST(req(ok)));
-    const done = ev[ev.length - 1] as unknown as { actions: { proposal: { versionId: number } }[] };
+    const done = ev[ev.length - 1] as unknown as { actions: { key: string; proposal: { versionId: number } }[] };
     expect(done.actions).toHaveLength(1);
     expect(done.actions[0].proposal.versionId).toBe(11);
+    // Keys are unique per conversation (stamp prefix), not the bare index that repeats every turn.
+    expect(done.actions[0].key).toMatch(/^[0-9a-z]+-0-review$/);
   });
 });
 

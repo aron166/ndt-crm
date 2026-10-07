@@ -55,4 +55,14 @@ describe("renderHubContext", () => {
     expect(t.split("</crm>").length - 1).toBe(1);
     expect(t.split("<crm>").length - 1).toBe(1);
   });
+  it("a tight budget (post-read hop) keeps at most 5 open decisions and stays near budget", () => {
+    const decisions = Array.from({ length: 30 }, (_, k) => ({
+      checkId: k + 1, itemId: k + 1, question: "Melyik ajánlatot küldjük ki a partnernek jövő héten?", forWhom: "either" as const,
+      state: k % 3 === 0 ? "resolved" : "open", deadline: null, daysWaiting: 2, answer: null,
+    }));
+    const t = renderHubContext(data(Array.from({ length: 40 }, (_, k) => item(k + 1)), { decisions }), { budgetChars: 1500 });
+    expect(t.split("\n").filter((l) => l.startsWith("kérdés #")).length).toBeLessThanOrEqual(5);
+    expect(t).not.toMatch(/állapot: (Megválaszolva|resolved)/);
+    expect(t.length).toBeLessThanOrEqual(1500);
+  });
 });

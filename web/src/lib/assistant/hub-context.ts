@@ -186,7 +186,8 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}
     ].join("\n");
   };
 
-  let decs = d.decisions;
+  // A tight budget (the post-read hop) keeps only 5 open decisions: 30 lines alone are ~6000 chars.
+  let decs = budget < 3000 ? d.decisions.filter((x) => x.state === "open").slice(0, 5) : d.decisions;
   const text = build(decs, items, [], 0);
   if (text.length <= budget && !d.truncatedQuery) return text;
 
