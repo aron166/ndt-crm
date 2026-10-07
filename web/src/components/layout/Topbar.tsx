@@ -39,6 +39,7 @@ const CRUMB: Record<string, string> = {
   "/invoices":  "Számlák",
   "/settings":  "Beállítások",
   "/analytics": "Analytics",
+  "/reports/weekly": "Heti riport",
 };
 
 function useCrumb(pathname: string) {
