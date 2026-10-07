@@ -50,6 +50,7 @@ model Tenant {
   patchTestMarks         PatchTestMark[]
   assistantCalls         AssistantCall[]
   contentNotes           ContentNote[]
+  assistantConversations AssistantConversation[]
   campaigns              Campaign[]
   contentItems           ContentItem[]
   emailDrafts            EmailDraft[]
@@ -291,6 +292,7 @@ model User {
   patchTestMarks     PatchTestMark[]
   assistantCalls     AssistantCall[]
   contentNotes       ContentNote[]
+  assistantConversations AssistantConversation[]
 
   @@map("users")
 }
@@ -1461,6 +1463,8 @@ model AssistantCall {
   promptTokens     Int      @map("prompt_tokens")
   completionTokens Int      @map("completion_tokens")
   costUsd          Decimal  @map("cost_usd") @db.Decimal(10, 6)
+  /// The panel conversation this call belongs to (v3), no FK: the log outlives the conversation.
+  conversationId   Int?     @map("conversation_id")
   createdAt        DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -1468,6 +1472,29 @@ model AssistantCall {
 
   @@index([tenantId, createdAt])
   @@map("assistant_calls")
+}
+
+/// Assistant v3 panel conversation, one per chat, per user and tenant. Soft delete.
+model AssistantConversation {
+  id        Int       @id @default(autoincrement())
+  tenantId  Int       @map("tenant_id")
+  userId    Int       @map("user_id")
+  /// First user message, trimmed to 80 chars.
+  title     String
+  /// Pathname and item the conversation was opened on; re-sent to the model.
+  page      String
+  itemId    Int?      @map("item_id")
+  /// ChatTurn[] (lib/assistant/chat-types.ts), capped at 40.
+  messages  Json      @default("[]")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, updatedAt(sort: Desc)], map: "assistant_conversations_owner_idx")
+  @@map("assistant_conversations")
 }
 
 // A free-text note on a content item (assistant panel, ADR/019). Append-only,
