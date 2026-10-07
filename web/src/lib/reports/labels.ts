@@ -21,7 +21,7 @@ export const REPORT_UI = {
   callOutcomes: "Hívás eredmények",
   calls: "Hívás",
   demosBooked: "Foglalt demó",
-  demosScheduled: "Demó a időszakban",
+  demosScheduled: "Ütemezett demó",
   demosHeld: "Megtartott demó",
   stageTransitions: "Lead fázisváltások",
   suppression: "Tiltólista",
