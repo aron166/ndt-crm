@@ -57,7 +57,7 @@ describe("askAssistant", () => {
     expect(await askAssistant(input)).toEqual({ ok: true, reply: "Válasz" });
     expect(db.assistantCall.create).toHaveBeenCalledTimes(1);
     expect(db.assistantCall.create.mock.calls[0][0].data).toMatchObject({
-      tenantId: 1, userId: 2, page: "/marketing/5", purpose: "explain", itemId: 5, model: "grok-4.3", promptTokens: 100, completionTokens: 20,
+      tenantId: 1, userId: 2, page: "/marketing/5", purpose: "explain", itemId: 5, model: "openai/gpt-oss-120b", promptTokens: 100, completionTokens: 20,
     });
     expect(db.contentItem.findFirst.mock.calls[0][0].where).toEqual({ id: 5, tenantId: 1 });
   });
@@ -113,7 +113,7 @@ describe("draftTicket", () => {
     const d = { title: "Hibás gomb", body: "Nem működik a gomb az oldalon.", label: "bug", repo: "ndt-crm" };
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(d) } }] }), { status: 200 }));
     expect(await draftTicket(input)).toEqual({ ok: true, draft: d });
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ response_format: { type: "json_object" }, max_tokens: 700 });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ response_format: { type: "json_object" }, max_tokens: 1500 });
     expect(db.assistantCall.create.mock.calls[0][0].data.purpose).toBe("ticket");
   });
   it("unparseable output asks to rephrase", async () => {
