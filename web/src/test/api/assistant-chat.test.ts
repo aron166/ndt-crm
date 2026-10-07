@@ -15,7 +15,7 @@ vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/actor", () => ({ getActor: vi.fn(), NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
 vi.mock("@/lib/content/reviewers", () => ({ getContentReviewers: vi.fn() }));
 vi.mock("@/lib/assistant/cap", () => ({ capState: vi.fn(), CAP_EXCEEDED: "cap" }));
-vi.mock("@/lib/assistant/hub-context", () => ({ loadHubData: vi.fn(), renderHubContext: vi.fn(() => "HUB") }));
+vi.mock("@/lib/assistant/hub-context", () => ({ loadHubData: vi.fn(), renderHubContext: vi.fn(() => "HUB"), routeIntent: vi.fn(() => ({ kind: "general" })) }));
 vi.mock("@/lib/assistant/context", async () => ({
   ...(await vi.importActual<typeof import("@/lib/assistant/context")>("@/lib/assistant/context")),
   loadItemContext: vi.fn(),

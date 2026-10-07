@@ -19,7 +19,23 @@ export function assistantConfig(env: Env = process.env): AssistantConfig | null 
 
 /** Shown when the provider answers 429 twice (free-tier rate limit). PROPOSAL copy. */
 export const RATE_LIMITED = "Pillanat, túl sok kérés. Kérem, próbálja újra egy perc múlva.";
-const RETRY_CAP_MS = 10_000;
+/** A TPM 429 asks for up to ~60 s; past this cap the user gets RATE_LIMITED instead of a hung panel. */
+const RETRY_CAP_MS = 30_000;
+
+/**
+ * Wait before the single retry: `retry-after` (seconds), else Groq's `x-ratelimit-reset-tokens`
+ * ("7.66s", "1m2.5s", "450ms"), else 2 s. The old fixed 10 s cap retried before the token window
+ * reset, so the retry failed too (#150).
+ */
+export function retryDelayMs(h: Headers): number {
+  const after = Number(h.get("retry-after"));
+  let ms = Number.isFinite(after) && after > 0 ? after * 1000 : NaN;
+  if (!Number.isFinite(ms)) {
+    const m = /^(?:(\d+(?:\.\d+)?)m(?!s))?(?:(\d+(?:\.\d+)?)s)?(?:(\d+(?:\.\d+)?)ms)?$/.exec(h.get("x-ratelimit-reset-tokens")?.trim() ?? "");
+    if (m && (m[1] || m[2] || m[3])) ms = Number(m[1] ?? 0) * 60_000 + Number(m[2] ?? 0) * 1000 + Number(m[3] ?? 0);
+  }
+  return Math.min(RETRY_CAP_MS, Number.isFinite(ms) && ms > 0 ? Math.ceil(ms) + 250 : 2000);
+}
 
 export class AssistantError extends Error {
   status?: number;
@@ -70,8 +86,7 @@ export async function chatCompletion(
     res = await send();
     // Free tier: one retry after retry-after (capped), then give up with RATE_LIMITED.
     if (res.status === 429) {
-      const after = Number(res.headers.get("retry-after"));
-      await sleep(Math.min(RETRY_CAP_MS, Number.isFinite(after) && after > 0 ? after * 1000 : 1000));
+      await sleep(retryDelayMs(res.headers));
       res = await send();
     }
   } catch {
@@ -136,8 +151,7 @@ export async function chatCompletionStream(
   try {
     res = await send();
     if (res.status === 429) {
-      const after = Number(res.headers.get("retry-after"));
-      await sleep(Math.min(RETRY_CAP_MS, Number.isFinite(after) && after > 0 ? after * 1000 : 1000));
+      await sleep(retryDelayMs(res.headers));
       res = await send();
     }
   } catch {

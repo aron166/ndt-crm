@@ -8,8 +8,11 @@ import { getPatchnotes } from "@/lib/patchnotes/github";
 import { getWeeklyReport, lastDays } from "@/lib/reports/weekly";
 import type { ContentCategory } from "@/lib/content/types";
 
-/** ~2.5K tokens of CRM state per message: Groq free tier is 8K tokens/min (prompt + reply). */
-export const HUB_CONTEXT_BUDGET_CHARS = 6000;
+/**
+ * ~1.1K tokens of CRM state per message (Hungarian ~2.6 chars/token, measured on prod 2026-10-07).
+ * Groq free tier is 8K tokens/min (prompt + reply); 6000 chars here made the second question 429.
+ */
+export const HUB_CONTEXT_BUDGET_CHARS = 2800;
 
 export type HubItem = {
   id: number; title: string; category: string; status: string; stage: string; version: number | null;
@@ -152,80 +155,86 @@ export async function loadHubData(tenantId: number, userId: number, userName: st
 // Data never contains "<": no nested or spaced variant can rebuild a tag (Vanda r3).
 const clean = (s: string) => flat(s.replace(/</g, "‹"));
 
-export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}): string {
-  const budget = opts.budgetChars ?? HUB_CONTEXT_BUDGET_CHARS;
-  const items = [...d.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+export type HubIntent = { kind: "waiting" } | { kind: "stage"; stage: string } | { kind: "general" };
 
-  // Every stage names its item ids (up to 40), so "mi van a vázlatokban?" maps to ids even when
-  // the item lines are truncated (prod smoke 2026-10-07: 2 drafts, compact-only, model said "Nem tudom").
-  const idCap = budget < 3000 ? 8 : 40; // tight budgets (post-read hop) keep the stage line short
-  const counts = STAGES.map((s) => {
-    if (s.key === "archived") return `${s.label}: ${d.archivedCount}`;
-    const ids = items.filter((i) => s.statuses.includes(i.status)).map((i) => `#${i.id}`);
-    return `${s.label}: ${ids.length}${ids.length ? ` (${ids.slice(0, idCap).join(", ")}${ids.length > idCap ? ", ..." : ""})` : ""}`;
-  });
+/**
+ * Routes the question to the context it needs (Groq free tier 8K TPM: the whole page summary
+ * on every call ran ~4.4K prompt tokens and the second question hit 429, QA walk 2026-10-07).
+ * ponytail: keyword match on the folded text; a miss falls back to "general" plus the read tool.
+ */
+export function routeIntent(message: string): HubIntent {
+  const m = fold(message);
+  if (/\bvar ram\b|\bram var\b|\bonre var|teendo|\bdolgom\b|\bmit kell\b/.test(m)) return { kind: "waiting" };
+  const stages: [RegExp, string][] = [
+    [/vazlat|\bdraft/, "draft"],
+    [/biralat|\breview/, "in_review"],
+    [/javit|ujrair|visszadob/, "changes"],
+    [/\bai\b/, "ai_working"],
+    [/\belo\b|\belok\b|\beles|\blive\b/, "live"],
+    [/archiv/, "archived"],
+  ];
+  for (const [re, stage] of stages) if (re.test(m)) return { kind: "stage", stage };
+  return { kind: "general" };
+}
+
+/**
+ * Every item id in the output is printed with its title (no bare id lists): bare ids made the
+ * model answer "#31 (adat hiányzik)" (#149). Fixed lines first, optional lines greedily while
+ * they fit the budget, then a FIGYELEM line with the omitted count.
+ */
+export function renderHubContext(d: HubData, opts: { budgetChars?: number; intent?: HubIntent } = {}): string {
+  const budget = opts.budgetChars ?? HUB_CONTEXT_BUDGET_CHARS;
+  const intent = opts.intent ?? { kind: "general" };
+  const tight = budget < 2000;
+  const items = [...d.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const decById = new Map(d.decisions.map((x) => [x.checkId, x]));
+
+  const counts = STAGES.map((s) => `${s.label}: ${s.key === "archived" ? d.archivedCount : items.filter((i) => s.statuses.includes(i.status)).length}`);
   const decLine = (x: HubDecision) =>
     `kérdés #${x.checkId} | ${clean(x.question)} | kitől: ${WHO[x.forWhom]} | állapot: ${STATE_HU[x.state] ?? x.state} | határidő: ${x.deadline ?? "nincs"} | vár ${x.daysWaiting} nap | válasz: ${x.answer ? clean(x.answer) : "nincs"} | link /marketing/decisions#${x.checkId}`;
   const full = (i: HubItem) =>
     `#${i.id} | ${clean(i.title)} | ${CATEGORY_LABEL[i.category as ContentCategory] ?? i.category} | ${i.stage} | v${i.version ?? "-"} | nyitott kérdés: ${i.openChecks} | jóváhagyásra vár: ${i.owedBy.length ? i.owedBy.map(clean).join(", ") : "senki"} | kor: ${i.ageDays} nap | utolsó megjegyzés: ${i.lastComment ? `${clean(i.lastComment.by)}: "${clean(i.lastComment.text)}"` : "nincs"} | /marketing/${i.id}${i.campaign ? ` | kampány: ${clean(i.campaign)}` : ""}`;
   const compact = (i: HubItem) => `#${i.id} ${clean(i.title).slice(0, 80)} [${i.stage}]`;
-
-  const byId = new Map(items.map((i) => [i.id, i]));
-  const decById = new Map(d.decisions.map((x) => [x.checkId, x]));
-  // Totals are server-computed, so only the oldest few are listed: 34 + 16 full lines were ~6000 chars,
-  // most of the 7000 budget, and ÖNRE VÁR is never dropped.
-  const tight = budget < 3000;
-  const ownItems = [...d.mine.itemIds].sort((a, b) => (byId.get(b)?.ageDays ?? 0) - (byId.get(a)?.ageDays ?? 0)).slice(0, tight ? 5 : 10).flatMap((id) => {
+  const ownItem = (id: number) => {
     const i = byId.get(id);
-    return i ? [`#${id} ${clean(i.title)} | ${i.stage} | jóváhagyásra vár: ${i.owedBy.length ? i.owedBy.map(clean).join(", ") : "senki"} | /marketing/${id}`] : [];
-  });
-  const ownDecs = d.mine.checkIds.slice(0, tight ? 3 : 5).flatMap((id) => {
-    const x = decById.get(id);
-    return x ? [`kérdés #${id} ${clean(x.question)} | kitől: ${WHO[x.forWhom]} | /marketing/decisions#${id}`] : [];
-  });
-  const own = [
-    `ÖNRE VÁR: ${d.pendingCount} anyag vár Önre; ${d.mine.checkIds.length} nyitott döntés.`,
-    ...ownItems, ...ownDecs,
-  ];
-  const patch = d.patch ? `merged 7 nap: ${d.patch.merged7}; nyitott backlog: ${d.patch.backlog}; Áron döntésére váró issue: ${d.patch.decisionAron}` : "(nincs adat)";
-  const weekly = d.weekly ? `leads: ${d.weekly.leads}; hívások: ${d.weekly.calls}; demók: ${d.weekly.demos}` : "(nincs adat)";
-
-  const build = (decisions: HubDecision[], fullItems: HubItem[], compactItems: HubItem[], omitted: number) => {
-    const order = (i: HubItem) => STAGES.findIndex((s) => s.label === i.stage);
-    const compactSorted = [...compactItems].sort((a, b) => order(a) - order(b));
-    return [
-      "<crm>",
-      "SZAKASZOK:", counts.join("; "),
-      ...own,
-      "DÖNTÉSEK:", ...(decisions.length ? decisions.map(decLine) : ["(nincs)"]),
-      "FEJLESZTÉS (patchnotes):", patch,
-      "HETI SZÁMOK (7 nap):", weekly,
-      "ANYAGOK:", ...(fullItems.length ? fullItems.map(full) : ["(nincs)"]), ...compactSorted.map(compact),
-      ...(omitted || d.truncatedQuery
-        ? [`FIGYELEM: a lista csonkolt; ${omitted} anyag csak számként szerepel. Részletekért használja a read_item_ids eszközt.`]
-        : []),
-      "</crm>",
-    ].join("\n");
+    return i ? `#${id} ${clean(i.title)} | ${i.stage} | jóváhagyásra vár: ${i.owedBy.length ? i.owedBy.map(clean).join(", ") : "senki"} | /marketing/${id}` : null;
   };
+  const ownDec = (id: number) => {
+    const x = decById.get(id);
+    return x ? `kérdés #${id} ${clean(x.question)} | kitől: ${WHO[x.forWhom]} | /marketing/decisions#${id}` : null;
+  };
+  // Oldest waiting first; totals are server-computed, so a few lines are enough.
+  const oldestMine = [...d.mine.itemIds].sort((a, b) => (byId.get(b)?.ageDays ?? 0) - (byId.get(a)?.ageDays ?? 0));
+  const own = (nItems: number, nDecs: number) => [
+    ...oldestMine.slice(0, nItems).map(ownItem), ...d.mine.checkIds.slice(0, nDecs).map(ownDec),
+  ].filter((l): l is string => l !== null);
 
-  // A tight budget (the post-read hop) keeps only 5 open decisions: 30 lines alone are ~6000 chars.
-  let decs = budget < 3000 ? d.decisions.filter((x) => x.state === "open").slice(0, 5) : d.decisions;
-  const text = build(decs, items, [], 0);
-  if (text.length <= budget && !d.truncatedQuery) return text;
-
-  if (decs.length > 30 && build(decs, items.slice(0, 20), [], items.length - 20).length > budget) decs = decs.slice(0, 30);
-  // ponytail: binary search on the compact count, 20 full lines shrink only if they alone overflow.
-  for (let fullN = Math.min(20, items.length); fullN >= 0; fullN--) {
-    const head = items.slice(0, fullN);
-    const rest = items.slice(fullN);
-    if (build(decs, head, [], rest.length).length > budget) continue;
-    let lo = 0, hi = rest.length;
-    while (lo < hi) {
-      const mid = Math.ceil((lo + hi) / 2);
-      if (build(decs, head, rest.slice(0, mid), rest.length - mid).length <= budget) lo = mid;
-      else hi = mid - 1;
-    }
-    return build(decs, head, rest.slice(0, lo), rest.length - lo);
+  const fixed = ["<crm>", "SZAKASZOK:", counts.join("; "), `ÖNRE VÁR: ${d.pendingCount} anyag vár Önre; ${d.mine.checkIds.length} nyitott döntés.`];
+  let optional: string[] = [];
+  let listed: HubItem[] = [];
+  if (intent.kind === "waiting") {
+    fixed.push(...own(tight ? 5 : 10, tight ? 3 : 5));
+  } else if (intent.kind === "stage") {
+    const s = STAGES.find((x) => x.key === intent.stage) ?? STAGES[0];
+    listed = items.filter((i) => s.statuses.includes(i.status));
+    fixed.push(`ANYAGOK (${s.label}):`, ...(listed.length ? [] : ["(nincs)"]));
+    optional = listed.map(full);
+  } else {
+    const patch = d.patch ? `merged 7 nap: ${d.patch.merged7}; nyitott backlog: ${d.patch.backlog}; Áron döntésére váró issue: ${d.patch.decisionAron}` : "(nincs adat)";
+    const weekly = d.weekly ? `leads: ${d.weekly.leads}; hívások: ${d.weekly.calls}; demók: ${d.weekly.demos}` : "(nincs adat)";
+    const open = d.decisions.filter((x) => x.state === "open").slice(0, tight ? 3 : 8);
+    fixed.push(...own(tight ? 3 : 5, tight ? 2 : 3), "FEJLESZTÉS (patchnotes):", patch, "HETI SZÁMOK (7 nap):", weekly, "NYITOTT DÖNTÉSEK:", ...(open.length ? open.map(decLine) : ["(nincs)"]), "ANYAGOK (legutóbb módosítva):");
+    listed = items;
+    optional = items.map(compact);
   }
-  return build(decs, [], [], items.length);
+
+  const note = (omitted: number) => (omitted || (intent.kind !== "waiting" && d.truncatedQuery)
+    ? [`FIGYELEM: a lista csonkolt; ${omitted} anyag kimaradt. Részletekért használja a read_item_ids eszközt.`]
+    : []);
+  const render = (n: number) => [...fixed, ...optional.slice(0, n), ...note(listed.length ? optional.length - n : 0), "</crm>"].join("\n");
+  // ponytail: linear scan from the full list down, fine for ITEM_TAKE=400 lines.
+  let n = optional.length;
+  while (n > 0 && render(n).length > budget) n--;
+  return render(n);
 }
