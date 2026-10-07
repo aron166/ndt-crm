@@ -337,7 +337,11 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
   }, [msgs, tab, vis]);
 
+  // A new chat or another tab starts pinned to the newest message.
+  useEffect(() => { pinned.current = true; }, [tab]);
+
   function fresh() {
+    pinned.current = true;
     abort();
     setConv(null);
     setMsgs([]); setCards({}); setChatError(null); setInput("");

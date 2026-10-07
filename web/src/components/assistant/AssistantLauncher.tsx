@@ -83,6 +83,7 @@ export function AssistantLauncher({ userId, pending }: { userId: number | null; 
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
     if (e.button !== 0) return;
+    suppressClick.current = false; // a drag that produced no click must not swallow the next tap
     const r = e.currentTarget.getBoundingClientRect();
     drag.current = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, moved: false };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -101,6 +102,7 @@ export function AssistantLauncher({ userId, pending }: { userId: number | null; 
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
     if (!d?.moved) return;
     suppressClick.current = true; // the click that follows a drag is not an open
+    setTimeout(() => { suppressClick.current = false; }, 0); // touch drags and cancels fire no click
     setDragging(false);
     const r = e.currentTarget.getBoundingClientRect();
     const next = fit({ x: r.left, y: r.top }, true);
@@ -113,9 +115,9 @@ export function AssistantLauncher({ userId, pending }: { userId: number | null; 
     setFocus(null);
     show();
   }
+  // Resets the spot only; the drawer state is left to the clicks.
   function resetPosition() {
     setPos(null);
-    setOpen(false);
     try { savePosition(window.localStorage, key, null); } catch { /* storage unavailable */ }
   }
 
