@@ -39,8 +39,9 @@ function Row({ row }: { row: DecisionRow }) {
 
   return (
     <li
+      id={String(row.checkId)}
       className="panel-pad"
-      style={{ borderBottom: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 8 }}
+      style={{ borderBottom: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 8, scrollMarginTop: 80 }}
     >
       <div className="flex items-center gap-2 flex-wrap">
         <span className="badge-ds slate">{sourceLabel(row.source)}</span>

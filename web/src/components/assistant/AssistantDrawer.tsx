@@ -1,24 +1,44 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { A } from "@/lib/assistant/labels";
 import {
-  addItemNote, askAssistant, draftTicket, executeAction, fileTicket, openAssistant, proposeAction, whatsWaiting,
-  type NoteView, type ProposalView, type WaitingView,
+  addItemNote, deleteConversation, executeAction, getConversation, openAssistant, whatsWaiting,
+  type NoteView, type WaitingView,
 } from "@/app/actions/assistant";
-import type { TicketDraft } from "@/lib/assistant/ticket";
 import type { ActionProposal } from "@/lib/assistant/actions";
+import type { ActionCard, ChatEvent, ChatRequest, ConversationSummary, ConversationView } from "@/lib/assistant/chat-types";
 import { VERDICT_ACTION } from "@/lib/content/labels";
 import { REVIEW_REASON_LABEL } from "@/lib/content/reasons";
-import { PATCH_REPOS } from "@/lib/patchnotes/repos";
 
-type Msg = { role: "user" | "assistant"; content: string };
-type Tab = "ask" | "note" | "ticket" | "actions";
-type Filed = { url: string } | { fallbackUrl: string } | null;
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  actions?: ActionCard[];
+  /** Streaming only: each delta is its own fading span. */
+  deltas?: string[];
+  streaming?: boolean;
+  status?: string;
+};
+type Tab = "chat" | "notes";
+type CardState = {
+  phase: "idle" | "running" | "done" | "dismissed";
+  error?: string;
+  message?: string;
+  state?: string;
+  href?: string;
+  waiting?: WaitingView;
+};
 
-const MAX_USER = 20;
+const LS_KEY = "assistant.conversationId";
+const lsGet = (): number | null => {
+  try { const n = Number(localStorage.getItem(LS_KEY)); return Number.isInteger(n) && n > 0 ? n : null; } catch { return null; }
+};
+const lsSet = (id: number | null) => {
+  try { if (id == null) localStorage.removeItem(LS_KEY); else localStorage.setItem(LS_KEY, String(id)); } catch { /* storage unavailable */ }
+};
 
 const field: React.CSSProperties = {
   width: "100%", background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
@@ -31,10 +51,9 @@ const btn: React.CSSProperties = {
 const btnQuiet: React.CSSProperties = {
   ...btn, background: "var(--bg-raised)", color: "var(--fg-mute)", border: "1px solid var(--line-soft)",
 };
-const pre: React.CSSProperties = { whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 14, lineHeight: 1.45 };
 const errStyle: React.CSSProperties = { fontSize: 13, color: "var(--coral)" };
-
 const linkStyle: React.CSSProperties = { color: "var(--mint-fg)", overflowWrap: "anywhere" };
+const small: React.CSSProperties = { fontSize: 12, color: "var(--fg-faint)" };
 
 function proposalRows(p: ActionProposal): [string, string][] {
   switch (p.type) {
@@ -52,109 +71,332 @@ function proposalRows(p: ActionProposal): [string, string][] {
       ...(p.deadline ? [[A.fDeadline, p.deadline]] as [string, string][] : []),
       [A.fDecidedBy, A.forWhom[p.decidedBy] ?? p.decidedBy],
     ];
-    case "note": return [[A.fBody, p.body]];
+    case "note": return [[A.fItem, `#${p.itemId}`], [A.fBody, p.body]];
     case "ticket": return [
       [A.fTitle, p.draft.title],
       [A.fLabel, p.draft.label === "bug" ? A.labelBug : A.labelBacklog],
       [A.fBody, p.draft.body],
     ];
+    case "open_item": return [[A.fItem, `#${p.itemId}`]];
+    case "navigate": return [[A.fPath, p.path]];
+    case "waiting":
     case "none": return [];
   }
 }
 
-function dis(on: boolean): React.CSSProperties {
-  return on ? { opacity: 0.5, cursor: "not-allowed" } : {};
+// ---- answer rendering (no dangerouslySetInnerHTML) ----
+
+const INLINE_RE = /(\*\*[^*]+\*\*|\/(?:marketing[\w/?=&#-]*|patchnotes|reports\/weekly))/g;
+
+function Inline({ text, bold }: { text: string; bold?: boolean }) {
+  const parts = text.split(INLINE_RE);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (!part) return null;
+        if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith("/") && INLINE_RE.test(part)) {
+          INLINE_RE.lastIndex = 0;
+          const trail = /[.,;:)]+$/.exec(part)?.[0] ?? "";
+          const path = trail ? part.slice(0, -trail.length) : part;
+          return <Fragment key={i}><Link href={path} style={linkStyle}>{path}</Link>{trail}</Fragment>;
+        }
+        INLINE_RE.lastIndex = 0;
+        return <Fragment key={i}>{bold ? <strong>{part}</strong> : part}</Fragment>;
+      })}
+    </>
+  );
 }
 
-export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; itemId: number | null; onClose: () => void }) {
-  const pathname = usePathname();
+function Answer({ text }: { text: string }) {
+  const lines = text.split("\n");
+  const out: React.ReactNode[] = [];
+  let list: string[] = [];
+  const flush = (k: number) => {
+    if (!list.length) return;
+    out.push(<ul key={`u${k}`} style={{ margin: "4px 0", paddingLeft: 18 }}>{list.map((l, i) => <li key={i}><Inline text={l} /></li>)}</ul>);
+    list = [];
+  };
+  let first = true;
+  lines.forEach((line, i) => {
+    if (line.startsWith("- ")) { list.push(line.slice(2)); return; }
+    flush(i);
+    if (!line.trim()) { out.push(<div key={i} style={{ height: 6 }} />); return; }
+    out.push(<div key={i}><Inline text={line} bold={first} /></div>);
+    first = false;
+  });
+  flush(lines.length);
+  return <div style={{ fontSize: 14, lineHeight: 1.45, overflowWrap: "anywhere" }}>{out}</div>;
+}
+
+function turnsToMsgs(c: ConversationView): Msg[] {
+  return c.messages.map((t) => (t.role === "user" ? { role: "user", content: t.content } : { role: "assistant", content: t.content, actions: t.actions }));
+}
+
+const budapestDate = (iso: string) => new Date(iso).toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest" });
+
+function WaitingList({ w }: { w: WaitingView }) {
+  if (w.items.length === 0 && w.decisions.length === 0) return <p role="status" style={{ fontSize: 14, color: "var(--fg-mute)", margin: 0 }}>{A.nothingWaiting}</p>;
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {w.items.length > 0 && (
+        <div>
+          <div style={small}>{A.waitingItems}</div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>
+            {w.items.map((i) => (
+              <li key={i.id}>
+                <Link href={i.href} style={linkStyle}>{i.title}</Link>
+                {i.days != null && <span style={{ color: "var(--fg-faint)" }}> {A.daysAgo(i.days)}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {w.decisions.length > 0 && (
+        <div>
+          <div style={small}>{A.waitingDecisions}</div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>
+            {w.decisions.map((d) => (
+              <li key={d.checkId}>
+                <Link href={d.href} style={linkStyle}>{d.question}</Link>
+                <span style={{ color: "var(--fg-faint)" }}>
+                  {" "}{A.fDecidedBy}: {A.forWhom[d.forWhom] ?? d.forWhom}
+                  {d.deadline ? `, ${A.fDeadline}: ${d.deadline}` : ""}, {A.daysAgo(d.days)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Card({ card, st, onRun, onDismiss }: { card: ActionCard; st: CardState; onRun: () => void; onDismiss: () => void }) {
+  if (st.phase === "dismissed") return null;
+  const rows = proposalRows(card.proposal);
+  const finished = st.phase === "done";
+  const running = st.phase === "running";
+  const external = st.href?.startsWith("http");
+  return (
+    <div style={{ border: "1px solid var(--line-soft)", background: "var(--bg-raised)", borderRadius: 8, padding: 10, display: "grid", gap: 6 }}>
+      <div style={{ fontSize: 14, fontWeight: 600 }}>{card.summary}</div>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ fontSize: 13 }}>
+          <span style={small}>{k}: </span><span style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{v}</span>
+        </div>
+      ))}
+      {st.waiting && <WaitingList w={st.waiting} />}
+      {st.message && <p role="status" style={{ margin: 0, fontSize: 13, color: "var(--mint-fg)" }}>{st.message}</p>}
+      {st.state && <div style={{ fontSize: 13 }}><span style={small}>{A.newState}: </span>{st.state}</div>}
+      {st.href && (external
+        ? <a href={st.href} target="_blank" rel="noopener noreferrer" style={linkStyle}>{A.open}</a>
+        : <Link href={st.href} style={linkStyle}>{A.open}</Link>)}
+      {st.error && <p role="alert" style={{ ...errStyle, margin: 0 }}>{st.error}</p>}
+      {!finished && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" disabled={running} onClick={onRun} style={{ ...btn, ...(running ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>
+            {running ? A.executing : A.execute}
+          </button>
+          <button type="button" disabled={running} onClick={onDismiss} style={btnQuiet}>{A.dismiss}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boolean; pathname: string; itemId: number | null; onClose: () => void }) {
+  const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<Tab>("ask");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const convRef = useRef<number | null>(null);
+  const restored = useRef(false);
+
+  const [tab, setTab] = useState<Tab>("chat");
   const [configured, setConfigured] = useState(true);
   const [item, setItem] = useState<{ id: number; title: string } | null>(null);
   const [notes, setNotes] = useState<NoteView[]>([]);
+  const [recent, setRecent] = useState<ConversationSummary[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [askError, setAskError] = useState<string | null>(null);
-  const [asking, startAsk] = useTransition();
+  const [streaming, setStreaming] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [cards, setCards] = useState<Record<string, CardState>>({});
+  const [quickWait, setQuickWait] = useState(false);
 
   const [noteText, setNoteText] = useState("");
   const [noteError, setNoteError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
 
-  const [ticketText, setTicketText] = useState("");
-  const [draft, setDraft] = useState<TicketDraft | null>(null);
-  const [filed, setFiled] = useState<Filed>(null);
-  const [ticketError, setTicketError] = useState<string | null>(null);
-  const [drafting, startDraft] = useTransition();
-  const [filing, startFile] = useTransition();
+  const setConv = useCallback((id: number | null) => { convRef.current = id; lsSet(id); }, []);
+  const abort = useCallback(() => { abortRef.current?.abort(); abortRef.current = null; setStreaming(false); }, []);
 
-  const [waiting, setWaiting] = useState<WaitingView | null>(null);
-  const [waitError, setWaitError] = useState<string | null>(null);
-  const [loadingWait, startWait] = useTransition();
-  const [actText, setActText] = useState("");
-  const [view, setView] = useState<ProposalView | null>(null);
-  const [reply, setReply] = useState<string | null>(null);
-  const [done, setDone] = useState<{ message: string; href?: string } | null>(null);
-  const [actError, setActError] = useState<string | null>(null);
-  const [proposing, startPropose] = useTransition();
-  const [executing, startExecute] = useTransition();
+  // Focus in on open, back to the opener on close. No trap: the page behind stays usable.
+  useEffect(() => {
+    if (!open) return;
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const t = setTimeout(() => (inputRef.current ?? dialogRef.current)?.focus(), 0);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+      openerRef.current?.focus();
+    };
+  }, [open, onClose]);
 
-  // Load item context + notes on open and when the item changes.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  // ONE request per open (and when the item in view changes). The conversation is applied once, on first load.
   useEffect(() => {
     if (!open) return;
     let live = true;
-    openAssistant({ itemId }).then((res) => {
+    const want = restored.current ? convRef.current : lsGet();
+    openAssistant({ itemId, conversationId: want }).then((res) => {
       if (!live) return;
       if ("error" in res) { setLoadError(res.error); return; }
       setLoadError(null);
       setConfigured(res.configured);
       setItem(res.item);
       setNotes(res.notes);
+      setRecent(res.conversations);
+      if (!restored.current) {
+        restored.current = true;
+        if (res.conversation) { setConv(res.conversation.id); setMsgs(turnsToMsgs(res.conversation)); }
+        else if (want != null) setConv(null);
+      }
     }).catch(() => live && setLoadError(A.genericError));
     return () => { live = false; };
-  }, [open, itemId]);
+  }, [open, itemId, setConv]);
 
   useEffect(() => {
-    if (!open) return;
-    const opener = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { onClose(); return; }
-      if (e.key !== "Tab" || !dialogRef.current) return;
-      const f = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      ));
-      if (f.length === 0) { e.preventDefault(); return; }
-      const first = f[0], last = f[f.length - 1], cur = document.activeElement;
-      const inside = dialogRef.current.contains(cur) && cur !== dialogRef.current;
-      if (e.shiftKey && (!inside || cur === first)) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && (!inside || cur === last)) { e.preventDefault(); first.focus(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); opener?.focus?.(); };
-  }, [open, onClose]);
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [msgs, tab]);
 
-  const userCount = msgs.filter((m) => m.role === "user").length;
-  const atLimit = userCount >= MAX_USER;
-  const noAi = !configured || !!loadError;
+  function fresh() {
+    abort();
+    setConv(null);
+    setMsgs([]); setCards({}); setChatError(null); setInput("");
+  }
 
-  function send(text: string) {
-    const t = text.trim();
-    if (!t || atLimit || asking || noAi) return;
-    const next: Msg[] = [...msgs, { role: "user", content: t }];
-    setMsgs(next);
+  function removeConversation() {
+    const id = convRef.current;
+    if (id == null) { fresh(); return; }
+    if (!window.confirm(A.delConfirm)) return;
+    deleteConversation(id).then((res) => {
+      if ("error" in res) { setChatError(res.error); return; }
+      setRecent((r) => r.filter((c) => c.id !== id));
+      fresh();
+    }).catch(() => setChatError(A.genericError));
+  }
+
+  function loadConversation(id: number) {
+    abort();
+    getConversation(id).then((res) => {
+      if ("error" in res) { setChatError(res.error); return; }
+      setConv(res.conversation.id);
+      setMsgs(turnsToMsgs(res.conversation)); setCards({}); setChatError(null); setTab("chat");
+    }).catch(() => setChatError(A.genericError));
+  }
+
+  function patchLast(f: (m: Msg) => Msg) {
+    setMsgs((all) => all.length ? [...all.slice(0, -1), f(all[all.length - 1])] : all);
+  }
+
+  async function send(text: string) {
+    const message = text.trim();
+    if (!message || streaming) return;
+    setChatError(null);
     setInput("");
-    setAskError(null);
-    startAsk(async () => {
-      try {
-        const res = await askAssistant({ pathname, itemId, messages: next });
-        if ("error" in res) { setAskError(res.error); setMsgs(msgs); setInput(t); }
-        else setMsgs([...next, { role: "assistant", content: res.reply }]);
-      } catch { setAskError(A.genericError); setMsgs(msgs); setInput(t); }
-    });
+    setMsgs((m) => [...m, { role: "user", content: message }, { role: "assistant", content: "", deltas: [], streaming: true }]);
+    setStreaming(true);
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const fail = (msg: string) => {
+      setMsgs((all) => (all.length >= 2 ? all.slice(0, -1) : all));
+      setChatError(msg);
+      setInput(message);
+    };
+    try {
+      const body: ChatRequest = { conversationId: convRef.current, pathname, itemId, message };
+      const res = await fetch("/api/assistant/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ac.signal,
+      });
+      if (!res.ok || !res.body) {
+        const j = await res.json().catch(() => null) as { error?: string } | null;
+        fail(j?.error ?? A.genericError);
+        return;
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let finished = false;
+      const handle = (ev: ChatEvent) => {
+        if (ev.type === "start") {
+          setConv(ev.conversationId);
+          setRecent((r) => r.some((c) => c.id === ev.conversationId) ? r : [{ id: ev.conversationId, title: message.slice(0, 60), updatedAt: new Date().toISOString() }, ...r]);
+        } else if (ev.type === "status") patchLast((m) => ({ ...m, status: ev.text }));
+        else if (ev.type === "delta") patchLast((m) => ({ ...m, status: undefined, deltas: [...(m.deltas ?? []), ev.text] }));
+        else if (ev.type === "done") {
+          finished = true;
+          patchLast(() => ({ role: "assistant", content: ev.answer, actions: ev.actions }));
+        } else if (ev.type === "error") { finished = true; fail(ev.message); }
+      };
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buf.indexOf("\n\n")) >= 0) {
+          const frame = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          const type = /^event: (.+)$/m.exec(frame)?.[1];
+          const data = /^data: (.*)$/m.exec(frame)?.[1];
+          if (!type || data == null) continue;
+          try { handle({ type, ...JSON.parse(data) } as ChatEvent); } catch { /* skip malformed frame */ }
+        }
+      }
+      if (!finished) fail(A.genericError);
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) fail(A.genericError);
+    } finally {
+      if (abortRef.current === ac) { abortRef.current = null; setStreaming(false); }
+    }
+  }
+
+  function quickWaiting() {
+    if (configured) { void send(A.quickWaiting); return; }
+    setQuickWait(true);
+    whatsWaiting().then((res) => {
+      const w = "error" in res ? null : res.waiting;
+      setMsgs((m) => [...m, { role: "user", content: A.quickWaiting }, { role: "assistant", content: "error" in res ? res.error : A.waitingItems, actions: w ? [{ key: `w${Date.now()}`, summary: A.quickWaiting, proposal: { type: "waiting" } }] : [] }]);
+      if (w) setCards((c) => ({ ...c, [`${msgs.length + 1}:w`]: { phase: "done", waiting: w } }));
+    }).catch(() => setChatError(A.genericError)).finally(() => setQuickWait(false));
+  }
+
+  function patchCard(k: string, s: CardState) { setCards((c) => ({ ...c, [k]: s })); }
+
+  function run(k: string, p: ActionProposal) {
+    if (p.type === "none") return;
+    if (p.type === "open_item") { router.push(`/marketing/${p.itemId}`); patchCard(k, { phase: "done" }); return; }
+    if (p.type === "navigate") { router.push(p.path); patchCard(k, { phase: "done" }); return; }
+    patchCard(k, { phase: "running" });
+    if (p.type === "waiting") {
+      whatsWaiting().then((res) => patchCard(k, "error" in res ? { phase: "idle", error: res.error } : { phase: "done", waiting: res.waiting }))
+        .catch(() => patchCard(k, { phase: "idle", error: A.genericError }));
+      return;
+    }
+    executeAction(p).then((res) => {
+      if ("error" in res) { patchCard(k, { phase: "idle", error: res.error }); return; }
+      patchCard(k, { phase: "done", message: res.message, state: res.state, href: res.href });
+      router.refresh();
+    }).catch(() => patchCard(k, { phase: "idle", error: A.genericError }));
   }
 
   function saveNote() {
@@ -169,316 +411,125 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
     });
   }
 
-  function makeDraft() {
-    const t = ticketText.trim();
-    if (!t || noAi) return;
-    setTicketError(null);
-    setFiled(null);
-    startDraft(async () => {
-      try {
-        const res = await draftTicket({ pathname, itemId, messages: [{ role: "user", content: t }] });
-        if ("error" in res) setTicketError(res.error);
-        else setDraft(res.draft);
-      } catch { setTicketError(A.genericError); }
-    });
-  }
-
-  function submitTicket() {
-    if (!draft) return;
-    setTicketError(null);
-    startFile(async () => {
-      try {
-        const res = await fileTicket(draft);
-        if ("error" in res) setTicketError(res.error);
-        else setFiled("url" in res ? { url: res.url } : { fallbackUrl: res.fallbackUrl });
-      } catch { setTicketError(A.genericError); }
-    });
-  }
-
-  function loadWaiting() {
-    setWaitError(null);
-    startWait(async () => {
-      try {
-        const res = await whatsWaiting();
-        if ("error" in res) setWaitError(res.error);
-        else setWaiting(res.waiting);
-      } catch { setWaitError(A.genericError); }
-    });
-  }
-
-  function propose() {
-    const t = actText.trim();
-    if (!t || noAi) return;
-    setActError(null); setView(null); setReply(null); setDone(null);
-    startPropose(async () => {
-      try {
-        const res = await proposeAction({ pathname, itemId, messages: [{ role: "user", content: t }] });
-        if ("error" in res) setActError(res.error);
-        else if (res.view.proposal.type === "none") setReply(res.view.proposal.message);
-        else setView(res.view);
-      } catch { setActError(A.genericError); }
-    });
-  }
-
-  // Only ever called from the "Megerősítem" click.
-  function confirmAction() {
-    if (!view) return;
-    setActError(null);
-    startExecute(async () => {
-      try {
-        const res = await executeAction(view.proposal);
-        if ("error" in res) setActError(res.error);
-        else { setDone({ message: res.message, href: res.href }); setView(null); setActText(""); }
-      } catch { setActError(A.genericError); }
-    });
-  }
-
-  function patch(p: Partial<TicketDraft>) { setDraft((d) => (d ? { ...d, ...p } : d)); }
-
-  const tabBtn = (id: Tab, label: string) => (
-    <button
-      type="button" role="tab" id={`assistant-tab-${id}`} aria-controls="assistant-panel" aria-selected={tab === id} onClick={() => setTab(id)}
-      style={{
-        flex: 1, minHeight: 36, fontSize: 14, fontWeight: 500, cursor: "pointer", background: "none",
-        color: tab === id ? "var(--fg)" : "var(--fg-mute)", border: "none",
-        borderBottom: `2px solid ${tab === id ? "var(--coral)" : "transparent"}`,
-      }}
-    >
+  const noAi = !configured;
+  const tabBtn = (t: Tab, label: string) => (
+    <button type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+      style={{ ...btnQuiet, ...(tab === t ? { background: "var(--mint-soft)", color: "var(--mint-fg)", border: "1px solid var(--mint-line)" } : {}) }}>
       {label}
     </button>
   );
 
+  if (!open) return <div hidden />;
   return (
-    <div style={{ display: open ? "block" : "none" }}>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 90 }} />
-      <div
-        ref={dialogRef} role="dialog" aria-modal="true" aria-label={A.dialog} tabIndex={-1}
-        style={{
-          position: "fixed", top: 0, right: 0, bottom: 0, width: "min(420px, 100vw)", zIndex: 91,
-          background: "var(--bg-page)", borderLeft: "1px solid var(--line-soft)", color: "var(--fg)",
-          display: "flex", flexDirection: "column", outline: "none",
-        }}
-      >
-        <div className="panel-pad" style={{ display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid var(--line-soft)" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{A.dialog}</div>
-            <div style={{ fontSize: 15, fontWeight: 600, overflowWrap: "anywhere" }}>
-              {loadError ?? (itemId == null ? A.general : (item?.title ?? A.loading))}
-            </div>
-          </div>
-          <button type="button" onClick={onClose} style={btnQuiet}>{A.close}</button>
+    <>
+      <style>{`
+        .assistant-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; z-index: 40; display: flex; flex-direction: column;
+          background: var(--bg-page); color: var(--fg); border-left: 1px solid var(--line-soft); padding-bottom: env(safe-area-inset-bottom); }
+        @media (max-width: 767px) { .assistant-drawer { width: 100vw; border-left: 0; } }
+        @keyframes assistantFade { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes assistantBlink { 50% { opacity: 0 } }
+        .assistant-fade { animation: assistantFade 180ms ease-out; }
+        .assistant-caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: text-bottom; background: var(--fg-mute); animation: assistantBlink 1s steps(1) infinite; }
+        @media (prefers-reduced-motion: reduce) { .assistant-fade, .assistant-caret { animation: none; } }
+      `}</style>
+      <div ref={dialogRef} className="assistant-drawer" role="dialog" aria-modal="false" aria-label={A.dialog} tabIndex={-1}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--line-soft)", flexWrap: "wrap" }}>
+          <strong style={{ fontSize: 15, flex: 1 }}>{A.dialog}</strong>
+          <button type="button" onClick={fresh} style={btnQuiet}>{A.newChat}</button>
+          <button type="button" onClick={removeConversation} style={btnQuiet}>{A.del}</button>
+          <button type="button" onClick={onClose} aria-label={A.close} style={btnQuiet}>{A.close}</button>
         </div>
-
-        <div role="tablist" style={{ display: "flex", borderBottom: "1px solid var(--line-soft)" }}>
-          {tabBtn("ask", A.tabAsk)}{tabBtn("note", A.tabNote)}{tabBtn("ticket", A.tabTicket)}{tabBtn("actions", A.tabActions)}
-        </div>
-
-        <div id="assistant-panel" role="tabpanel" aria-labelledby={`assistant-tab-${tab}`} className="panel-pad" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-          {!configured && !loadError && <p style={{ fontSize: 14, color: "var(--fg-mute)" }}>{A.notConfigured}</p>}
-          {loadError && <p style={errStyle}>{loadError}</p>}
-
-          {tab === "ask" && (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" disabled={noAi || atLimit || asking} onClick={() => send(A.quick)} style={{ ...btnQuiet, ...dis(noAi || atLimit || asking) }}>
-                  {A.quick}
+        <details style={{ padding: "6px 12px", borderBottom: "1px solid var(--line-soft)" }}>
+          <summary style={{ fontSize: 13, color: "var(--fg-mute)", cursor: "pointer", minHeight: 36, display: "flex", alignItems: "center" }}>{A.previous}</summary>
+          {recent.length === 0 && <p style={{ ...small, margin: "4px 0" }}>{A.noPrevious}</p>}
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 2 }}>
+            {recent.map((c) => (
+              <li key={c.id}>
+                <button type="button" onClick={() => loadConversation(c.id)}
+                  style={{ ...btnQuiet, width: "100%", textAlign: "left", display: "flex", justifyContent: "space-between", gap: 8, border: "0", fontWeight: c.id === convRef.current ? 700 : 400 }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || A.untitled}</span>
+                  <span style={{ ...small, flexShrink: 0, alignSelf: "center" }}>{budapestDate(c.updatedAt)}</span>
                 </button>
-                <span className="badge-ds" style={{ color: "var(--fg-mute)" }}>{A.counter(userCount, MAX_USER)}</span>
-                {msgs.length > 0 && (
-                  <button type="button" onClick={() => { setMsgs([]); setAskError(null); }} style={btnQuiet}>{A.reset}</button>
-                )}
-              </div>
+              </li>
+            ))}
+          </ul>
+        </details>
+        <div role="tablist" style={{ display: "flex", gap: 8, padding: "8px 12px" }}>
+          {tabBtn("chat", A.tabChat)}
+          {tabBtn("notes", A.tabNotes)}
+        </div>
+        {loadError && <p role="alert" style={{ ...errStyle, padding: "0 12px", margin: 0 }}>{loadError}</p>}
+
+        {tab === "chat" && (
+          <>
+            <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "8px 12px", display: "grid", gap: 10, alignContent: "start" }}>
+              {msgs.length === 0 && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" disabled={quickWait || streaming} onClick={quickWaiting} style={btnQuiet}>{A.quickWaiting}</button>
+                  <button type="button" disabled={noAi || streaming} onClick={() => send(A.quickDrafts)} style={btnQuiet}>{A.quickDrafts}</button>
+                  <button type="button" disabled={noAi || streaming} onClick={() => send(A.quickAbilities)} style={btnQuiet}>{A.quickAbilities}</button>
+                </div>
+              )}
+              {noAi && <p style={{ fontSize: 13, color: "var(--fg-mute)", margin: 0 }}>{A.notConfigured}</p>}
               {msgs.map((m, i) => (
-                <div key={i} className="panel-pad" style={{ background: m.role === "user" ? "var(--bg-raised)" : "transparent", border: "1px solid var(--line-soft)", borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 4 }}>{m.role === "user" ? A.you : A.assistant}</div>
-                  <div style={pre}>{m.content}</div>
+                <div key={i} style={m.role === "user"
+                  ? { justifySelf: "end", maxWidth: "85%", background: "var(--mint-soft)", borderRadius: 8, padding: "6px 10px", fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
+                  : { display: "grid", gap: 6 }}>
+                  {m.role === "user" ? m.content : m.streaming ? (
+                    <div style={{ fontSize: 14, lineHeight: 1.45, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                      {m.status && <div style={{ ...small, marginBottom: 2 }}>{m.status}</div>}
+                      {m.deltas?.length === 0 && !m.status && <span style={small}>{A.thinking}</span>}
+                      {m.deltas?.map((d, j) => <span key={j} className="assistant-fade">{d}</span>)}
+                      <span className="assistant-caret" aria-hidden="true" />
+                    </div>
+                  ) : (
+                    <>
+                      <Answer text={m.content} />
+                      {m.actions?.map((c, j) => {
+                        const k = `${i}:${c.key}:${j}`;
+                        const st = cards[k] ?? (c.proposal.type === "waiting" ? cards[`${i}:w`] : undefined) ?? { phase: "idle" as const };
+                        return <Card key={k} card={c} st={st} onRun={() => run(k, c.proposal)} onDismiss={() => patchCard(k, { phase: "dismissed" })} />;
+                      })}
+                    </>
+                  )}
                 </div>
               ))}
-              {asking && <p style={{ fontSize: 13, color: "var(--fg-mute)" }}>{A.thinking}</p>}
-              {askError && <p style={errStyle}>{askError}</p>}
-              {atLimit && <p style={{ fontSize: 13, color: "var(--fg-mute)" }}>{A.limitHint}</p>}
-            </>
-          )}
+              {chatError && <p role="alert" style={{ ...errStyle, margin: 0 }}>{chatError}</p>}
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); void send(input); }} style={{ display: "flex", gap: 8, padding: "8px 12px", borderTop: "1px solid var(--line-soft)" }}>
+              <input ref={inputRef} aria-label={A.inputPlaceholder} placeholder={A.inputPlaceholder} maxLength={2000} value={input} disabled={noAi}
+                onChange={(e) => setInput(e.target.value)} style={{ ...field, flex: 1, ...(noAi ? { opacity: 0.5 } : {}) }} />
+              <button type="submit" disabled={noAi || streaming || !input.trim()} style={{ ...btn, ...(noAi || streaming || !input.trim() ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>{A.send}</button>
+            </form>
+          </>
+        )}
 
-          {tab === "note" && (itemId == null ? (
-            <p style={{ fontSize: 14, color: "var(--fg-mute)" }}>{A.noteNeedItem}</p>
-          ) : (
-            <>
-              <textarea
-                aria-label={A.notePlaceholder} placeholder={A.notePlaceholder} rows={3}
-                value={noteText} onChange={(e) => setNoteText(e.target.value)} style={{ ...field, resize: "vertical" }}
-              />
-              {noteError && <p style={errStyle}>{noteError}</p>}
-              <div>
-                <button type="button" disabled={saving || !noteText.trim() || !!loadError} onClick={saveNote} style={{ ...btn, ...dis(saving || !noteText.trim() || !!loadError) }}>
-                  {A.noteSave}
-                </button>
-              </div>
-              {notes.length === 0 && <p style={{ fontSize: 13, color: "var(--fg-faint)" }}>{A.noteEmpty}</p>}
-              {notes.map((n) => (
-                <div key={n.id} style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 8 }}>
-                  <div style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 4 }}>
-                    {n.author} {new Date(n.createdAt).toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}
-                  </div>
-                  <div style={pre}>{n.body}</div>
-                </div>
-              ))}
-            </>
-          ))}
-
-          {tab === "ticket" && (
-            <>
-              <label style={{ fontSize: 13, color: "var(--fg-mute)" }} htmlFor="assistant-ticket-text">{A.ticketPrompt}</label>
-              <textarea
-                id="assistant-ticket-text" rows={3} maxLength={2000} value={ticketText}
-                onChange={(e) => setTicketText(e.target.value)} style={{ ...field, resize: "vertical" }}
-              />
-              <div>
-                <button type="button" disabled={noAi || drafting || !ticketText.trim()} onClick={makeDraft} style={{ ...btn, ...dis(noAi || drafting || !ticketText.trim()) }}>
-                  {drafting ? A.thinking : A.ticketDraft}
-                </button>
-              </div>
-              {draft && (
-                <div className="panel-pad" style={{ border: "1px solid var(--line-soft)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>{A.ticketTitle}
-                    <input value={draft.title} onChange={(e) => patch({ title: e.target.value })} style={field} />
-                  </label>
-                  <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>{A.ticketBody}
-                    <textarea rows={6} value={draft.body} onChange={(e) => patch({ body: e.target.value })} style={{ ...field, resize: "vertical" }} />
-                  </label>
-                  <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>{A.ticketLabel}
-                    <select value={draft.label} onChange={(e) => patch({ label: e.target.value as TicketDraft["label"] })} style={field}>
-                      <option value="bug">{A.labelBug}</option>
-                      <option value="backlog">{A.labelBacklog}</option>
-                    </select>
-                  </label>
-                  <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>{A.ticketRepo}
-                    <select value={draft.repo} onChange={(e) => patch({ repo: e.target.value as TicketDraft["repo"] })} style={field}>
-                      {PATCH_REPOS.map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </label>
-                  <div>
-                    <button type="button" disabled={filing || !!filed || !draft.title.trim()} onClick={submitTicket} style={{ ...btn, ...dis(filing || !!filed || !draft.title.trim()) }}>
-                      {A.ticketFile}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {filed && "url" in filed && (
-                <p style={{ fontSize: 14 }}>{A.ticketDone}{" "}
-                  <a href={filed.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--mint-fg)", overflowWrap: "anywhere" }}>{A.ticketOpen}</a>
-                </p>
-              )}
-              {filed && "fallbackUrl" in filed && (
-                <p style={{ fontSize: 14 }}>{A.ticketFallback}{" "}
-                  <a href={filed.fallbackUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--mint-fg)", overflowWrap: "anywhere" }}>{A.ticketOpen}</a>
-                </p>
-              )}
-              {ticketError && <p style={errStyle}>{ticketError}</p>}
-            </>
-          )}
-          {tab === "actions" && (
-            <>
-              <div>
-                <button type="button" disabled={loadingWait} onClick={loadWaiting} style={{ ...btnQuiet, ...dis(loadingWait) }}>
-                  {loadingWait ? A.thinking : A.whatsWaiting}
-                </button>
-              </div>
-              {waitError && <p role="alert" style={errStyle}>{waitError}</p>}
-              {waiting && waiting.items.length === 0 && waiting.decisions.length === 0 && (
-                <p role="status" style={{ fontSize: 14, color: "var(--fg-mute)" }}>{A.nothingWaiting}</p>
-              )}
-              {waiting && waiting.items.length > 0 && (
+        {tab === "notes" && (
+          <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px", display: "grid", gap: 10, alignContent: "start" }}>
+            {item == null ? (
+              <p style={{ fontSize: 14, color: "var(--fg-mute)", margin: 0 }}>{A.noteNeedItem}</p>
+            ) : (
+              <>
+                <div style={small}>#{item.id} {item.title}</div>
+                <textarea aria-label={A.notePlaceholder} placeholder={A.notePlaceholder} rows={3} value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)} style={{ ...field, resize: "vertical" }} />
+                {noteError && <p style={{ ...errStyle, margin: 0 }}>{noteError}</p>}
                 <div>
-                  <div style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 4 }}>{A.waitingItems}</div>
-                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>
-                    {waiting.items.map((i) => (
-                      <li key={i.id}>
-                        <Link href={i.href} onClick={onClose} style={linkStyle}>{i.title}</Link>
-                        {i.days != null && <span style={{ color: "var(--fg-faint)" }}> {A.daysAgo(i.days)}</span>}
-                      </li>
-                    ))}
-                  </ul>
+                  <button type="button" disabled={saving || !noteText.trim() || !!loadError} onClick={saveNote}
+                    style={{ ...btn, ...(saving || !noteText.trim() ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>{A.noteSave}</button>
                 </div>
-              )}
-              {waiting && waiting.decisions.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 4 }}>{A.waitingDecisions}</div>
-                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>
-                    {waiting.decisions.map((d) => (
-                      <li key={d.checkId}>
-                        <Link href={d.href} onClick={onClose} style={linkStyle}>{d.question}</Link>
-                        <span style={{ color: "var(--fg-faint)" }}>
-                          {" "}{A.fDecidedBy}: {A.forWhom[d.forWhom] ?? d.forWhom}
-                          {d.deadline ? `, ${A.fDeadline}: ${d.deadline}` : ""}, {A.daysAgo(d.days)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <hr style={{ border: 0, borderTop: "1px solid var(--line-soft)", width: "100%" }} />
-              <label style={{ fontSize: 13, color: "var(--fg-mute)" }} htmlFor="assistant-action-text">{A.actionPrompt}</label>
-              <textarea
-                id="assistant-action-text" aria-label={A.actionPrompt} rows={3} maxLength={2000} value={actText}
-                disabled={noAi} onChange={(e) => setActText(e.target.value)} style={{ ...field, resize: "vertical", ...dis(noAi) }}
-              />
-              <div>
-                <button type="button" disabled={noAi || proposing || executing || !actText.trim()} onClick={propose} style={{ ...btn, ...dis(noAi || proposing || executing || !actText.trim()) }}>
-                  {proposing ? A.thinking : A.actionPropose}
-                </button>
-              </div>
-              {reply && (
-                <div className="panel-pad" style={{ border: "1px solid var(--line-soft)", borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 4 }}>{A.assistant}</div>
-                  <div role="status" style={pre}>{reply}</div>
-                </div>
-              )}
-              {view && (
-                <div className="panel-pad" style={{ border: "1px solid var(--line-soft)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ ...pre, fontWeight: 700 }}>{view.summary}</div>
-                  <dl style={{ margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-                    {proposalRows(view.proposal).map(([k, v]) => (
-                      <div key={k}>
-                        <dt style={{ fontSize: 12, color: "var(--fg-faint)" }}>{k}</dt>
-                        <dd style={{ ...pre, margin: 0 }}>{v}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button type="button" disabled={executing} onClick={confirmAction} style={{ ...btn, ...dis(executing) }}>{A.confirm}</button>
-                    <button type="button" disabled={executing} onClick={() => { setView(null); setActError(null); }} style={{ ...btnQuiet, ...dis(executing) }}>{A.cancel}</button>
+                {notes.length === 0 && <p style={{ fontSize: 13, color: "var(--fg-faint)", margin: 0 }}>{A.noteEmpty}</p>}
+                {notes.map((n) => (
+                  <div key={n.id} style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 8 }}>
+                    <div style={{ ...small, marginBottom: 4 }}>{n.author} {new Date(n.createdAt).toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</div>
+                    <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 14, lineHeight: 1.45 }}>{n.body}</div>
                   </div>
-                </div>
-              )}
-              {done && (
-                <p role="status" style={{ fontSize: 14 }}>{done.message}{" "}
-                  {done.href && (/^https?:\/\//.test(done.href)
-                    ? <a href={done.href} target="_blank" rel="noreferrer" style={linkStyle}>{A.open}</a>
-                    : <Link href={done.href} onClick={onClose} style={linkStyle}>{A.open}</Link>)}
-                </p>
-              )}
-              {actError && <p role="alert" style={errStyle}>{actError}</p>}
-            </>
-          )}
-        </div>
-
-        {tab === "ask" && (
-          <form
-            onSubmit={(e) => { e.preventDefault(); send(input); }}
-            style={{ display: "flex", gap: 8, padding: "10px 16px calc(10px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--line-soft)" }}
-          >
-            <input
-              aria-label={A.askPlaceholder} placeholder={A.askPlaceholder} value={input} maxLength={2000}
-              onChange={(e) => setInput(e.target.value)} disabled={noAi || atLimit} style={{ ...field, flex: 1, ...dis(noAi || atLimit) }}
-            />
-            <button type="submit" disabled={noAi || atLimit || asking || !input.trim()} style={{ ...btn, ...dis(noAi || atLimit || asking || !input.trim()) }}>
-              {A.send}
-            </button>
-          </form>
+                ))}
+              </>
+            )}
+          </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

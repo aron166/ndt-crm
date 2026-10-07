@@ -52,8 +52,8 @@ export function AssistantLauncher() {
       >
         {A.launcher}
       </button>
-      {/* key: a new item in view starts a new conversation, answers about item A never carry into item B. */}
-      {mounted && <AssistantDrawer key={itemId ?? "none"} open={open} itemId={itemId} onClose={close} />}
+      {/* No key: the drawer stays mounted across page changes so a chat survives navigation. */}
+      {mounted && <AssistantDrawer open={open} pathname={pathname} itemId={itemId} onClose={close} />}
     </>
   );
 }
