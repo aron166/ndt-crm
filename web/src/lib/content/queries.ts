@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { getApprovalRule, getContentReviewers } from "./reviewers";
 import { STALE_REVIEW_MS } from "./types";
@@ -203,13 +204,14 @@ export function bouncedByRuleWhere(tenantId: number): Prisma.ContentItemWhereInp
  * pendingForReviewerWhere): its sentence is "N anyag vár Önre", and a bounced
  * item is waiting on a text fix, not on the reviewer's judgement.
  */
-export async function countPendingForReviewer(tenantId: number, userId: number): Promise<number> {
+// cache(): the app layout (nav badge) and the marketing layout (assistant badge) both ask in one request.
+export const countPendingForReviewer = cache(async (tenantId: number, userId: number): Promise<number> => {
   const reviewers = await getContentReviewers(tenantId);
   if (!reviewers.includes(userId)) return 0;
   return db.contentItem.count({
     where: { OR: [pendingForReviewerWhere(tenantId, userId), bouncedByRuleWhere(tenantId)] },
   });
-}
+});
 
 export interface ReviewPageData {
   item: {
