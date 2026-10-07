@@ -166,11 +166,12 @@ export async function runPersonImport(
         res.companiesCreated++;
       } else if (!companyId && r.companyName && opts.dryRun) {
         res.companiesCreated++;
-        companyId = -1; // so the contact count matches the real run
-        // same in-file dedupe as the real run, placeholder id -1
-        if (r.companyVat) idx.byVat.set(r.companyVat, -1);
+        // Dry run mirrors the real run with a unique negative placeholder id, so
+        // in-file dedupe and the contact count match what the commit would do.
+        companyId = -rowNum;
+        if (r.companyVat) idx.byVat.set(r.companyVat, companyId);
         const key = stripLegalSuffix(normalizeName(r.companyName));
-        if (key && !idx.byName.has(key)) idx.byName.set(key, -1);
+        if (key && !idx.byName.has(key)) idx.byName.set(key, companyId);
       }
     }
 
@@ -186,8 +187,10 @@ export async function runPersonImport(
         });
         await audit("person", p.id, "create", null, { name: label, source: "import" }, { tenantId: opts.tenantId });
         personId = p.id;
-        if (nameKey) personByName.set(nameKey, p.id);
+      } else {
+        personId = -rowNum; // dry-run placeholder, see company branch above
       }
+      if (nameKey) personByName.set(nameKey, personId);
       res.created++;
     } else {
       res.matched++;

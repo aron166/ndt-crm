@@ -75,7 +75,7 @@ export function normalizeCompanyStatus(raw: string | null | undefined): {
   if (s.includes("f a") || s.includes("felszamol") || s === "fa") {
     return { status: "F.A.", dissolved: true };
   }
-  if (s.includes("inaktiv") || s.includes("inactive") || s.includes("megszunt") || s.includes("vegelszamol") || s.includes("torolt") || s.includes("dissolved")) {
+  if (/\b(nem|not|non)\b/.test(s) || s.includes("inaktiv") || s.includes("inactive") || s.includes("megszunt") || s.includes("vegelszamol") || s.includes("torolt") || s.includes("dissolved")) {
     return { status: "inactive", dissolved: true };
   }
   if (s.includes("aktiv") || s.includes("active") || s.includes("mukod")) return { status: "active", dissolved: false };

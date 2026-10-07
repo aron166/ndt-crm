@@ -2,7 +2,11 @@ import { describe, it, expect, vi } from "vitest";
 import * as XLSX from "xlsx";
 
 const { db } = vi.hoisted(() => ({
-  db: { company: { findMany: vi.fn(), create: vi.fn() } },
+  db: {
+    company: { findMany: vi.fn(), create: vi.fn() },
+    person: { findMany: vi.fn(), create: vi.fn() },
+    contact: { findMany: vi.fn(), create: vi.fn() },
+  },
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ db }));
@@ -11,7 +15,7 @@ vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 import { readWorkbook } from "@/lib/import/read";
 import { normalizeAccountType, normalizeWarmth } from "@/lib/import/normalize";
 import { buildCompanyRecord } from "@/lib/import/build";
-import { runCompanyImport } from "@/lib/import/commit";
+import { runCompanyImport, runPersonImport } from "@/lib/import/commit";
 
 const CSV = "Cégnév,Város\nÁrvíztűrő Kft.,Győr\n";
 const rowsOf = (wb: XLSX.WorkBook) =>
@@ -106,5 +110,33 @@ describe("runCompanyImport dry run", () => {
     expect(res.created).toBe(2);
     expect(res.matched).toBe(2);
     expect(db.company.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("normalizeCompanyStatus negation", () => {
+  it("treats Nem aktív as inactive", async () => {
+    const { normalizeCompanyStatus } = await import("@/lib/import/normalize");
+    expect(normalizeCompanyStatus("Nem aktív").status).toBe("inactive");
+    expect(normalizeCompanyStatus("nem működő").dissolved).toBe(true);
+  });
+});
+
+describe("runPersonImport dry run", () => {
+  it("counts like the real run: in-file person dedupe, one contact per person and new company", async () => {
+    db.company.findMany.mockResolvedValue([]);
+    db.person.findMany.mockResolvedValue([]);
+    db.contact.findMany.mockResolvedValue([]);
+    const rows = [
+      { P: "Kiss Anna", C: "Alfa Kft." },
+      { P: "Kiss Anna", C: "Beta Kft." },
+      { P: "Nagy Béla", C: "alfa kft" },
+    ];
+    const res = await runPersonImport(rows, { P: "fullName", C: "companyName" }, { dryRun: true, tenantId: 1 });
+    expect(res.created).toBe(2);
+    expect(res.matched).toBe(1);
+    expect(res.companiesCreated).toBe(2);
+    expect(res.contactsCreated).toBe(3);
+    expect(db.person.create).not.toHaveBeenCalled();
+    expect(db.contact.create).not.toHaveBeenCalled();
   });
 });
