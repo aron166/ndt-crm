@@ -66,7 +66,7 @@ export function buildWeeklyReportEmail(input: {
       `- ${U.suppressionCancelled}: ${r.suppression.draftsCancelled}`,
     ]),
     ...section(`${U.topCompanies} (${U.touches})`, companies),
-    `A teljes riport: ${baseUrl}/reports/weekly`,
+    `Élő riport (utolsó 7 és 28 nap, nem csak a fenti hét): ${baseUrl}/reports/weekly`,
   ].join("\n");
 
   // PROPOSAL copy, not final until Aron approves it. Always sent: a zero week is information.

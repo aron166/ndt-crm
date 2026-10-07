@@ -58,7 +58,7 @@ describe("buildWeeklyReportEmail", () => {
     expect(text).toContain("Uj lead -> Elso hivas: 6");
     expect(text).toContain("Acme Kft: 8");
     expect(text).toContain("Foglalt demó: 3");
-    expect(text.trimEnd().endsWith("A teljes riport: https://x.test/reports/weekly")).toBe(true);
+    expect(text.trimEnd().endsWith("Élő riport (utolsó 7 és 28 nap, nem csak a fenti hét): https://x.test/reports/weekly")).toBe(true);
   });
 
   it("an all-empty week still builds, with empty markers", () => {
