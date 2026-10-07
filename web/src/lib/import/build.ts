@@ -2,6 +2,8 @@ import {
   normalizeVat,
   normalizeWebsite,
   normalizeCompanyStatus,
+  normalizeAccountType,
+  normalizeWarmth,
   splitFullName,
 } from "./normalize";
 
@@ -62,14 +64,19 @@ export function buildCompanyRecord(values: Record<string, string>): BuildResult<
   const name = orNull(values.name);
   if (!name) return { ok: false, error: "Hiányzó cégnév" };
 
-  const { status, dissolved } = normalizeCompanyStatus(values.status);
+  const { status, dissolved, unknown } = normalizeCompanyStatus(values.status);
+  if (unknown) return { ok: false, error: `Ismeretlen státusz: ${values.status}` };
+  const accountType = normalizeAccountType(values.accountType);
+  if (accountType === undefined) return { ok: false, error: `Ismeretlen partner kategória: ${values.accountType}` };
+  const warmth = normalizeWarmth(values.warmth);
+  if (warmth === undefined) return { ok: false, error: `Ismeretlen hőfok: ${values.warmth}` };
 
   const record: CompanyRecord = {
     name,
     vatNumber: normalizeVat(values.vatNumber),
     shortCode: orNull(values.shortCode),
     status,
-    accountType: orNull(values.accountType),
+    accountType,
     city: orNull(values.city),
     county: orNull(values.county),
     zipCode: orNull(values.zipCode),
@@ -79,7 +86,7 @@ export function buildCompanyRecord(values: Record<string, string>): BuildResult<
     teaorCode: orNull(values.teaorCode),
     teaorDescription: orNull(values.teaorDescription),
     industryCode: orNull(values.industryCode),
-    warmth: orNull(values.warmth),
+    warmth,
     linkedinUrl: orNull(values.linkedinUrl),
     notes: orNull(values.notes),
   };

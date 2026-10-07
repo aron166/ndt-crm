@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
+import { readWorkbook } from "@/lib/import/read";
 
 export const runtime = "nodejs";
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
   let wb: XLSX.WorkBook;
   try {
     const buf = Buffer.from(await file.arrayBuffer());
-    wb = XLSX.read(buf, { type: "buffer", cellDates: true });
+    wb = readWorkbook(file.name, buf);
   } catch {
     return NextResponse.json({ error: "A fájl nem olvasható (xlsx/csv várt)." }, { status: 400 });
   }

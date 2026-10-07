@@ -67,6 +67,8 @@ export function splitFullName(full: string | null | undefined): {
 export function normalizeCompanyStatus(raw: string | null | undefined): {
   status: string;
   dissolved: boolean;
+  /** set when a non-blank value matched nothing; caller rejects the row */
+  unknown?: boolean;
 } {
   const s = normalizeName(raw);
   if (!s) return { status: "active", dissolved: false };
@@ -76,5 +78,25 @@ export function normalizeCompanyStatus(raw: string | null | undefined): {
   if (s.includes("inaktiv") || s.includes("inactive") || s.includes("megszunt")) {
     return { status: "inactive", dissolved: true };
   }
-  return { status: "active", dissolved: false };
+  if (s === "active" || s === "aktiv" || s === "mukodo") return { status: "active", dissolved: false };
+  return { status: "active", dissolved: false, unknown: true };
 }
+
+// Company enum columns. Keys are normalizeName() forms (case + accent insensitive),
+// values are the stored canonical value. English values + Hungarian UI labels.
+const ACCOUNT_TYPES: Record<string, string> = {
+  prospect: "Prospect", customer: "Customer", ugyfel: "Customer",
+  vendor: "Vendor", szallito: "Vendor", lead: "Lead",
+};
+const WARMTHS: Record<string, string> = {
+  cold: "cold", hideg: "cold", warm: "warm", langyos: "warm", hot: "hot", forro: "hot",
+};
+
+/** Map an enum cell to its canonical value; blank → null; unknown → undefined (caller rejects). */
+function mapEnum(table: Record<string, string>, raw: string | null | undefined): string | null | undefined {
+  const s = normalizeName(raw);
+  if (!s) return null;
+  return table[s];
+}
+export const normalizeAccountType = (raw: string | null | undefined) => mapEnum(ACCOUNT_TYPES, raw);
+export const normalizeWarmth = (raw: string | null | undefined) => mapEnum(WARMTHS, raw);
