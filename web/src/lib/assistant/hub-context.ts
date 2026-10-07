@@ -153,7 +153,14 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}
   const budget = opts.budgetChars ?? HUB_CONTEXT_BUDGET_CHARS;
   const items = [...d.items].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
-  const counts = STAGES.map((s) => `${s.label}: ${s.key === "archived" ? d.archivedCount : items.filter((i) => s.statuses.includes(i.status)).length}`);
+  // Every stage names its item ids (up to 40), so "mi van a vázlatokban?" maps to ids even when
+  // the item lines are truncated (prod smoke 2026-10-07: 2 drafts, compact-only, model said "Nem tudom").
+  const idCap = budget < 3000 ? 8 : 40; // tight budgets (post-read hop) keep the stage line short
+  const counts = STAGES.map((s) => {
+    if (s.key === "archived") return `${s.label}: ${d.archivedCount}`;
+    const ids = items.filter((i) => s.statuses.includes(i.status)).map((i) => `#${i.id}`);
+    return `${s.label}: ${ids.length}${ids.length ? ` (${ids.slice(0, idCap).join(", ")}${ids.length > idCap ? ", ..." : ""})` : ""}`;
+  });
   const decLine = (x: HubDecision) =>
     `kérdés #${x.checkId} | ${clean(x.question)} | kitől: ${WHO[x.forWhom]} | állapot: ${STATE_HU[x.state] ?? x.state} | határidő: ${x.deadline ?? "nincs"} | vár ${x.daysWaiting} nap | válasz: ${x.answer ? clean(x.answer) : "nincs"} | link /marketing/decisions#${x.checkId}`;
   const full = (i: HubItem) =>
