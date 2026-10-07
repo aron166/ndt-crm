@@ -67,7 +67,9 @@ async function run(userId: number, input: AssistantInput, purpose: Purpose): Pro
     capState(TENANT_ID),
     db.user.findFirst({ where: { id: userId, tenantId: TENANT_ID }, select: { role: true, name: true } }),
     getContentReviewers(TENANT_ID),
-    onList || purpose === "propose" ? loadPageData(TENANT_ID, userId).then((d) => renderPageContext(d)) : Promise.resolve(null),
+    onList || purpose === "propose" ? loadPageData(TENANT_ID, userId).then((d) =>
+      // With an item body (up to 6000 chars) also in the prompt, halve the page budget: Groq free tier is 8K tokens/min.
+      renderPageContext(d, input.itemId !== null ? { budgetChars: 4500 } : {})) : Promise.resolve(null),
   ]);
   if (input.itemId !== null && !item) return { error: NOT_FOUND };
   if (cap.exceeded) return { error: CAP_EXCEEDED };
