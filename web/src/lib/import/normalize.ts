@@ -15,7 +15,8 @@ export function normalizeName(s: string | null | undefined): string {
 
 const LEGAL_SUFFIXES = new Set([
   "zrt", "kft", "nyrt", "kkt", "bt", "nonprofit", "kozhasznu", "csoport",
-  "holding", "group", "kozhasznu", "ev", "kht", "rt",
+  "holding", "group", "ev", "kht", "rt",
+  "ltd", "limited", "llc", "gmbh", "sro", "plc", "inc",
 ]);
 
 /** Drop trailing legal-form words (kft, zrt…) so "Acme Kft." matches "Acme". */
@@ -25,6 +26,17 @@ export function stripLegalSuffix(norm: string): string {
     words = words.slice(0, -1);
   }
   return words.join(" ");
+}
+
+/**
+ * The deterministic company match key: accent, case, punctuation and whitespace
+ * insensitive, legal form and a trailing "f. a." / "v. a." (felszamolas /
+ * vegelszamolas alatt) dropped, spaces removed so "A-Hid" == "AHID" == "A Hid".
+ * ponytail: exact key equality, no fuzzy scoring; typos stay unmatched by design.
+ */
+export function companyKey(name: string | null | undefined): string {
+  const norm = normalizeName(name).replace(/ ([fv]) a$/, "");
+  return stripLegalSuffix(norm).replace(/ /g, "");
 }
 
 /** Hungarian VAT reduced to its 8-digit core (the part that identifies the entity). */

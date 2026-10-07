@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
-import { normalizeName, stripLegalSuffix, normalizeVat } from "./normalize";
+import { companyKey, normalizeName, normalizeVat } from "./normalize";
 import {
   buildCompanyRecord,
   buildPersonRecord,
@@ -32,7 +32,7 @@ async function loadCompanyIndex(tenantId: number) {
   for (const c of companies) {
     const vat = normalizeVat(c.vatNumber);
     if (vat) byVat.set(vat, c.id);
-    const key = stripLegalSuffix(normalizeName(c.name));
+    const key = companyKey(c.name);
     if (key && !byName.has(key)) byName.set(key, c.id);
   }
   return { byVat, byName };
@@ -47,7 +47,7 @@ function matchCompany(
     const hit = idx.byVat.get(vat);
     if (hit !== undefined) return hit;
   }
-  return idx.byName.get(stripLegalSuffix(normalizeName(name)));
+  return idx.byName.get(companyKey(name));
 }
 
 export async function runCompanyImport(
@@ -102,7 +102,7 @@ export async function runCompanyImport(
     }
     // dedupe within this same file, in dry run too (placeholder id -1) so the preview matches the real run
     if (r.vatNumber) idx.byVat.set(r.vatNumber, newId);
-    const key = stripLegalSuffix(normalizeName(r.name));
+    const key = companyKey(r.name);
     if (key && !idx.byName.has(key)) idx.byName.set(key, newId);
     res.created++;
     const note = opts.dryRun ? "új cég lesz" : "létrehozva";
@@ -161,7 +161,7 @@ export async function runPersonImport(
         await audit("company", c.id, "create", null, { name: r.companyName, source: "import" }, { tenantId: opts.tenantId });
         companyId = c.id;
         if (r.companyVat) idx.byVat.set(r.companyVat, c.id);
-        const key = stripLegalSuffix(normalizeName(r.companyName));
+        const key = companyKey(r.companyName);
         if (key && !idx.byName.has(key)) idx.byName.set(key, c.id);
         res.companiesCreated++;
       } else if (!companyId && r.companyName && opts.dryRun) {
@@ -170,7 +170,7 @@ export async function runPersonImport(
         // in-file dedupe and the contact count match what the commit would do.
         companyId = -rowNum;
         if (r.companyVat) idx.byVat.set(r.companyVat, companyId);
-        const key = stripLegalSuffix(normalizeName(r.companyName));
+        const key = companyKey(r.companyName);
         if (key && !idx.byName.has(key)) idx.byName.set(key, companyId);
       }
     }
