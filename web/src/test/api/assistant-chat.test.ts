@@ -236,4 +236,19 @@ describe("failures", () => {
     expect(calls.filter((c) => "messages" in c[0].data)).toHaveLength(3);
     expect(calls.some((c) => "deletedAt" in c[0].data)).toBe(true);
   });
+  it("a one-burst answer (Groq gpt-oss) is re-emitted word by word", async () => {
+    const answer = "Kettő anyag van a Vázlat szakaszban, mindkettő régi.";
+    const burst = new Response(new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: reply(answer) } }] })}\n\ndata: [DONE]\n\n`));
+        c.close();
+      },
+    }), { status: 200 });
+    fetchMock.mockImplementation(async () => burst);
+    const ev = await events(await POST(req(ok)));
+    const deltas = ev.filter((e) => e.type === "delta").map((e) => (e as unknown as { text: string }).text);
+    expect(deltas.length).toBeGreaterThan(5);
+    expect(deltas.join("")).toBe(answer);
+    expect(ev[ev.length - 1]).toMatchObject({ type: "done", answer });
+  });
 });

@@ -65,4 +65,10 @@ describe("renderHubContext", () => {
     expect(t).not.toMatch(/állapot: (Megválaszolva|resolved)/);
     expect(t.length).toBeLessThanOrEqual(1500);
   });
+  it("each stage lists its item ids even when item lines are truncated", () => {
+    const items = [...Array.from({ length: 300 }, (_, k) => item(k + 1, { title: "Hosszú cím ".repeat(5) })),
+      item(9001, { status: "draft", stage: stageOf("draft"), updatedAt: new Date(0).toISOString() })];
+    const t = renderHubContext(data(items));
+    expect(t).toContain(`${stageOf("draft")}: 1 (#9001)`);
+  });
 });

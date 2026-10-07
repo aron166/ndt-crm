@@ -25,6 +25,7 @@ const TENANT_ID = 1;
 const MAX_USER_TURNS = 20;
 const READ_MAX = 3;
 const READ_BODY_MAX = 1200;
+const PACE_MS = 15;
 /** Hub budget on the second (post-read) call: the read bodies replace most of the page summary (8K TPM). */
 const HOP_HUB_BUDGET = 1500;
 
@@ -144,6 +145,28 @@ export async function POST(request: Request) {
         if (gone()) return;
         try { controller.enqueue(enc.encode(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`)); } catch { closed = true; }
       };
+      // Groq delivers gpt-oss content in one burst after reasoning (prod smoke 2026-10-07: one
+      // delta per answer). The pacer re-emits big bursts word by word so the panel types it out.
+      // ponytail: fixed 15 ms per piece, ~2 s for a 5-bullet answer; tune PACE_MS if it feels slow.
+      const pacer = (() => {
+        let queue = "";
+        let pump: Promise<void> | null = null;
+        const run = async () => {
+          await null; // always async: `pump` is assigned before run can clear it
+          while (queue && !gone()) {
+            const piece = /^\s*\S+\s*/.exec(queue)?.[0] ?? queue;
+            queue = queue.slice(piece.length);
+            send({ type: "delta", text: piece });
+            if (queue) await new Promise((r) => setTimeout(r, PACE_MS));
+          }
+          pump = null;
+        };
+        return {
+          push(t: string) { queue += t; pump ??= run(); },
+          reset() { queue = ""; },
+          drain: async () => { while (pump) await pump; },
+        };
+      })();
       const finish = () => { if (!closed) { closed = true; try { controller.close(); } catch { /* already closed */ } } };
       send({ type: "start", conversationId: conv.id });
       try {
@@ -162,8 +185,8 @@ export async function POST(request: Request) {
               // Read requested before any answer text: stop this call and fetch the items.
               if (hop === 0 && ids && ids.length > 0 && answer === "") { wantRead = ids; return "stop"; }
               // The strict fallback may restart the text: tell the panel to drop what it showed.
-              if (!answer.startsWith(emitted)) { send({ type: "reset" }); emitted = ""; }
-              if (answer.length > emitted.length) { send({ type: "delta", text: answer.slice(emitted.length) }); emitted = answer; }
+              if (!answer.startsWith(emitted)) { pacer.reset(); send({ type: "reset" }); emitted = ""; }
+              if (answer.length > emitted.length) { pacer.push(answer.slice(emitted.length)); emitted = answer; }
             },
           });
           const usage = { promptTokens: r.promptTokens, completionTokens: r.completionTokens };
@@ -187,6 +210,7 @@ export async function POST(request: Request) {
         const res = parseModelResponse(finalText);
         if (!res || !res.answer.trim()) {
           await dropIfEmpty();
+          pacer.reset();
           send({ type: "error", message: "Nem sikerült választ adni. Kérem, fogalmazza meg másképp." });
           finish();
           return;
@@ -218,15 +242,18 @@ export async function POST(request: Request) {
         if (!saved) {
           // Cards that were never stored cannot be executed: do not show them.
           await dropIfEmpty();
+          pacer.reset();
           send({ type: "error", message: "Nem sikerült menteni a választ. Kérem, próbálja újra." });
           finish();
           return;
         }
+        await pacer.drain();
         send({ type: "done", answer: res.answer, actions });
       } catch (e) {
         if (e instanceof AssistantError && e.usage) await logCall(userId, input.pathname, "chat", conv.id, itemId, cfg.model, e.usage).catch(() => {});
         if (!(e instanceof AssistantError)) reportError("assistant.chat", e, { userId });
         await dropIfEmpty();
+        pacer.reset();
         send({ type: "error", message: e instanceof AssistantError && e.status === 429 ? RATE_LIMITED : "Az asszisztens most nem érhető el. Kérem, próbálja újra később." });
       }
       finish();
