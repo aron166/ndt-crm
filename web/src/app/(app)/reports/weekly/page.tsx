@@ -5,7 +5,7 @@ import { getLeadStatuses } from "@/lib/leads/queries";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { callOutcomeLabel } from "@/lib/leads/outcomes";
 import { getWeeklyReport, lastDays, type WeeklyReport } from "@/lib/reports/weekly";
-import { REPORT_UI, formatMinutes } from "@/lib/reports/labels";
+import { REPORT_UI, formatMinutesOrDash } from "@/lib/reports/labels";
 
 const TENANT_ID = 1;
 // Hungarian copy (lib/reports/labels.ts) is PROPOSAL until Áron approves.
@@ -24,6 +24,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   if (rows.length === 0) return <p style={{ fontSize: 13, color: "var(--fg-faint)" }}>{REPORT_UI.empty}</p>;
   return (
+    <div style={{ overflowX: "auto" }}>
     <table className="tbl">
       <thead>
         <tr>{head.map((h, i) => <th key={h} style={i === head.length - 1 ? R : undefined}>{h}</th>)}</tr>
@@ -34,6 +35,7 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 
@@ -59,8 +61,8 @@ function Window({ title, r, statuses }: { title: string; r: WeeklyReport; status
         <Stat label={REPORT_UI.calls} value={r.callsTotal} />
         <Stat label={REPORT_UI.demosBooked} value={r.demos.booked} />
         <Stat label={REPORT_UI.demosHeld} value={r.demos.held} />
-        <Stat label={`${REPORT_UI.tierA} ${REPORT_UI.median}`} value={formatMinutes(t.medianMinutes)} />
-        <Stat label={`${REPORT_UI.tierA} ${REPORT_UI.p90}`} value={formatMinutes(t.p90Minutes)} />
+        <Stat label={`${REPORT_UI.tierA} ${REPORT_UI.median}`} value={formatMinutesOrDash(t.medianMinutes)} />
+        <Stat label={`${REPORT_UI.tierA} ${REPORT_UI.p90}`} value={formatMinutesOrDash(t.p90Minutes)} />
       </div>
 
       <Panel title={REPORT_UI.bySourceTier}>
@@ -72,8 +74,8 @@ function Window({ title, r, statuses }: { title: string; r: WeeklyReport; status
 
       <Panel title={REPORT_UI.tierA}>
         <Table
-          head={[REPORT_UI.tierATotal, REPORT_UI.contacted, REPORT_UI.awaitingCall, REPORT_UI.withoutTask, REPORT_UI.median, REPORT_UI.p90]}
-          rows={t.total === 0 ? [] : [[t.total, t.contacted, t.awaitingCall, t.withoutTask, formatMinutes(t.medianMinutes), formatMinutes(t.p90Minutes)]]}
+          head={[REPORT_UI.tierATotal, REPORT_UI.contacted, REPORT_UI.awaitingCall, REPORT_UI.withoutTask]}
+          rows={t.total === 0 ? [] : [[t.total, t.contacted, t.awaitingCall, t.withoutTask]]}
         />
       </Panel>
 

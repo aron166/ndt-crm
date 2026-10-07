@@ -5,19 +5,16 @@ import { getContentReviewers } from "@/lib/content/reviewers";
 import { callOutcomeLabel } from "@/lib/leads/outcomes";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { getLeadStatuses } from "@/lib/leads/queries";
-import { REPORT_UI, formatMinutes } from "./labels";
-import { getWeeklyReport, lastDays, type WeeklyReport } from "./weekly";
+import { firstName } from "@/lib/content/digest";
+import { REPORT_UI, formatMinutesOrDash } from "./labels";
+import { getWeeklyReport, previousBudapestWeek, type WeeklyReport } from "./weekly";
 
 /**
  * Monday weekly report email. Same split as lib/content/digest: the builder and
  * the time gate are pure, sendWeeklyReports is the only part touching the DB.
  */
 
-/** "Nagy Péter" (last-name-first) -> "Péter"; a single token is used as-is. */
-function firstName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts[parts.length - 1] || name;
-}
+const budapestDate = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(d);
 
 export function buildWeeklyReportEmail(input: {
   report: WeeklyReport;
@@ -42,8 +39,8 @@ export function buildWeeklyReportEmail(input: {
     `- ${U.contacted}: ${t.contacted}`,
     `- ${U.awaitingCall}: ${t.awaitingCall}`,
     `- ${U.withoutTask}: ${t.withoutTask}`,
-    `- ${U.median}: ${formatMinutes(t.medianMinutes)}`,
-    `- ${U.p90}: ${formatMinutes(t.p90Minutes)}`,
+    `- ${U.median}: ${formatMinutesOrDash(t.medianMinutes)}`,
+    `- ${U.p90}: ${formatMinutesOrDash(t.p90Minutes)}`,
   ];
   const outcomes = r.callOutcomes.map((o) => `- ${callOutcomeLabel(o.outcome)}: ${o.count}`);
   const transitions = r.stageTransitions.map(
@@ -53,6 +50,7 @@ export function buildWeeklyReportEmail(input: {
 
   const text = [
     `Kedves ${firstName(recipientName)}!`,
+    `Időszak: ${budapestDate(r.from)} - ${budapestDate(new Date(r.to.getTime() - 1))}`,
     "",
     ...section(`${U.leadsCreated}: ${r.leadsTotal}`, bySource),
     ...section(U.tierA, tierA),
@@ -97,7 +95,7 @@ export function isWeeklyReportTime(now: Date): boolean {
 }
 
 /**
- * Sends the last-7-days report to every tenant reviewer. Never throws per
+ * Sends the previous full Budapest week's report to every tenant reviewer. Never throws per
  * recipient: a failure is reported and the others still get theirs.
  * `skipLog: true`: a report is not a CRM interaction with a person/company.
  */
@@ -110,7 +108,18 @@ export async function sendWeeklyReports(
     return { sent: 0, skipped: 0, reason: "not_report_time" };
   }
 
-  // Double-send guard: atomically claim today's Budapest date on the tenant
+  const recipientIds = await getContentReviewers(tenantId);
+  if (recipientIds.length === 0) return { sent: 0, skipped: 0, reason: "no_reviewers" };
+
+  const baseUrl = process.env.APP_BASE_URL ?? "https://ndt-crm.vercel.app";
+  // Fetched once: the same numbers go to every recipient.
+  const [report, statuses] = await Promise.all([
+    getWeeklyReport(tenantId, previousBudapestWeek(now)),
+    getLeadStatuses(tenantId),
+  ]);
+
+  // Double-send guard, taken only after reviewers and report fetched fine so a failed
+  // fetch does not burn the day. Atomically claim today's Budapest date on the tenant
   // row; only the caller that flips it from "not today" sends. `force` bypasses.
   if (!opts.force) {
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(now);
@@ -125,16 +134,6 @@ export async function sendWeeklyReports(
       return { sent: 0, skipped: 0, reason: "already_sent" };
     }
   }
-
-  const recipientIds = await getContentReviewers(tenantId);
-  if (recipientIds.length === 0) return { sent: 0, skipped: 0, reason: "no_reviewers" };
-
-  const baseUrl = process.env.APP_BASE_URL ?? "https://ndt-crm.vercel.app";
-  // Fetched once: the same numbers go to every recipient.
-  const [report, statuses] = await Promise.all([
-    getWeeklyReport(tenantId, lastDays(7, now)),
-    getLeadStatuses(tenantId),
-  ]);
 
   let sent = 0;
   let skipped = 0;
@@ -165,6 +164,12 @@ export async function sendWeeklyReports(
       skipped++;
       reportError("reports.weekly", err, { userId: id });
     }
+  }
+
+  // A run that delivered nothing must not burn the day: release the claim so a manual
+  // CRON_SECRET re-run (without force) can retry.
+  if (!opts.force && sent === 0) {
+    await db.$executeRaw`UPDATE "tenants" SET "settings" = "settings" - 'weeklyReportLastSentOn' WHERE "id" = ${tenantId}`;
   }
 
   return { sent, skipped };

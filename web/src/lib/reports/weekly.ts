@@ -13,8 +13,11 @@ import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
  * - call outcome: an interaction of type `call` whose outcome is one of the six
  *   CALL_OUTCOMES keys (so `transcribed` queue rows never count). Superseded rows
  *   (a human correction of an auto-outcome) are skipped: the latest word counts.
- * - tier-A time to first contact: from the lead's first `call` task (the #118
- *   rule creates it at intake) to the first logged call outcome on that lead.
+ * - tier-A time to first contact: from the lead's INTAKE `call` task (the #118
+ *   rule creates it at intake; a call task created more than 5 minutes after
+ *   the lead is a callback and ignored) to the first logged call outcome on that
+ *   lead. This is time to first CALL from the intake task, deliberately different from the board's 'Első kontakt' (lead creation to any first contact).
+ * - demo scheduled: meeting tasks in the window that are not cancelled.
  * - demo held: a lead booking task (type meeting, starts_at set) starting in the
  *   window with status `done`.
  * - stage transition: a lead audit row whose before/after `status` differ.
@@ -24,12 +27,35 @@ import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
  * - company touched: any non-superseded interaction linked to the company.
  */
 
-export const REPORT_QUERY_COUNT = 7;
 export const MAX_WINDOW_DAYS = 92;
 const DAY_MS = 86_400_000;
 const CALL_OUTCOME_KEYS: string[] = CALL_OUTCOMES.map((o) => o.key);
 
 export interface ReportWindow { from: Date; to: Date }
+
+/** UTC instant of 00:00 Europe/Budapest on `now`'s Budapest calendar date (CET/CEST aware). */
+export function budapestMidnight(now: Date): Date {
+  const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(now);
+  const guess = new Date(`${date}T00:00:00Z`);
+  // Offset of Budapest at that instant, read back from Intl (ponytail: one correction
+  // pass is exact except when midnight itself sits in a DST gap, which Budapest never does).
+  const at = (d: Date) => {
+    const p = Object.fromEntries(
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Budapest", hourCycle: "h23",
+        year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric",
+      }).formatToParts(d).map((x) => [x.type, x.value]),
+    );
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - d.getTime();
+  };
+  return new Date(guess.getTime() - at(new Date(guess.getTime() - at(guess))));
+}
+
+/** The previous full Budapest week: [midnight 7 days ago, midnight today). */
+export function previousBudapestWeek(now: Date): ReportWindow {
+  const to = budapestMidnight(now);
+  return { from: budapestMidnight(new Date(to.getTime() - 7 * DAY_MS + 12 * 3_600_000)), to };
+}
 
 /** Parse ?from=&to= (ISO date or datetime). Default: the 7 days ending now. */
 export function parseWindow(
@@ -135,10 +161,14 @@ export async function getWeeklyReport(tenantId: number, { from, to }: ReportWind
       SELECT l."id" AS "leadId", c."name" AS "companyName", l."created_at" AS "createdAt",
              t."taskAt", i."firstCallAt"
         FROM "leads" l
-        LEFT JOIN "companies" c ON c."id" = l."company_id" AND c."tenant_id" = l."tenant_id"
+        LEFT JOIN "companies" c ON c."id" = l."company_id" AND c."tenant_id" = l."tenant_id" AND c."deleted_at" IS NULL
         LEFT JOIN LATERAL (
           SELECT MIN(tk."created_at") AS "taskAt" FROM "tasks" tk
            WHERE tk."tenant_id" = l."tenant_id" AND tk."lead_id" = l."id" AND tk."type" = 'call'
+             -- Only the INTAKE call task counts: a later callback task (type call, created by
+             -- logging callback_requested) must not become the start, otherwise a lead with no
+             -- intake task reads as contacted in 0 minutes.
+             AND tk."created_at" <= l."created_at" + interval '5 minutes'
         ) t ON true
         LEFT JOIN LATERAL (
           SELECT MIN(it."occurred_at") AS "firstCallAt" FROM "interactions" it
@@ -155,7 +185,7 @@ export async function getWeeklyReport(tenantId: number, { from, to }: ReportWind
        WHERE i."tenant_id" = ${tenantId} AND i."type" = 'call'
          AND i."outcome" = ANY(${CALL_OUTCOME_KEYS})
          AND i."occurred_at" >= ${from} AND i."occurred_at" < ${to}
-         AND NOT EXISTS (SELECT 1 FROM "interactions" s WHERE s."supersedes_interaction_id" = i."id")
+         AND NOT EXISTS (SELECT 1 FROM "interactions" s WHERE s."supersedes_interaction_id" = i."id" AND s."tenant_id" = i."tenant_id")
        GROUP BY 1
        ORDER BY 2 DESC`,
 
@@ -164,9 +194,9 @@ export async function getWeeklyReport(tenantId: number, { from, to }: ReportWind
         (SELECT COUNT(*)::int FROM "interactions" i
           WHERE i."tenant_id" = ${tenantId} AND i."type" = 'call' AND i."outcome" = 'meeting_booked'
             AND i."occurred_at" >= ${from} AND i."occurred_at" < ${to}
-            AND NOT EXISTS (SELECT 1 FROM "interactions" s WHERE s."supersedes_interaction_id" = i."id")
+            AND NOT EXISTS (SELECT 1 FROM "interactions" s WHERE s."supersedes_interaction_id" = i."id" AND s."tenant_id" = i."tenant_id")
         ) AS "booked",
-        COUNT(*)::int AS "scheduled",
+        (COUNT(*) FILTER (WHERE t."status" <> 'cancelled'))::int AS "scheduled",
         (COUNT(*) FILTER (WHERE t."status" = 'done'))::int AS "held"
         FROM "tasks" t
        WHERE t."tenant_id" = ${tenantId} AND t."lead_id" IS NOT NULL AND t."type" = 'meeting'
@@ -195,9 +225,9 @@ export async function getWeeklyReport(tenantId: number, { from, to }: ReportWind
     db.$queryRaw<{ companyId: number; name: string; touches: number; lastTouchAt: Date }[]>`
       SELECT c."id" AS "companyId", c."name", COUNT(*)::int AS "touches", MAX(i."occurred_at") AS "lastTouchAt"
         FROM "interactions" i
-        JOIN "companies" c ON c."id" = i."company_id" AND c."tenant_id" = i."tenant_id"
+        JOIN "companies" c ON c."id" = i."company_id" AND c."tenant_id" = i."tenant_id" AND c."deleted_at" IS NULL
        WHERE i."tenant_id" = ${tenantId} AND i."occurred_at" >= ${from} AND i."occurred_at" < ${to}
-         AND NOT EXISTS (SELECT 1 FROM "interactions" s WHERE s."supersedes_interaction_id" = i."id")
+         AND NOT EXISTS (SELECT 1 FROM "interactions" s WHERE s."supersedes_interaction_id" = i."id" AND s."tenant_id" = i."tenant_id")
        GROUP BY c."id", c."name"
        ORDER BY 3 DESC, 4 DESC
        LIMIT 10`,

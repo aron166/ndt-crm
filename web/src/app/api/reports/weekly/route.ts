@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { reportError } from "@/lib/report-error";
-import { getWeeklyReport, parseWindow, REPORT_QUERY_COUNT } from "@/lib/reports/weekly";
+import { getWeeklyReport, parseWindow } from "@/lib/reports/weekly";
 
 // GET /api/reports/weekly?from=&to= - the weekly sales-engine report as JSON.
 // Pure read, tenant from the app key. Definitions: lib/reports/weekly.ts.
@@ -39,7 +39,6 @@ export async function GET(request: Request) {
         ok: true,
         from: r.from,
         to: r.to,
-        query_count: REPORT_QUERY_COUNT,
         leads_created: {
           total: r.leadsTotal,
           by_source_tier: r.leadsBySourceTier.map((x) => ({ source: x.source, tier: x.tier, count: x.count })),

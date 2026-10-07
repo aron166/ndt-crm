@@ -5,7 +5,7 @@ vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/integrations/resend", () => ({ sendEmail: vi.fn() }));
 vi.mock("@/lib/content/reviewers", () => ({ getContentReviewers: vi.fn() }));
 vi.mock("@/lib/leads/queries", () => ({ getLeadStatuses: vi.fn() }));
-vi.mock("./weekly", () => ({ getWeeklyReport: vi.fn(), lastDays: vi.fn() }));
+vi.mock("./weekly", () => ({ getWeeklyReport: vi.fn(), previousBudapestWeek: vi.fn() }));
 
 import { buildWeeklyReportEmail, isWeeklyReportTime } from "./weekly-email";
 import type { WeeklyReport } from "./weekly";
@@ -17,8 +17,8 @@ const statuses: LeadStatusDef[] = [
 ] as LeadStatusDef[];
 
 const empty: WeeklyReport = {
-  from: new Date("2026-10-05T05:00:00Z"),
-  to: new Date("2026-10-12T05:00:00Z"),
+  from: new Date("2026-10-04T22:00:00Z"),
+  to: new Date("2026-10-11T22:00:00Z"),
   leadsBySourceTier: [],
   leadsTotal: 0,
   tierA: { total: 0, withoutTask: 0, awaitingCall: 0, contacted: 0, medianMinutes: null, p90Minutes: null, leads: [] },
@@ -51,6 +51,7 @@ describe("buildWeeklyReportEmail", () => {
     const { subject, text } = build(full);
     expect(subject).toBe("Heti riport: 7 lead, 12 hívás, 3 demó");
     expect(text.startsWith("Kedves Péter!")).toBe(true);
+    expect(text.split("\n")[1]).toBe("Időszak: 2026-10-05 - 2026-10-11");
     expect(text).toContain("Új leadek: 7");
     expect(text).toContain("Medián: 1 ó 35 p");
     expect(text).toContain("Foglalt meeting: 3");

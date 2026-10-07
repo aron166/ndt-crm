@@ -33,7 +33,7 @@ export interface DigestInput {
 }
 
 /** "Nagy Péter" (last-name-first) → "Péter"; a single token is used as-is. */
-function firstName(reviewerName: string): string {
+export function firstName(reviewerName: string): string {
   const parts = reviewerName.trim().split(/\s+/);
   return parts[parts.length - 1] || reviewerName;
 }

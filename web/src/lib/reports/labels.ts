@@ -1,3 +1,5 @@
+import { formatMinutes } from "@/lib/leads/first-contact";
+
 // Weekly report copy. PROPOSAL: Hungarian UI copy is not final until Áron
 // approves it. Shared by the /reports/weekly page and the Monday email so the
 // two never drift. No emojis, no dash glyphs (portfolio style law).
@@ -35,11 +37,5 @@ export const REPORT_UI = {
   empty: "Nincs adat ebben az időszakban.",
 } as const;
 
-/** 95 -> "1 ó 35 p", 12 -> "12 p", null -> "-". */
-export function formatMinutes(min: number | null): string {
-  if (min === null) return "-";
-  if (min < 60) return `${min} p`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m === 0 ? `${h} ó` : `${h} ó ${m} p`;
-}
+/** null -> "-", else the board's formatMinutes. */
+export const formatMinutesOrDash = (min: number | null): string => (min === null ? "-" : formatMinutes(min));

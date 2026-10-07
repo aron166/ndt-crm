@@ -82,7 +82,6 @@ describe("GET /api/reports/weekly", () => {
     });
     const b = await res.json();
     expect(b.ok).toBe(true);
-    expect(b.query_count).toBe(7);
     expect(b.leads_created.total).toBe(2);
     expect(b.leads_created.by_source_tier[0]).toEqual({ source: "web", tier: "A", count: 2 });
     expect(b.tier_a.without_task).toBe(0);

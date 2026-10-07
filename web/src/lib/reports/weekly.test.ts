@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/db", () => ({ db: {} }));
 
-import { parseWindow, lastDays, percentile, summarizeTierA, type TierALeadRow } from "./weekly";
+import { parseWindow, lastDays, budapestMidnight, previousBudapestWeek, percentile, summarizeTierA, type TierALeadRow } from "./weekly";
 
 const NOW = new Date("2026-10-07T12:00:00Z");
 const DAY = 86_400_000;
@@ -93,5 +93,18 @@ describe("summarizeTierA", () => {
     const s = summarizeTierA([row(1, at(0), null)]);
     expect(s.medianMinutes).toBeNull();
     expect(s.p90Minutes).toBeNull();
+  });
+});
+
+describe("budapestMidnight", () => {
+  it("CEST", () => expect(budapestMidnight(new Date("2026-10-12T05:00:00Z")).toISOString()).toBe("2026-10-11T22:00:00.000Z"));
+  it("CET", () => expect(budapestMidnight(new Date("2026-11-02T05:00:00Z")).toISOString()).toBe("2026-11-01T23:00:00.000Z"));
+});
+
+describe("previousBudapestWeek", () => {
+  it("across the 2026-10-25 DST change", () => {
+    const w = previousBudapestWeek(new Date("2026-10-26T05:00:00Z"));
+    expect(w.from.toISOString()).toBe("2026-10-18T22:00:00.000Z");
+    expect(w.to.toISOString()).toBe("2026-10-25T23:00:00.000Z");
   });
 });
