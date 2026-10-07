@@ -1,6 +1,6 @@
 "use client";
 
-import { displayScriptText } from "@/lib/leads/placeholder";
+import { displayScriptLabel, displayScriptText } from "@/lib/leads/placeholder";
 import { useState, useTransition } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -144,7 +144,7 @@ export function CallOutcomeModal({
           <FormField label="Szkript">
             <select style={inputStyle} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
               <option value="">Nincs szkript</option>
-              {scriptVariants.map((v) => <option key={v.key} value={v.key}>{displayScriptText(v.label)}</option>)}
+              {scriptVariants.map((v) => <option key={v.key} value={v.key}>{displayScriptLabel(v.label)}</option>)}
             </select>
             {script && (script.body || script.liveMissing) && (
               <div style={{ marginTop: 8, fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 220, overflowY: "auto" }}>

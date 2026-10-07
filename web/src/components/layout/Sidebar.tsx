@@ -1,4 +1,5 @@
 "use client";
+// Hungarian copy is PROPOSAL until Áron approves.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";

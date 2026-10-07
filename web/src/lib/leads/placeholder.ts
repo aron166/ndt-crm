@@ -9,3 +9,10 @@ export function isPlaceholderText(s: string | null | undefined): boolean {
 export function displayScriptText(s: string | null | undefined): string {
   return isPlaceholderText(s) ? SCRIPT_MISSING_TEXT : (s ?? "");
 }
+
+// Option labels: strip only the TODO prefix so "A változat" / "B változat" stay distinguishable.
+export function displayScriptLabel(s: string | null | undefined): string {
+  const t = s ?? "";
+  if (!isPlaceholderText(t)) return t;
+  return t.trim().replace(/^todo:?\s*/i, "").trim() || SCRIPT_MISSING_TEXT;
+}

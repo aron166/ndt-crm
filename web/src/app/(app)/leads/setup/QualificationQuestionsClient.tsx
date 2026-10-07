@@ -1,4 +1,5 @@
 "use client";
+// Hungarian copy is PROPOSAL until Áron approves.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";

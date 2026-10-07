@@ -12,7 +12,7 @@ import type { DriveLead } from "@/lib/leads/drive";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import Link from "next/link";
 // Hungarian copy is PROPOSAL until Áron approves.
-import { displayScriptText, isPlaceholderText } from "@/lib/leads/placeholder";
+import { displayScriptLabel, displayScriptText, isPlaceholderText } from "@/lib/leads/placeholder";
 import type { BookingConflictInfo } from "@/lib/leads/service";
 
 // datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
@@ -296,7 +296,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <select style={{ ...inputStyle, width: "auto", flex: 1 }} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
               <option value="">Nincs szkript</option>
-              {scriptVariants.map((v) => <option key={v.key} value={v.key}>{displayScriptText(v.label)}</option>)}
+              {scriptVariants.map((v) => <option key={v.key} value={v.key}>{displayScriptLabel(v.label)}</option>)}
             </select>
             {script && (script.body || script.liveMissing) && (
               <button onClick={() => setScriptOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 13, padding: 4, cursor: "pointer" }}>
