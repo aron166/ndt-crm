@@ -38,12 +38,12 @@ export default async function LeadsPage({
   ]);
 
   const Toggle = (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Link
         href="/leads"
         className="rounded-full font-mono-ndt"
         style={{
-          height: 26, padding: "0 12px", fontSize: 12, lineHeight: "26px",
+          minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
           background: showConverted ? "var(--bg-panel)" : "var(--indigo-soft)",
           color: showConverted ? "var(--fg-mute)" : "var(--indigo)",
           border: `1px solid ${showConverted ? "var(--line-soft)" : "var(--indigo-line)"}`,
@@ -55,7 +55,7 @@ export default async function LeadsPage({
         href="/leads?view=closed"
         className="rounded-full font-mono-ndt"
         style={{
-          height: 26, padding: "0 12px", fontSize: 12, lineHeight: "26px",
+          minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
           background: showConverted ? "var(--mint-soft)" : "var(--bg-panel)",
           color: showConverted ? "var(--mint)" : "var(--fg-mute)",
           border: `1px solid ${showConverted ? "var(--mint-line)" : "var(--line-soft)"}`,
@@ -236,7 +236,7 @@ export default async function LeadsPage({
       href={href}
       className="rounded-full font-mono-ndt"
       style={{
-        height: 26, padding: "0 12px", fontSize: 12, lineHeight: "26px",
+        minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
         background: active ? (color ? "var(--bg-hover)" : "var(--indigo-soft)") : "var(--bg-panel)",
         color: active ? (color ?? "var(--indigo)") : "var(--fg-mute)",
         border: `1px solid ${active ? (color ?? "var(--indigo-line)") : "var(--line-soft)"}`,
@@ -247,7 +247,7 @@ export default async function LeadsPage({
   );
 
   const TierFilter = (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {tierPill("/leads", tier === null, "Mind")}
       {TIERS.map((t) => tierPill(`/leads?tier=${t}`, tier === t, `${t} · ${TIER_LABEL[t]}`, TIER_COLOR[t]))}
     </div>

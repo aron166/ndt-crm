@@ -510,6 +510,7 @@
 
 /* ── Mockup CSS variable aliases ──────────────────────────── */
 :root {
+  --topbar-h: 60px; /* Topbar height */
   --statusbar-h: 26px; /* StatusBar height; 0 on phones where it is hidden */
   --bg-0: var(--bg-page);
   --bg-1: var(--bg-panel);
@@ -772,7 +773,7 @@
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .page-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0; display: flex; align-items: center; gap: 12px; color: var(--fg); }
 .page-sub { font-size: 13px; color: var(--fg-mute); margin-top: 4px; }
-.page-actions { display: flex; align-items: center; gap: 8px; }
+.page-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
 .tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .tbl th {

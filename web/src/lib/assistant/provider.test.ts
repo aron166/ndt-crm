@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-import { AssistantError, RATE_LIMITED, assistantConfig, chatCompletion, chatCompletionStream, estimateCostUsd } from "./provider";
+import { AssistantError, RATE_LIMITED, assistantConfig, chatCompletion, chatCompletionStream, estimateCostUsd, retryDelayMs } from "./provider";
 
 const cfg = { baseUrl: "https://x.test/v1", apiKey: "sk-secret", model: "m" };
 const ok = (body: unknown, status = 200) => vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status }));
@@ -55,14 +55,26 @@ describe("chatCompletion", () => {
 });
 
 describe("429 handling", () => {
-  const limited = () => new Response("{}", { status: 429, headers: { "retry-after": "30" } });
-  it("retries once after a 429, capped wait, then succeeds", async () => {
-    const f = vi.fn().mockResolvedValueOnce(limited()).mockResolvedValueOnce(new Response(JSON.stringify(good)));
+  const limited = () => new Response("{}", { status: 429, headers: { "retry-after": "3" } });
+  it("retry-after past the cap fails at once, no wait, no retry", async () => {
+    const f = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 429, headers: { "retry-after": "30" } })).mockResolvedValueOnce(new Response(JSON.stringify(good)));
     const sleep = vi.fn().mockResolvedValue(undefined);
-    const r = await chatCompletion(cfg, [], { fetchImpl: f, sleep });
-    expect(r.text).toBe("szia");
-    expect(f).toHaveBeenCalledTimes(2);
-    expect(sleep).toHaveBeenCalledWith(10000);
+    const e = await chatCompletion(cfg, [], { fetchImpl: f, sleep }).catch((x) => x);
+    expect(e.message).toBe(RATE_LIMITED);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+    const g = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 429, headers: { "retry-after": "5" } })).mockResolvedValueOnce(new Response(JSON.stringify(good)));
+    const onWait = vi.fn();
+    expect((await chatCompletion(cfg, [], { fetchImpl: g, sleep, onWait })).text).toBe("szia");
+    expect(onWait).toHaveBeenCalledWith(5250);
+  });
+  it("waits for retry-after, else Groq's reset-tokens header, else 2 s", () => {
+    expect(retryDelayMs(new Headers({ "retry-after": "7" }))).toBe(7250);
+    expect(retryDelayMs(new Headers({ "retry-after": "120" }))).toBeNull();
+    expect(retryDelayMs(new Headers({ "x-ratelimit-reset-tokens": "7.66s" }))).toBe(7910);
+    expect(retryDelayMs(new Headers({ "x-ratelimit-reset-tokens": "1m2.5s" }))).toBeNull();
+    expect(retryDelayMs(new Headers({ "x-ratelimit-reset-tokens": "450ms" }))).toBe(700);
+    expect(retryDelayMs(new Headers())).toBe(2000);
   });
   it("two 429s give the Hungarian rate-limit error, no third try", async () => {
     const f = vi.fn().mockImplementation(async () => limited());
@@ -118,7 +130,7 @@ describe("chatCompletionStream", () => {
     const sleep = vi.fn().mockResolvedValue(undefined);
     const r = await chatCompletionStream(cfg, [], { fetchImpl: f, sleep, onText: () => {} });
     expect(r.text).toBe("Szia");
-    expect(sleep).toHaveBeenCalledWith(2000);
+    expect(sleep).toHaveBeenCalledWith(2250);
     const e = await chatCompletionStream(cfg, [], { fetchImpl: vi.fn().mockImplementation(async () => new Response("{}", { status: 429 })), sleep, onText: () => {} }).catch((x) => x);
     expect(e.message).toBe(RATE_LIMITED);
   });

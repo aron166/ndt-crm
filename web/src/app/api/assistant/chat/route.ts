@@ -7,8 +7,8 @@ import { getContentReviewers } from "@/lib/content/reviewers";
 import { AssistantError, RATE_LIMITED, assistantConfig, chatCompletionStream, estimateCostUsd, type ChatMessage } from "@/lib/assistant/provider";
 import { CAP_EXCEEDED, capState } from "@/lib/assistant/cap";
 import { loadItemContext, pageKind, type ItemContext } from "@/lib/assistant/context";
-import { loadHubData, renderHubContext } from "@/lib/assistant/hub-context";
-import { buildChatSystemPrompt, isInformal } from "@/lib/assistant/prompt";
+import { loadHubData, renderHubContext, routeIntent } from "@/lib/assistant/hub-context";
+import { buildChatSystemPrompt, history, isInformal } from "@/lib/assistant/prompt";
 import { MODEL_RESPONSE_SCHEMA, parseModelResponse, toProposals } from "@/lib/assistant/actions";
 import { completeIntArrayField, partialStringField } from "@/lib/assistant/partial-json";
 import { enrichProposals } from "@/lib/assistant/enrich";
@@ -21,12 +21,15 @@ import { MAX_CONVERSATION_TURNS, type ChatEvent, type ChatTurn } from "@/lib/ass
  * (read_item_ids, max 3 items, one hop) -> validated actions -> persisted turn.
  * Nothing is written to CRM data here: actions run only from the panel's "Végrehajtom".
  */
+/** Typical turn is seconds; the theoretical worst case (two hops, each with 429 waits, a 60 s stream and a strict fallback) can pass 300 s, where Vercel ends the function. */
+export const maxDuration = 300;
+
 const TENANT_ID = 1;
 const MAX_USER_TURNS = 20;
 const READ_MAX = 3;
 const READ_BODY_MAX = 1200;
 const PACE_MS = 15;
-/** Hub budget on the second (post-read) call: the read bodies replace most of the page summary (8K TPM). */
+/** Hub budget on the post-read call and with an item in view: the bodies replace most of the summary (8K TPM). */
 const HOP_HUB_BUDGET = 1500;
 
 const bodySchema = z.object({
@@ -47,15 +50,6 @@ function logCall(userId: number, page: string, purpose: "chat" | "read", convers
       promptTokens: u.promptTokens, completionTokens: u.completionTokens, costUsd: estimateCostUsd(u.promptTokens, u.completionTokens),
     },
   });
-}
-
-/** Last 6 turns, older ones dropped until under 4000 chars. Assistant turns carry their proposals as text. */
-function history(turns: ChatTurn[]): ChatMessage[] {
-  let h = turns.slice(-6).map((t): ChatMessage => (t.role === "user"
-    ? { role: "user", content: t.content }
-    : { role: "assistant", content: t.content + (t.actions.length ? `\n[Javasolt műveletek: ${t.actions.map((a) => a.summary).join("; ")}]` : "") }));
-  while (h.length > 0 && h.reduce((n, m) => n + m.content.length, 0) > 4000) h = h.slice(1);
-  return h;
 }
 
 function readBlock(items: ItemContext[]): string {
@@ -117,12 +111,14 @@ export async function POST(request: Request) {
     });
   }
 
+  const intent = routeIntent(input.message);
   const system = (hop: 0 | 1) => buildChatSystemPrompt({
     user: { name: user.name, role: user.role, isReviewer: reviewers.includes(userId), informal: isInformal(user.settings) },
     pathname: input.pathname,
     conversationPage: conv.page !== input.pathname ? conv.page : null,
     item: hop === 0 ? item : null,
-    hub: renderHubContext(hub, hop === 1 ? { budgetChars: HOP_HUB_BUDGET } : item ? { budgetChars: 4500 } : {}),
+    // A stage question keeps the full budget with an item in view: read_item_ids cannot list a stage.
+    hub: renderHubContext(hub, { intent, ...(hop === 1 || (item && intent.kind !== "stage") ? { budgetChars: HOP_HUB_BUDGET } : {}) }),
     now: new Date(),
   });
   const turnMessages = (hop: 0 | 1): ChatMessage[] => [{ role: "system", content: system(hop) }, ...history(turns), { role: "user", content: input.message }];
@@ -177,7 +173,8 @@ export async function POST(request: Request) {
           let emitted = "";
           let wantRead: number[] | null = null;
           const r = await chatCompletionStream(cfg, messages, {
-            schema, maxTokens: 1800,
+            schema, maxTokens: 1000, signal: request.signal,
+            onWait: (ms) => send({ type: "status", text: `Pillanat, a díjmentes keret miatt ${Math.ceil(ms / 1000)} mp múlva folytatom.` }),
             accept: (t) => parseModelResponse(t) !== null || (completeIntArrayField(t, "read_item_ids")?.length ?? 0) > 0,
             onText: (soFar) => {
               if (gone()) return "stop";
@@ -191,6 +188,8 @@ export async function POST(request: Request) {
             },
           });
           const usage = { promptTokens: r.promptTokens, completionTokens: r.completionTokens };
+          // Prompt size per call (Vercel logs): the 8K TPM budget is the constraint, see #150.
+          console.info("assistant.tokens", JSON.stringify({ conv: conv.id, hop, intent: intent.kind, chars: messages.reduce((n, m) => n + m.content.length, 0), ...usage, streamed: r.streamed }));
           const final = r.stopped ? null : parseModelResponse(r.text);
           const ids: number[] = wantRead ?? (final && !final.answer.trim() ? final.read_item_ids : []);
           if (hop === 0 && ids.length > 0) {
@@ -252,7 +251,8 @@ export async function POST(request: Request) {
         send({ type: "done", answer: res.answer, actions });
       } catch (e) {
         if (e instanceof AssistantError && e.usage) await logCall(userId, input.pathname, "chat", conv.id, itemId, cfg.model, e.usage).catch(() => {});
-        if (!(e instanceof AssistantError)) reportError("assistant.chat", e, { userId });
+        // A 429 reaches the panel inside a 200 SSE stream: report it so monitoring sees it (#150).
+        if (!(e instanceof AssistantError) || e.status === 429) reportError("assistant.chat", e, { userId, status: e instanceof AssistantError ? e.status : undefined });
         await dropIfEmpty();
         pacer.reset();
         send({ type: "error", message: e instanceof AssistantError && e.status === 429 ? RATE_LIMITED : "Az asszisztens most nem érhető el. Kérem, próbálja újra később." });

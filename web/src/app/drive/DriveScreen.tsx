@@ -10,6 +10,9 @@ import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booki
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
 import type { ScriptVariant } from "@/lib/leads/scripts";
+import Link from "next/link";
+// Hungarian copy is PROPOSAL until Áron approves.
+import { displayScriptLabel, displayScriptText, isPlaceholderText } from "@/lib/leads/placeholder";
 import type { BookingConflictInfo } from "@/lib/leads/service";
 
 // datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
@@ -293,7 +296,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <select style={{ ...inputStyle, width: "auto", flex: 1 }} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
               <option value="">Nincs szkript</option>
-              {scriptVariants.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
+              {scriptVariants.map((v) => <option key={v.key} value={v.key}>{displayScriptLabel(v.label)}</option>)}
             </select>
             {script && (script.body || script.liveMissing) && (
               <button onClick={() => setScriptOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 13, padding: 4, cursor: "pointer" }}>
@@ -303,7 +306,10 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           </div>
           {scriptOpen && script && (script.body || script.liveMissing) && (
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-              {script.liveMissing ? "Nincs élő változat: a szkript még jóváhagyásra vár." : script.body}
+              {script.liveMissing ? "Nincs élő változat: a szkript még jóváhagyásra vár." : displayScriptText(script.body)}
+              {!script.liveMissing && isPlaceholderText(script.body) && (
+                <> <Link href="/leads/setup" style={{ color: "var(--indigo)" }}>Beállítás</Link></>
+              )}
             </p>
           )}
         </div>

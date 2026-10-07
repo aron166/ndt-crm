@@ -495,10 +495,10 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
   return (
     <>
       <style>{`
-        .assistant-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; z-index: 40; display: flex; flex-direction: column;
+        .assistant-drawer { position: fixed; top: var(--topbar-h, 60px); right: 0; bottom: calc(var(--statusbar-h, 26px) + env(safe-area-inset-bottom)); width: 420px; z-index: 40; display: flex; flex-direction: column;
           transform: translateX(100%); opacity: 0; visibility: hidden; pointer-events: none;
           transition: transform 200ms ease, opacity 200ms ease, visibility 0s linear 200ms;
-          background: var(--bg-page); color: var(--fg); border-left: 1px solid var(--line-soft); padding-bottom: env(safe-area-inset-bottom); }
+          background: var(--bg-page); color: var(--fg); border-left: 1px solid var(--line-soft); }
         .assistant-drawer[data-open="true"] { transform: none; opacity: 1; visibility: visible; pointer-events: auto; transition: transform 200ms ease, opacity 200ms ease, visibility 0s; }
         .assistant-chip:hover:not(:disabled) { border-color: var(--mint-line); background: var(--mint-soft); }
         .assistant-chip:disabled { opacity: 0.5; cursor: not-allowed; }
