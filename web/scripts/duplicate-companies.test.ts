@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error plain .mjs script, no types
 import { groupDuplicates } from "./duplicate-companies.mjs";
 
 const row = (id: number, name: string, vat: string | null, website: string | null, links = 0, created = "2026-01-01") =>

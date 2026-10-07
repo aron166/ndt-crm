@@ -27,7 +27,8 @@ export function groupDuplicates(rows) {
     key: (r) => companyKey(r.name) || null,
     domain: (r) => domainOf(r.website),
   };
-  const out = {};
+  /** @type {Record<"vat" | "key" | "domain", any[]>} */
+  const out = { vat: [], key: [], domain: [] };
   for (const [method, fn] of Object.entries(keyers)) {
     const by = new Map();
     for (const r of rows) {
