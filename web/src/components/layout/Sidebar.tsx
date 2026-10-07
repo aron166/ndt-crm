@@ -168,6 +168,7 @@ const NAV = [
       { href: "/invoices",    label: "Számlák",     icon: IconInvoice },
       { href: "/analytics",   label: "Analytics",   icon: IconAnalytics },
       { href: "/reports/weekly", label: "Heti riport", icon: IconAnalytics },
+      { href: "/patchnotes", label: "Patchnotes", icon: IconAnalytics },
       { href: "/enrichment",  label: "Enrichment",  icon: IconSparkle },
       { href: "/automations", label: "Automatizálás", icon: IconZap },
       { href: "/marketing",   label: "Marketing",   icon: IconMegaphone },

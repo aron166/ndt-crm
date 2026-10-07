@@ -48,6 +48,9 @@
     },
     "/leads/setup": {
       "maxKB": 953
+    },
+    "/patchnotes": {
+      "maxKB": 601
     }
   }
 }
