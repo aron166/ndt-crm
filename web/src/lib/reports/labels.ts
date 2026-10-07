@@ -4,6 +4,8 @@ import { formatMinutes } from "@/lib/leads/first-contact";
 // approves it. Shared by the /reports/weekly page and the Monday email so the
 // two never drift. No emojis, no dash glyphs (portfolio style law).
 export const REPORT_UI = {
+  assistantMonth: (calls: number, tokens: number, usd: number) =>
+    `Asszisztens (hónap): ${calls} hívás, ${tokens.toLocaleString("hu-HU")} token, kb. $${usd.toFixed(2)}`,
   title: "Heti értékesítési riport",
   last7: "Utolsó 7 nap",
   last28: "Utolsó 28 nap",

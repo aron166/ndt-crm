@@ -5,6 +5,7 @@ import { getLeadStatuses } from "@/lib/leads/queries";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { callOutcomeLabel } from "@/lib/leads/outcomes";
 import { getWeeklyReport, lastDays, type WeeklyReport } from "@/lib/reports/weekly";
+import { monthUsage } from "@/lib/assistant/cap";
 import { REPORT_UI, formatMinutesOrDash } from "@/lib/reports/labels";
 
 const TENANT_ID = 1;
@@ -118,10 +119,11 @@ export default async function WeeklyReportPage() {
   const denied = await requireCrmUser(TENANT_ID);
   if (denied) notFound();
 
-  const [r7, r28, statuses] = await Promise.all([
+  const [r7, r28, statuses, assistant] = await Promise.all([
     getWeeklyReport(TENANT_ID, lastDays(7)),
     getWeeklyReport(TENANT_ID, lastDays(28)),
     getLeadStatuses(TENANT_ID),
+    monthUsage(TENANT_ID),
   ]);
 
   return (
@@ -129,6 +131,7 @@ export default async function WeeklyReportPage() {
       <div className="page-head">
         <h1 className="page-title">{REPORT_UI.title}</h1>
       </div>
+      <p style={{ fontSize: 13, color: "var(--fg-faint)" }}>{REPORT_UI.assistantMonth(assistant.calls, assistant.tokens, assistant.costUsd)}</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: 24, alignItems: "start" }}>
         <Window title={REPORT_UI.last7} r={r7} statuses={statuses} />
         <Window title={REPORT_UI.last28} r={r28} statuses={statuses} />

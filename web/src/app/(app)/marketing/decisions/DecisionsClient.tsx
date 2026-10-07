@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UI } from "@/lib/content/labels";
+import { A } from "@/lib/assistant/labels";
 import type { DecisionQueue, DecisionRow } from "@/lib/content/queries";
 import { setContentCheck } from "@/app/actions/content";
 
@@ -97,6 +98,16 @@ function Row({ row }: { row: DecisionRow }) {
           }}
         >
           {UI.checkWaive}
+        </button>
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent("assistant:focus", { detail: { itemId: row.item.id } }))}
+          style={{
+            minHeight: 32, padding: "0 12px", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer",
+            background: "var(--bg-raised)", color: "var(--fg-mute)", border: "1px solid var(--line-soft)",
+          }}
+        >
+          {A.askAbout}
         </button>
       </div>
     </li>
