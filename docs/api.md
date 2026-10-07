@@ -895,6 +895,43 @@ Definitions:
 | suppression hit | A suppression added in the window, or an email draft the suppression list cancelled (audit reason `suppressed`). Sends blocked inside `sendEmail` are not persisted, so they are not counted. |
 | company touched | Any non-superseded interaction linked to the company. |
 
+## Assistant: call-note ingest
+
+### `POST /api/assistant/callnote`: dictated post-call note to call outcome
+
+Auth: `Authorization: Bearer <app key>`, tenant from the key, same as the leads API.
+
+Body: `{ transcript (required, 1..20000 chars), lead_id?, company?, person?, occurred_at? (ISO), now? (ISO, defaults to server time, used to resolve "jovo kedd"), apply? (boolean) }`
+
+The server sends the transcript to the configured assistant provider (Groq by default) with a strict JSON schema, then validates the answer (company, outcome, `callback_at` as `YYYY-MM-DDTHH:MM` Budapest time with date and hour for `callback_requested` only, `lost_reason` 3..500 chars for `not_interested` / `disqualified`, non-blank `note`). The transcript is treated as data, never as instructions.
+
+Lead resolution: `lead_id` if given (must be in the tenant, else 404); otherwise an exact, case-insensitive company-name match among OPEN leads in the tenant (`company` from the body if given, else the model's company). Zero or more than one match gives 422 `{ error, proposed, candidates: [{ lead_id, company }] }` (up to 10 candidates by name containment).
+
+- Without `apply: true`: 200 `{ ok: true, applied: false, lead_id, proposed: <CallNote>, payload: <outcome input> }`. Nothing is written.
+- With `apply: true`: writes through the same call-outcome function as the CRM modal (board moves, technology word stored, callback task created) and returns 201 `{ ok: true, applied: true, lead_id, interaction_id, task_id }`. The interaction `call_id` is `callnote:` + the first 40 hex chars of the SHA-256 of the trimmed transcript, so a repeat of the same transcript returns 200 `{ ok: true, applied: true, existed: true, interaction_id }` without calling the model.
+
+Errors: 401 no/invalid key, 400 invalid JSON or empty transcript, 422 model output failed validation (`{ error, issues }`) or lead unresolved, 429 rate limited (CRM 30 req/min, or the provider), 503 assistant not configured or monthly token cap reached, 502 provider failed.
+
+```bash
+# synthetic sample transcript, quoting-safe via heredoc + jq -Rs
+TRANSCRIPT=$(cat <<'EOF' | jq -Rs .
+Hívás után jegyzet. A híd építő ZRT. Varda Balázssal beszéltem, ő projektvezető. Az érdekelte, hogy a meglévő betont fel tudjuk emérni fúrás nélkül. Azt mondta, hogy a georadar technológiát nem ismerik, eddig csak magfúrás haszáltak. Kifogás. Idén nincs rá keret, a szerződés már le van fedve. Kétszer is mondta, hogy küldjek ajánlatot emailben. Megegyeztünk, hogy visszahívom jövő kedven, 11 órakor. Következő lépés. Küldök egy egyoldalas összefoglalót a georadaros felmérésről, és kedven 11 órakor visszahívom. A következő munkájuk a lánckíd melletti pillér javítása, jövő tavasszal. Ez egy szintetikus minta, kitalált hívás.
+EOF
+)
+
+# 1) dry run: proposal + payload, nothing written
+curl -sS -X POST "$NDT_CRM_BASE_URL/api/assistant/callnote" \
+  -H "Authorization: Bearer $NDT_CRM_APP_KEY" -H "Content-Type: application/json" \
+  -d "{\"transcript\": $TRANSCRIPT, \"company\": \"ZMT\"}"
+# -> 200 { "ok": true, "applied": false, "lead_id": 12, "proposed": {...}, "payload": {...} }
+
+# 2) apply to a known lead
+curl -sS -X POST "$NDT_CRM_BASE_URL/api/assistant/callnote" \
+  -H "Authorization: Bearer $NDT_CRM_APP_KEY" -H "Content-Type: application/json" \
+  -d "{\"transcript\": $TRANSCRIPT, \"lead_id\": 12, \"apply\": true}"
+# -> 201 { "ok": true, "applied": true, "lead_id": 12, "interaction_id": 91, "task_id": 40 }
+```
+
 ## Automations (for reference)
 
 Rules live in `/automations`. Triggers: `lead_created`, `lead_status_changed`,
