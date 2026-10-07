@@ -57,7 +57,7 @@ export function buildWeeklyReportEmail(input: {
     ...section(`${U.leadsCreated}: ${r.leadsTotal}`, bySource),
     ...section(U.tierA, tierA),
     ...section(`${U.callOutcomes} (${U.calls}: ${r.callsTotal})`, outcomes),
-    ...section("Demók", [
+    ...section(U.demos, [
       `- ${U.demosBooked}: ${r.demos.booked}`,
       `- ${U.demosScheduled}: ${r.demos.scheduled}`,
       `- ${U.demosHeld}: ${r.demos.held}`,
