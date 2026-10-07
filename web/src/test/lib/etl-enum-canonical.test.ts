@@ -6,6 +6,7 @@ const c = (o: Record<string, unknown>) => canonicalCompanyEnums(o, 't');
 describe('etl canonicalCompanyEnums', () => {
   it('maps status', () => {
     expect(c({ status: 'Aktív' }).status).toBe('active');
+    expect(c({ status: 'zzz' }).status).toBe('inactive');
     expect(c({ status: 'F.A.' }).status).toBe('fa');
     expect(c({ status: 'Felszámolás alatt' }).status).toBe('fa');
   });

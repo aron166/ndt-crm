@@ -89,15 +89,17 @@ describe("buildScalarCompanyWhere", () => {
       AND: [
         { county: { in: ["Pest", "Fejér"] } },
         { warmth: { in: ["warm"] } },
-        { OR: [{ status: null }, { status: { not: "fa" } }] },
+        NOT_FA,
       ],
     });
   });
 
-  it("keys F.A. hiding on status, never on the company name", () => {
-    const json = JSON.stringify(buildScalarCompanyWhere({}));
-    expect(json).not.toContain("F.A.");
+  it("hides F.A. by status fa, keeping NULL status visible, plus the name belt", () => {
     expect(buildScalarCompanyWhere({})).toEqual({ AND: [NOT_FA] });
+    const json = JSON.stringify(NOT_FA);
+    expect(json).toContain('{"status":null}');
+    expect(json).toContain('{"status":{"not":"fa"}}');
+    expect(json).toContain("F. A.");
   });
 
   it("an explicit status=fa facet is not cancelled by the default hiding", () => {

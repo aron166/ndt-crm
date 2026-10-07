@@ -30,13 +30,12 @@ export function stripLegalSuffix(norm: string): string {
 
 /**
  * The deterministic company match key: accent, case, punctuation and whitespace
- * insensitive, legal form and a trailing "f. a." / "v. a." (felszamolas /
- * vegelszamolas alatt) dropped, spaces removed so "A-Hid" == "AHID" == "A Hid".
+ * insensitive, legal form dropped, spaces removed so "A-Hid" == "AHID" == "A Hid".
+ * A trailing "f. a." is kept on purpose: a live row must not merge into a liquidated one.
  * ponytail: exact key equality, no fuzzy scoring; typos stay unmatched by design.
  */
 export function companyKey(name: string | null | undefined): string {
-  const norm = normalizeName(name).replace(/ ([fv]) a$/, "");
-  return stripLegalSuffix(norm).replace(/ /g, "");
+  return stripLegalSuffix(normalizeName(name)).replace(/ /g, "");
 }
 
 /** Hungarian VAT reduced to its 8-digit core (the part that identifies the entity). */

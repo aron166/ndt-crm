@@ -57,6 +57,22 @@ try {
       }
     }
   }
+  // F.A. name but status not fa. NOT_FA (lib/companies/filters.ts) still ORs a name
+  // clause in for these; once this reports 0, that clause can be dropped.
+  const faRows = (await c.query(
+    `SELECT id, name, status FROM companies WHERE tenant_id = $1
+       AND (name LIKE '%F.A.%' OR name LIKE '%F. A.%') AND status IS DISTINCT FROM 'fa'`, [tenant])).rows;
+  console.log(`status from F.A. name: ${faRows.length} companies`);
+  for (const r of faRows) {
+    console.log(`  ${r.id} ${r.name}: ${r.status} -> fa`);
+    if (!apply) continue;
+    await c.query(`UPDATE companies SET status = 'fa' WHERE tenant_id = $1 AND id = $2`, [tenant, r.id]);
+    await c.query(
+      `INSERT INTO audit_log (tenant_id, actor_agent_id, action, entity_type, entity_id, changes)
+       VALUES ($1, 'backfill-company-enums', 'update', 'company', $2, $3)`,
+      [tenant, r.id, JSON.stringify({ before: { status: r.status }, after: { status: "fa" } })]);
+  }
+  total += faRows.length;
   await c.query(apply ? "COMMIT" : "ROLLBACK");
   console.log(`${apply ? "applied" : "dry run"}: ${total} rows ${apply ? "rewritten" : "would be rewritten"} (tenant ${tenant})`);
 } catch (e) {

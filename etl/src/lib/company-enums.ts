@@ -16,9 +16,9 @@ export function canonicalCompanyEnums(raw: Raw, rowId?: string | number) {
   let status: string | null = null;
   if (!blank(raw.status)) {
     const st = normalizeCompanyStatus(String(raw.status));
-    // Unknown status is stored active (importer rule); the old etl mapper said inactive. Warn so it is visible.
+    // Unknown status keeps the old etl rule (inactive), not the importer's active. Warn so it is visible.
     if (st.unknown) warn('status', raw.status);
-    status = st.status;
+    status = st.unknown ? 'inactive' : st.status;
   }
   let accountType: string | null = null;
   if (!blank(raw.accountType)) {

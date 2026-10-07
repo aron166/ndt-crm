@@ -137,12 +137,10 @@ describe("companyKey (deterministic company match key)", () => {
     for (const v of ["A-HID ZRT", "a hid", "AHíd Zrt", "  A - Híd  Zrt. ", "A-Híd"]) expect(companyKey(v)).toBe(k);
     expect(companyKey("KÉSZ Építő Zrt.")).toBe(companyKey("KESZ EPITO ZRT"));
   });
-  it("drops foreign legal forms and a trailing f. a. / v. a.", () => {
+  it("drops foreign legal forms, keeps a trailing f. a.", () => {
     expect(companyKey("Acme Ltd.")).toBe(companyKey("ACME Kft"));
     expect(companyKey("Acme GmbH")).toBe("acme");
-    expect(companyKey("KEG NYRT.F.A.")).toBe(companyKey("KEG Nyrt."));
-    expect(companyKey("BBS COOL KFT. F. A.")).toBe("bbscool");
-    expect(companyKey("Valami Kft. v.a.")).toBe("valami");
+    expect(companyKey("KEG NYRT.F.A.")).not.toBe(companyKey("KEG Nyrt."));
   });
   it("does not over-match: different words stay different, never strips to empty", () => {
     expect(companyKey("A-Híd Zrt.")).not.toBe(companyKey("Híd Zrt."));
