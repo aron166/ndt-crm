@@ -47,6 +47,7 @@ model Tenant {
   automationFirings      AutomationFiring[]
   automationEmailSends   AutomationEmailSend[]
   suppressions           Suppression[]
+  patchTestMarks         PatchTestMark[]
   campaigns              Campaign[]
   contentItems           ContentItem[]
   emailDrafts            EmailDraft[]
@@ -285,6 +286,7 @@ model User {
   contentVersions    ContentVersion[]
   contentReviews     ContentReview[]
   resolvedChecks     ContentCheck[]
+  patchTestMarks     PatchTestMark[]
 
   @@map("users")
 }
@@ -1416,4 +1418,24 @@ model Suppression {
   @@unique([tenantId, email])
   @@unique([tenantId, domain])
   @@map("suppressions")
+}
+
+// One user's manual-test verdict on one step of a merged PR's "## Manual test"
+// section (/patchnotes). "Not yet" = no row. Steps are keyed by position, so an
+// edited PR body can shift marks (ponytail: add a step-text hash if that bites).
+model PatchTestMark {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  userId    Int      @map("user_id")
+  repo      String
+  prNumber  Int      @map("pr_number")
+  stepIndex Int      @map("step_index")
+  state     String // ok | bug
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, repo, prNumber, stepIndex], map: "patch_test_marks_user_step_key")
+  @@map("patch_test_marks")
 }
