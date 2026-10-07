@@ -2,6 +2,7 @@
 import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import { CATEGORY_LABEL, UI } from "@/lib/content/labels";
+import { openDecisionsWhere } from "@/lib/content/queries";
 import { reviewersFromSettings } from "@/lib/content/reviewers";
 import { getPatchnotes } from "@/lib/patchnotes/github";
 import { getWeeklyReport, lastDays } from "@/lib/reports/weekly";
@@ -90,7 +91,8 @@ export async function loadHubData(tenantId: number, userId: number, userName: st
       return ids.map((id) => users.find((u) => u.id === id)).filter((u): u is { id: number; name: string } => Boolean(u));
     })(),
     db.contentCheck.findMany({
-      where: { tenantId, OR: [{ source: "decision" }, { item: { category: "decision" } }] },
+      // Open set = /marketing/decisions (openDecisionsWhere); answered/waived decision-category checks as before.
+      where: { tenantId, OR: [openDecisionsWhere(tenantId), { state: { not: "open" }, OR: [{ source: "decision" }, { item: { category: "decision" } }] }] },
       orderBy: { createdAt: "desc" }, take: DECISION_TAKE,
       select: { id: true, itemId: true, question: true, forWhom: true, state: true, answer: true, createdAt: true, item: { select: { sourceMeta: true } } },
     }),
@@ -126,7 +128,7 @@ export async function loadHubData(tenantId: number, userId: number, userName: st
   });
 
   const me = fold(userName.trim().split(/\s+/)[0] ?? "");
-  const hubDecisions: HubDecision[] = decisions.map((c) => {
+  const hubDecisions: HubDecision[] = [...new Map(decisions.map((c) => [c.id, c])).values()].map((c) => {
     const dl = (c.item.sourceMeta as { deadline?: unknown } | null)?.deadline;
     return {
       checkId: c.id, itemId: c.itemId, question: c.question,
@@ -144,7 +146,7 @@ export async function loadHubData(tenantId: number, userId: number, userName: st
   };
 }
 
-const clean = (s: string) => flat(s.replace(/<\/?crm\b[^>]*>/gi, ""));
+const clean = (s: string) => flat(s.replace(/<\s*\/?\s*crm\b[^>]*>/gi, ""));
 
 export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}): string {
   const budget = opts.budgetChars ?? HUB_CONTEXT_BUDGET_CHARS;
@@ -185,7 +187,7 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}
   };
 
   let decs = d.decisions;
-  let text = build(decs, items, [], 0);
+  const text = build(decs, items, [], 0);
   if (text.length <= budget && !d.truncatedQuery) return text;
 
   if (decs.length > 30 && build(decs, items.slice(0, 20), [], items.length - 20).length > budget) decs = decs.slice(0, 30);

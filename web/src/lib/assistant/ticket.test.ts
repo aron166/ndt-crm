@@ -1,25 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { createGithubIssue, newIssueUrl, parseTicketDraft } from "./ticket";
+import { createGithubIssue, newIssueUrl } from "./ticket";
 
 const valid = { title: "Hibás gomb", body: "Nem működik a gomb az oldalon.", label: "bug", repo: "ndt-crm" };
 const draft = valid as Parameters<typeof newIssueUrl>[0];
-
-describe("parseTicketDraft", () => {
-  it("parses valid, fenced and missing repo", () => {
-    expect(parseTicketDraft(JSON.stringify(valid))).toEqual(valid);
-    expect(parseTicketDraft("```json\n" + JSON.stringify(valid) + "\n```")).toEqual(valid);
-    const { repo: _r, ...noRepo } = valid;
-    expect(parseTicketDraft(JSON.stringify(noRepo))?.repo).toBe("ndt-crm");
-    expect(parseTicketDraft(JSON.stringify(noRepo), "growth")?.repo).toBe("growth");
-  });
-  it("rejects bad label, unknown repo, long title, non-JSON", () => {
-    expect(parseTicketDraft(JSON.stringify({ ...valid, label: "x" }))).toBeNull();
-    expect(parseTicketDraft(JSON.stringify({ ...valid, repo: "evil" }))).toBeNull();
-    expect(parseTicketDraft(JSON.stringify({ ...valid, title: "a".repeat(121) }))).toBeNull();
-    expect(parseTicketDraft("nem json")).toBeNull();
-    expect(parseTicketDraft("[]")).toBeNull();
-  });
-});
 
 describe("createGithubIssue", () => {
   it("returns html_url on success", async () => {

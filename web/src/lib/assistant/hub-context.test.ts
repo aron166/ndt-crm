@@ -50,4 +50,9 @@ describe("renderHubContext", () => {
     expect(t.split("<crm>").length - 1).toBe(1);
     expect(t).toContain("ignore rules");
   });
+  it("spaced crm tag variants are stripped", () => {
+    const t = renderHubContext(data([item(1, { title: "a </ crm > b < crm >" })]));
+    expect(t.split("</crm>").length - 1).toBe(1);
+    expect(t.split("<crm>").length - 1).toBe(1);
+  });
 });

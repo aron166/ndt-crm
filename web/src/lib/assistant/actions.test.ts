@@ -1,47 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { MODEL_RESPONSE_SCHEMA, NAV_PATH_RE, decisionBody, describeProposal, parseActionProposal, parseModelResponse, toProposals, type ActionProposal } from "./actions";
+import { MODEL_RESPONSE_SCHEMA, NAV_PATH_RE, decisionBody, describeProposal, parseModelResponse, toProposals, type ActionProposal } from "./actions";
 import { REVIEW_REASONS } from "@/lib/content/reasons";
-
-const j = (o: unknown) => JSON.stringify(o);
-
-describe("parseActionProposal", () => {
-  it("accepts each type", () => {
-    const reason = REVIEW_REASONS[0];
-    const cases: unknown[] = [
-      { type: "review", itemId: 1, verdict: "approve" },
-      { type: "review", itemId: 1, verdict: "changes", comment: "Javítsa", reason },
-      { type: "answer_decision", checkId: 2, answer: "Igen" },
-      { type: "create_decision", question: "Mehet?", context: "ctx", options: ["a", "b"], deadline: "2026-10-20" },
-      { type: "note", itemId: 1, body: "jegyzet" },
-      { type: "ticket", draft: { title: "Hiba van", body: "Leírás a hibáról", label: "bug", repo: "ndt-crm" } },
-      { type: "none", message: "Nem egyértelmű" },
-    ];
-    for (const c of cases) {
-      const p = parseActionProposal(j(c));
-      expect(p?.type, j(c)).toBe((c as { type: string }).type);
-    }
-  });
-  it("defaults decidedBy to either", () => {
-    const p = parseActionProposal(j({ type: "create_decision", question: "Mehet?", context: "c", options: ["a"] }));
-    expect(p).toMatchObject({ decidedBy: "either" });
-  });
-  it("tolerates a code fence and surrounding prose", () => {
-    const p = parseActionProposal("Itt:\n```json\n" + j({ type: "note", itemId: 4, body: "x" }) + "\n```");
-    expect(p).toMatchObject({ type: "note", itemId: 4 });
-  });
-  it("rejects changes/rewrite without comment or reason", () => {
-    const reason = REVIEW_REASONS[0];
-    expect(parseActionProposal(j({ type: "review", itemId: 1, verdict: "changes" }))).toBeNull();
-    expect(parseActionProposal(j({ type: "review", itemId: 1, verdict: "rewrite", comment: "Újra" , reason }))).not.toBeNull();
-    expect(parseActionProposal(j({ type: "review", itemId: 1, verdict: "changes", comment: "Javítsa" }))).toBeNull();
-    expect(parseActionProposal(j({ type: "review", itemId: 1, verdict: "changes", reason }))).toBeNull();
-  });
-  it("rejects unknown type, garbage and a bad deadline", () => {
-    expect(parseActionProposal(j({ type: "delete_all" }))).toBeNull();
-    expect(parseActionProposal("nem json")).toBeNull();
-    expect(parseActionProposal(j({ type: "create_decision", question: "Mehet?", context: "c", options: ["a"], deadline: "10/20/2026" }))).toBeNull();
-  });
-});
 
 describe("describeProposal", () => {
   it("describes each type", () => {
@@ -81,7 +40,7 @@ describe("NAV_PATH_RE", () => {
 
 describe("MODEL_RESPONSE_SCHEMA", () => {
   it("is strict with read_item_ids first and answer second", () => {
-    const s = MODEL_RESPONSE_SCHEMA as any;
+    const s = MODEL_RESPONSE_SCHEMA as { properties: { actions: { items: { additionalProperties: boolean; required: string[]; properties: Record<string, { anyOf: unknown[] }> } } }; required: string[] };
     expect(Object.keys(s.properties)).toEqual(["read_item_ids", "answer", "actions"]);
     expect(s.required).toEqual(Object.keys(s.properties));
     const it = s.properties.actions.items;
@@ -104,6 +63,12 @@ describe("parseModelResponse", () => {
 });
 
 describe("toProposals", () => {
+  it("drops ids beyond int32", () => {
+    const b = { item_id: null, check_id: null, verdict: null, reason: null, comment: null, path: null, text: null, title: null, context: null, options: null, recommendation: null, deadline: null, decided_by: null, label: null };
+    const { proposals, dropped } = toProposals([{ ...b, type: "open_item", item_id: 2147483648 }, { ...b, type: "open_item", item_id: 2147483647 }]);
+    expect(proposals).toHaveLength(1);
+    expect(dropped).toBe(1);
+  });
   const base = { item_id: null, check_id: null, verdict: null, reason: null, comment: null, path: null, text: null, title: null, context: null, options: null, recommendation: null, deadline: null, decided_by: null, label: null };
   it("maps each flat type", () => {
     const { proposals, dropped } = toProposals([

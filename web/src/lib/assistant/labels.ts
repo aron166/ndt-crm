@@ -22,7 +22,6 @@ export const A = {
   newState: "Új állapot",
   fItem: "Anyag",
   fPath: "Oldal",
-  fNone: "Nincs további adat.",
   askAbout: "Kérdezek róla",
   loading: "Betöltés...",
   notConfigured: "Az asszisztens még nincs beállítva (Groq kulcs hiányzik). A jegyzetek és a Mi vár rám? működnek.",

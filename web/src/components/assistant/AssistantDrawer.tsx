@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, memo, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { A } from "@/lib/assistant/labels";
@@ -95,20 +95,18 @@ function Inline({ text, bold }: { text: string; bold?: boolean }) {
       {parts.map((part, i) => {
         if (!part) return null;
         if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
-        if (part.startsWith("/") && INLINE_RE.test(part)) {
-          INLINE_RE.lastIndex = 0;
+        if (i % 2 === 1) { // odd indices are the captured bold/path matches
           const trail = /[.,;:)]+$/.exec(part)?.[0] ?? "";
           const path = trail ? part.slice(0, -trail.length) : part;
           return <Fragment key={i}><Link href={path} style={linkStyle}>{path}</Link>{trail}</Fragment>;
         }
-        INLINE_RE.lastIndex = 0;
         return <Fragment key={i}>{bold ? <strong>{part}</strong> : part}</Fragment>;
       })}
     </>
   );
 }
 
-function Answer({ text }: { text: string }) {
+const Answer = memo(function Answer({ text }: { text: string }) {
   const lines = text.split("\n");
   const out: React.ReactNode[] = [];
   let list: string[] = [];
@@ -127,7 +125,7 @@ function Answer({ text }: { text: string }) {
   });
   flush(lines.length);
   return <div style={{ fontSize: 14, lineHeight: 1.45, overflowWrap: "anywhere" }}>{out}</div>;
-}
+});
 
 function turnsToMsgs(c: ConversationView): Msg[] {
   return c.messages.map((t) => (t.role === "user" ? { role: "user", content: t.content } : { role: "assistant", content: t.content, actions: t.actions }));
@@ -175,7 +173,8 @@ function WaitingList({ w }: { w: WaitingView }) {
 function Card({ card, st, onRun, onDismiss }: { card: ActionCard; st: CardState; onRun: () => void; onDismiss: () => void }) {
   if (st.phase === "dismissed") return null;
   const rows = proposalRows(card.proposal);
-  const finished = st.phase === "done";
+  const executed = !!card.executedAt;
+  const finished = st.phase === "done" || executed;
   const running = st.phase === "running";
   const external = st.href?.startsWith("http");
   return (
@@ -193,6 +192,7 @@ function Card({ card, st, onRun, onDismiss }: { card: ActionCard; st: CardState;
         ? <a href={st.href} target="_blank" rel="noopener noreferrer" style={linkStyle}>{A.open}</a>
         : <Link href={st.href} style={linkStyle}>{A.open}</Link>)}
       {st.error && <p role="alert" style={{ ...errStyle, margin: 0 }}>{st.error}</p>}
+      {executed && st.phase !== "done" && <p role="status" style={{ margin: 0, fontSize: 13, color: "var(--mint-fg)" }}>{A.executed}</p>}
       {!finished && (
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" disabled={running} onClick={onRun} style={{ ...btn, ...(running ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>
@@ -204,6 +204,37 @@ function Card({ card, st, onRun, onDismiss }: { card: ActionCard; st: CardState;
     </div>
   );
 }
+
+type RowProps = {
+  m: Msg; i: number; cards: Record<string, CardState>;
+  onRun: (k: string, c: ActionCard) => void; onDismiss: (k: string) => void;
+};
+// Memoized: finished rows keep their identity while a later row streams, so they are not re-rendered or re-parsed.
+const MsgRow = memo(function MsgRow({ m, i, cards, onRun, onDismiss }: RowProps) {
+  return (
+    <div style={m.role === "user"
+      ? { justifySelf: "end", maxWidth: "85%", background: "var(--mint-soft)", borderRadius: 8, padding: "6px 10px", fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
+      : { display: "grid", gap: 6 }}>
+      {m.role === "user" ? m.content : m.streaming ? (
+        <div style={{ fontSize: 14, lineHeight: 1.45, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+          {m.status && <div style={{ ...small, marginBottom: 2 }}>{m.status}</div>}
+          {m.deltas?.length === 0 && !m.status && <span style={small}>{A.thinking}</span>}
+          {m.deltas?.map((d, j) => <span key={j} className="assistant-fade">{d}</span>)}
+          <span className="assistant-caret" aria-hidden="true" />
+        </div>
+      ) : (
+        <>
+          <Answer text={m.content} />
+          {m.actions?.map((c, j) => {
+            const k = `${i}:${c.key}:${j}`;
+            const st = cards[k] ?? (c.proposal.type === "waiting" ? cards[`${i}:w`] : undefined) ?? { phase: "idle" as const };
+            return <Card key={k} card={c} st={st} onRun={() => onRun(k, c)} onDismiss={() => onDismiss(k)} />;
+          })}
+        </>
+      )}
+    </div>
+  );
+});
 
 export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boolean; pathname: string; itemId: number | null; onClose: () => void }) {
   const router = useRouter();
@@ -229,7 +260,10 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
   const [cards, setCards] = useState<Record<string, CardState>>({});
   const [quickWait, setQuickWait] = useState(false);
 
-  const [noteText, setNoteText] = useState("");
+  // The drawer stays mounted across navigation: a half-typed note belongs to the item it was typed on.
+  const [noteDraft, setNoteDraft] = useState<{ id: number | null; text: string }>({ id: null, text: "" });
+  const noteText = noteDraft.id === itemId ? noteDraft.text : "";
+  const setNoteText = (text: string) => setNoteDraft({ id: itemId, text });
   const [noteError, setNoteError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
 
@@ -241,11 +275,8 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
     if (!open) return;
     openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const t = setTimeout(() => (inputRef.current ?? dialogRef.current)?.focus(), 0);
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
     return () => {
       clearTimeout(t);
-      window.removeEventListener("keydown", onKey);
       openerRef.current?.focus();
     };
   }, [open, onClose]);
@@ -256,7 +287,7 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
   useEffect(() => {
     if (!open) return;
     let live = true;
-    const want = restored.current ? convRef.current : lsGet();
+    const want = restored.current ? null : lsGet(); // after the first restore the client already holds the messages
     openAssistant({ itemId, conversationId: want }).then((res) => {
       if (!live) return;
       if ("error" in res) { setLoadError(res.error); return; }
@@ -319,7 +350,7 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
     const ac = new AbortController();
     abortRef.current = ac;
     const fail = (msg: string) => {
-      setMsgs((all) => (all.length >= 2 ? all.slice(0, -1) : all));
+      setMsgs((all) => (all.length >= 2 ? all.slice(0, -2) : all)); // drop the user bubble and the pending answer; the input is restored
       setChatError(msg);
       setInput(message);
     };
@@ -381,9 +412,11 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
     }).catch(() => setChatError(A.genericError)).finally(() => setQuickWait(false));
   }
 
-  function patchCard(k: string, s: CardState) { setCards((c) => ({ ...c, [k]: s })); }
+  const patchCard = useCallback((k: string, s: CardState) => { setCards((c) => ({ ...c, [k]: s })); }, []);
+  const dismissCard = useCallback((k: string) => patchCard(k, { phase: "dismissed" }), [patchCard]);
 
-  function run(k: string, p: ActionProposal) {
+  const run = useCallback((k: string, card: ActionCard) => {
+    const p = card.proposal;
     if (p.type === "none") return;
     if (p.type === "open_item") { router.push(`/marketing/${p.itemId}`); patchCard(k, { phase: "done" }); return; }
     if (p.type === "navigate") { router.push(p.path); patchCard(k, { phase: "done" }); return; }
@@ -393,19 +426,21 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
         .catch(() => patchCard(k, { phase: "idle", error: A.genericError }));
       return;
     }
-    executeAction(p).then((res) => {
+    const conversationId = convRef.current;
+    executeAction(p, conversationId != null ? { conversationId, key: card.key } : undefined).then((res) => {
       if ("error" in res) { patchCard(k, { phase: "idle", error: res.error }); return; }
       patchCard(k, { phase: "done", message: res.message, state: res.state, href: res.href });
       router.refresh();
     }).catch(() => patchCard(k, { phase: "idle", error: A.genericError }));
-  }
+  }, [router, patchCard]);
 
   function saveNote() {
-    if (itemId == null || !noteText.trim() || loadError) return;
+    if (item == null || !noteText.trim() || loadError) return;
+    const target = item.id;
     setNoteError(null);
     startSave(async () => {
       try {
-        const res = await addItemNote({ itemId, body: noteText.trim() });
+        const res = await addItemNote({ itemId: target, body: noteText.trim() });
         if ("error" in res) setNoteError(res.error);
         else { setNotes((n) => [res.note, ...n]); setNoteText(""); }
       } catch { setNoteError(A.genericError); }
@@ -433,7 +468,8 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
         .assistant-caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: text-bottom; background: var(--fg-mute); animation: assistantBlink 1s steps(1) infinite; }
         @media (prefers-reduced-motion: reduce) { .assistant-fade, .assistant-caret { animation: none; } }
       `}</style>
-      <div ref={dialogRef} className="assistant-drawer" role="dialog" aria-modal="false" aria-label={A.dialog} tabIndex={-1}>
+      <div ref={dialogRef} className="assistant-drawer" role="dialog" aria-modal="false" aria-label={A.dialog} tabIndex={-1}
+        onKeyDown={(e) => { if (e.key === "Escape" && !e.defaultPrevented) onClose(); }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--line-soft)", flexWrap: "wrap" }}>
           <strong style={{ fontSize: 15, flex: 1 }}>{A.dialog}</strong>
           <button type="button" onClick={fresh} style={btnQuiet}>{A.newChat}</button>
@@ -472,29 +508,7 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
                 </div>
               )}
               {noAi && <p style={{ fontSize: 13, color: "var(--fg-mute)", margin: 0 }}>{A.notConfigured}</p>}
-              {msgs.map((m, i) => (
-                <div key={i} style={m.role === "user"
-                  ? { justifySelf: "end", maxWidth: "85%", background: "var(--mint-soft)", borderRadius: 8, padding: "6px 10px", fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
-                  : { display: "grid", gap: 6 }}>
-                  {m.role === "user" ? m.content : m.streaming ? (
-                    <div style={{ fontSize: 14, lineHeight: 1.45, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                      {m.status && <div style={{ ...small, marginBottom: 2 }}>{m.status}</div>}
-                      {m.deltas?.length === 0 && !m.status && <span style={small}>{A.thinking}</span>}
-                      {m.deltas?.map((d, j) => <span key={j} className="assistant-fade">{d}</span>)}
-                      <span className="assistant-caret" aria-hidden="true" />
-                    </div>
-                  ) : (
-                    <>
-                      <Answer text={m.content} />
-                      {m.actions?.map((c, j) => {
-                        const k = `${i}:${c.key}:${j}`;
-                        const st = cards[k] ?? (c.proposal.type === "waiting" ? cards[`${i}:w`] : undefined) ?? { phase: "idle" as const };
-                        return <Card key={k} card={c} st={st} onRun={() => run(k, c.proposal)} onDismiss={() => patchCard(k, { phase: "dismissed" })} />;
-                      })}
-                    </>
-                  )}
-                </div>
-              ))}
+              {msgs.map((m, i) => <MsgRow key={i} m={m} i={i} cards={cards} onRun={run} onDismiss={dismissCard} />)}
               {chatError && <p role="alert" style={{ ...errStyle, margin: 0 }}>{chatError}</p>}
             </div>
             <form onSubmit={(e) => { e.preventDefault(); void send(input); }} style={{ display: "flex", gap: 8, padding: "8px 12px", borderTop: "1px solid var(--line-soft)" }}>

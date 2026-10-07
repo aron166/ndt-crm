@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PATCH_OWNER, PATCH_REPOS, type PatchRepo } from "@/lib/patchnotes/repos";
+import { PATCH_OWNER, PATCH_REPOS } from "@/lib/patchnotes/repos";
 
 export const TicketDraftSchema = z.object({
   title: z.string().trim().min(5).max(120),
@@ -8,27 +8,6 @@ export const TicketDraftSchema = z.object({
   repo: z.enum(PATCH_REPOS),
 });
 export type TicketDraft = z.infer<typeof TicketDraftSchema>;
-
-export function parseTicketDraft(text: string, defaultRepo: PatchRepo = "ndt-crm"): TicketDraft | null {
-  const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  let o: unknown;
-  try {
-    o = JSON.parse(t);
-  } catch {
-    return null;
-  }
-  if (!o || typeof o !== "object" || Array.isArray(o)) return null;
-  const r = TicketDraftSchema.safeParse({ ...o, repo: (o as { repo?: unknown }).repo || defaultRepo });
-  return r.success ? r.data : null;
-}
-
-export const TICKET_INSTRUCTION = [
-  "A felhasználó hibát jelentene vagy fejlesztési ötletet adna le. A beszélgetés alapján készítsen jegyet.",
-  'Válaszoljon KIZÁRÓLAG egyetlen JSON objektummal, más szöveg nélkül: {"title": string, "body": string, "label": "bug" | "backlog", "repo": string}.',
-  `A "repo" értéke "ndt-crm", kivéve ha a felhasználó kifejezetten megnevezi a következők egyikét: ${PATCH_REPOS.join(", ")}.`,
-  'A "label" legyen "bug", ha valami hibásan működik, és "backlog", ha új ötlet vagy kérés.',
-  'A "title" és a "body" magyarul szóljon. A "body" tartalmazza: mi történt, mit várt volna a felhasználó, és melyik oldalon (útvonal) történt.',
-].join("\n");
 
 export function newIssueUrl(d: TicketDraft): string {
   const q = new URLSearchParams({ title: d.title, body: d.body, labels: d.label });

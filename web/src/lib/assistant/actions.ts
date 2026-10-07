@@ -8,7 +8,7 @@ import { CHECK_ANSWER_MAX, CHECK_FOR, CHECK_QUESTION_MAX } from "@/lib/content/s
 import { TicketDraftSchema } from "./ticket";
 
 const text = (max: number, min = 1) => z.string().trim().min(min).max(max);
-const id = z.number().int().positive();
+const id = z.number().int().positive().max(2147483647); // Prisma Int (int32)
 
 export const NAV_PATH_RE = /^\/(?:marketing(?:\/(?:live|campaigns|decisions|\d+))?(?:\?[a-z_]+=[a-z0-9_]+(?:&[a-z_]+=[a-z0-9_]+)*)?|marketing\/decisions#\d+|patchnotes|reports\/weekly)$/;
 /** Proposals the browser handles itself (no server action, no confirm). */
@@ -46,28 +46,6 @@ export const ActionProposalSchema = z.discriminatedUnion("type", [
 ]);
 export type ActionProposal = z.infer<typeof ActionProposalSchema>;
 export type ActionType = Exclude<ActionProposal["type"], "none">;
-
-export function parseActionProposal(raw: string): ActionProposal | null {
-  try {
-    const s = raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
-    const r = ActionProposalSchema.safeParse(JSON.parse(s));
-    return r.success ? r.data : null;
-  } catch {
-    return null;
-  }
-}
-
-export const ACTION_INSTRUCTION = [
-  "A felhasználó egy műveletet kér. Ön NEM hajtja végre: csak javaslatot ad, amit a felhasználó a panelen megerősít.",
-  "Válaszoljon KIZÁRÓLAG egyetlen JSON objektummal, más szöveg nélkül, az alábbi alakok egyikében:",
-  `{"type":"review","itemId":number,"verdict":${VERDICTS.map((v) => `"${v}"`).join("|")},"comment"?:string,"reason"?:${REVIEW_REASONS.map((r) => `"${r}"`).join("|")}}  (anyag bírálata; "approve" kivételével a comment és a reason kötelező)`,
-  '{"type":"answer_decision","checkId":number,"answer":string}  (egy döntés vagy tisztázandó kérdés megválaszolása; a checkId a <page> "kérdés #" száma)',
-  '{"type":"create_decision","question":string,"context":string,"options":string[],"recommendation"?:string,"deadline"?:"YYYY-MM-DD","decidedBy":"aron"|"peter"|"either"}  (új döntés a Döntések oldalra)',
-  '{"type":"note","itemId":number,"body":string}  (jegyzet egy anyaghoz)',
-  '{"type":"ticket","draft":{"title":string,"body":string,"label":"bug"|"backlog","repo":"ndt-crm"}}  (hibajegy vagy ötlet)',
-  '{"type":"none","message":string}  (ha a kérés nem egyértelmű, vagy az anyag/kérdés nem azonosítható; a message magyarul mondja meg, mi hiányzik)',
-  "Az itemId és a checkId CSAK a <page> vagy <item> adatokban szereplő szám lehet. Ne találjon ki azonosítót, inkább adjon \"none\" választ.",
-].join("\n");
 
 /** One-line Hungarian description of a proposal for the confirm card and the log. */
 export function describeProposal(p: ActionProposal, names: { itemTitle?: string; question?: string } = {}): string {
