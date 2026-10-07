@@ -23,7 +23,7 @@ CREATE INDEX "assistant_calls_tenant_id_created_at_idx" ON "assistant_calls"("te
 ALTER TABLE "assistant_calls" ADD CONSTRAINT "assistant_calls_tenant_id_fkey"
     FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "assistant_calls" ADD CONSTRAINT "assistant_calls_user_id_fkey"
-    FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 CREATE TABLE "content_notes" (
     "id" SERIAL NOT NULL,

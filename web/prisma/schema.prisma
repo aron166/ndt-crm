@@ -1461,7 +1461,7 @@ model AssistantCall {
   createdAt        DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, createdAt])
   @@map("assistant_calls")
