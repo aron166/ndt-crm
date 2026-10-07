@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireCrmUser, getActor } from "@/lib/actor";
+import { getActor } from "@/lib/actor";
 import { db } from "@/lib/db";
 import { getPatchnotes, type Issue, type RepoData } from "@/lib/patchnotes/github";
 import { PATCH_UI } from "@/lib/patchnotes/labels";
@@ -47,13 +47,12 @@ function RepoCard({ r }: { r: RepoData }) {
 }
 
 export default async function PatchnotesPage() {
-  const denied = await requireCrmUser(TENANT_ID);
-  if (denied) notFound();
   const { userId } = await getActor(TENANT_ID);
+  if (userId == null) notFound();
 
   const [data, marks] = await Promise.all([
     getPatchnotes(),
-    db.patchTestMark.findMany({ where: { tenantId: TENANT_ID, userId: userId! }, select: { repo: true, prNumber: true, stepIndex: true, state: true } }),
+    db.patchTestMark.findMany({ where: { tenantId: TENANT_ID, userId }, select: { repo: true, prNumber: true, stepIndex: true, state: true } }),
   ]);
   const byPr = new Map<string, Record<number, PatchState>>();
   for (const m of marks) {

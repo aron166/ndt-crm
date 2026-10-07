@@ -7,7 +7,6 @@ export const PATCH_UI = {
   days28: "28 nap",
   backlog: "Backlog",
   decisionAron: "Áron dönt",
-  merged: "Merge-elve",
   testOk: "Teszt OK",
   bug: "Hiba",
   notYet: "Még nem",
@@ -17,6 +16,7 @@ export const PATCH_UI = {
   noMerged: "Nincs merge-elt PR.",
   none: "Nincs.",
   errors: "Lekérési hibák",
-  author: "Szerző",
+  saveFailed: "Mentés sikertelen, próbáld újra.",
+  openIssue: "Hibajegy",
   progress: (ok: number, total: number, bug: number) => `${ok}/${total} OK, ${bug} hiba`,
 } as const;

@@ -36,3 +36,19 @@ describe("bugIssueUrl", () => {
     expect(body).toContain("Actual:");
   });
 });
+
+describe("parseManualTest hardening", () => {
+  it("indented sub-bullets continue the previous step", () => {
+    expect(parseManualTest("## Manual test\n1. open /leads\n   - expect badge")).toEqual(["open /leads - expect badge"]);
+  });
+  it("an indented #123 line does not end the section", () => {
+    expect(parseManualTest("## Manual test\n1. open\n   #118 now shows the badge\n2. two")).toEqual(["open #118 now shows the badge", "two"]);
+  });
+  it("ignores fenced blocks", () => {
+    expect(parseManualTest("## Manual test\n1. a\n```\n# x\n1. y\n```\n2. b")).toEqual(["a", "b"]);
+  });
+  it("caps at 100 steps", () => {
+    const body = "## Manual test\n" + Array.from({ length: 120 }, (_, i) => `${i + 1}. s${i}`).join("\n");
+    expect(parseManualTest(body)).toHaveLength(100);
+  });
+});

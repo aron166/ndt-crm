@@ -9,3 +9,7 @@ export function isPatchRepo(r: unknown): r is PatchRepo {
 }
 
 export type PatchState = "ok" | "bug";
+
+// Only PRs merged into the integration branch count (excludes feature-into-feature
+// PRs and dev to main promotions).
+export const PATCH_BASE: Record<PatchRepo, string> = { "ndt-crm": "dev", "betonscan-landing": "main", growth: "dev", workspace: "main", peterdrive: "dev" };

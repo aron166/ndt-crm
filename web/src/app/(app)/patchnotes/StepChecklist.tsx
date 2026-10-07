@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { setPatchStepState } from "@/app/actions/patchnotes";
 import { bugIssueUrl } from "@/lib/patchnotes/parse";
 import { PATCH_UI } from "@/lib/patchnotes/labels";
@@ -26,25 +26,34 @@ export function StepChecklist({ repo, prNumber, prTitle, steps, initial }: Props
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
 
-  function set(i: number, state: PatchState | null) {
-    const prev = marks[i];
-    setError(null);
+  const confirmed = useRef<Record<number, PatchState>>(initial);
+
+  function apply(i: number, state: PatchState | null | undefined) {
     setMarks((m) => {
       const n = { ...m };
-      if (state === null) delete n[i];
+      if (state == null) delete n[i];
       else n[i] = state;
       return n;
     });
+  }
+
+  function set(i: number, state: PatchState | null) {
+    setError(null);
+    apply(i, state);
     start(async () => {
-      const res = await setPatchStepState(repo, prNumber, i, state);
-      if ("error" in res && res.error) {
-        setError(res.error);
-        setMarks((m) => {
-          const n = { ...m };
-          if (prev === undefined) delete n[i];
-          else n[i] = prev;
-          return n;
-        });
+      let err: string | null = null;
+      try {
+        const res = await setPatchStepState(repo, prNumber, i, state);
+        if ("error" in res && res.error) err = res.error;
+      } catch {
+        err = PATCH_UI.saveFailed;
+      }
+      if (err === null) {
+        if (state === null) delete confirmed.current[i];
+        else confirmed.current[i] = state;
+      } else {
+        setError(err);
+        apply(i, confirmed.current[i]);
       }
     });
   }
@@ -66,25 +75,39 @@ export function StepChecklist({ repo, prNumber, prTitle, steps, initial }: Props
             <button type="button" className="btn sm" aria-pressed={marks[i] === "ok"} style={seg(marks[i] === "ok")} onClick={() => set(i, "ok")}>
               {PATCH_UI.testOk}
             </button>
-            <a
-              className="btn sm"
-              role="button"
-              aria-pressed={marks[i] === "bug"}
-              style={seg(marks[i] === "bug")}
-              href={bugIssueUrl(repo, prNumber, prTitle, s)}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => set(i, "bug")}
-            >
-              {PATCH_UI.bug}
-            </a>
+            {marks[i] === "bug" ? (
+              <>
+                <button type="button" className="btn sm" aria-pressed style={seg(true)}>
+                  {PATCH_UI.bug}
+                </button>
+                <a className="tbl-link" style={{ fontSize: 12, alignSelf: "center" }} href={bugIssueUrl(repo, prNumber, prTitle, s)} target="_blank" rel="noopener noreferrer">
+                  {PATCH_UI.openIssue}
+                </a>
+              </>
+            ) : (
+              <a
+                className="btn sm"
+                role="button"
+                aria-pressed={false}
+                style={seg(false)}
+                href={bugIssueUrl(repo, prNumber, prTitle, s)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => set(i, "bug")}
+                onAuxClick={(e) => {
+                  if (e.button === 1) set(i, "bug");
+                }}
+              >
+                {PATCH_UI.bug}
+              </a>
+            )}
             <button type="button" className="btn sm" aria-pressed={marks[i] === undefined} style={seg(marks[i] === undefined)} onClick={() => set(i, null)}>
               {PATCH_UI.notYet}
             </button>
           </div>
         </div>
       ))}
-      {error && <div role="alert" style={{ fontSize: 12, color: "var(--danger, var(--fg))" }}>{error}</div>}
+      {error && <div role="alert" style={{ fontSize: 12, color: "var(--destructive)" }}>{error}</div>}
     </div>
   );
 }

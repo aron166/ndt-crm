@@ -1,7 +1,7 @@
 import { PATCH_OWNER } from "./repos";
 
 const HEADING = /^#{2,3}\s*manual test\s*$/i;
-const ITEM = /^\s*(?:\d+[.)]|[-*])\s+(.*)$/;
+const ITEM = /^(?:\d+[.)]|[-*])\s+(.*)$/;
 
 /** Steps from the "Manual test" section of a PR body. Client-safe (no server imports). */
 export function parseManualTest(body: string | null): string[] {
@@ -10,8 +10,14 @@ export function parseManualTest(body: string | null): string[] {
   const start = lines.findIndex((l) => HEADING.test(l.trim()));
   if (start < 0) return [];
   const steps: string[] = [];
+  let inFence = false;
   for (const line of lines.slice(start + 1)) {
-    if (line.trimStart().startsWith("#")) break;
+    if (line.trimStart().startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    if (/^#{1,6}\s/.test(line)) break;
     const m = ITEM.exec(line);
     if (m) {
       steps.push(m[1].replace(/^\[[ xX]\]\s*/, "").trim());
@@ -19,7 +25,8 @@ export function parseManualTest(body: string | null): string[] {
       steps[steps.length - 1] = `${steps[steps.length - 1]} ${line.trim()}`;
     }
   }
-  return steps.filter((s) => s !== "");
+  // The action rejects stepIndex > 99.
+  return steps.filter((s) => s !== "").slice(0, 100);
 }
 
 /** Prefilled "new bug issue" link for one failed manual-test step. */
