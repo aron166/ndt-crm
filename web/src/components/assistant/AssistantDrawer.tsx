@@ -337,9 +337,6 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
   }, [msgs, tab, vis]);
 
-  // A new chat or another tab starts pinned to the newest message.
-  useEffect(() => { pinned.current = true; }, [tab]);
-
   function fresh() {
     pinned.current = true;
     abort();
@@ -488,7 +485,7 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
 
   const noAi = !configured;
   const tabBtn = (t: Tab, label: string) => (
-    <button type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+    <button type="button" role="tab" aria-selected={tab === t} onClick={() => { pinned.current = true; setTab(t); }}
       style={{ ...btnQuiet, ...(tab === t ? { background: "var(--mint-soft)", color: "var(--mint-fg)", border: "1px solid var(--mint-line)" } : {}) }}>
       {label}
     </button>
