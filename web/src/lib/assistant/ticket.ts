@@ -40,7 +40,7 @@ export async function createGithubIssue(
   opts: { token?: string; fetchImpl?: typeof fetch } = {},
 ): Promise<{ ok: true; url: string } | { ok: false; fallbackUrl: string }> {
   const fallback = { ok: false as const, fallbackUrl: newIssueUrl(d) };
-  const token = opts.token ?? process.env.GITHUB_TOKEN;
+  const token = opts.token ?? process.env.ASSISTANT_GITHUB_TOKEN; // not GITHUB_TOKEN: that one is the read-only /patchnotes token
   if (!token) return fallback;
   try {
     const res = await (opts.fetchImpl ?? fetch)(`https://api.github.com/repos/${PATCH_OWNER}/${d.repo}/issues`, {

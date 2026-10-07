@@ -17,10 +17,13 @@ export function assistantConfig(env: Env = process.env): AssistantConfig | null 
 
 export class AssistantError extends Error {
   status?: number;
-  constructor(message: string, status?: number) {
+  /** Set when the provider answered 2xx (so tokens may have been billed) but the reply was unusable. */
+  usage?: { promptTokens: number; completionTokens: number };
+  constructor(message: string, status?: number, usage?: { promptTokens: number; completionTokens: number }) {
     super(message);
     this.name = "AssistantError";
     this.status = status;
+    this.usage = usage;
   }
 }
 
@@ -54,11 +57,13 @@ export async function chatCompletion(
   try {
     data = JSON.parse(raw);
   } catch {
-    throw new AssistantError("Assistant returned invalid JSON", res.status);
+    throw new AssistantError("Assistant returned invalid JSON", res.status, { promptTokens: 0, completionTokens: 0 });
   }
-  const text = data.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text) throw new AssistantError("Assistant returned no content", res.status);
-  return { text, promptTokens: data.usage?.prompt_tokens ?? 0, completionTokens: data.usage?.completion_tokens ?? 0 };
+  const promptTokens = data?.usage?.prompt_tokens ?? 0;
+  const completionTokens = data?.usage?.completion_tokens ?? 0;
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text) throw new AssistantError("Assistant returned no content", res.status, { promptTokens, completionTokens });
+  return { text, promptTokens, completionTokens };
 }
 
 const num = (v: string | undefined, d: number) => {

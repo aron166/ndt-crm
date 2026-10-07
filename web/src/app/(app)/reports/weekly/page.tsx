@@ -131,7 +131,7 @@ export default async function WeeklyReportPage() {
       <div className="page-head">
         <h1 className="page-title">{REPORT_UI.title}</h1>
       </div>
-      <p style={{ fontSize: 13, color: "var(--fg-faint)" }}>Asszisztens (hónap): {assistant.calls} hívás, {assistant.tokens} token, kb. ${assistant.costUsd.toFixed(2)}</p>
+      <p style={{ fontSize: 13, color: "var(--fg-faint)" }}>{REPORT_UI.assistantMonth(assistant.calls, assistant.tokens, assistant.costUsd)}</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: 24, alignItems: "start" }}>
         <Window title={REPORT_UI.last7} r={r7} statuses={statuses} />
         <Window title={REPORT_UI.last28} r={r28} statuses={statuses} />

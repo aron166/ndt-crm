@@ -37,7 +37,7 @@ describe("createGithubIssue", () => {
   });
   it("no token falls back without fetching", async () => {
     const f = vi.fn();
-    vi.stubEnv("GITHUB_TOKEN", "");
+    vi.stubEnv("ASSISTANT_GITHUB_TOKEN", "");
     expect((await createGithubIssue(draft, { fetchImpl: f })).ok).toBe(false);
     expect(f).not.toHaveBeenCalled();
     vi.unstubAllEnvs();

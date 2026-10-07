@@ -43,7 +43,7 @@ export function AssistantLauncher() {
       <button
         type="button"
         className="assistant-launcher"
-        onClick={show}
+        onClick={() => { setFocus(null); show(); }}
         style={{
           minHeight: 36, padding: "0 14px", borderRadius: 18, fontSize: 13, fontWeight: 500, cursor: "pointer",
           background: "var(--bg-raised)", color: "var(--fg)", border: "1px solid var(--line-soft)",

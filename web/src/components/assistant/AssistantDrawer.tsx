@@ -8,13 +8,13 @@ import {
   type NoteView,
 } from "@/app/actions/assistant";
 import type { TicketDraft } from "@/lib/assistant/ticket";
+import { PATCH_REPOS } from "@/lib/patchnotes/repos";
 
 type Msg = { role: "user" | "assistant"; content: string };
 type Tab = "ask" | "note" | "ticket";
 type Filed = { url: string } | { fallbackUrl: string } | null;
 
 const MAX_USER = 20;
-const REPOS: TicketDraft["repo"][] = ["ndt-crm", "betonscan-landing", "growth", "workspace", "peterdrive"];
 
 const field: React.CSSProperties = {
   width: "100%", background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
@@ -76,15 +76,27 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
 
   useEffect(() => {
     if (!open) return;
+    const opener = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const f = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      if (f.length === 0) { e.preventDefault(); return; }
+      const first = f[0], last = f[f.length - 1], cur = document.activeElement;
+      const inside = dialogRef.current.contains(cur) && cur !== dialogRef.current;
+      if (e.shiftKey && (!inside || cur === first)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (!inside || cur === last)) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); opener?.focus?.(); };
   }, [open, onClose]);
 
   const userCount = msgs.filter((m) => m.role === "user").length;
   const atLimit = userCount >= MAX_USER;
-  const noAi = !configured;
+  const noAi = !configured || !!loadError;
 
   function send(text: string) {
     const t = text.trim();
@@ -103,7 +115,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
   }
 
   function saveNote() {
-    if (itemId == null || !noteText.trim()) return;
+    if (itemId == null || !noteText.trim() || loadError) return;
     setNoteError(null);
     startSave(async () => {
       try {
@@ -121,7 +133,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
     setFiled(null);
     startDraft(async () => {
       try {
-        const res = await draftTicket({ pathname, itemId, messages: [...msgs, { role: "user", content: t }] });
+        const res = await draftTicket({ pathname, itemId, messages: [{ role: "user", content: t }] });
         if ("error" in res) setTicketError(res.error);
         else setDraft(res.draft);
       } catch { setTicketError(A.genericError); }
@@ -144,7 +156,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
 
   const tabBtn = (id: Tab, label: string) => (
     <button
-      type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+      type="button" role="tab" id={`assistant-tab-${id}`} aria-controls="assistant-panel" aria-selected={tab === id} onClick={() => setTab(id)}
       style={{
         flex: 1, minHeight: 36, fontSize: 14, fontWeight: 500, cursor: "pointer", background: "none",
         color: tab === id ? "var(--fg)" : "var(--fg-mute)", border: "none",
@@ -170,7 +182,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{A.dialog}</div>
             <div style={{ fontSize: 15, fontWeight: 600, overflowWrap: "anywhere" }}>
-              {itemId == null ? A.general : (item?.title ?? A.loading)}
+              {loadError ?? (itemId == null ? A.general : (item?.title ?? A.loading))}
             </div>
           </div>
           <button type="button" onClick={onClose} style={btnQuiet}>{A.close}</button>
@@ -180,8 +192,8 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
           {tabBtn("ask", A.tabAsk)}{tabBtn("note", A.tabNote)}{tabBtn("ticket", A.tabTicket)}
         </div>
 
-        <div className="panel-pad" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-          {noAi && <p style={{ fontSize: 14, color: "var(--fg-mute)" }}>{A.notConfigured}</p>}
+        <div id="assistant-panel" role="tabpanel" aria-labelledby={`assistant-tab-${tab}`} className="panel-pad" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+          {!configured && !loadError && <p style={{ fontSize: 14, color: "var(--fg-mute)" }}>{A.notConfigured}</p>}
           {loadError && <p style={errStyle}>{loadError}</p>}
 
           {tab === "ask" && (
@@ -217,7 +229,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
               />
               {noteError && <p style={errStyle}>{noteError}</p>}
               <div>
-                <button type="button" disabled={saving || !noteText.trim()} onClick={saveNote} style={{ ...btn, ...dis(saving || !noteText.trim()) }}>
+                <button type="button" disabled={noAi || saving || !noteText.trim()} onClick={saveNote} style={{ ...btn, ...dis(noAi || saving || !noteText.trim()) }}>
                   {A.noteSave}
                 </button>
               </div>
@@ -261,7 +273,7 @@ export function AssistantDrawer({ open, itemId, onClose }: { open: boolean; item
                   </label>
                   <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>{A.ticketRepo}
                     <select value={draft.repo} onChange={(e) => patch({ repo: e.target.value as TicketDraft["repo"] })} style={field}>
-                      {REPOS.map((r) => <option key={r} value={r}>{r}</option>)}
+                      {PATCH_REPOS.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </label>
                   <div>

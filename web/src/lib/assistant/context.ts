@@ -62,6 +62,9 @@ const GUIDES: Record<PageKind, string> = {
   live: `Ez az ${UI.library} oldal: csak az élő (mindkét bíráló által jóváhagyott) anyagok. Szűrhető kategória, kampány és formátum szerint. Egy anyagnál látszik, hogy melyik verzió van élesben, és a szöveg másolható vagy letölthető. Ha ide nem kerül anyag, ${UI.noLiveMatch.toLowerCase()}\n${PIPELINE}`,
 };
 
+/** Item fields are data inside <item>; strip angle brackets so they cannot close or open tags. */
+const clean = (s: string) => s.replace(/[<>]/g, "");
+
 export function buildSystemPrompt(input: { pathname: string; item: ItemContext | null; role: string; isReviewer: boolean }): string {
   const kind = pageKind(input.pathname);
   const parts = [
@@ -73,10 +76,10 @@ export function buildSystemPrompt(input: { pathname: string; item: ItemContext |
   if (input.item) {
     const i = input.item;
     const checks = i.checks.length
-      ? i.checks.map((c) => `- [${c.state}] ${c.question}${c.answer ? ` => ${c.answer}` : ""}`).join("\n")
+      ? i.checks.map((c) => `- [${c.state}] ${clean(c.question)}${c.answer ? ` => ${clean(c.answer)}` : ""}`).join("\n")
       : "(nincs)";
     parts.push(
-      `<item>\nCím: ${i.title}\nKategória: ${CATEGORY_LABEL[i.category as ContentCategory] ?? i.category}\nCél: ${i.purpose ?? "(nincs megadva)"}\nÁllapot: ${STATUS_LABELS[i.status as ContentStatus] ?? i.status}\nTisztázandó kérdések:\n${checks}\nSzöveg:\n${i.body}\n</item>`,
+      `<item>\nCím: ${clean(i.title)}\nKategória: ${CATEGORY_LABEL[i.category as ContentCategory] ?? i.category}\nCél: ${i.purpose ? clean(i.purpose) : "(nincs megadva)"}\nÁllapot: ${STATUS_LABELS[i.status as ContentStatus] ?? i.status}\nTisztázandó kérdések:\n${checks}\nSzöveg:\n${clean(i.body)}\n</item>`,
     );
   }
   return parts.join("\n\n");

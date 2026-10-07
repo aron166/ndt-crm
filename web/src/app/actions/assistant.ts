@@ -4,9 +4,9 @@
 import { db } from "@/lib/db";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { getContentReviewers } from "@/lib/content/reviewers";
-import { assistantConfig, chatCompletion, estimateCostUsd, type ChatMessage } from "@/lib/assistant/provider";
+import { AssistantError, assistantConfig, chatCompletion, estimateCostUsd, type ChatMessage } from "@/lib/assistant/provider";
 import { CAP_EXCEEDED, capState } from "@/lib/assistant/cap";
-import { buildSystemPrompt, loadItemContext, pageKind, type ItemContext } from "@/lib/assistant/context";
+import { buildSystemPrompt, loadItemContext, pageKind } from "@/lib/assistant/context";
 import { TICKET_INSTRUCTION, TicketDraftSchema, createGithubIssue, parseTicketDraft, type TicketDraft } from "@/lib/assistant/ticket";
 
 const TENANT_ID = 1;
@@ -27,7 +27,7 @@ function checkInput(input: AssistantInput): string | null {
   const m = input.messages;
   if (!Array.isArray(m) || m.length < 1 || m.length > 40 || m[m.length - 1].role !== "user") return BAD_INPUT;
   for (const x of m) {
-    if ((x?.role !== "user" && x?.role !== "assistant") || typeof x.content !== "string" || x.content.length < 1 || x.content.length > 2000) return BAD_INPUT;
+    if ((x?.role !== "user" && x?.role !== "assistant") || typeof x.content !== "string" || x.content.length < 1 || x.content.length > (x.role === "user" ? 2000 : 6000)) return BAD_INPUT;
   }
   if (m.filter((x) => x.role === "user").length > 20) return TOO_LONG;
   return null;
@@ -37,6 +37,15 @@ const noteView = (n: { id: number; body: string; createdAt: Date; user: { name: 
   id: n.id, body: n.body, author: n.user?.name ?? "", createdAt: n.createdAt.toISOString(),
 });
 
+function logCall(userId: number, input: AssistantInput, purpose: "explain" | "ticket", model: string, promptTokens: number, completionTokens: number) {
+  return db.assistantCall.create({
+    data: {
+      tenantId: TENANT_ID, userId, page: input.pathname, purpose, itemId: input.itemId, model,
+      promptTokens, completionTokens, costUsd: estimateCostUsd(promptTokens, completionTokens),
+    },
+  });
+}
+
 /** Shared by askAssistant and draftTicket: validate, cap, call, log. */
 async function run(userId: number, input: AssistantInput, purpose: "explain" | "ticket"): Promise<{ text: string } | { error: string }> {
   const bad = checkInput(input);
@@ -44,17 +53,14 @@ async function run(userId: number, input: AssistantInput, purpose: "explain" | "
   const cfg = assistantConfig();
   if (!cfg) return { error: NOT_CONFIGURED };
 
-  let item: ItemContext | null = null;
-  if (input.itemId !== null) {
-    item = await loadItemContext(TENANT_ID, input.itemId);
-    if (!item) return { error: NOT_FOUND };
-  }
-  if ((await capState(TENANT_ID)).exceeded) return { error: CAP_EXCEEDED };
-
-  const [user, reviewers] = await Promise.all([
+  const [item, cap, user, reviewers] = await Promise.all([
+    input.itemId !== null ? loadItemContext(TENANT_ID, input.itemId) : Promise.resolve(null),
+    capState(TENANT_ID),
     db.user.findFirst({ where: { id: userId, tenantId: TENANT_ID }, select: { role: true, name: true } }),
     getContentReviewers(TENANT_ID),
   ]);
+  if (input.itemId !== null && !item) return { error: NOT_FOUND };
+  if (cap.exceeded) return { error: CAP_EXCEEDED };
   const messages: ChatMessage[] = [
     { role: "system", content: buildSystemPrompt({ pathname: input.pathname, item, role: user?.role ?? "user", isReviewer: reviewers.includes(userId) }) },
     ...(purpose === "ticket" ? [{ role: "system", content: TICKET_INSTRUCTION } as ChatMessage] : []),
@@ -64,16 +70,12 @@ async function run(userId: number, input: AssistantInput, purpose: "explain" | "
   let r;
   try {
     r = await chatCompletion(cfg, messages, purpose === "ticket" ? { json: true, maxTokens: 700 } : {});
-  } catch {
+  } catch (e) {
+    // A 2xx with an unusable reply may still have been billed: count it against the cap.
+    if (e instanceof AssistantError && e.usage) await logCall(userId, input, purpose, cfg.model, e.usage.promptTokens, e.usage.completionTokens);
     return { error: MODEL_FAILED };
   }
-  await db.assistantCall.create({
-    data: {
-      tenantId: TENANT_ID, userId, page: input.pathname, purpose, itemId: input.itemId, model: cfg.model,
-      promptTokens: r.promptTokens, completionTokens: r.completionTokens,
-      costUsd: estimateCostUsd(r.promptTokens, r.completionTokens),
-    },
-  });
+  await logCall(userId, input, purpose, cfg.model, r.promptTokens, r.completionTokens);
   return { text: r.text };
 }
 
@@ -85,9 +87,8 @@ export async function openAssistant(input: { itemId: number | null }): Promise<{
   let item: { id: number; title: string } | null = null;
   let notes: NoteView[] = [];
   if (input.itemId !== null) {
-    const ctx = await loadItemContext(TENANT_ID, input.itemId);
-    if (!ctx) return { error: NOT_FOUND };
-    item = { id: ctx.id, title: ctx.title };
+    item = await db.contentItem.findFirst({ where: { id: input.itemId, tenantId: TENANT_ID }, select: { id: true, title: true } });
+    if (!item) return { error: NOT_FOUND };
     const rows = await db.contentNote.findMany({
       where: { tenantId: TENANT_ID, itemId: input.itemId },
       orderBy: { createdAt: "desc" },

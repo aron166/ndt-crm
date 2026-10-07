@@ -84,6 +84,16 @@ describe("askAssistant", () => {
     expect(await askAssistant(input)).toEqual({ error: "Nem található" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it("accepts an assistant message of 3000 chars", async () => {
+    const messages = [{ role: "user" as const, content: "Mi ez?" }, { role: "assistant" as const, content: "y".repeat(3000) }, { role: "user" as const, content: "És ez?" }];
+    expect(await askAssistant({ ...input, messages })).toEqual({ ok: true, reply: "Válasz" });
+  });
+  it("2xx with empty content but usage still logs the call and returns an error", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: "" } }], usage: { prompt_tokens: 50, completion_tokens: 7 } }), { status: 200 }));
+    expect("error" in (await askAssistant(input))).toBe(true);
+    expect(db.assistantCall.create).toHaveBeenCalledTimes(1);
+    expect(db.assistantCall.create.mock.calls[0][0].data).toMatchObject({ promptTokens: 50, completionTokens: 7 });
+  });
   it("not configured without a key", async () => {
     vi.stubEnv("ASSISTANT_API_KEY", "");
     expect(await askAssistant(input)).toEqual({ error: "Az asszisztens nincs beállítva." });
@@ -111,9 +121,32 @@ describe("draftTicket", () => {
 });
 
 describe("fileTicket", () => {
+  const draft = { title: "Hibás gomb", body: "Nem működik a gomb.", label: "bug" as const, repo: "ndt-crm" as const };
+  it("files via the issues token, appends the footer and returns the url", async () => {
+    vi.stubEnv("ASSISTANT_GITHUB_TOKEN", "ghp-test");
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ html_url: "https://github.com/aron166/ndt-crm/issues/9" }), { status: 201 }));
+    expect(await fileTicket(draft)).toEqual({ ok: true, url: "https://github.com/aron166/ndt-crm/issues/9" });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body).body as string;
+    expect(body).toContain("Beküldve a CRM asszisztensből, beküldő: Péter");
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer ghp-test");
+  });
+  it("without ASSISTANT_GITHUB_TOKEN returns the fallback url", async () => {
+    vi.stubEnv("ASSISTANT_GITHUB_TOKEN", "");
+    const r = await fileTicket(draft);
+    expect(r).toHaveProperty("fallbackUrl");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("rejects a tampered draft", async () => {
     expect(await fileTicket({ title: "x", body: "y", label: "bug", repo: "evil" } as never)).toEqual({ error: "Érvénytelen kérés." });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("openAssistant", () => {
+  it("item from another tenant gives not found", async () => {
+    db.contentItem.findFirst.mockResolvedValue(null);
+    expect(await openAssistant({ itemId: 5 })).toEqual({ error: "Nem található" });
+    expect(db.contentItem.findFirst.mock.calls[0][0].where).toEqual({ id: 5, tenantId: 1 });
   });
 });
 
