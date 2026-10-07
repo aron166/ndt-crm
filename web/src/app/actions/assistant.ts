@@ -2,6 +2,7 @@
 // Hungarian copy is PROPOSAL until Áron approves.
 
 import { db } from "@/lib/db";
+import { reportError } from "@/lib/report-error";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { getContentReviewers } from "@/lib/content/reviewers";
 import { AssistantError, RATE_LIMITED, assistantConfig, chatCompletion, estimateCostUsd, type ChatMessage } from "@/lib/assistant/provider";
@@ -20,6 +21,9 @@ const NOT_FOUND = "Nem található";
 const MODEL_FAILED = "Az asszisztens most nem érhető el. Kérem, próbálja újra később.";
 const TOO_LONG = "Ebben a beszélgetésben elérte a 20 üzenetet. Kérem, kezdjen újat.";
 const BAD_INPUT = "Érvénytelen kérés.";
+const MODEL_FAILED_WRITE = "Nem sikerült menteni. Kérem, próbálja újra.";
+/** The one error the decision transaction throws on purpose (rolls the item back). */
+class CheckFail extends Error {}
 
 export type NoteView = { id: number; body: string; author: string; createdAt: string };
 export type AssistantInput = { pathname: string; itemId: number | null; messages: { role: "user" | "assistant"; content: string }[] };
@@ -280,9 +284,13 @@ export async function executeAction(raw: ActionProposal): Promise<{ ok: true; me
       }, tx);
       if (!c.ok) return c;
       const k = await addChecks(actor, c.itemId, [{ question: p.question, forWhom: p.decidedBy, source: "decision" }], tx);
-      if (!k.ok) throw new Error(k.error);
+      if (!k.ok) throw new CheckFail(k.error);
       return c;
-    }).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : "Hiba" }));
+    }).catch((e: unknown) => {
+      if (e instanceof CheckFail) return { ok: false as const, error: e.message };
+      reportError("assistant.create_decision", e, { userId });
+      return { ok: false as const, error: MODEL_FAILED_WRITE };
+    });
     if (!created.ok) return { error: created.error };
     await logExecuted(userId, "create_decision", created.itemId);
     revalidatePath("/marketing");
