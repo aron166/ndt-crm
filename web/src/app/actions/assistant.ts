@@ -183,7 +183,8 @@ type ExecResult = { ok: true; message: string; href?: string; state?: string } |
 /** The item's stage after a write, for the panel's "new state" line. */
 async function withState(r: ExecResult, itemId: number): Promise<ExecResult> {
   if ("error" in r) return r;
-  const it = await db.contentItem.findFirst({ where: { id: itemId, tenantId: TENANT_ID }, select: { status: true } });
+  // Runs after the write: must never throw, or the caller would release a card that did run.
+  const it = await db.contentItem.findFirst({ where: { id: itemId, tenantId: TENANT_ID }, select: { status: true } }).catch(() => null);
   return it ? { ...r, state: STATUS_LABELS[it.status as ContentStatus] ?? it.status } : r;
 }
 

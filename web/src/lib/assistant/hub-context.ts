@@ -146,7 +146,8 @@ export async function loadHubData(tenantId: number, userId: number, userName: st
   };
 }
 
-const clean = (s: string) => flat(s.replace(/<\s*\/?\s*crm\b[^>]*>/gi, ""));
+// Data never contains "<": no nested or spaced variant can rebuild a tag (Vanda r3).
+const clean = (s: string) => flat(s.replace(/</g, "‹"));
 
 export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}): string {
   const budget = opts.budgetChars ?? HUB_CONTEXT_BUDGET_CHARS;
