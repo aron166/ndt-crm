@@ -201,7 +201,7 @@ describe("failures", () => {
       .mockImplementationOnce(async () => Response.json({ choices: [{ message: { content: JSON.stringify({ read_item_ids: [], answer: "Jó válasz.", actions: [] }) } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }));
     const ev = await events(await POST(req(ok)));
     expect(ev.some((e) => e.type === "reset")).toBe(true);
-    const afterReset = ev.slice(ev.findIndex((e) => e.type === "reset") + 1).filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("");
+    const afterReset = ev.slice(ev.findIndex((e) => e.type === "reset") + 1).filter((e) => e.type === "delta").map((e) => (e as unknown as { text: string }).text).join("");
     expect(afterReset).toBe("Jó válasz.");
     expect(ev[ev.length - 1]).toMatchObject({ type: "done", answer: "Jó válasz." });
   });
