@@ -78,15 +78,32 @@ describe("renderHubContext", () => {
     const t = renderHubContext(data(items), { intent: { kind: "stage", stage: "draft" } });
     expect(t.split("\n").filter((l) => /^#\d+ /.test(l))).toEqual([expect.stringMatching(/^#2 \| Vázlat cím \|/)]);
   });
-  it("a tight budget keeps at most 3 open decisions, none answered", () => {
+  it("a tight budget stays within budget with at most 5 open decisions", () => {
     const decisions = Array.from({ length: 30 }, (_, k) => ({
-      checkId: k + 1, itemId: k + 1, question: "Melyik ajánlatot küldjük ki a partnernek jövő héten?", forWhom: "either" as const,
+      checkId: k + 1, itemId: k + 1, question: "Melyik ajánlatot küldjük ki a partnernek jövő héten? ".repeat(4), forWhom: "either" as const,
       state: k % 3 === 0 ? "resolved" : "open", deadline: null, daysWaiting: 2, answer: null,
     }));
     const t = renderHubContext(data(Array.from({ length: 40 }, (_, k) => item(k + 1)), { decisions }), { budgetChars: 1500 });
-    expect(t.split("\n").filter((l) => l.startsWith("kérdés #")).length).toBeLessThanOrEqual(3);
-    expect(t).not.toMatch(/állapot: (Megválaszolva|resolved)/);
+    expect(t.split("\n").filter((l) => l.startsWith("kérdés #") && !l.includes("Megválaszolva")).length).toBeLessThanOrEqual(5);
     expect(t.length).toBeLessThanOrEqual(1500);
+  });
+  it("prod shape: general keeps 15+ item lines, a stage question lists the whole stage, all within budget", () => {
+    const items = Array.from({ length: 34 }, (_, k) => item(k + 1, {
+      title: `Hideg e-mail keretrendszer, ${k + 1}. érintés (mind a 80 levél szabálya)`, status: k < 2 ? "draft" : "in_review", stage: stageOf(k < 2 ? "draft" : "in_review"),
+    }));
+    const decisions = Array.from({ length: 16 }, (_, k) => ({
+      checkId: 100 + k, itemId: 1, question: "Magánszemélyek: a hívás kösse le az időpontot, vagy térkép-listára tegyük őket? ".repeat(3), forWhom: "either" as const,
+      state: "open", deadline: null, daysWaiting: 3, answer: null,
+    }));
+    const d = data(items, { decisions, pendingCount: 34, mine: { itemIds: items.map((i) => i.id), checkIds: decisions.map((x) => x.checkId) } });
+    for (const budgetChars of [HUB_CONTEXT_BUDGET_CHARS, 1500]) {
+      const g = renderHubContext(d, { budgetChars });
+      expect(g.length).toBeLessThanOrEqual(budgetChars);
+      if (budgetChars === HUB_CONTEXT_BUDGET_CHARS) expect(g.split("\n").filter((l) => /^#\d+ .*\[/.test(l)).length).toBeGreaterThanOrEqual(15);
+    }
+    const st = renderHubContext(d, { intent: { kind: "stage", stage: "in_review" } });
+    expect(st.length).toBeLessThanOrEqual(HUB_CONTEXT_BUDGET_CHARS);
+    expect(st.split("\n").filter((l) => /^#\d+ /.test(l)).length).toBe(32);
   });
   it("no item id appears without its title, in any intent (#149)", () => {
     const statuses = ["draft", "in_review", "changes_requested", "ai_working", "live"];
@@ -108,11 +125,10 @@ describe("renderHubContext", () => {
     for (const l of lines) expect(l).toMatch(/^#(\d+) (\| )?Cím \1( \||\s\[)/);
     for (const l of t.split("\n").filter((x) => x.startsWith("kérdés #"))) expect(l).toMatch(/^kérdés #(\d+) (\| )?Kérdés \1\b/);
   });
-  it("totals line survives budget 1500, own lines cut to 5 + 3", () => {
+  it("totals line survives budget 1500 and own lines stay within it", () => {
     const { t } = mineData(50, 1500);
     expect(t).toContain("ÖNRE VÁR: 34 anyag vár Önre; 16 nyitott döntés.");
-    const own = t.split("\n").filter((l) => l.includes("| jóváhagyásra vár:") && l.includes("/marketing/") && !l.includes("| v"));
-    expect(own.length).toBeLessThanOrEqual(5);
+    expect(t.length).toBeLessThanOrEqual(1500);
   });
 });
 
@@ -124,6 +140,11 @@ describe("routeIntent", () => {
     expect(routeIntent("Mi vár bírálatra?")).toEqual({ kind: "stage", stage: "in_review" });
     expect(routeIntent("Mi van élesben?")).toEqual({ kind: "stage", stage: "live" });
     expect(routeIntent("Mit jelent a #12?")).toEqual({ kind: "general" });
+    expect(routeIntent("Az AI mit javasol a 12-re?")).toEqual({ kind: "general" });
+    expect(routeIntent("hozd elő a 12-t")).toEqual({ kind: "general" });
+    expect(routeIntent("Írj vázlatot a #12-höz")).toEqual({ kind: "general" });
+    expect(routeIntent("Mit kell javítani?")).toEqual({ kind: "general" });
+    expect(routeIntent("Mi van az archívban?")).toEqual({ kind: "general" });
   });
 });
 

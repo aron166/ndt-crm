@@ -19,7 +19,7 @@ export function assistantConfig(env: Env = process.env): AssistantConfig | null 
 
 /** Shown when the provider answers 429 twice (free-tier rate limit). PROPOSAL copy. */
 export const RATE_LIMITED = "Pillanat, túl sok kérés. Kérem, próbálja újra egy perc múlva.";
-/** A TPM 429 asks for up to ~60 s; past this cap the user gets RATE_LIMITED instead of a hung panel. */
+/** A TPM 429 asks for up to ~60 s; past this cap the user gets RATE_LIMITED at once instead of a hung panel. */
 const RETRY_CAP_MS = 30_000;
 
 /**
@@ -27,14 +27,24 @@ const RETRY_CAP_MS = 30_000;
  * ("7.66s", "1m2.5s", "450ms"), else 2 s. The old fixed 10 s cap retried before the token window
  * reset, so the retry failed too (#150).
  */
-export function retryDelayMs(h: Headers): number {
+export function retryDelayMs(h: Headers): number | null {
   const after = Number(h.get("retry-after"));
   let ms = Number.isFinite(after) && after > 0 ? after * 1000 : NaN;
   if (!Number.isFinite(ms)) {
     const m = /^(?:(\d+(?:\.\d+)?)m(?!s))?(?:(\d+(?:\.\d+)?)s)?(?:(\d+(?:\.\d+)?)ms)?$/.exec(h.get("x-ratelimit-reset-tokens")?.trim() ?? "");
     if (m && (m[1] || m[2] || m[3])) ms = Number(m[1] ?? 0) * 60_000 + Number(m[2] ?? 0) * 1000 + Number(m[3] ?? 0);
   }
-  return Math.min(RETRY_CAP_MS, Number.isFinite(ms) && ms > 0 ? Math.ceil(ms) + 250 : 2000);
+  const wait = Number.isFinite(ms) && ms > 0 ? Math.ceil(ms) + 250 : 2000;
+  // Past the cap the retry would land in the same token window: give up now (RATE_LIMITED).
+  return wait > RETRY_CAP_MS ? null : wait;
+}
+
+function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((r) => {
+    if (signal?.aborted) return r();
+    const t = setTimeout(r, ms);
+    signal?.addEventListener("abort", () => { clearTimeout(t); r(); }, { once: true });
+  });
 }
 
 export class AssistantError extends Error {
@@ -59,10 +69,14 @@ export async function chatCompletion(
     maxTokens?: number;
     fetchImpl?: typeof fetch;
     sleep?: (ms: number) => Promise<void>;
+    /** Called before a 429 wait (ms), so the caller can tell the user. */
+    onWait?: (ms: number) => void;
+    /** Ends a 429 wait early (the panel went away). */
+    signal?: AbortSignal;
   } = {},
 ): Promise<{ text: string; promptTokens: number; completionTokens: number }> {
   const f = opts.fetchImpl ?? fetch;
-  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const sleep = opts.sleep ?? ((ms: number) => abortableSleep(ms, opts.signal));
   const responseFormat = opts.schema
     ? { response_format: { type: "json_schema", json_schema: { name: opts.schema.name, schema: opts.schema.schema, strict: true } } }
     : opts.json ? { response_format: { type: "json_object" } } : {};
@@ -86,10 +100,15 @@ export async function chatCompletion(
     res = await send();
     // Free tier: one retry after retry-after (capped), then give up with RATE_LIMITED.
     if (res.status === 429) {
-      await sleep(retryDelayMs(res.headers));
+      const wait = retryDelayMs(res.headers);
+      if (wait === null) throw new AssistantError(RATE_LIMITED, 429);
+      opts.onWait?.(wait);
+      await sleep(wait);
+      if (opts.signal?.aborted) throw new AssistantError("Assistant request aborted");
       res = await send();
     }
-  } catch {
+  } catch (e) {
+    if (e instanceof AssistantError) throw e;
     throw new AssistantError("Assistant request failed (network or timeout)");
   }
   if (res.status === 429) throw new AssistantError(RATE_LIMITED, 429);
@@ -119,13 +138,15 @@ export async function chatCompletionStream(
     maxTokens?: number;
     fetchImpl?: typeof fetch;
     sleep?: (ms: number) => Promise<void>;
+    onWait?: (ms: number) => void;
+    signal?: AbortSignal;
     onText: (soFar: string) => void | "stop";
     /** Checks the finished streamed text; false triggers the strict one-shot fallback. */
     accept?: (text: string) => boolean;
   },
 ): Promise<{ text: string; promptTokens: number; completionTokens: number; stopped: boolean; streamed: boolean }> {
   const f = opts.fetchImpl ?? fetch;
-  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const sleep = opts.sleep ?? ((ms: number) => abortableSleep(ms, opts.signal));
   const ctrl = new AbortController();
   // Groq: "Streaming and tool use are not currently supported with Structured Outputs"
   // (console.groq.com/docs/structured-outputs, 2026-10-07). So the stream carries no
@@ -151,17 +172,22 @@ export async function chatCompletionStream(
   try {
     res = await send();
     if (res.status === 429) {
-      await sleep(retryDelayMs(res.headers));
+      const wait = retryDelayMs(res.headers);
+      if (wait === null) throw new AssistantError(RATE_LIMITED, 429);
+      opts.onWait?.(wait);
+      await sleep(wait);
+      if (opts.signal?.aborted) throw new AssistantError("Assistant request aborted");
       res = await send();
     }
-  } catch {
+  } catch (e) {
+    if (e instanceof AssistantError) throw e;
     throw new AssistantError("Assistant request failed (network or timeout)");
   }
   if (res.status === 429) throw new AssistantError(RATE_LIMITED, 429);
   const oneShot = async (spent: { promptTokens: number; completionTokens: number }) => {
     let r;
     try {
-      r = await chatCompletion(cfg, messages, { schema: opts.schema, maxTokens: opts.maxTokens, fetchImpl: f, sleep });
+      r = await chatCompletion(cfg, messages, { schema: opts.schema, maxTokens: opts.maxTokens, fetchImpl: f, sleep, onWait: opts.onWait, signal: opts.signal });
     } catch (e) {
       // The streamed attempt was billed: carry its usage so the caller logs it against the cap.
       if (e instanceof AssistantError && (spent.promptTokens || spent.completionTokens)) {

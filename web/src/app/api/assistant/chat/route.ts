@@ -21,6 +21,9 @@ import { MAX_CONVERSATION_TURNS, type ChatEvent, type ChatTurn } from "@/lib/ass
  * (read_item_ids, max 3 items, one hop) -> validated actions -> persisted turn.
  * Nothing is written to CRM data here: actions run only from the panel's "Végrehajtom".
  */
+/** Worst case: stream 60 s + one 30 s rate-limit wait + strict fallback 30 s, per hop (two hops). */
+export const maxDuration = 300;
+
 const TENANT_ID = 1;
 const MAX_USER_TURNS = 20;
 const READ_MAX = 3;
@@ -169,7 +172,8 @@ export async function POST(request: Request) {
           let emitted = "";
           let wantRead: number[] | null = null;
           const r = await chatCompletionStream(cfg, messages, {
-            schema, maxTokens: 1000,
+            schema, maxTokens: 1000, signal: request.signal,
+            onWait: (ms) => send({ type: "status", text: `Pillanat, a díjmentes keret miatt ${Math.ceil(ms / 1000)} mp múlva folytatom.` }),
             accept: (t) => parseModelResponse(t) !== null || (completeIntArrayField(t, "read_item_ids")?.length ?? 0) > 0,
             onText: (soFar) => {
               if (gone()) return "stop";

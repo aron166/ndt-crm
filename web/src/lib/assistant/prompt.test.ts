@@ -97,4 +97,8 @@ describe("prompt size per call (Groq free tier 8K TPM, #150)", () => {
     const many = Array.from({ length: 5 }, (_, k) => turn(`k${k}`, `v${k}`)).flat();
     expect(history(many).map((m) => m.content)).toEqual(["k3", "v3", "k4", "v4"]);
   });
+  it("a long last reply keeps the last pair, cut to 1000 chars", () => {
+    const h = history([...turn("a", "b"), ...turn("Mi vár rám?", "x".repeat(3000))]);
+    expect(h.map((m) => m.content.length)).toEqual([11, 1000]);
+  });
 });

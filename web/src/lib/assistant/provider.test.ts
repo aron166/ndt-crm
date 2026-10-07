@@ -55,20 +55,24 @@ describe("chatCompletion", () => {
 });
 
 describe("429 handling", () => {
-  const limited = () => new Response("{}", { status: 429, headers: { "retry-after": "30" } });
-  it("retries once after a 429, capped wait, then succeeds", async () => {
-    const f = vi.fn().mockResolvedValueOnce(limited()).mockResolvedValueOnce(new Response(JSON.stringify(good)));
+  const limited = () => new Response("{}", { status: 429, headers: { "retry-after": "3" } });
+  it("retry-after past the cap fails at once, no wait, no retry", async () => {
+    const f = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 429, headers: { "retry-after": "30" } })).mockResolvedValueOnce(new Response(JSON.stringify(good)));
     const sleep = vi.fn().mockResolvedValue(undefined);
-    const r = await chatCompletion(cfg, [], { fetchImpl: f, sleep });
-    expect(r.text).toBe("szia");
-    expect(f).toHaveBeenCalledTimes(2);
-    expect(sleep).toHaveBeenCalledWith(30000);
+    const e = await chatCompletion(cfg, [], { fetchImpl: f, sleep }).catch((x) => x);
+    expect(e.message).toBe(RATE_LIMITED);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+    const g = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 429, headers: { "retry-after": "5" } })).mockResolvedValueOnce(new Response(JSON.stringify(good)));
+    const onWait = vi.fn();
+    expect((await chatCompletion(cfg, [], { fetchImpl: g, sleep, onWait })).text).toBe("szia");
+    expect(onWait).toHaveBeenCalledWith(5250);
   });
   it("waits for retry-after, else Groq's reset-tokens header, else 2 s", () => {
     expect(retryDelayMs(new Headers({ "retry-after": "7" }))).toBe(7250);
-    expect(retryDelayMs(new Headers({ "retry-after": "120" }))).toBe(30000);
+    expect(retryDelayMs(new Headers({ "retry-after": "120" }))).toBeNull();
     expect(retryDelayMs(new Headers({ "x-ratelimit-reset-tokens": "7.66s" }))).toBe(7910);
-    expect(retryDelayMs(new Headers({ "x-ratelimit-reset-tokens": "1m2.5s" }))).toBe(30000);
+    expect(retryDelayMs(new Headers({ "x-ratelimit-reset-tokens": "1m2.5s" }))).toBeNull();
     expect(retryDelayMs(new Headers({ "x-ratelimit-reset-tokens": "450ms" }))).toBe(700);
     expect(retryDelayMs(new Headers())).toBe(2000);
   });
