@@ -6,7 +6,7 @@ export async function resolveDraftRecipient(
 ): Promise<string | null> {
   // Recipient resolution: explicit toEmail, else the linked person, else the
   // company's first current contact. The person lookup is scoped to this
-  // tenant AND to the draft's company — `personId` arrives from an app-key
+  // tenant AND to the draft's company: `personId` arrives from an app-key
   // payload and is not otherwise proven to belong here. (Vanda, #88.)
   let to = row.toEmail?.trim() || null;
   if (!to && row.personId) {
