@@ -13,7 +13,13 @@ export function canonicalCompanyEnums(raw: Raw, rowId?: string | number) {
   const warn = (field: string, v: unknown) =>
     console.warn(`  [enums] unknown ${field} ${JSON.stringify(v)} (row ${rowId ?? '?'}) -> null`);
 
-  const status = blank(raw.status) ? null : normalizeCompanyStatus(String(raw.status)).status;
+  let status: string | null = null;
+  if (!blank(raw.status)) {
+    const st = normalizeCompanyStatus(String(raw.status));
+    // Unknown status is stored active (importer rule); the old etl mapper said inactive. Warn so it is visible.
+    if (st.unknown) warn('status', raw.status);
+    status = st.status;
+  }
   let accountType: string | null = null;
   if (!blank(raw.accountType)) {
     accountType = normalizeAccountType(String(raw.accountType)) ?? null;
