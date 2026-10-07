@@ -1,5 +1,7 @@
 import "server-only";
-// OpenAI-compatible chat adapter (xAI Grok first, ADR/019). Text in, text out: the model is never given tools.
+// OpenAI-compatible chat adapter (Groq first, ADR/019). Text in, text out: the model is never given tools.
+// Default model openai/gpt-oss-120b: the strongest general model on the Groq free tier
+// (console.groq.com/docs/models, /docs/rate-limits, 2026-10-07: 30 RPM, 1K RPD, 8K TPM, 200K TPD).
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 export type AssistantConfig = { baseUrl: string; apiKey: string; model: string };
@@ -9,11 +11,15 @@ export function assistantConfig(env: Env = process.env): AssistantConfig | null 
   const apiKey = env.ASSISTANT_API_KEY?.trim();
   if (!apiKey) return null;
   return {
-    baseUrl: (env.ASSISTANT_BASE_URL?.trim() || "https://api.x.ai/v1").replace(/\/+$/, ""),
+    baseUrl: (env.ASSISTANT_BASE_URL?.trim() || "https://api.groq.com/openai/v1").replace(/\/+$/, ""),
     apiKey,
-    model: env.ASSISTANT_MODEL?.trim() || "grok-4.3",
+    model: env.ASSISTANT_MODEL?.trim() || "openai/gpt-oss-120b",
   };
 }
+
+/** Shown when the provider answers 429 twice (free-tier rate limit). PROPOSAL copy. */
+export const RATE_LIMITED = "Pillanat, túl sok kérés. Kérem, próbálja újra egy perc múlva.";
+const RETRY_CAP_MS = 4_000;
 
 export class AssistantError extends Error {
   status?: number;
@@ -30,26 +36,48 @@ export class AssistantError extends Error {
 export async function chatCompletion(
   cfg: AssistantConfig,
   messages: ChatMessage[],
-  opts: { json?: boolean; maxTokens?: number; fetchImpl?: typeof fetch } = {},
+  opts: {
+    json?: boolean;
+    /** Strict JSON schema (OpenAI-compatible `json_schema` response format). Implies json. */
+    schema?: { name: string; schema: Record<string, unknown> };
+    maxTokens?: number;
+    fetchImpl?: typeof fetch;
+    sleep?: (ms: number) => Promise<void>;
+  } = {},
 ): Promise<{ text: string; promptTokens: number; completionTokens: number }> {
   const f = opts.fetchImpl ?? fetch;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const responseFormat = opts.schema
+    ? { response_format: { type: "json_schema", json_schema: { name: opts.schema.name, schema: opts.schema.schema, strict: true } } }
+    : opts.json ? { response_format: { type: "json_object" } } : {};
+  // gpt-oss is a reasoning model: reasoning tokens count against max_tokens, so keep it low.
+  const reasoning = cfg.model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {};
+  const send = () => f(`${cfg.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages,
+      max_tokens: opts.maxTokens ?? 800,
+      temperature: 0.2,
+      ...reasoning,
+      ...responseFormat,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
   let res: Response;
   try {
-    res = await f(`${cfg.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages,
-        max_tokens: opts.maxTokens ?? 800,
-        temperature: 0.2,
-        ...(opts.json ? { response_format: { type: "json_object" } } : {}),
-      }),
-      signal: AbortSignal.timeout(30_000),
-    });
+    res = await send();
+    // Free tier: one retry after retry-after (capped), then give up with RATE_LIMITED.
+    if (res.status === 429) {
+      const after = Number(res.headers.get("retry-after"));
+      await sleep(Math.min(RETRY_CAP_MS, Number.isFinite(after) && after > 0 ? after * 1000 : 1000));
+      res = await send();
+    }
   } catch {
     throw new AssistantError("Assistant request failed (network or timeout)");
   }
+  if (res.status === 429) throw new AssistantError(RATE_LIMITED, 429);
   const raw = await res.text();
   const scrub = (s: string) => s.split(cfg.apiKey).join("[redacted]").slice(0, 200);
   if (!res.ok) throw new AssistantError(`Assistant HTTP ${res.status}: ${scrub(raw)}`, res.status);
@@ -71,9 +99,13 @@ const num = (v: string | undefined, d: number) => {
   return Number.isFinite(n) && n >= 0 ? n : d;
 };
 
-/** USD per 1M tokens; defaults are the grok-4.3 list price (docs.x.ai, 2026-10-07). */
+/**
+ * USD per 1M tokens; defaults are the Groq openai/gpt-oss-120b list price
+ * (console.groq.com/docs/models, 2026-10-07: $0.15 in / $0.60 out). The free tier
+ * bills nothing, so this is the cost if the key is on a paid plan.
+ */
 export function estimateCostUsd(promptTokens: number, completionTokens: number, env: Env = process.env): number {
-  const pin = num(env.ASSISTANT_PRICE_IN, 1.25);
-  const pout = num(env.ASSISTANT_PRICE_OUT, 2.5);
+  const pin = num(env.ASSISTANT_PRICE_IN, 0.15);
+  const pout = num(env.ASSISTANT_PRICE_OUT, 0.6);
   return (promptTokens * pin + completionTokens * pout) / 1_000_000;
 }
