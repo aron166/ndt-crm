@@ -155,10 +155,11 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}
 
   // Every stage names its item ids (up to 40), so "mi van a vázlatokban?" maps to ids even when
   // the item lines are truncated (prod smoke 2026-10-07: 2 drafts, compact-only, model said "Nem tudom").
+  const idCap = budget < 3000 ? 8 : 40; // tight budgets (post-read hop) keep the stage line short
   const counts = STAGES.map((s) => {
     if (s.key === "archived") return `${s.label}: ${d.archivedCount}`;
     const ids = items.filter((i) => s.statuses.includes(i.status)).map((i) => `#${i.id}`);
-    return `${s.label}: ${ids.length}${ids.length ? ` (${ids.slice(0, 40).join(", ")}${ids.length > 40 ? ", ..." : ""})` : ""}`;
+    return `${s.label}: ${ids.length}${ids.length ? ` (${ids.slice(0, idCap).join(", ")}${ids.length > idCap ? ", ..." : ""})` : ""}`;
   });
   const decLine = (x: HubDecision) =>
     `kérdés #${x.checkId} | ${clean(x.question)} | kitől: ${WHO[x.forWhom]} | állapot: ${STATE_HU[x.state] ?? x.state} | határidő: ${x.deadline ?? "nincs"} | vár ${x.daysWaiting} nap | válasz: ${x.answer ? clean(x.answer) : "nincs"} | link /marketing/decisions#${x.checkId}`;

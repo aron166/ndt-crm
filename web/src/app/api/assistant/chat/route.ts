@@ -146,7 +146,8 @@ export async function POST(request: Request) {
         try { controller.enqueue(enc.encode(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`)); } catch { closed = true; }
       };
       // Groq delivers gpt-oss content in one burst after reasoning (prod smoke 2026-10-07: one
-      // delta per answer). The pacer re-emits big bursts word by word so the panel types it out.
+      // delta per answer). The pacer re-emits every delta word by word so the panel types it out;
+      // the answer format caps it at ~6 lines, so the added latency is about 1-2 s.
       // ponytail: fixed 15 ms per piece, ~2 s for a 5-bullet answer; tune PACE_MS if it feels slow.
       const pacer = (() => {
         let queue = "";

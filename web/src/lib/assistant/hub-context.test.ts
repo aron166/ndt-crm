@@ -71,4 +71,10 @@ describe("renderHubContext", () => {
     const t = renderHubContext(data(items));
     expect(t).toContain(`${stageOf("draft")}: 1 (#9001)`);
   });
+  it("the stage id line stays within a tight budget with many items", () => {
+    const statuses = ["draft", "in_review", "changes_requested", "ai_working", "live"];
+    const items = Array.from({ length: 400 }, (_, k) => item(1000 + k, { status: statuses[k % 5], stage: stageOf(statuses[k % 5]) }));
+    const t = renderHubContext(data(items), { budgetChars: 1500 });
+    expect(t.length).toBeLessThanOrEqual(1500);
+  });
 });

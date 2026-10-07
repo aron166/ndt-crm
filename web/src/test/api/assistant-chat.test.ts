@@ -251,4 +251,15 @@ describe("failures", () => {
     expect(deltas.join("")).toBe(answer);
     expect(ev[ev.length - 1]).toMatchObject({ type: "done", answer });
   });
+  it("no delta follows an error while a burst is pacing", async () => {
+    const answer = "Egy kettő három négy öt hat hét nyolc kilenc tíz tizenegy tizenkettő.";
+    fetchMock.mockImplementation(async () => new Response(new ReadableStream({
+      start(c) { c.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: reply(answer) } }] })}\n\ndata: [DONE]\n\n`)); c.close(); },
+    }), { status: 200 }));
+    db.assistantConversation.updateMany.mockResolvedValue({ count: 0 });
+    const ev = await events(await POST(req(ok)));
+    const errAt = ev.findIndex((e) => e.type === "error");
+    expect(errAt).toBeGreaterThan(-1);
+    expect(ev.slice(errAt + 1).some((e) => e.type === "delta")).toBe(false);
+  });
 });
