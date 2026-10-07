@@ -20,9 +20,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Érvénytelen kérés." }, { status: 400 });
   }
 
-  const { entity, mapping, rows, dryRun } = body as {
-    entity?: unknown; mapping?: unknown; rows?: unknown; dryRun?: unknown;
+  const { entity, mapping, rows, dryRun, fileName } = body as {
+    entity?: unknown; mapping?: unknown; rows?: unknown; dryRun?: unknown; fileName?: unknown;
   };
+  const safeFileName = (typeof fileName === "string" ? fileName.trim().slice(0, 200) : "") || "ismeretlen fájl";
 
   if (entity !== "company" && entity !== "person") {
     return NextResponse.json({ error: "Ismeretlen entitás." }, { status: 400 });
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
   const result = await runImport(entity, rows as RawRow[], mapping as Mapping, {
     dryRun: Boolean(dryRun),
     tenantId: TENANT_ID,
+    fileName: safeFileName,
   });
   return NextResponse.json(result);
 }

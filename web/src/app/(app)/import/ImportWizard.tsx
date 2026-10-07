@@ -103,7 +103,7 @@ export function ImportWizard() {
       const res = await fetch("/api/import/commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entity, mapping, rows: activeSheet.rows, dryRun }),
+        body: JSON.stringify({ entity, mapping, rows: activeSheet.rows, dryRun, fileName }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Hiba az importálás során."); return; }
@@ -172,6 +172,11 @@ export function ImportWizard() {
           <Stat label="Kihagyva" value={r.skipped} accent="var(--amber)" />
           <Stat label="Hiba" value={r.errors.length} accent="var(--coral)" />
         </div>
+        {r.notesAppended > 0 && (
+          <p className="text-xs text-slate-400 mb-3">
+            {r.notesAppended} meglévő cégnél import megjegyzés {done ? "hozzáfűzve" : "hozzáfűzésre kerül"}.
+          </p>
+        )}
         {entity === "person" && (r.companiesCreated > 0 || r.contactsCreated > 0) && (
           <p className="text-xs text-slate-400 mb-3">
             +{r.companiesCreated} új cég, {r.contactsCreated} kapcsolat (személy ↔ cég){done ? " létrehozva" : " lesz"}.
