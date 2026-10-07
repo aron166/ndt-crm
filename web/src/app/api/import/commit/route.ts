@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireCrmUser } from "@/lib/actor";
 import { runImport } from "@/lib/import/commit";
 import type { RawRow, Mapping } from "@/lib/import/build";
 
@@ -11,6 +12,9 @@ const TENANT_ID = 1;
 const MAX_ROWS = 10000;
 
 export async function POST(req: NextRequest) {
+  // A session is not enough: the proxy only proves login. Import writes tenant data.
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Érvénytelen kérés." }, { status: 400 });

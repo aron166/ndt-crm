@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireCrmUser } from "@/lib/actor";
 import * as XLSX from "xlsx";
 import { readWorkbook } from "@/lib/import/read";
 
@@ -25,7 +26,13 @@ function makeColumns(rawHeader: unknown[]): string[] {
   });
 }
 
+// Single tenant today (decisions.md #12).
+const TENANT_ID = 1;
+
 export async function POST(req: NextRequest) {
+  // A session is not enough: the proxy only proves login. Import writes tenant data.
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File)) {
