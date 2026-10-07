@@ -94,6 +94,111 @@ export async function chatCompletion(
   return { text, promptTokens, completionTokens };
 }
 
+type Usage = { prompt_tokens?: number; completion_tokens?: number };
+
+export async function chatCompletionStream(
+  cfg: AssistantConfig,
+  messages: ChatMessage[],
+  opts: {
+    schema?: { name: string; schema: Record<string, unknown> };
+    maxTokens?: number;
+    fetchImpl?: typeof fetch;
+    sleep?: (ms: number) => Promise<void>;
+    onText: (soFar: string) => void | "stop";
+  },
+): Promise<{ text: string; promptTokens: number; completionTokens: number; stopped: boolean; streamed: boolean }> {
+  const f = opts.fetchImpl ?? fetch;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const ctrl = new AbortController();
+  const responseFormat = opts.schema
+    ? { response_format: { type: "json_schema", json_schema: { name: opts.schema.name, schema: opts.schema.schema, strict: true } } }
+    : {};
+  const reasoning = cfg.model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {};
+  const send = () => f(`${cfg.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages,
+      max_tokens: opts.maxTokens ?? 800,
+      temperature: 0.2,
+      stream: true,
+      stream_options: { include_usage: true },
+      ...reasoning,
+      ...responseFormat,
+    }),
+    signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(60_000)]),
+  });
+  const scrub = (t: string) => t.split(cfg.apiKey).join("[redacted]").slice(0, 200);
+  let res: Response;
+  try {
+    res = await send();
+    if (res.status === 429) {
+      const after = Number(res.headers.get("retry-after"));
+      await sleep(Math.min(RETRY_CAP_MS, Number.isFinite(after) && after > 0 ? after * 1000 : 1000));
+      res = await send();
+    }
+  } catch {
+    throw new AssistantError("Assistant request failed (network or timeout)");
+  }
+  if (res.status === 429) throw new AssistantError(RATE_LIMITED, 429);
+  if (res.status >= 400 && res.status < 500) {
+    // Some providers reject stream + json_schema: fall back to one-shot and fake the stream.
+    const r = await chatCompletion(cfg, messages, { schema: opts.schema, maxTokens: opts.maxTokens, fetchImpl: f, sleep });
+    let stopped = false;
+    for (let n = 24; !stopped; n += 24) {
+      if (opts.onText(r.text.slice(0, n)) === "stop") stopped = true;
+      if (n >= r.text.length) break;
+      await sleep(12);
+    }
+    return { ...r, stopped, streamed: false };
+  }
+  if (!res.ok || !res.body) throw new AssistantError(`Assistant HTTP ${res.status}: ${scrub(await res.text().catch(() => ""))}`, res.status);
+
+  let text = "";
+  let usage: Usage | undefined;
+  let stopped = false;
+  const handle = (line: string): boolean => {
+    if (!line.startsWith("data:")) return false;
+    const d = line.slice(5).trim();
+    if (!d || d === "[DONE]") return false;
+    let j: { choices?: { delta?: { content?: unknown } }[]; usage?: Usage; x_groq?: { usage?: Usage } };
+    try { j = JSON.parse(d); } catch { return false; }
+    usage = j.usage ?? j.x_groq?.usage ?? usage;
+    const c = j.choices?.[0]?.delta?.content;
+    if (typeof c === "string" && c) {
+      text += c;
+      if (opts.onText(text) === "stop") return true;
+    }
+    return false;
+  };
+  try {
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    read: for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (handle(line)) { stopped = true; break read; }
+      }
+    }
+    if (!stopped && buf.trim() && handle(buf.trim())) stopped = true;
+    if (stopped) { ctrl.abort(); reader.cancel().catch(() => {}); }
+  } catch {
+    if (!stopped) throw new AssistantError("Assistant stream failed", res.status);
+  }
+  const est = (chars: number) => Math.ceil(chars / 3);
+  const promptTokens = usage?.prompt_tokens ?? est(messages.reduce((n, m) => n + m.content.length, 0));
+  const completionTokens = usage?.completion_tokens ?? est(text.length);
+  if (!text) throw new AssistantError("Assistant returned no content", res.status, { promptTokens, completionTokens });
+  return { text, promptTokens, completionTokens, stopped, streamed: true };
+}
+
 const num = (v: string | undefined, d: number) => {
   const n = v === undefined || v.trim() === "" ? NaN : Number(v);
   return Number.isFinite(n) && n >= 0 ? n : d;
