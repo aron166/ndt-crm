@@ -9,7 +9,7 @@ import { getWeeklyReport, lastDays } from "@/lib/reports/weekly";
 import type { ContentCategory } from "@/lib/content/types";
 
 /** ~2.5K tokens of CRM state per message: Groq free tier is 8K tokens/min (prompt + reply). */
-export const HUB_CONTEXT_BUDGET_CHARS = 7000;
+export const HUB_CONTEXT_BUDGET_CHARS = 6000;
 
 export type HubItem = {
   id: number; title: string; category: string; status: string; stage: string; version: number | null;
@@ -175,7 +175,7 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}
   // Totals are server-computed, so only the oldest few are listed: 34 + 16 full lines were ~6000 chars,
   // most of the 7000 budget, and ÖNRE VÁR is never dropped.
   const tight = budget < 3000;
-  const ownItems = d.mine.itemIds.slice(0, tight ? 5 : 10).flatMap((id) => {
+  const ownItems = [...d.mine.itemIds].sort((a, b) => (byId.get(b)?.ageDays ?? 0) - (byId.get(a)?.ageDays ?? 0)).slice(0, tight ? 5 : 10).flatMap((id) => {
     const i = byId.get(id);
     return i ? [`#${id} ${clean(i.title)} | ${i.stage} | jóváhagyásra vár: ${i.owedBy.length ? i.owedBy.map(clean).join(", ") : "senki"} | /marketing/${id}`] : [];
   });
@@ -184,8 +184,7 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}
     return x ? [`kérdés #${id} ${clean(x.question)} | kitől: ${WHO[x.forWhom]} | /marketing/decisions#${id}`] : [];
   });
   const own = [
-    `ÖNRE VÁR: ${d.pendingCount} anyag az Ön bírálatára vár; ${d.mine.checkIds.length} nyitott döntés.`,
-    "FONTOS: a számokat ebből a sorból vegye, ne számolja meg a sorokat.",
+    `ÖNRE VÁR: ${d.pendingCount} anyag vár Önre; ${d.mine.checkIds.length} nyitott döntés.`,
     ...ownItems, ...ownDecs,
   ];
   const patch = d.patch ? `merged 7 nap: ${d.patch.merged7}; nyitott backlog: ${d.patch.backlog}; Áron döntésére váró issue: ${d.patch.decisionAron}` : "(nincs adat)";

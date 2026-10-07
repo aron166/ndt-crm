@@ -91,8 +91,7 @@ describe("renderHubContext", () => {
   };
   it("totals line uses pendingCount and the open decision count, not the line count", () => {
     const { t } = mineData(50);
-    expect(t).toContain("ÖNRE VÁR: 34 anyag az Ön bírálatára vár; 16 nyitott döntés.");
-    expect(t).toContain("FONTOS: a számokat ebből a sorból vegye, ne számolja meg a sorokat.");
+    expect(t).toContain("ÖNRE VÁR: 34 anyag vár Önre; 16 nyitott döntés.");
   });
   it("every item id in ÖNRE VÁR and ANYAGOK lines is followed by its title", () => {
     const { t } = mineData(50);
@@ -103,7 +102,7 @@ describe("renderHubContext", () => {
   });
   it("totals line survives budget 1500, own lines cut to 5 + 3", () => {
     const { t } = mineData(50, 1500);
-    expect(t).toContain("ÖNRE VÁR: 34 anyag az Ön bírálatára vár; 16 nyitott döntés.");
+    expect(t).toContain("ÖNRE VÁR: 34 anyag vár Önre; 16 nyitott döntés.");
     const own = t.split("\n").filter((l) => l.includes("| jóváhagyásra vár:") && l.includes("/marketing/") && !l.includes("| v"));
     expect(own.length).toBeLessThanOrEqual(5);
   });
@@ -122,5 +121,12 @@ describe("loadHubData", () => {
     const h = await loadHubData(1, 7, "Áron Balogh");
     expect(countPending).toHaveBeenCalledWith(1, 7);
     expect(h.pendingCount).toBe(34);
+  });
+  it("ÖNRE VÁR lists the oldest waiting items first", () => {
+    const items = Array.from({ length: 20 }, (_, k) => item(k + 1, { title: `Cím ${k + 1}`, ageDays: k }));
+    const t = renderHubContext(data(items, { pendingCount: 20, mine: { itemIds: items.map((i) => i.id), checkIds: [] } }));
+    const own = t.split("\n").slice(t.split("\n").findIndex((l) => l.startsWith("ÖNRE VÁR:")) + 1).filter((l) => /^#\d+ Cím/.test(l)).slice(0, 10);
+    expect(own[0]).toMatch(/^#20 /);
+    expect(own).not.toContainEqual(expect.stringMatching(/^#1 /));
   });
 });

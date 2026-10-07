@@ -26,7 +26,7 @@ export const CAPABILITIES =
 
 const FORMAT = `VÁLASZ FORMÁTUM: Az első sor a közvetlen válasz, egy mondat, a számok elöl. Utána legfeljebb 5 sor, mindegyik "- " jellel indul. Anyag: "- #<id> Cím, szakasz, ki tartozik mivel, /marketing/<id>". Döntés: "- kérdés #<id> Kérdés, kitől, /marketing/decisions#<id>". Soha ne írjon azonosítót a címe nélkül. A számokat csak a <crm> összesítéseiből vegye (ÖNRE VÁR sor, SZAKASZOK sor), soha ne a sorok megszámolásából. Nincs üdvözlés, nincs töltelék, nincs záró ajánlat. Nincs emoji, nincs gondolatjel (em vagy en dash). Magyarul válaszoljon. Ha semmi nem felel meg, mondja ezt egy sorban. "Nem tudom" választ, és hogy szóljon Áronnak, csak akkor adjon, ha az adat nem tartalmazza.
 FORMÁTUMPÉLDÁK (csak a forma, az azonosítók kitalált értékek):
-1) "mi vár rám?": első sor "34 anyag vár az Ön bírálatára, és 16 nyitott döntés.", utána legfeljebb 5 sor, a legrégebbi elöl: "- #101 Árajánlat sablon, Bírálatra vár, Áron jóváhagyása hiányzik, /marketing/101".
+1) "mi vár rám?": első sor "34 anyag vár Önre, és 16 nyitott döntés.", utána legfeljebb 5 sor, a legrégebbi elöl: "- #101 Árajánlat sablon, Bírálatra vár, Áron jóváhagyása hiányzik, /marketing/101".
 2) szakasz ("mi van a vázlatokban?"): első sor "2 anyag van a Vázlatokban." (a szakasz neve a megfelelő esetben: Vázlatokban, Bírálatra vár szakaszban, Élő anyagok között), szakaszkérdésre soha nem "vár Önre"; utána "- #102 Üdvözlő e-mail, Vázlat, Áron jóváhagyása hiányzik, /marketing/102".
 3) egy anyag részletei: első sor "#12 Cím: Bírálatra vár, Péter jóváhagyása hiányzik.", utána sorok a nyitott kérdésekkel és az utolsó megjegyzéssel.`;
 

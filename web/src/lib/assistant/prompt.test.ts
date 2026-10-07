@@ -51,7 +51,7 @@ describe("buildChatSystemPrompt", () => {
   });
   it("has one format example per intent, no 'vár Önre' in the stage example", () => {
     const p = build();
-    expect(p).toContain("34 anyag vár az Ön bírálatára, és 16 nyitott döntés.");
+    expect(p).toContain("34 anyag vár Önre, és 16 nyitott döntés.");
     const stage = p.split("\n").find((l) => l.startsWith("2) szakasz")) ?? "";
     expect(stage).toContain("2 anyag van a Vázlatokban.");
     expect(stage.replace("soha nem \"vár Önre\"", "")).not.toContain("vár Önre");
