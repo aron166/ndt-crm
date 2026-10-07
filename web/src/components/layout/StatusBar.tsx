@@ -42,7 +42,7 @@ export function StatusBar({ collapsed, overdueCount = 0 }: StatusBarProps) {
       className="fixed bottom-0 right-0 flex items-center gap-4 px-4 z-20 transition-all duration-200 font-mono-ndt"
       style={{
         left: collapsed ? "3.5rem" : "240px",
-        height: 26,
+        height: "var(--statusbar-h)",
         background: "var(--bg-sidebar-blur)",
         backdropFilter: "blur(8px)",
         borderTop: "1px solid var(--line-soft)",

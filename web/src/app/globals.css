@@ -510,6 +510,7 @@
 
 /* ── Mockup CSS variable aliases ──────────────────────────── */
 :root {
+  --statusbar-h: 26px; /* StatusBar height; 0 on phones where it is hidden */
   --bg-0: var(--bg-page);
   --bg-1: var(--bg-panel);
   --bg-2: var(--bg-raised);
@@ -793,3 +794,5 @@
 .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 
 } /* end @layer components */
+
+@media (max-width: 767px) { :root { --statusbar-h: 0px; } }

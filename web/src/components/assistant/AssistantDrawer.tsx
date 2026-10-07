@@ -2,6 +2,7 @@
 
 import { Fragment, memo, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { ArrowRight, Bug, CheckCircle, ExternalLink, Gavel, Inbox, Scale, StickyNote, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { A } from "@/lib/assistant/labels";
 import {
@@ -50,6 +51,17 @@ const btn: React.CSSProperties = {
 };
 const btnQuiet: React.CSSProperties = {
   ...btn, background: "var(--bg-raised)", color: "var(--fg-mute)", border: "1px solid var(--line-soft)",
+};
+const btnPrimary: React.CSSProperties = {
+  ...btn, background: "var(--mint)", color: "var(--fg-on-accent)", border: "1px solid var(--mint)", fontWeight: 600,
+};
+const chip: React.CSSProperties = {
+  minHeight: 36, padding: "0 14px", borderRadius: 18, fontSize: 14, cursor: "pointer",
+  background: "var(--bg-raised)", color: "var(--fg)", border: "1px solid var(--line)",
+};
+const CARD_ICON: Record<ActionProposal["type"], LucideIcon> = {
+  open_item: ExternalLink, navigate: ArrowRight, waiting: Inbox, review: CheckCircle,
+  answer_decision: Gavel, create_decision: Scale, note: StickyNote, ticket: Bug, none: StickyNote,
 };
 const errStyle: React.CSSProperties = { fontSize: 13, color: "var(--coral)" };
 const linkStyle: React.CSSProperties = { color: "var(--mint-fg)", overflowWrap: "anywhere" };
@@ -176,10 +188,14 @@ function Card({ card, st, onRun, onDismiss, locked }: { card: ActionCard; st: Ca
   const executed = !!card.executedAt;
   const finished = st.phase === "done" || executed;
   const running = st.phase === "running";
+  const Icon = CARD_ICON[card.proposal.type];
   const external = st.href?.startsWith("http");
   return (
     <div style={{ border: "1px solid var(--line-soft)", background: "var(--bg-raised)", borderRadius: 8, padding: 10, display: "grid", gap: 6 }}>
-      <div style={{ fontSize: 14, fontWeight: 600 }}>{card.summary}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <Icon size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: "var(--mint-fg)" }} />
+        <span>{card.summary}</span>
+      </div>
       {rows.map(([k, v]) => (
         <div key={k} style={{ fontSize: 13 }}>
           <span style={small}>{k}: </span><span style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{v}</span>
@@ -196,7 +212,7 @@ function Card({ card, st, onRun, onDismiss, locked }: { card: ActionCard; st: Ca
       {!finished && (
         <div style={{ display: "flex", gap: 8 }}>
           {/* locked while a reply streams: the route appends to the stored turns at the end of the stream */}
-          <button type="button" disabled={running || locked} onClick={onRun} style={{ ...btn, ...(running || locked ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>
+          <button type="button" disabled={running || locked} onClick={onRun} style={{ ...btnPrimary, ...(running || locked ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>
             {running ? A.executing : A.execute}
           </button>
           <button type="button" disabled={running} onClick={onDismiss} style={btnQuiet}>{A.dismiss}</button>
@@ -260,6 +276,8 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
   const [chatError, setChatError] = useState<string | null>(null);
   const [cards, setCards] = useState<Record<string, CardState>>({});
   const [quickWait, setQuickWait] = useState(false);
+  const [vis, setVis] = useState(false); // drives the slide: false while closed, true one frame after open
+  const pinned = useRef(true);
 
   // The drawer stays mounted across navigation: a half-typed note belongs to the item it was typed on.
   const [noteDraft, setNoteDraft] = useState<{ id: number | null; text: string }>({ id: null, text: "" });
@@ -271,16 +289,23 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
   const setConv = useCallback((id: number | null) => { convRef.current = id; lsSet(id); }, []);
   const abort = useCallback(() => { abortRef.current?.abort(); abortRef.current = null; setStreaming(false); }, []);
 
-  // Focus in on open, back to the opener on close. No trap: the page behind stays usable.
+  // Mounted while closed so the close can animate; flips one frame after open so the slide-in runs.
   useEffect(() => {
     if (!open) return;
+    const r = requestAnimationFrame(() => setVis(true));
+    return () => { cancelAnimationFrame(r); setVis(false); };
+  }, [open]);
+
+  // Focus in on open, back to the opener on close. No trap: the page behind stays usable.
+  useEffect(() => {
+    if (!vis) return;
     openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const t = setTimeout(() => (inputRef.current ?? dialogRef.current)?.focus(), 0);
     return () => {
       clearTimeout(t);
       openerRef.current?.focus();
     };
-  }, [open, onClose]);
+  }, [vis]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -306,10 +331,11 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
     return () => { live = false; };
   }, [open, itemId, setConv]);
 
+  // Pin to the newest message unless the reader scrolled up (more than 40px from the bottom).
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs, tab]);
+    if (el && pinned.current) el.scrollTop = el.scrollHeight;
+  }, [msgs, tab, vis]);
 
   function fresh() {
     abort();
@@ -346,6 +372,7 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
     if (!message || streaming) return;
     setChatError(null);
     setInput("");
+    pinned.current = true;
     setMsgs((m) => [...m, { role: "user", content: message }, { role: "assistant", content: "", deltas: [], streaming: true }]);
     setStreaming(true);
     const ac = new AbortController();
@@ -463,20 +490,25 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
     </button>
   );
 
-  if (!open) return <div hidden />;
+  const ticketChip = itemId != null && item?.id === itemId;
   return (
     <>
       <style>{`
         .assistant-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; z-index: 40; display: flex; flex-direction: column;
+          transform: translateX(100%); opacity: 0; visibility: hidden; pointer-events: none;
+          transition: transform 200ms ease, opacity 200ms ease, visibility 0s linear 200ms;
           background: var(--bg-page); color: var(--fg); border-left: 1px solid var(--line-soft); padding-bottom: env(safe-area-inset-bottom); }
+        .assistant-drawer[data-open="true"] { transform: none; opacity: 1; visibility: visible; pointer-events: auto; transition: transform 200ms ease, opacity 200ms ease, visibility 0s; }
+        .assistant-chip:hover:not(:disabled) { border-color: var(--mint-line); background: var(--mint-soft); }
+        .assistant-chip:disabled { opacity: 0.5; cursor: not-allowed; }
         @media (max-width: 767px) { .assistant-drawer { width: 100vw; border-left: 0; } }
         @keyframes assistantFade { from { opacity: 0 } to { opacity: 1 } }
         @keyframes assistantBlink { 50% { opacity: 0 } }
         .assistant-fade { animation: assistantFade 180ms ease-out; }
         .assistant-caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: text-bottom; background: var(--fg-mute); animation: assistantBlink 1s steps(1) infinite; }
-        @media (prefers-reduced-motion: reduce) { .assistant-fade, .assistant-caret { animation: none; } }
+        @media (prefers-reduced-motion: reduce) { .assistant-fade, .assistant-caret { animation: none; } .assistant-drawer, .assistant-drawer[data-open="true"] { transition: none; } }
       `}</style>
-      <div ref={dialogRef} className="assistant-drawer" role="dialog" aria-modal="false" aria-label={A.dialog} tabIndex={-1}
+      <div ref={dialogRef} className="assistant-drawer" role="dialog" aria-modal="false" data-open={vis ? "true" : "false"} aria-hidden={vis ? undefined : true} aria-label={A.dialog} tabIndex={-1}
         onKeyDown={(e) => { if (e.key === "Escape" && !e.defaultPrevented) onClose(); }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--line-soft)", flexWrap: "wrap" }}>
           <strong style={{ fontSize: 15, flex: 1 }}>{A.dialog}</strong>
@@ -507,12 +539,16 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
 
         {tab === "chat" && (
           <>
-            <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "8px 12px", display: "grid", gap: 10, alignContent: "start" }}>
+            <div ref={listRef} onScroll={(e) => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 40; }} style={{ flex: 1, overflowY: "auto", padding: "8px 12px", display: "grid", gap: 10, alignContent: "start" }}>
               {msgs.length === 0 && (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button type="button" disabled={quickWait || streaming} onClick={quickWaiting} style={btnQuiet}>{A.quickWaiting}</button>
-                  <button type="button" disabled={noAi || streaming} onClick={() => send(A.quickDrafts)} style={btnQuiet}>{A.quickDrafts}</button>
-                  <button type="button" disabled={noAi || streaming} onClick={() => send(A.quickAbilities)} style={btnQuiet}>{A.quickAbilities}</button>
+                <div role="group" aria-label={A.suggestions} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" className="assistant-chip" disabled={quickWait || streaming} onClick={quickWaiting} style={chip}>{A.quickWaiting}</button>
+                  <button type="button" className="assistant-chip" disabled={noAi || streaming} onClick={() => send(A.quickDrafts)} style={chip}>{A.quickDrafts}</button>
+                  {ticketChip && item ? (
+                    <button type="button" className="assistant-chip" disabled={noAi || streaming} onClick={() => send(`${A.chipTicket}: ${item.title}`)} style={chip}>{A.chipTicket}</button>
+                  ) : (
+                    <button type="button" className="assistant-chip" disabled={noAi || streaming} onClick={() => send(A.quickAbilities)} style={chip}>{A.quickAbilities}</button>
+                  )}
                 </div>
               )}
               {noAi && <p style={{ fontSize: 13, color: "var(--fg-mute)", margin: 0 }}>{A.notConfigured}</p>}
