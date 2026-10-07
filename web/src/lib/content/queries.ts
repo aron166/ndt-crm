@@ -207,7 +207,8 @@ export function bouncedByRuleWhere(tenantId: number): Prisma.ContentItemWhereInp
 // cache(): the app layout (nav badge) and the marketing layout (assistant badge) both ask in one request.
 export const countPendingForReviewer = cache(async (tenantId: number, userId: number): Promise<number> => {
   const reviewers = await getContentReviewers(tenantId);
-  if (!reviewers.includes(userId)) return 0;
+  // Non-reviewers still see rule-bounced items in getInbox `mine`: the count must agree.
+  if (!reviewers.includes(userId)) return db.contentItem.count({ where: bouncedByRuleWhere(tenantId) });
   return db.contentItem.count({
     where: { OR: [pendingForReviewerWhere(tenantId, userId), bouncedByRuleWhere(tenantId)] },
   });

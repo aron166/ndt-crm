@@ -1,8 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ db: {} }));
+const countPending = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/content/queries", () => ({ countPendingForReviewer: countPending, openDecisionsWhere: () => ({}) }));
+vi.mock("@/lib/patchnotes/github", () => ({ getPatchnotes: async () => ({ configured: false, repos: [] }) }));
+vi.mock("@/lib/reports/weekly", () => ({ getWeeklyReport: async () => ({}), lastDays: () => ({}) }));
 vi.mock("next/cache", () => ({ unstable_cache: (fn: unknown) => fn }));
-import { HUB_CONTEXT_BUDGET_CHARS, STAGES, renderHubContext, stageOf, type HubData, type HubItem } from "./hub-context";
+import { HUB_CONTEXT_BUDGET_CHARS, loadHubData, STAGES, renderHubContext, stageOf, type HubData, type HubItem } from "./hub-context";
 
 const item = (id: number, over: Partial<HubItem> = {}): HubItem => ({
   id, title: `Anyag ${id}`, category: "email", status: "in_review", stage: stageOf("in_review"), version: 2, openChecks: 1,
@@ -10,7 +14,7 @@ const item = (id: number, over: Partial<HubItem> = {}): HubItem => ({
   lastComment: { by: "Péter", text: "Rövidebb legyen" }, campaign: null, ...over,
 });
 const data = (items: HubItem[], over: Partial<HubData> = {}): HubData => ({
-  now: new Date(), items, archivedCount: 7, decisions: [], mine: { itemIds: [], checkIds: [] },
+  now: new Date(), items, archivedCount: 7, decisions: [], mine: { itemIds: [], checkIds: [] }, pendingCount: 0,
   patch: null, weekly: null, truncatedQuery: false, ...over,
 });
 
@@ -76,5 +80,53 @@ describe("renderHubContext", () => {
     const items = Array.from({ length: 400 }, (_, k) => item(1000 + k, { status: statuses[k % 5], stage: stageOf(statuses[k % 5]) }));
     const t = renderHubContext(data(items), { budgetChars: 1500 });
     expect(t.length).toBeLessThanOrEqual(1500);
+  });
+  const mineData = (n: number, budgetChars?: number) => {
+    const items = Array.from({ length: n }, (_, k) => item(k + 1, { title: `Cím ${k + 1}` }));
+    const decisions = Array.from({ length: 16 }, (_, k) => ({
+      checkId: 500 + k, itemId: 1, question: `Kérdés ${500 + k}`, forWhom: "either" as const, state: "open", deadline: null, daysWaiting: 1, answer: null,
+    }));
+    const d = data(items, { decisions, pendingCount: 34, mine: { itemIds: items.map((i) => i.id), checkIds: decisions.map((x) => x.checkId) } });
+    return { items, t: renderHubContext(d, { budgetChars }) };
+  };
+  it("totals line uses pendingCount and the open decision count, not the line count", () => {
+    const { t } = mineData(50);
+    expect(t).toContain("ÖNRE VÁR: 34 anyag vár Önre; 16 nyitott döntés.");
+  });
+  it("every item id in ÖNRE VÁR and ANYAGOK lines is followed by its title", () => {
+    const { t } = mineData(50);
+    const lines = t.split("\n").filter((l) => /^#\d+ /.test(l));
+    expect(lines.length).toBeGreaterThan(10);
+    for (const l of lines) expect(l).toMatch(/^#(\d+) (\| )?Cím \1( \||\s\[)/);
+    for (const l of t.split("\n").filter((x) => x.startsWith("kérdés #"))) expect(l).toMatch(/^kérdés #(\d+) (\| )?Kérdés \1\b/);
+  });
+  it("totals line survives budget 1500, own lines cut to 5 + 3", () => {
+    const { t } = mineData(50, 1500);
+    expect(t).toContain("ÖNRE VÁR: 34 anyag vár Önre; 16 nyitott döntés.");
+    const own = t.split("\n").filter((l) => l.includes("| jóváhagyásra vár:") && l.includes("/marketing/") && !l.includes("| v"));
+    expect(own.length).toBeLessThanOrEqual(5);
+  });
+});
+
+describe("loadHubData", () => {
+  it("takes the waiting count from countPendingForReviewer(tenant, user)", async () => {
+    countPending.mockResolvedValue(34);
+    const { db } = await import("@/lib/db");
+    Object.assign(db, {
+      contentItem: { findMany: async () => [], count: async () => 0 },
+      contentCheck: { findMany: async () => [] },
+      tenant: { findUnique: async () => ({ settings: {} }) },
+      user: { findMany: async () => [] },
+    });
+    const h = await loadHubData(1, 7, "Áron Balogh");
+    expect(countPending).toHaveBeenCalledWith(1, 7);
+    expect(h.pendingCount).toBe(34);
+  });
+  it("ÖNRE VÁR lists the oldest waiting items first", () => {
+    const items = Array.from({ length: 20 }, (_, k) => item(k + 1, { title: `Cím ${k + 1}`, ageDays: k }));
+    const t = renderHubContext(data(items, { pendingCount: 20, mine: { itemIds: items.map((i) => i.id), checkIds: [] } }));
+    const own = t.split("\n").slice(t.split("\n").findIndex((l) => l.startsWith("ÖNRE VÁR:")) + 1).filter((l) => /^#\d+ Cím/.test(l)).slice(0, 10);
+    expect(own[0]).toMatch(/^#20 /);
+    expect(own).not.toContainEqual(expect.stringMatching(/^#1 /));
   });
 });

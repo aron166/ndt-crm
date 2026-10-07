@@ -2,14 +2,14 @@
 import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import { CATEGORY_LABEL, UI } from "@/lib/content/labels";
-import { openDecisionsWhere } from "@/lib/content/queries";
+import { countPendingForReviewer, openDecisionsWhere } from "@/lib/content/queries";
 import { reviewersFromSettings } from "@/lib/content/reviewers";
 import { getPatchnotes } from "@/lib/patchnotes/github";
 import { getWeeklyReport, lastDays } from "@/lib/reports/weekly";
 import type { ContentCategory } from "@/lib/content/types";
 
 /** ~2.5K tokens of CRM state per message: Groq free tier is 8K tokens/min (prompt + reply). */
-export const HUB_CONTEXT_BUDGET_CHARS = 7000;
+export const HUB_CONTEXT_BUDGET_CHARS = 6000;
 
 export type HubItem = {
   id: number; title: string; category: string; status: string; stage: string; version: number | null;
@@ -23,6 +23,8 @@ export type HubDecision = {
 export type HubData = {
   now: Date; items: HubItem[]; archivedCount: number; decisions: HubDecision[];
   mine: { itemIds: number[]; checkIds: number[] };
+  /** Server-computed: the same number as the nav badge, never counted by the model. */
+  pendingCount: number;
   patch: { merged7: number; backlog: number; decisionAron: number } | null;
   weekly: { leads: number; calls: number; demos: number } | null;
   truncatedQuery: boolean;
@@ -63,11 +65,11 @@ const flat = (s: string) => s.replace(/\s*[\r\n]+\s*/g, " ").trim();
 
 /**
  * Queries in the single Promise.all: items, archived count, reviewers (tenant + users, 2),
- * decisions = 5. Patchnotes is cached by getPatchnotes (GitHub, no DB); weekly is cached
+ * decisions = 5, plus the badge count (React-cached). Patchnotes is cached by getPatchnotes (GitHub, no DB); weekly is cached
  * here (10 min), so a cache miss adds the report's own queries once per 10 minutes.
  */
 export async function loadHubData(tenantId: number, userId: number, userName: string, now: Date = new Date()): Promise<HubData> {
-  const [items, archivedCount, reviewers, decisions, patch, weekly] = await Promise.all([
+  const [items, archivedCount, reviewers, decisions, patch, weekly, pendingCount] = await Promise.all([
     db.contentItem.findMany({
       where: { tenantId, status: { not: "archived" } },
       orderBy: { updatedAt: "desc" }, take: ITEM_TAKE,
@@ -105,6 +107,7 @@ export async function loadHubData(tenantId: number, userId: number, userName: st
       };
     }).catch(() => null),
     weeklyCached(tenantId).catch(() => null),
+    countPendingForReviewer(tenantId, userId),
   ]);
 
   const isReviewer = reviewers.some((r) => r.id === userId);
@@ -142,7 +145,7 @@ export async function loadHubData(tenantId: number, userId: number, userName: st
 
   return {
     now, items: hubItems, archivedCount, decisions: hubDecisions,
-    mine: { itemIds: mineItems, checkIds }, patch, weekly, truncatedQuery: items.length >= ITEM_TAKE,
+    mine: { itemIds: mineItems, checkIds }, pendingCount, patch, weekly, truncatedQuery: items.length >= ITEM_TAKE,
   };
 }
 
@@ -169,9 +172,20 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}
 
   const byId = new Map(items.map((i) => [i.id, i]));
   const decById = new Map(d.decisions.map((x) => [x.checkId, x]));
+  // Totals are server-computed, so only the oldest few are listed: 34 + 16 full lines were ~6000 chars,
+  // most of the 7000 budget, and ÖNRE VÁR is never dropped.
+  const tight = budget < 3000;
+  const ownItems = [...d.mine.itemIds].sort((a, b) => (byId.get(b)?.ageDays ?? 0) - (byId.get(a)?.ageDays ?? 0)).slice(0, tight ? 5 : 10).flatMap((id) => {
+    const i = byId.get(id);
+    return i ? [`#${id} ${clean(i.title)} | ${i.stage} | jóváhagyásra vár: ${i.owedBy.length ? i.owedBy.map(clean).join(", ") : "senki"} | /marketing/${id}`] : [];
+  });
+  const ownDecs = d.mine.checkIds.slice(0, tight ? 3 : 5).flatMap((id) => {
+    const x = decById.get(id);
+    return x ? [`kérdés #${id} ${clean(x.question)} | kitől: ${WHO[x.forWhom]} | /marketing/decisions#${id}`] : [];
+  });
   const own = [
-    ...d.mine.itemIds.flatMap((id) => (byId.get(id) ? [`#${id} ${clean(byId.get(id)!.title)}`] : [])),
-    ...d.mine.checkIds.flatMap((id) => (decById.get(id) ? [`kérdés #${id} ${clean(decById.get(id)!.question)}`] : [])),
+    `ÖNRE VÁR: ${d.pendingCount} anyag vár Önre; ${d.mine.checkIds.length} nyitott döntés.`,
+    ...ownItems, ...ownDecs,
   ];
   const patch = d.patch ? `merged 7 nap: ${d.patch.merged7}; nyitott backlog: ${d.patch.backlog}; Áron döntésére váró issue: ${d.patch.decisionAron}` : "(nincs adat)";
   const weekly = d.weekly ? `leads: ${d.weekly.leads}; hívások: ${d.weekly.calls}; demók: ${d.weekly.demos}` : "(nincs adat)";
@@ -182,7 +196,7 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}
     return [
       "<crm>",
       "SZAKASZOK:", counts.join("; "),
-      "ÖNRE VÁR:", ...(own.length ? own : ["(semmi)"]),
+      ...own,
       "DÖNTÉSEK:", ...(decisions.length ? decisions.map(decLine) : ["(nincs)"]),
       "FEJLESZTÉS (patchnotes):", patch,
       "HETI SZÁMOK (7 nap):", weekly,
