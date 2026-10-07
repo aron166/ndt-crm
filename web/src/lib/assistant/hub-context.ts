@@ -7,8 +7,8 @@ import { getPatchnotes } from "@/lib/patchnotes/github";
 import { getWeeklyReport, lastDays } from "@/lib/reports/weekly";
 import type { ContentCategory } from "@/lib/content/types";
 
-/** ~3K tokens of CRM state in every chat message. */
-export const HUB_CONTEXT_BUDGET_CHARS = 9000;
+/** ~2.5K tokens of CRM state per message: Groq free tier is 8K tokens/min (prompt + reply). */
+export const HUB_CONTEXT_BUDGET_CHARS = 7000;
 
 export type HubItem = {
   id: number; title: string; category: string; status: string; stage: string; version: number | null;

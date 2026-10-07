@@ -117,17 +117,17 @@ const FLAT_PROPS = {
   label: nullEnum(["bug", "backlog"]),
 };
 
-/** OpenAI strict schema. Property order matters: read_item_ids first, answer second (streamed). */
+/** OpenAI strict schema. Property order matters: read_item_ids first, answer second (streamed).
+ * No maxItems: not every strict-mode provider accepts it; the server caps reads at 3 and actions at 3. */
 export const MODEL_RESPONSE_SCHEMA: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
   required: ["read_item_ids", "answer", "actions"],
   properties: {
-    read_item_ids: { type: "array", items: { type: "integer" }, maxItems: 3 },
+    read_item_ids: { type: "array", items: { type: "integer" } },
     answer: { type: "string" },
     actions: {
       type: "array",
-      maxItems: 3,
       items: { type: "object", additionalProperties: false, required: Object.keys(FLAT_PROPS), properties: FLAT_PROPS },
     },
   },

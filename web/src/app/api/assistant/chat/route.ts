@@ -118,7 +118,7 @@ export async function POST(request: Request) {
     pathname: input.pathname,
     conversationPage: conv.page !== input.pathname ? conv.page : null,
     item,
-    hub: renderHubContext(hub, item ? { budgetChars: 6000 } : {}),
+    hub: renderHubContext(hub, item ? { budgetChars: 4500 } : {}),
     now: new Date(),
   });
   const base: ChatMessage[] = [{ role: "system", content: system }, ...history(turns), { role: "user", content: input.message }];
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
         }
         const res = parseModelResponse(finalText);
         if (!res || !res.answer.trim()) { send({ type: "error", message: "Nem sikerült választ adni. Kérem, fogalmazza meg másképp." }); controller.close(); return; }
-        const { proposals } = toProposals(res.actions);
+        const { proposals } = toProposals(res.actions.slice(0, 3));
         const actions = await enrichProposals(TENANT_ID, proposals);
         const now = new Date().toISOString();
         const next: ChatTurn[] = [
