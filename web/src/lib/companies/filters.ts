@@ -129,8 +129,22 @@ export function activeCompanyFilterCount(f: CompanyFilters): number {
  * The db-free portion of the Prisma where (everything EXCEPT tags, which need an
  * id lookup). Caller ANDs this with the tag-resolved clause + tenant scope. Each
  * present group is its own AND-ed key; multi-select values become `{ in: [...] }`
- * (OR-within). Always excludes soft-deleted; hides "F.A." unless includeFA.
+ * (OR-within). Always excludes soft-deleted; hides status "fa" unless includeFA.
  */
+/**
+ * Not under liquidation. Explicit null branch: `status <> 'fa'` alone drops NULL rows.
+ * TODO(nate): the name clauses are a belt for rows whose status was never set from the
+ * name. Drop them once `node scripts/backfill-company-enums.mjs --tenant 1` reports
+ * 0 "F.A. name, status not fa" rows (2026-10-07 prod: 0 of 27).
+ */
+export const NOT_FA: Prisma.CompanyWhereInput = {
+  AND: [
+    { OR: [{ status: null }, { status: { not: "fa" } }] },
+    { NOT: { name: { contains: "F.A." } } },
+    { NOT: { name: { contains: "F. A." } } },
+  ],
+};
+
 export function buildScalarCompanyWhere(f: CompanyFilters): Prisma.CompanyWhereInput {
   const and: Prisma.CompanyWhereInput[] = [];
 
@@ -158,7 +172,8 @@ export function buildScalarCompanyWhere(f: CompanyFilters): Prisma.CompanyWhereI
   }
 
   if (f.neverContacted) and.push({ lastInteractionDate: null });
-  if (!f.includeFA) and.push({ NOT: { name: { contains: "F.A." } } });
+  // Keyed on the canonical status (#122). An explicit status=fa facet shows them too.
+  if (!f.includeFA && !f.status?.includes("fa")) and.push(NOT_FA);
 
   return and.length ? { AND: and } : {};
 }

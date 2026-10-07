@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
-import { normalizeName, stripLegalSuffix, normalizeVat } from "./normalize";
+import { companyKey, normalizeName, normalizeVat } from "./normalize";
 import {
   buildCompanyRecord,
   buildPersonRecord,
@@ -11,31 +11,38 @@ import {
 } from "./build";
 import type { ImportEntity } from "./fields";
 import type { ImportResult } from "./types";
+import { DIFF_FIELDS, appendImportNote, budapestToday, buildImportNote, diffCompany, type DiffField } from "./note";
 
 const SAMPLE_LIMIT = 25;
 
 function emptyResult(entity: ImportEntity, dryRun: boolean): ImportResult {
   return {
     entity, dryRun, total: 0, created: 0, matched: 0, skipped: 0,
-    errors: [], companiesCreated: 0, contactsCreated: 0, sample: [],
+    notesAppended: 0, errors: [], companiesCreated: 0, contactsCreated: 0, sample: [],
   };
 }
 
 /** A company-matching index built once from the tenant's existing companies. */
 async function loadCompanyIndex(tenantId: number) {
   const companies = await db.company.findMany({
-    where: { tenantId },
-    select: { id: true, name: true, vatNumber: true },
+    where: { tenantId, deletedAt: null },
+    select: {
+      id: true, name: true, notes: true,
+      ...Object.fromEntries(DIFF_FIELDS.map((f) => [f, true])),
+    } as { id: true; name: true; vatNumber: true; notes: true } & Record<DiffField, true>,
   });
+  const byId = new Map<number, (typeof companies)[number]>();
   const byVat = new Map<string, number>();
   const byName = new Map<string, number>();
   for (const c of companies) {
+    byId.set(c.id, c);
     const vat = normalizeVat(c.vatNumber);
     if (vat) byVat.set(vat, c.id);
-    const key = stripLegalSuffix(normalizeName(c.name));
-    if (key && !byName.has(key)) byName.set(key, c.id);
+    const key = companyKey(c.name);
+    // companies under liquidation (status fa) stay matchable by VAT only
+    if (key && c.status !== "fa" && !byName.has(key)) byName.set(key, c.id);
   }
-  return { byVat, byName };
+  return { byVat, byName, byId };
 }
 
 function matchCompany(
@@ -47,13 +54,13 @@ function matchCompany(
     const hit = idx.byVat.get(vat);
     if (hit !== undefined) return hit;
   }
-  return idx.byName.get(stripLegalSuffix(normalizeName(name)));
+  return idx.byName.get(companyKey(name));
 }
 
 export async function runCompanyImport(
   rows: RawRow[],
   mapping: Mapping,
-  opts: { dryRun: boolean; tenantId: number },
+  opts: { dryRun: boolean; tenantId: number; fileName?: string },
 ): Promise<ImportResult> {
   const res = emptyResult("company", opts.dryRun);
   res.total = rows.length;
@@ -78,7 +85,50 @@ export async function runCompanyImport(
     const existing = matchCompany(idx, r.vatNumber, r.name);
     if (existing !== undefined) {
       res.matched++;
-      pushSample(res, rowNum, "meglévő", r.name, "már létezik: kihagyva");
+      const cur = existing >= 0 ? idx.byId.get(existing) : undefined;
+      if (!cur) {
+        // matched a company created earlier in this same file (placeholder or fresh id)
+        pushSample(res, rowNum, "meglévő", r.name, "már létezik: kihagyva");
+        continue;
+      }
+      const values = mapRowValues(rows[i], mapping);
+      const diffs = diffCompany(r, cur, values);
+      const block = buildImportNote({
+        fileName: opts.fileName ?? "ismeretlen fájl", date: budapestToday(), diffs, rowNotes: r.notes,
+      });
+      if (!block) {
+        pushSample(res, rowNum, "meglévő", r.name, "már létezik, nincs eltérés");
+        continue;
+      }
+      let next = appendImportNote(cur.notes, block);
+      if (next === null) {
+        pushSample(res, rowNum, "meglévő", r.name, "már létezik: az import megjegyzés már szerepel");
+        continue;
+      }
+      if (!opts.dryRun) {
+        const where = { id: existing, tenantId: opts.tenantId };
+        let before = cur.notes;
+        let upd = await db.company.updateMany({ where: { ...where, notes: before }, data: { notes: next } });
+        if (upd.count === 0) {
+          // lost-update guard: someone edited the notes meanwhile; re-read and retry once
+          const fresh = await db.company.findFirst({ where: { ...where, deletedAt: null }, select: { notes: true } });
+          before = fresh?.notes ?? null;
+          next = fresh ? appendImportNote(before, block) : null;
+          upd = next === null ? { count: 0 } : await db.company.updateMany({ where: { ...where, notes: before }, data: { notes: next } });
+          if (upd.count === 0) {
+            pushSample(res, rowNum, "meglévő", r.name, next === null && fresh
+              ? "már létezik: az import megjegyzés már szerepel"
+              : "már létezik: a megjegyzés közben módosult, kihagyva");
+            continue;
+          }
+        }
+        await audit("company", existing, "update", { notes: before }, { notes: next, source: "import" }, { tenantId: opts.tenantId });
+      }
+      cur.notes = next; // dry run too, so a second row for the same company sees the first block
+      res.notesAppended++;
+      const what = diffs.length ? ` (eltér: ${diffs.map((d) => d.field).join(", ")})` : "";
+      pushSample(res, rowNum, "meglévő", r.name,
+        opts.dryRun ? `már létezik: import megjegyzés lesz hozzáfűzve${what}` : `már létezik: import megjegyzés hozzáfűzve${what}`);
       continue;
     }
 
@@ -102,7 +152,7 @@ export async function runCompanyImport(
     }
     // dedupe within this same file, in dry run too (placeholder id -1) so the preview matches the real run
     if (r.vatNumber) idx.byVat.set(r.vatNumber, newId);
-    const key = stripLegalSuffix(normalizeName(r.name));
+    const key = companyKey(r.name);
     if (key && !idx.byName.has(key)) idx.byName.set(key, newId);
     res.created++;
     const note = opts.dryRun ? "új cég lesz" : "létrehozva";
@@ -161,7 +211,7 @@ export async function runPersonImport(
         await audit("company", c.id, "create", null, { name: r.companyName, source: "import" }, { tenantId: opts.tenantId });
         companyId = c.id;
         if (r.companyVat) idx.byVat.set(r.companyVat, c.id);
-        const key = stripLegalSuffix(normalizeName(r.companyName));
+        const key = companyKey(r.companyName);
         if (key && !idx.byName.has(key)) idx.byName.set(key, c.id);
         res.companiesCreated++;
       } else if (!companyId && r.companyName && opts.dryRun) {
@@ -170,7 +220,7 @@ export async function runPersonImport(
         // in-file dedupe and the contact count match what the commit would do.
         companyId = -rowNum;
         if (r.companyVat) idx.byVat.set(r.companyVat, companyId);
-        const key = stripLegalSuffix(normalizeName(r.companyName));
+        const key = companyKey(r.companyName);
         if (key && !idx.byName.has(key)) idx.byName.set(key, companyId);
       }
     }
@@ -226,7 +276,7 @@ export function runImport(
   entity: ImportEntity,
   rows: RawRow[],
   mapping: Mapping,
-  opts: { dryRun: boolean; tenantId: number },
+  opts: { dryRun: boolean; tenantId: number; fileName?: string },
 ): Promise<ImportResult> {
   return entity === "company"
     ? runCompanyImport(rows, mapping, opts)

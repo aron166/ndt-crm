@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { canonicalCompanyEnums } from '../lib/company-enums';
 import { readSheet, normalizeCompanyName } from '../lib/xlsx-utils';
 
 // MAIN sheet column key → field
@@ -184,7 +185,7 @@ export async function enrichCompanies(tenantId: number): Promise<number> {
     ].filter((v): v is string => v !== null);
 
     const warmthRaw = str(row[COL.warmth]);
-    const warmth = warmthRaw === 'COLD' ? 'cold' : warmthRaw === 'WARM' ? 'warm' : warmthRaw === 'HOT' ? 'hot' : null;
+    const { warmth } = canonicalCompanyEnums({ warmth: warmthRaw }, companyId);
 
     await prisma.company.update({
       where: { id: companyId },

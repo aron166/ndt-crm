@@ -1,8 +1,8 @@
 import { prisma } from '../lib/prisma';
+import { canonicalCompanyEnums } from '../lib/company-enums';
 import {
   readSheet,
   excelDateToJs,
-  mapStatus,
   parsePipelineStatus,
   normalizeCompanyName,
 } from '../lib/xlsx-utils';
@@ -75,12 +75,13 @@ export async function migrateCompanies(tenantId: number): Promise<CompanyMaps> {
               ? websiteRaw
               : null;
 
+          const enums = canonicalCompanyEnums({ status: row['1661'], accountType: row['__EMPTY_2'] }, name);
           const data = {
             tenantId,
             name,
             shortCode: (row['1696_2'] as string | null) ?? null,
-            status: mapStatus(row['1661']),
-            accountType: (row['__EMPTY_2'] as string | null) ?? null,
+            status: enums.status,
+            accountType: enums.accountType,
             industryCode: (row['__EMPTY_15'] as string | null) ?? null,
             country: (row['__EMPTY_6'] as string | null) ?? null,
             county: (row['__EMPTY_57'] as string | null) ?? null,

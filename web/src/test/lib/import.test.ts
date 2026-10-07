@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  companyKey,
   normalizeName,
   stripLegalSuffix,
   normalizeVat,
@@ -127,5 +128,24 @@ describe("buildPersonRecord", () => {
   it("errors when there is no name at all", () => {
     const r = buildPersonRecord({ email: "x@y.hu" });
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("companyKey (deterministic company match key)", () => {
+  it("is accent, case, punctuation and whitespace insensitive and drops the legal form", () => {
+    const k = companyKey("A-Híd Zrt.");
+    for (const v of ["A-HID ZRT", "a hid", "AHíd Zrt", "  A - Híd  Zrt. ", "A-Híd"]) expect(companyKey(v)).toBe(k);
+    expect(companyKey("KÉSZ Építő Zrt.")).toBe(companyKey("KESZ EPITO ZRT"));
+  });
+  it("drops foreign legal forms, keeps a trailing f. a.", () => {
+    expect(companyKey("Acme Ltd.")).toBe(companyKey("ACME Kft"));
+    expect(companyKey("Acme GmbH")).toBe("acme");
+    expect(companyKey("KEG NYRT.F.A.")).not.toBe(companyKey("KEG Nyrt."));
+  });
+  it("does not over-match: different words stay different, never strips to empty", () => {
+    expect(companyKey("A-Híd Zrt.")).not.toBe(companyKey("Híd Zrt."));
+    expect(companyKey("Magyar Közút Nonprofit Zrt.")).not.toBe(companyKey("Budapest Közút Zrt."));
+    expect(companyKey("Kft.")).toBe("kft");
+    expect(companyKey("")).toBe("");
   });
 });

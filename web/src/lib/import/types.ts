@@ -7,7 +7,8 @@ export interface ImportResult {
   dryRun: boolean;
   total: number;
   created: number; // new primary entities (companies or persons)
-  matched: number; // existing → skipped, never overwritten
+  matched: number; // existing → never overwritten
+  notesAppended: number; // matched companies that got (dry run: would get) an import note
   skipped: number; // dissolved / unmappable
   errors: { row: number; message: string }[];
   companiesCreated: number; // incidental companies created while linking persons
