@@ -29,6 +29,9 @@ export const REPORT_UI = {
   suppressionCancelled: "Tiltás miatt törölt piszkozat",
   topCompanies: "Legtöbbet érintett cégek",
   touches: "Érintés",
+  demos: "Demók",
+  transition: "Váltás",
+  count: "Darab",
   empty: "Nincs adat ebben az időszakban.",
 } as const;
 

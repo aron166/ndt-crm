@@ -78,10 +78,10 @@ function Window({ title, r, statuses }: { title: string; r: WeeklyReport; status
       </Panel>
 
       <Panel title={REPORT_UI.callOutcomes}>
-        <Table head={[REPORT_UI.callOutcomes, REPORT_UI.calls]} rows={r.callOutcomes.map((x) => [callOutcomeLabel(x.outcome), x.count])} />
+        <Table head={[REPORT_UI.callOutcomes, REPORT_UI.count]} rows={r.callOutcomes.map((x) => [callOutcomeLabel(x.outcome), x.count])} />
       </Panel>
 
-      <Panel title={`${REPORT_UI.demosBooked} / ${REPORT_UI.demosScheduled} / ${REPORT_UI.demosHeld}`}>
+      <Panel title={REPORT_UI.demos}>
         <Table
           head={[REPORT_UI.demosBooked, REPORT_UI.demosScheduled, REPORT_UI.demosHeld]}
           rows={[[r.demos.booked, r.demos.scheduled, r.demos.held]]}
@@ -90,7 +90,7 @@ function Window({ title, r, statuses }: { title: string; r: WeeklyReport; status
 
       <Panel title={REPORT_UI.stageTransitions}>
         <Table
-          head={[REPORT_UI.stageTransitions, REPORT_UI.leadsCreated]}
+          head={[REPORT_UI.transition, REPORT_UI.count]}
           rows={r.stageTransitions.map((x) => [`${x.from ? leadStatusLabel(x.from, statuses) : "-"} -> ${leadStatusLabel(x.to, statuses)}`, x.count])}
         />
       </Panel>
@@ -127,7 +127,7 @@ export default async function WeeklyReportPage() {
       <div className="page-head">
         <h1 className="page-title">{REPORT_UI.title}</h1>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: 24, alignItems: "start" }}>
         <Window title={REPORT_UI.last7} r={r7} statuses={statuses} />
         <Window title={REPORT_UI.last28} r={r28} statuses={statuses} />
       </div>
