@@ -62,14 +62,30 @@ describe("buildCompanyRecord enums", () => {
       expect(r.record.warmth).toBe("hot");
     }
   });
-  it.each([{ accountType: "valami" }, { warmth: "valami" }, { status: "valami" }])(
-    "rejects unknown %o",
+  it.each<Record<string, string>>([{ accountType: "valami" }, { warmth: "valami" }, { status: "valami" }])(
+    "keeps the row and warns on unknown %o",
     (extra) => {
       const r = buildCompanyRecord({ name: "A Kft", ...extra });
-      expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.error).toMatch(/^Ismeretlen/);
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.warnings?.[0]).toMatch(/^ismeretlen/);
+        expect(r.record.accountType).toBeNull();
+        expect(r.record.warmth).toBeNull();
+        expect(r.record.status).toBe("active");
+      }
     },
   );
+  it("maps Meleg to warm", () => {
+    const r = buildCompanyRecord({ name: "A Kft", warmth: "Meleg" });
+    expect(r.ok && r.record.warmth).toBe("warm");
+  });
+  it("reads a cp1250 CSV via fallback", () => {
+    // "Működő Kft." in cp1250: u-double-acute 0xFB, o-diaeresis 0xF6, o-double-acute 0xF5
+    const buf = Buffer.concat([Buffer.from("N\n"), Buffer.from([0x4d, 0xfb, 0x6b, 0xf6, 0x64, 0xf5]), Buffer.from(" Kft.\n")]);
+    const wb = readWorkbook("x.csv", buf);
+    const aoa = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+    expect(aoa[1][0]).toBe("Működő Kft.");
+  });
   it("accepts status Működő as active", () => {
     const r = buildCompanyRecord({ name: "A Kft", status: "Működő" });
     expect(r.ok).toBe(true);

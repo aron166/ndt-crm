@@ -55,7 +55,7 @@ export interface PersonRecord {
 }
 
 export type BuildResult<T> =
-  | { ok: true; record: T; skip?: { reason: string } }
+  | { ok: true; record: T; skip?: { reason: string }; warnings?: string[] }
   | { ok: false; error: string };
 
 const orNull = (v: string | undefined) => (v && v.trim() ? v.trim() : null);
@@ -65,11 +65,13 @@ export function buildCompanyRecord(values: Record<string, string>): BuildResult<
   if (!name) return { ok: false, error: "Hiányzó cégnév" };
 
   const { status, dissolved, unknown } = normalizeCompanyStatus(values.status);
-  if (unknown) return { ok: false, error: `Ismeretlen státusz: ${values.status}` };
-  const accountType = normalizeAccountType(values.accountType);
-  if (accountType === undefined) return { ok: false, error: `Ismeretlen partner kategória: ${values.accountType}` };
-  const warmth = normalizeWarmth(values.warmth);
-  if (warmth === undefined) return { ok: false, error: `Ismeretlen hőfok: ${values.warmth}` };
+  // Unknown enum values never drop the row: stored blank (status: active) and reported as a warning.
+  const warnings: string[] = [];
+  if (unknown) warnings.push(`ismeretlen státusz (aktív lesz): ${values.status}`);
+  const accountType = normalizeAccountType(values.accountType) ?? null;
+  if (values.accountType?.trim() && !accountType) warnings.push(`ismeretlen partner kategória (üres marad): ${values.accountType}`);
+  const warmth = normalizeWarmth(values.warmth) ?? null;
+  if (values.warmth?.trim() && !warmth) warnings.push(`ismeretlen hőfok (üres marad): ${values.warmth}`);
 
   const record: CompanyRecord = {
     name,
@@ -93,7 +95,8 @@ export function buildCompanyRecord(values: Record<string, string>): BuildResult<
 
   // Dissolved companies are imported-but-flagged: caller decides to skip them
   // (decisions ethos — don't seed dead companies into the attack list).
-  return dissolved ? { ok: true, record, skip: { reason: "Felszámolt / megszűnt cég" } } : { ok: true, record };
+  const w = warnings.length ? { warnings } : {};
+  return dissolved ? { ok: true, record, skip: { reason: "Felszámolt / megszűnt cég" }, ...w } : { ok: true, record, ...w };
 }
 
 export function buildPersonRecord(values: Record<string, string>): BuildResult<PersonRecord> {

@@ -105,7 +105,8 @@ export async function runCompanyImport(
     const key = stripLegalSuffix(normalizeName(r.name));
     if (key && !idx.byName.has(key)) idx.byName.set(key, newId);
     res.created++;
-    pushSample(res, rowNum, "új", r.name, opts.dryRun ? "új cég lesz" : "létrehozva");
+    const note = opts.dryRun ? "új cég lesz" : "létrehozva";
+    pushSample(res, rowNum, "új", r.name, built.warnings ? `${note}; ${built.warnings.join("; ")}` : note);
   }
   return res;
 }
@@ -165,6 +166,7 @@ export async function runPersonImport(
         res.companiesCreated++;
       } else if (!companyId && r.companyName && opts.dryRun) {
         res.companiesCreated++;
+        companyId = -1; // so the contact count matches the real run
         // same in-file dedupe as the real run, placeholder id -1
         if (r.companyVat) idx.byVat.set(r.companyVat, -1);
         const key = stripLegalSuffix(normalizeName(r.companyName));

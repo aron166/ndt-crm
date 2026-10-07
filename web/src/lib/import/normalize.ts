@@ -67,7 +67,7 @@ export function splitFullName(full: string | null | undefined): {
 export function normalizeCompanyStatus(raw: string | null | undefined): {
   status: string;
   dissolved: boolean;
-  /** set when a non-blank value matched nothing; caller rejects the row */
+  /** set when a non-blank value matched nothing; stored as active, caller warns */
   unknown?: boolean;
 } {
   const s = normalizeName(raw);
@@ -75,10 +75,10 @@ export function normalizeCompanyStatus(raw: string | null | undefined): {
   if (s.includes("f a") || s.includes("felszamol") || s === "fa") {
     return { status: "F.A.", dissolved: true };
   }
-  if (s.includes("inaktiv") || s.includes("inactive") || s.includes("megszunt")) {
+  if (s.includes("inaktiv") || s.includes("inactive") || s.includes("megszunt") || s.includes("vegelszamol") || s.includes("torolt") || s.includes("dissolved")) {
     return { status: "inactive", dissolved: true };
   }
-  if (s === "active" || s === "aktiv" || s === "mukodo") return { status: "active", dissolved: false };
+  if (s.includes("aktiv") || s.includes("active") || s.includes("mukod")) return { status: "active", dissolved: false };
   return { status: "active", dissolved: false, unknown: true };
 }
 
@@ -89,7 +89,7 @@ const ACCOUNT_TYPES: Record<string, string> = {
   vendor: "Vendor", szallito: "Vendor", lead: "Lead",
 };
 const WARMTHS: Record<string, string> = {
-  cold: "cold", hideg: "cold", warm: "warm", langyos: "warm", hot: "hot", forro: "hot",
+  cold: "cold", hideg: "cold", warm: "warm", langyos: "warm", meleg: "warm", hot: "hot", forro: "hot",
 };
 
 /** Map an enum cell to its canonical value; blank → null; unknown → undefined (caller rejects). */
