@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { PATCH_OWNER, PATCH_REPOS } from "./repos";
 import { parseManualTest } from "./parse";
 
@@ -30,15 +31,26 @@ export function toRepoData(repo: string, pulls: Raw[], backlog: Raw[], decision:
   return { repo, merged: merged.slice(0, SHOWN), merged7: within(7), merged28: within(28), backlog: toIssues(backlog), decisionAron: toIssues(decision) };
 }
 
-export async function getPatchnotes(): Promise<{ configured: false } | { configured: true; repos: RepoData[]; errors: string[] }> {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) return { configured: false };
+export type Patchnotes = { configured: false } | { configured: true; repos: RepoData[]; errors: string[] };
+
+// Cache the TRANSFORMED result, not the fetches: the raw ndt-crm pulls page is
+// ~1.8 MB, at the 2 MB Data Cache item limit. 15 GitHub requests per 10 min.
+// ponytail: a failed repo is cached for the same 10 min; key on errors if that bites.
+const cachedFetchAll = unstable_cache(() => fetchAll(process.env.GITHUB_TOKEN!), ["patchnotes-v1"], { revalidate: 600 });
+
+export async function getPatchnotes(): Promise<Patchnotes> {
+  if (!process.env.GITHUB_TOKEN) return { configured: false };
+  // The token is read inside, never passed as an arg: args become the cache key.
+  return cachedFetchAll();
+}
+
+async function fetchAll(token: string): Promise<Patchnotes> {
   const errors: string[] = [];
   const get = async (repo: string, path: string): Promise<Raw[]> => {
     try {
       const res = await fetch(`https://api.github.com/repos/${PATCH_OWNER}/${repo}/${path}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
-        next: { revalidate: 600 },
+        cache: "no-store",
       });
       if (!res.ok) {
         errors.push(`${repo}: HTTP ${res.status}`);
