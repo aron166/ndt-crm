@@ -839,6 +839,62 @@ applied, so the agreement rate between what was parsed and what a human later
 corrects it to can be measured — the 0.8 bar itself is expected to move once
 that data exists (`lib/calls/auto-outcome.ts`, `AUTO_OUTCOME_THRESHOLD`).
 
+## Reports
+
+### `GET /api/reports/weekly?from=&to=`
+
+The weekly sales-engine report: leads in, tier-A speed to contact, call
+outcomes, demos, stage moves, suppression hits and the most-touched companies.
+Auth as everywhere else (`401` / `429`). Tenant comes from the key, never from
+the request. Pure read: 7 queries per call, no pagination (every aggregate is
+bounded; `top_companies` is capped at 10, `tier_a.leads` is the tier-A leads
+created in the window).
+
+- `from`, `to`: ISO date or datetime. Window is `[from, to)` in UTC.
+- Defaults: `to` = now, `from` = 7 days before `to`. Maximum window 92 days.
+- `400` `{ "error": "Invalid window", "details": { "reason": "..." } }` for an
+  unparseable date, `from >= to`, or a window over 92 days.
+
+```bash
+curl -s "$CRM/api/reports/weekly?from=2026-09-30&to=2026-10-07" \
+  -H "Authorization: Bearer $KEY"
+```
+
+```json
+{
+  "ok": true,
+  "from": "2026-09-30T00:00:00.000Z",
+  "to": "2026-10-07T00:00:00.000Z",
+  "leads_created": { "total": 2, "by_source_tier": [{ "source": "web", "tier": "A", "count": 2 }] },
+  "tier_a": {
+    "total": 1, "without_task": 0, "awaiting_call": 0, "contacted": 1,
+    "median_minutes": 12, "p90_minutes": 12,
+    "leads": [{
+      "lead_id": 5, "company_name": "Acme", "created_at": "...", "task_at": "...",
+      "first_call_at": "...", "minutes_to_contact": 12
+    }]
+  },
+  "call_outcomes": { "total": 1, "by_outcome": [{ "outcome": "meeting_booked", "count": 1 }] },
+  "demos": { "booked": 1, "scheduled": 2, "held": 1 },
+  "stage_transitions": [{ "from": "new", "to": "contacted", "count": 3 }],
+  "suppression": { "added": 4, "drafts_cancelled": 1 },
+  "top_companies": [{ "company_id": 9, "name": "Acme", "touches": 6, "last_touch_at": "..." }]
+}
+```
+
+Definitions:
+
+| Metric | Meaning |
+|---|---|
+| window | `[from, to)` in UTC. |
+| call outcome | An interaction of type `call` whose outcome is one of the six call-outcome keys (so `transcribed` queue rows never count). Superseded rows (a human correction of an auto-outcome) are skipped: the latest word counts. |
+| tier-A time to first contact | From the lead's intake `call` task (the #118 rule creates it at intake) to the first logged call outcome on that lead. A call logged before the task counts as 0 minutes. Only the INTAKE task counts (created within 5 minutes of the lead); a later callback task is ignored. This is time to first CALL from the intake task, deliberately different from the board's 'Első kontakt' (lead creation to any first contact). Median and p90 are linear-interpolated and rounded to whole minutes; uncontacted leads are excluded. |
+| `tier_a.without_task` / `awaiting_call` | Tier-A leads with no call task / with a task but no call outcome yet. |
+| demo held | A lead booking task (type meeting, `starts_at` set) starting in the window with status `done`. `scheduled` counts such tasks that are not cancelled; `booked` counts `meeting_booked` call outcomes. |
+| stage transition | A lead audit row whose before/after `status` differ. |
+| suppression hit | A suppression added in the window, or an email draft the suppression list cancelled (audit reason `suppressed`). Sends blocked inside `sendEmail` are not persisted, so they are not counted. |
+| company touched | Any non-superseded interaction linked to the company. |
+
 ## Automations (for reference)
 
 Rules live in `/automations`. Triggers: `lead_created`, `lead_status_changed`,
