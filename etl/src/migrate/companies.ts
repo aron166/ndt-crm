@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { withSourceClient } from '../lib/source-db';
+import { canonicalCompanyEnums } from '../lib/company-enums';
 
 interface SourceCompany {
   id: number;
@@ -18,13 +19,6 @@ interface SourceCompany {
   website: string | null;
   last_interaction_date: Date | null;
   last_interaction_owner: string | null;
-}
-
-function mapStatus(raw: string | null): string | null {
-  if (!raw) return null;
-  if (raw === 'active') return 'active';
-  if (raw === 'F.A.') return 'fa';
-  return 'inactive';
 }
 
 /**
@@ -46,13 +40,14 @@ export async function migrateCompanies(
 
   await prisma.$transaction(async (tx) => {
     for (const row of rows) {
+      const enums = canonicalCompanyEnums({ status: row.status, accountType: row.account_type }, row.id);
       const data = {
         tenantId,
         name: row.name,
         shortCode: row.short_code ?? null,
-        status: mapStatus(row.status),
+        status: enums.status,
         pipelineStatus: row.pipeline_status ?? null,
-        accountType: row.account_type ?? null,
+        accountType: enums.accountType,
         industryCode: row.industry_code ?? null,
         country: row.country ?? null,
         county: row.county ?? null,

@@ -33,14 +33,6 @@ export function parsePipelineStatus(raw: unknown): string | null {
   return m ? m[1] : null;
 }
 
-export function mapStatus(raw: unknown): string | null {
-  if (!raw) return null;
-  const s = String(raw);
-  if (s === 'active') return 'active';
-  if (s === 'F.A.') return 'fa';
-  return 'inactive';
-}
-
 export function mapInteractionType(raw: unknown): string | null {
   if (!raw) return null;
   const s = String(raw).toUpperCase();
