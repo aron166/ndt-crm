@@ -14,8 +14,8 @@ export type PageData = {
   truncated?: boolean;
 };
 
-/** ~3K tokens: Groq free tier is 8K tokens per minute. */
-export const PAGE_CONTEXT_BUDGET_CHARS = 9000;
+/** ~2K tokens: Groq free tier is 8K tokens per minute, shared with history and the reply. */
+export const PAGE_CONTEXT_BUDGET_CHARS = 6000;
 
 const DAY = 86_400_000;
 const WHO = { aron: "Áron", peter: "Péter", either: "bárki" } as const;

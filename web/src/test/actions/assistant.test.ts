@@ -108,6 +108,27 @@ describe("askAssistant", () => {
   });
 });
 
+describe("history trimming", () => {
+  const sent = () => (JSON.parse(fetchMock.mock.calls[0][1].body).messages as { role: string; content: string }[]).filter((x) => x.role !== "system");
+  it("sends at most 6 messages and keeps the last user message", async () => {
+    const messages = Array.from({ length: 11 }, (_, i) => ({ role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant", content: `m${i}` }));
+    await askAssistant({ ...input, messages });
+    const s = sent();
+    expect(s).toHaveLength(6);
+    expect(s[5]).toEqual({ role: "user", content: "m10" });
+  });
+  it("drops older messages under the 4000 char budget but keeps the last user message", async () => {
+    const messages = [
+      { role: "user" as const, content: "a".repeat(1900) }, { role: "assistant" as const, content: "b".repeat(1900) },
+      { role: "user" as const, content: "c".repeat(1900) },
+    ];
+    await askAssistant({ ...input, messages });
+    const s = sent();
+    expect(s.length).toBeLessThan(3);
+    expect(s[s.length - 1].content).toBe("c".repeat(1900));
+  });
+});
+
 describe("draftTicket", () => {
   it("returns a parsed draft in json mode and logs purpose ticket", async () => {
     const d = { title: "Hibás gomb", body: "Nem működik a gomb az oldalon.", label: "bug", repo: "ndt-crm" };

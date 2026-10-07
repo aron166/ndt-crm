@@ -8,7 +8,7 @@ import { AssistantError, RATE_LIMITED, assistantConfig, chatCompletion, estimate
 import { loadPageData, renderPageContext } from "@/lib/assistant/page-context";
 import { ACTION_INSTRUCTION, ActionProposalSchema, decisionBody, describeProposal, parseActionProposal, type ActionProposal } from "@/lib/assistant/actions";
 import { submitContentReview, setContentCheck } from "@/app/actions/content";
-import { addChecks, createItem } from "@/lib/content/service";
+import { createItem } from "@/lib/content/service";
 import { revalidatePath } from "next/cache";
 import { CAP_EXCEEDED, capState } from "@/lib/assistant/cap";
 import { buildSystemPrompt, loadItemContext, pageKind } from "@/lib/assistant/context";
@@ -53,6 +53,13 @@ function logCall(userId: number, input: AssistantInput, purpose: Purpose, model:
   });
 }
 
+/** Last 6 messages, older ones dropped further until under 4000 chars; the last (user) message always stays. */
+function trimHistory<T extends { content: string }>(ms: T[]): T[] {
+  let h = ms.slice(-6);
+  while (h.length > 1 && h.reduce((n, x) => n + x.content.length, 0) >= 4000) h = h.slice(1);
+  return h;
+}
+
 /** Shared by askAssistant, draftTicket and proposeAction: validate, cap, call, log. */
 async function run(userId: number, input: AssistantInput, purpose: Purpose): Promise<{ text: string } | { error: string }> {
   const bad = checkInput(input);
@@ -61,15 +68,15 @@ async function run(userId: number, input: AssistantInput, purpose: Purpose): Pro
   if (!cfg) return { error: NOT_CONFIGURED };
 
   // List pages see the whole page (items, decisions, own pending); an item page sees the item.
+  // Propose sees the page only when no item is open (an item page sends the item alone: token budget).
   const onList = pageKind(input.pathname) !== "item";
+  const withPage = purpose === "propose" ? input.itemId === null : onList;
   const [item, cap, user, reviewers, page] = await Promise.all([
     input.itemId !== null ? loadItemContext(TENANT_ID, input.itemId) : Promise.resolve(null),
     capState(TENANT_ID),
     db.user.findFirst({ where: { id: userId, tenantId: TENANT_ID }, select: { role: true, name: true } }),
     getContentReviewers(TENANT_ID),
-    onList || purpose === "propose" ? loadPageData(TENANT_ID, userId).then((d) =>
-      // With an item body (up to 6000 chars) also in the prompt, halve the page budget: Groq free tier is 8K tokens/min.
-      renderPageContext(d, input.itemId !== null ? { budgetChars: 4500 } : {})) : Promise.resolve(null),
+    withPage ? loadPageData(TENANT_ID, userId).then((d) => renderPageContext(d)) : Promise.resolve(null),
   ]);
   if (input.itemId !== null && !item) return { error: NOT_FOUND };
   if (cap.exceeded) return { error: CAP_EXCEEDED };
@@ -77,7 +84,7 @@ async function run(userId: number, input: AssistantInput, purpose: Purpose): Pro
   const messages: ChatMessage[] = [
     { role: "system", content: buildSystemPrompt({ pathname: input.pathname, item, role: user?.role ?? "user", isReviewer: reviewers.includes(userId), page }) },
     ...(extra ? [{ role: "system", content: extra } as ChatMessage] : []),
-    ...input.messages,
+    ...trimHistory(input.messages),
   ];
 
   let r;
@@ -208,9 +215,13 @@ export async function proposeAction(input: AssistantInput): Promise<{ ok: true; 
   // Resolve the ids the model named against the tenant so the confirm card shows real titles.
   const names: { itemTitle?: string; question?: string } = {};
   if (p.type === "review" || p.type === "note") {
-    const item = await db.contentItem.findFirst({ where: { id: p.itemId, tenantId: TENANT_ID }, select: { title: true } });
+    const item = await db.contentItem.findFirst({ where: { id: p.itemId, tenantId: TENANT_ID }, select: { title: true, currentVersionId: true } });
     if (!item) return { error: NOT_FOUND };
     names.itemTitle = item.title;
+    if (p.type === "review") {
+      if (item.currentVersionId == null) return { error: NOT_FOUND };
+      p.versionId = item.currentVersionId;
+    }
   } else if (p.type === "answer_decision") {
     const c = await db.contentCheck.findFirst({ where: { id: p.checkId, tenantId: TENANT_ID, state: "open" }, select: { question: true } });
     if (!c) return { error: NOT_FOUND };
@@ -241,9 +252,11 @@ export async function executeAction(raw: ActionProposal): Promise<{ ok: true; me
   const p = parsed.data;
 
   if (p.type === "review") {
-    const item = await db.contentItem.findFirst({ where: { id: p.itemId, tenantId: TENANT_ID }, select: { currentVersionId: true } });
-    if (!item?.currentVersionId) return { error: NOT_FOUND };
-    const r = await submitContentReview({ versionId: item.currentVersionId, verdict: p.verdict, comment: p.comment, reason: p.reason });
+    // The version the user confirmed: a newer one landing since makes the service answer 409.
+    if (p.versionId == null) return { error: BAD_INPUT };
+    const v = await db.contentVersion.findFirst({ where: { id: p.versionId, itemId: p.itemId, tenantId: TENANT_ID }, select: { id: true } });
+    if (!v) return { error: NOT_FOUND };
+    const r = await submitContentReview({ versionId: p.versionId, verdict: p.verdict, comment: p.comment, reason: p.reason });
     if (!r.ok) return { error: r.error };
     await logExecuted(userId, "review", p.itemId);
     return { ok: true, message: r.wentLive ? "Rögzítve, az anyag élesbe került." : "Rögzítve.", href: `/marketing/${p.itemId}` };
@@ -260,12 +273,16 @@ export async function executeAction(raw: ActionProposal): Promise<{ ok: true; me
     // Same gate as answering: only a reviewer may put a question on the Döntések page.
     if (!(await getContentReviewers(TENANT_ID)).includes(userId)) return { error: "Csak bíráló hozhat létre döntést." };
     const actor = { tenantId: TENANT_ID, kind: "user" as const, userId };
-    const created = await createItem(actor, {
-      title: p.question, body: decisionBody(p), category: "decision", channel: "other", contentType: "other",
-      source: "assistant", ...(p.deadline ? { sourceMeta: { deadline: p.deadline } } : {}),
+    const created = await db.$transaction(async (tx) => {
+      const c = await createItem(actor, {
+        title: p.question, body: decisionBody(p), category: "decision", channel: "other", contentType: "other",
+        source: "assistant", ...(p.deadline ? { sourceMeta: { deadline: p.deadline } } : {}),
+      }, tx);
+      if (!c.ok) return c;
+      await tx.contentCheck.create({ data: { tenantId: TENANT_ID, itemId: c.itemId, question: p.question, forWhom: p.decidedBy, source: "decision" } });
+      return c;
     });
     if (!created.ok) return { error: created.error };
-    await addChecks(actor, created.itemId, [{ question: p.question, forWhom: p.decidedBy, source: "decision" }]);
     await logExecuted(userId, "create_decision", created.itemId);
     revalidatePath("/marketing");
     revalidatePath("/marketing/decisions");

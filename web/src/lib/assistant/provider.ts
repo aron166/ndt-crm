@@ -19,7 +19,7 @@ export function assistantConfig(env: Env = process.env): AssistantConfig | null 
 
 /** Shown when the provider answers 429 twice (free-tier rate limit). PROPOSAL copy. */
 export const RATE_LIMITED = "Pillanat, túl sok kérés. Kérem, próbálja újra egy perc múlva.";
-const RETRY_CAP_MS = 4_000;
+const RETRY_CAP_MS = 10_000;
 
 export class AssistantError extends Error {
   status?: number;

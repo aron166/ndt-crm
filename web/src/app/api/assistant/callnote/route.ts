@@ -6,7 +6,7 @@ import { logLeadCallOutcome } from "@/lib/leads/service";
 import { AssistantError, assistantConfig, chatCompletion, estimateCostUsd } from "@/lib/assistant/provider";
 import { capState } from "@/lib/assistant/cap";
 import {
-  CALLNOTE_JSON_SCHEMA, callNotePrompt, parseCallNote, toCallOutcomeInput, transcriptHash,
+  CALLNOTE_JSON_SCHEMA, callNoteCallId, callNotePrompt, parseCallNote, toCallOutcomeInput,
 } from "@/lib/assistant/callnote";
 import { resolveCallNoteLead } from "@/lib/assistant/callnote-lead";
 
@@ -16,7 +16,7 @@ import { resolveCallNoteLead } from "@/lib/assistant/callnote-lead";
  * lead resolution -> proposal, or with apply:true the same logLeadCallOutcome the modal uses.
  */
 const bodySchema = z.object({
-  transcript: z.string().trim().min(1).max(20_000),
+  transcript: z.string().trim().min(1).max(12_000),
   lead_id: z.number().int().positive().optional(),
   company: z.string().trim().max(300).optional(),
   person: z.string().trim().max(300).optional(),
@@ -35,15 +35,17 @@ export async function POST(request: Request) {
   const auth = await leadApiCtx(request);
   if ("res" in auth) return auth.res;
   const { tenantId } = auth.ctx;
+  const allowed = (process.env.ASSISTANT_CALLNOTE_APPS ?? "callnotes").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!auth.ctx.actorAgentId || !allowed.includes(auth.ctx.actorAgentId)) return json({ error: "App key not allowed for call notes" }, 403);
   const raw = await readJson(request);
   if (raw instanceof Response) return raw;
   const parsed = bodySchema.safeParse(raw);
   if (!parsed.success) return json({ error: "Validation failed", details: parsed.error.flatten() }, 400);
   const b = parsed.data;
 
+  const callId = callNoteCallId(b.transcript, b.lead_id != null ? `lead:${b.lead_id}` : `company:${b.company ?? ""}`);
   try {
-    const callId = `callnote:${transcriptHash(b.transcript).slice(0, 40)}`;
-    // Idempotency: the same transcript was already applied -> no model call, no second write.
+    // Idempotency: the same transcript for the same lead/company was already applied -> no model call, no second write.
     const prior = await db.interaction.findFirst({ where: { tenantId, callId }, select: { id: true, leadId: true } });
     if (prior && b.apply) return json({ ok: true, applied: true, existed: true, interaction_id: prior.id, lead_id: prior.leadId });
     if (b.lead_id != null) {
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
     const lead = await resolveCallNoteLead(tenantId, b.lead_id ?? null, b.company ?? proposed.company);
     if (!lead.ok) return json({ error: lead.error, proposed, candidates: lead.candidates }, lead.status);
 
-    const payload = toCallOutcomeInput(proposed, { transcript: b.transcript, ...(b.occurred_at ? { occurredAt: new Date(b.occurred_at) } : {}) });
+    const payload = toCallOutcomeInput(proposed, { transcript: b.transcript, callId, ...(b.occurred_at ? { occurredAt: new Date(b.occurred_at) } : {}) });
     if (!b.apply) return json({ ok: true, applied: false, lead_id: lead.leadId, proposed, payload });
 
     const res = await logLeadCallOutcome(lead.leadId, payload, auth.ctx);
@@ -91,7 +93,11 @@ export async function POST(request: Request) {
     return json({ ok: true, applied: true, lead_id: lead.leadId, interaction_id: res.interactionId, task_id: res.taskId }, 201);
   } catch (err) {
     // A concurrent duplicate trips the unique call_id inside the transaction: report it as the replay it is.
-    if ((err as { code?: string })?.code === "P2002") return json({ error: "Duplicate transcript (already applied)" }, 409);
+    if ((err as { code?: string })?.code === "P2002") {
+      const dup = await db.interaction.findFirst({ where: { tenantId, callId }, select: { id: true, leadId: true } }).catch(() => null);
+      if (dup) return json({ ok: true, applied: true, existed: true, interaction_id: dup.id, lead_id: dup.leadId });
+      return json({ error: "Duplicate transcript (already applied)" }, 409);
+    }
     reportError("api.assistant.callnote", err, { tenantId });
     return json({ error: "Internal error" }, 500);
   }

@@ -8,6 +8,7 @@ import {
   parseCallNote,
   toCallOutcomeInput,
   transcriptHash,
+  callNoteCallId,
 } from "./callnote";
 
 const sample = {
@@ -81,15 +82,20 @@ describe("hash and mapping", () => {
   };
   it.each(CALLNOTE_OUTCOMES)("maps %s into a valid call-outcome input", (outcome) => {
     const note = callNoteSchema.parse({ ...sample, outcome, ...variants[outcome] });
-    const input = toCallOutcomeInput(note, { transcript: t, occurredAt: new Date("2026-10-06T10:00:00Z") });
+    const input = toCallOutcomeInput(note, { transcript: t, callId: callNoteCallId(t, "lead:3"), occurredAt: new Date("2026-10-06T10:00:00Z") });
     expect(callOutcomeSchema.safeParse(input).success).toBe(true);
-    expect(input.callId).toBe(`callnote:${transcriptHash(t).slice(0, 40)}`);
+    expect(input.callId).toBe(callNoteCallId(t, "lead:3"));
     expect("callbackAt" in input).toBe(outcome === "callback_requested");
     expect("lostReason" in input).toBe(outcome === "not_interested" || outcome === "disqualified");
     expect(input.demoWith).toBe(outcome === "meeting_booked" ? "peter" : undefined);
   });
+  it("callNoteCallId depends on the target, trimmed and case-insensitive", () => {
+    expect(callNoteCallId(t, "lead:3")).not.toBe(callNoteCallId(t, "lead:4"));
+    expect(callNoteCallId(` ${t} `, "company:ACME")).toBe(callNoteCallId(t, "company:acme"));
+    expect(callNoteCallId(t, "lead:3")).toMatch(/^callnote:[0-9a-f]{40}$/);
+  });
   it("appends next step, objections and person to the note", () => {
-    const input = toCallOutcomeInput(callNoteSchema.parse(sample), { transcript: t });
+    const input = toCallOutcomeInput(callNoteSchema.parse(sample), { transcript: t, callId: "callnote:x" });
     expect(input.note).toContain("\nKövetkező lépés: Egyoldalas");
     expect(input.note).toContain("\nKifogások: A georadar technológiát nem ismerik.; Idén");
     expect(input.note).toContain("\nBeszélgetőpartner: Vaga");

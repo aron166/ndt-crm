@@ -17,6 +17,8 @@ export const ActionProposalSchema = z.discriminatedUnion("type", [
     verdict: z.enum(VERDICTS),
     comment: text(2000).optional(),
     reason: z.enum(REVIEW_REASONS).optional(),
+    /** Pinned by proposeAction (never by the model): the version the user saw when confirming. */
+    versionId: id.optional(),
   }).refine((d) => d.verdict === "approve" || (d.comment && d.comment.length >= 3 && d.reason), {
     message: "A javításhoz megjegyzés és ok kell",
   }),

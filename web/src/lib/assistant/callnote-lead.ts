@@ -17,11 +17,11 @@ export async function resolveCallNoteLead(tenantId: number, leadId: number | nul
   const name = company.trim();
   const select = { id: true, company: { select: { name: true } } } as const;
   const exact = name
-    ? await db.lead.findMany({ where: { tenantId, outcome: "open", company: { name: { equals: name, mode: "insensitive" } } }, select, take: 2 })
+    ? await db.lead.findMany({ where: { tenantId, outcome: "open", company: { name: { equals: name, mode: "insensitive" } } }, select, take: 10 })
     : [];
   if (exact.length === 1) return { ok: true, leadId: exact[0].id };
   const near = exact.length > 1
-    ? await db.lead.findMany({ where: { tenantId, outcome: "open", company: { name: { equals: name, mode: "insensitive" } } }, select, take: 10 })
+    ? exact
     : name
       ? await db.lead.findMany({ where: { tenantId, outcome: "open", company: { name: { contains: name, mode: "insensitive" } } }, select, take: 10 })
       : [];

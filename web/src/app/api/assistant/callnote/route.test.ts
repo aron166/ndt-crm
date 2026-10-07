@@ -52,6 +52,30 @@ beforeEach(() => {
 });
 
 describe("POST /api/assistant/callnote", () => {
+  it("403 for a non-allow-listed app slug, before body parsing", async () => {
+    mock(validateAppKey).mockResolvedValue({ keyId: 9, tenantId: 7, appSlug: "other" });
+    expect((await POST(req("{nope", true))).status).toBe(403);
+    expect(chatCompletion).not.toHaveBeenCalled();
+  });
+  it("400 on a 12001 char transcript", async () => {
+    expect((await POST(req({ transcript: "x".repeat(12_001) }))).status).toBe(400);
+  });
+  it("same transcript for two lead_ids gets different callIds and both apply", async () => {
+    const a = await POST(req({ transcript: T, lead_id: 3, apply: true }));
+    const b = await POST(req({ transcript: T, lead_id: 4, apply: true }));
+    expect([a.status, b.status]).toEqual([201, 201]);
+    const ids = mock(logLeadCallOutcome).mock.calls.map((c) => (c[1] as { callId: string }).callId);
+    expect(ids[0]).not.toBe(ids[1]);
+    expect(m.interaction.findFirst.mock.calls[0][0].where.callId).toBe(ids[0]);
+  });
+  it("P2002 race replays as 200 existed", async () => {
+    m.lead.findMany.mockResolvedValue([{ id: 3, company: { name: "Teszt Kft." } }]);
+    mock(logLeadCallOutcome).mockRejectedValue(Object.assign(new Error("dup"), { code: "P2002" }));
+    m.interaction.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 77, leadId: 3 });
+    const res = await POST(req({ transcript: T, apply: true }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, applied: true, existed: true, interaction_id: 77, lead_id: 3 });
+  });
   it("401 without a key", async () => {
     mock(validateAppKey).mockResolvedValue(null);
     expect((await POST(req({ transcript: T }))).status).toBe(401);

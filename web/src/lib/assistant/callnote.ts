@@ -124,6 +124,11 @@ export function transcriptHash(transcript: string): string {
   return createHash("sha256").update(transcript.trim()).digest("hex");
 }
 
+/** Idempotency key: the transcript AND the lead it targets, so one dictation may be applied to two leads. */
+export function callNoteCallId(transcript: string, target: string): string {
+  return `callnote:${createHash("sha256").update(`${transcript.trim()}|${target.trim().toLowerCase()}`).digest("hex").slice(0, 40)}`;
+}
+
 const bpFmt = new Intl.DateTimeFormat("en-US", {
   timeZone: "Europe/Budapest",
   hourCycle: "h23",
@@ -147,7 +152,7 @@ export function budapestLocalToUtc(local: string): Date {
 
 export function toCallOutcomeInput(
   n: CallNote,
-  opts: { transcript: string; occurredAt?: Date; demoWith?: "aron" | "peter" },
+  opts: { transcript: string; callId: string; occurredAt?: Date; demoWith?: "aron" | "peter" },
 ): Record<string, unknown> {
   const extra = [
     n.next_step && `Következő lépés: ${n.next_step}`,
@@ -160,7 +165,7 @@ export function toCallOutcomeInput(
   if (n.outcome === "meeting_booked") p.demoWith = opts.demoWith ?? "peter";
   if (n.technology_word) p.technologyWord = n.technology_word;
   p.transcript = opts.transcript;
-  p.callId = `callnote:${transcriptHash(opts.transcript).slice(0, 40)}`;
+  p.callId = opts.callId;
   if (opts.occurredAt) p.occurredAt = opts.occurredAt;
   return p;
 }

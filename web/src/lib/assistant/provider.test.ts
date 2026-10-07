@@ -62,7 +62,7 @@ describe("429 handling", () => {
     const r = await chatCompletion(cfg, [], { fetchImpl: f, sleep });
     expect(r.text).toBe("szia");
     expect(f).toHaveBeenCalledTimes(2);
-    expect(sleep).toHaveBeenCalledWith(4000);
+    expect(sleep).toHaveBeenCalledWith(10000);
   });
   it("two 429s give the Hungarian rate-limit error, no third try", async () => {
     const f = vi.fn().mockImplementation(async () => limited());
