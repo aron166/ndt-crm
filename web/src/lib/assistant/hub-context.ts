@@ -172,12 +172,14 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number } = {}
 
   const byId = new Map(items.map((i) => [i.id, i]));
   const decById = new Map(d.decisions.map((x) => [x.checkId, x]));
+  // Totals are server-computed, so only the oldest few are listed: 34 + 16 full lines were ~6000 chars,
+  // most of the 7000 budget, and ÖNRE VÁR is never dropped.
   const tight = budget < 3000;
-  const ownItems = (tight ? d.mine.itemIds.slice(0, 15) : d.mine.itemIds).flatMap((id) => {
+  const ownItems = d.mine.itemIds.slice(0, tight ? 5 : 10).flatMap((id) => {
     const i = byId.get(id);
     return i ? [`#${id} ${clean(i.title)} | ${i.stage} | jóváhagyásra vár: ${i.owedBy.length ? i.owedBy.map(clean).join(", ") : "senki"} | /marketing/${id}`] : [];
   });
-  const ownDecs = (tight ? d.mine.checkIds.slice(0, 5) : d.mine.checkIds).flatMap((id) => {
+  const ownDecs = d.mine.checkIds.slice(0, tight ? 3 : 5).flatMap((id) => {
     const x = decById.get(id);
     return x ? [`kérdés #${id} ${clean(x.question)} | kitől: ${WHO[x.forWhom]} | /marketing/decisions#${id}`] : [];
   });

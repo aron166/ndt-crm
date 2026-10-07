@@ -98,14 +98,14 @@ describe("renderHubContext", () => {
     const { t } = mineData(50);
     const lines = t.split("\n").filter((l) => /^#\d+ /.test(l));
     expect(lines.length).toBeGreaterThan(10);
-    for (const l of lines) expect(l).toMatch(/^#(\d+) (\| )?Cím \1 \|/);
+    for (const l of lines) expect(l).toMatch(/^#(\d+) (\| )?Cím \1( \||\s\[)/);
     for (const l of t.split("\n").filter((x) => x.startsWith("kérdés #"))) expect(l).toMatch(/^kérdés #(\d+) (\| )?Kérdés \1\b/);
   });
-  it("totals line survives budget 1500, own lines cut to 15 + 5", () => {
+  it("totals line survives budget 1500, own lines cut to 5 + 3", () => {
     const { t } = mineData(50, 1500);
     expect(t).toContain("ÖNRE VÁR: 34 anyag az Ön bírálatára vár; 16 nyitott döntés.");
     const own = t.split("\n").filter((l) => l.includes("| jóváhagyásra vár:") && l.includes("/marketing/") && !l.includes("| v"));
-    expect(own.length).toBeLessThanOrEqual(15);
+    expect(own.length).toBeLessThanOrEqual(5);
   });
 });
 
