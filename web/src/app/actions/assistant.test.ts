@@ -6,7 +6,7 @@ import { addChecks, createItem } from "@/lib/content/service";
 import { submitContentReview, setContentCheck } from "@/app/actions/content";
 import { loadPageData } from "@/lib/assistant/page-context";
 import {
-  openAssistant, askAssistant, draftTicket, fileTicket, addItemNote, whatsWaiting, proposeAction, executeAction,
+  openAssistant, getConversation, deleteConversation, fileTicket, addItemNote, whatsWaiting, executeAction,
 } from "./assistant";
 
 vi.mock("server-only", () => ({}));
@@ -20,6 +20,7 @@ vi.mock("@/lib/db", () => ({
     contentNote: { findMany: vi.fn(), create: vi.fn() },
     contentCheck: { findFirst: vi.fn(), create: vi.fn() },
     assistantCall: { create: vi.fn() },
+    assistantConversation: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -45,7 +46,6 @@ const mock = <T>(f: T) => f as unknown as ReturnType<typeof vi.fn>;
 type Dbm = Record<string, Record<string, ReturnType<typeof vi.fn>>>;
 const m = db as unknown as Dbm;
 
-const input = { pathname: "/marketing", itemId: null, messages: [{ role: "user" as const, content: "szia" }] };
 const draft = { title: "Hiba van", body: "Részletes leírás a hibáról", label: "bug" as const, repo: "ndt-crm" as const };
 
 beforeEach(() => {
@@ -57,13 +57,12 @@ describe("denial for a non CRM user", () => {
   it("every action returns NOT_A_CRM_USER and writes nothing", async () => {
     mock(getActor).mockResolvedValue({ userId: null, email: null });
     const results = await Promise.all([
-      openAssistant({ itemId: null }),
-      askAssistant(input),
-      draftTicket(input),
+      openAssistant({ itemId: null, conversationId: null }),
+      getConversation(1),
+      deleteConversation(1),
       fileTicket(draft),
       addItemNote({ itemId: 1, body: "x" }),
       whatsWaiting(),
-      proposeAction(input),
       executeAction({ type: "note", itemId: 1, body: "x" }),
     ]);
     for (const r of results) expect(r).toEqual({ error: "NOT_A_CRM_USER_MSG" });
@@ -149,20 +148,23 @@ describe("executeAction as a CRM user", () => {
   });
 });
 
-describe("proposeAction", () => {
-  it("fills versionId from the item's current version", async () => {
-    vi.stubEnv("ASSISTANT_API_KEY", "sk");
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ type: "review", itemId: 9, verdict: "approve", versionId: 1 }) } }] }), { status: 200 })));
-    const cap = await import("@/lib/assistant/cap");
-    mock(cap.capState).mockResolvedValue({ exceeded: false });
-    mock(getContentReviewers).mockResolvedValue([5]);
-    mock(loadPageData).mockResolvedValue({});
-    m.user.findFirst.mockResolvedValue({ role: "admin", name: "P" });
+describe("executeAction client-only and state", () => {
+  it("rejects open_item, navigate and waiting with BAD_INPUT and touches nothing", async () => {
+    for (const p of [{ type: "open_item", itemId: 1 }, { type: "navigate", path: "/marketing" }, { type: "waiting" }] as const) {
+      expect(await executeAction(p)).toEqual({ error: "Érvénytelen kérés." });
+    }
+    for (const t of Object.values(m)) if (typeof t === "object") for (const f of Object.values(t)) expect(f).not.toHaveBeenCalled();
+    expect(submitContentReview).not.toHaveBeenCalled();
+    expect(setContentCheck).not.toHaveBeenCalled();
+  });
+  it("review returns the item's status label as state after success", async () => {
+    m.contentVersion.findFirst.mockResolvedValue({ id: 4 });
+    m.contentItem.findFirst.mockResolvedValue({ status: "in_review" });
     m.assistantCall.create.mockResolvedValue({});
-    m.contentItem.findFirst.mockResolvedValue({ title: "Cím", currentVersionId: 8 });
-    const r = await proposeAction(input);
-    expect(r).toMatchObject({ ok: true, view: { proposal: { type: "review", versionId: 8 } } });
-    vi.unstubAllGlobals(); vi.unstubAllEnvs();
+    mock(submitContentReview).mockResolvedValue({ ok: true, wentLive: false });
+    const r = await executeAction({ type: "review", itemId: 9, versionId: 4, verdict: "approve" });
+    expect(r).toEqual({ ok: true, message: "Rögzítve.", href: "/marketing/9", state: "Bírálatra vár" });
+    expect(m.contentItem.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 9, tenantId: 1 } }));
   });
 });
 
