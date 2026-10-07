@@ -9,16 +9,20 @@ import { pathToFileURL } from "node:url";
 import { companyKey, normalizeVat, normalizeWebsite } from "../src/lib/import/normalize.ts";
 
 // ponytail: shared hosts that never identify a company; extend when the report shows more
-const SHARED_DOMAINS = new Set(["facebook.com", "gmail.com", "google.com", "linkedin.com", "freemail.hu", "sites.google.com"]);
+const SHARED_DOMAINS = new Set(["facebook.com", "gmail.com", "google.com", "linkedin.com", "freemail.hu", "blogspot.com", "wix.com"]);
 
 export function domainOf(website) {
   const w = normalizeWebsite(website);
   if (!w) return null;
   const host = new URL(w).hostname.replace(/^www\./, "");
-  return SHARED_DOMAINS.has(host) ? null : host;
+  return [...SHARED_DOMAINS].some((d) => host === d || host.endsWith("." + d)) ? null : host;
 }
 
-const linked = (r) => r.contacts + r.leads + r.deals + r.tasks;
+const LINKS = ["contacts", "leads", "deals", "tasks", "proposals", "quotes", "invoices", "interactions"];
+// commercial records a merge would have to move; two members owning any of these = split
+const COMMERCIAL = ["leads", "deals", "proposals", "quotes", "invoices"];
+const sum = (r, cols) => cols.reduce((s, k) => s + (r[k] || 0), 0);
+const linked = (r) => sum(r, LINKS);
 
 /** rows: {id,name,vat_number,website,created_at,contacts,leads,deals,tasks,...}. Returns {vat,key,domain} -> groups. */
 export function groupDuplicates(rows) {
@@ -44,9 +48,9 @@ export function groupDuplicates(rows) {
           method, key: k, members, survivor: members[0].id,
           linked: members.reduce((s, r) => s + linked(r), 0),
           // dangerous: a merge would move leads or deals from more than one member
-          split: members.filter((r) => r.leads + r.deals > 0).length > 1,
+          split: members.filter((r) => sum(r, COMMERCIAL) > 0).length > 1,
           // members carry different VAT cores: likely distinct legal entities, not duplicates
-          vatConflict: new Set(members.map((r) => normalizeVat(r.vat_number)).filter(Boolean)).size > 1,
+          vatConflict: method !== "vat" && new Set(members.map((r) => normalizeVat(r.vat_number)).filter(Boolean)).size > 1,
         };
       })
       .sort((a, b) => b.linked - a.linked || a.key.localeCompare(b.key));
@@ -59,7 +63,9 @@ export function renderReport(groups, tenant, date) {
   const ids = new Set(all.flatMap((g) => g.members.map((r) => r.id)));
   const L = [`# Duplicate companies, tenant ${tenant}, ${date}`, "",
     "Read-only report from `web/scripts/duplicate-companies.mjs`. Live companies only (soft-deleted excluded).",
-    "Survivor = most linked records (contacts + leads + deals + tasks), then oldest. Split = more than one member owns leads or deals.",
+    "Survivor = most linked records (active contacts, leads, deals, tasks, proposals, quotes, invoices, interactions), then oldest, then lowest id.",
+    "Split = more than one member owns leads, deals, proposals, quotes or invoices (a merge would move commercial records).",
+    "A company can appear under more than one method (for example same VAT and same name); merge it once.",
     "VAT CONFLICT = members carry different VAT cores, so they are likely distinct legal entities; verify before any merge.", "",
     "| Method | Groups | Split groups | VAT conflict groups |", "|---|---|---|---|"];
   for (const [m, gs] of Object.entries(groups)) L.push(`| ${m} | ${gs.length} | ${gs.filter((g) => g.split).length} | ${gs.filter((g) => g.vatConflict).length} |`);
@@ -69,9 +75,9 @@ export function renderReport(groups, tenant, date) {
     L.push(`## By ${m} (${gs.length})`, "");
     for (const g of gs) {
       L.push(`### ${esc(g.key)}${g.split ? " (SPLIT)" : ""}${g.vatConflict ? " (VAT CONFLICT)" : ""}, survivor ${g.survivor}, linked ${g.linked}`, "",
-        "| id | name | status | account_type | VAT | website | created | contacts | leads | deals | tasks | notes len |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|");
-      for (const r of g.members) L.push(`| ${r.id} | ${esc(r.name)} | ${esc(r.status)} | ${esc(r.account_type)} | ${esc(r.vat_number)} | ${esc(r.website)} | ${new Date(r.created_at).toISOString().slice(0, 10)} | ${r.contacts} | ${r.leads} | ${r.deals} | ${r.tasks} | ${r.notes_len} |`);
+        `| id | name | status | account_type | VAT | website | created | ${LINKS.join(" | ")} | notes len |`,
+        `|${"---|".repeat(8 + LINKS.length)}`);
+      for (const r of g.members) L.push(`| ${r.id} | ${esc(r.name)} | ${esc(r.status)} | ${esc(r.account_type)} | ${esc(r.vat_number)} | ${esc(r.website)} | ${new Date(r.created_at).toISOString().slice(0, 10)} | ${LINKS.map((k) => r[k] || 0).join(" | ")} | ${r.notes_len} |`);
       L.push("");
     }
   }
@@ -83,24 +89,28 @@ async function main() {
   const tenant = Number(args[args.indexOf("--tenant") + 1]);
   if (!args.includes("--tenant") || !Number.isInteger(tenant)) { console.error("--tenant <id> is required"); process.exit(1); }
   const outPath = args.includes("--out") ? args[args.indexOf("--out") + 1] : null;
+  if (args.includes("--out") && !outPath) { console.error("--out needs a path"); process.exit(1); }
+  const envFile = new URL("../.env.local", import.meta.url);
   const env = { ...process.env };
-  if (fs.existsSync(".env.local")) {
-    for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
+  if (fs.existsSync(envFile)) {
+    for (const l of fs.readFileSync(envFile, "utf8").split("\n")) {
       const i = l.indexOf("=");
       if (i > 0 && !l.startsWith("#")) env[l.slice(0, i).trim()] ??= l.slice(i + 1).trim().replace(/^"|"$/g, "");
     }
   }
   const { default: pg } = await import("pg");
   const url = (env.DIRECT_URL || env.DATABASE_URL || "").replace(/[?&]pgbouncer=true/, "");
+  if (!url) { console.error("DIRECT_URL or DATABASE_URL is required"); process.exit(1); }
   const c = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
   await c.connect();
   try {
     await c.query("BEGIN READ ONLY");
-    const cnt = (t) => `(SELECT count(*)::int FROM ${t} x WHERE x.tenant_id = c.tenant_id AND x.company_id = c.id)`;
+    const cnt = (t, extra = "") => `(SELECT count(*)::int FROM ${t} x WHERE x.tenant_id = c.tenant_id AND x.company_id = c.id${extra})`;
     const { rows } = await c.query(
       `SELECT c.id, c.name, c.status, c.account_type, c.vat_number, c.website, c.created_at,
               coalesce(length(c.notes), 0) notes_len,
-              ${cnt("contacts")} contacts, ${cnt("leads")} leads, ${cnt("deals")} deals, ${cnt("tasks")} tasks
+              ${cnt("contacts", " AND x.ended_at IS NULL")} contacts,
+              ${LINKS.slice(1).map((t) => `${cnt(t)} ${t}`).join(", ")}
          FROM companies c WHERE c.tenant_id = $1 AND c.deleted_at IS NULL`, [tenant]);
     await c.query("ROLLBACK");
     const md = renderReport(groupDuplicates(rows), tenant, new Date().toISOString().slice(0, 10)) +

@@ -27,12 +27,17 @@ describe("groupDuplicates", () => {
     expect(g.key[0].survivor).toBe(3);
     expect(g.key[0].vatConflict).toBe(false);
     expect(groupDuplicates([row(1, "A Kft", "11111111", null), row(2, "A Zrt", "22222222", null)]).key[0].vatConflict).toBe(true);
+    expect(g.key.some((x: { members: { id: number }[] }) => x.members.some((m) => m.id === 7 || m.id === 8))).toBe(false);
   });
   it("groups by website domain ignoring www and path", () => {
     expect(ids(g.domain)).toEqual([[5, 6]]);
+    expect(groupDuplicates([row(1, "A", null, "m.facebook.com/a"), row(2, "B", null, "facebook.com/b")]).domain).toEqual([]);
   });
   it("flags split groups where more than one member owns leads or deals", () => {
     const s = groupDuplicates([{ ...row(1, "A", null, null), leads: 1 }, { ...row(2, "A Kft", null, null), deals: 1 }]);
     expect(s.key[0].split).toBe(true);
+    const q = groupDuplicates([{ ...row(1, "A", null, null), invoices: 2 }, { ...row(2, "A Kft", null, null), leads: 1 }]);
+    expect(q.key[0].split).toBe(true);
+    expect(q.key[0].survivor).toBe(1);
   });
 });
