@@ -51,6 +51,8 @@ export const COMPANY_ATTR_DEFS: Record<CompanyAttrType, CompanyAttrTypeDef> = {
       { value: "Prospect", label: "Prospect" },
       { value: "Customer", label: "Ügyfél" },
       { value: "Vendor", label: "Szállító" },
+      { value: "Lead", label: "Lead" },
+      { value: "Competitor", label: "Versenytárs" }, // HU label: PROPOSAL
     ],
   },
   status: {

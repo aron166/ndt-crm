@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeStatus } from "@/lib/import/normalize";
 import { db } from "@/lib/db";
 import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
@@ -226,8 +227,8 @@ async function buildCompanyChanges(company: {
     if (registry) {
       factLines.push(`Registry: found=${registry.found}, dissolved=${registry.dissolved}, liquidation=${registry.liquidation}`);
 
-      if (registry.liquidation && company.status !== "F.A.") {
-        changes["status"] = { current: company.status ?? null, proposed: "F.A.", source: "registry", confidence: 0.92, status: "pending" };
+      if (registry.liquidation && company.status !== "fa") {
+        changes["status"] = { current: company.status ?? null, proposed: "fa", source: "registry", confidence: 0.92, status: "pending" };
       } else if (registry.dissolved && company.status !== "inactive") {
         changes["status"] = { current: company.status ?? null, proposed: "inactive", source: "registry", confidence: 0.9, status: "pending" };
       } else if (registry.found && !registry.dissolved && !registry.liquidation && company.status === "inactive") {
@@ -482,8 +483,18 @@ export async function applyProposal(proposalId: number, approvedFields: string[]
   const changes = proposal.changes as unknown as ChangesMap;
   const allFields = Object.keys(changes);
   const updateData: Record<string, unknown> = {};
-  for (const field of approvedFields) {
-    if (changes[field]) updateData[field] = changes[field].proposed;
+  approvedFields = [...approvedFields];
+  for (const field of [...approvedFields]) {
+    if (!changes[field]) continue;
+    let proposed: unknown = changes[field].proposed;
+    if (field === "status" && proposal.entityType === "company") {
+      proposed = normalizeStatus(String(proposed ?? ""));
+      if (!proposed) { // unknown or blank: not written, so recorded as rejected
+        approvedFields = approvedFields.filter((f) => f !== field);
+        continue;
+      }
+    }
+    updateData[field] = proposed;
   }
 
   if (Object.keys(updateData).length > 0) {

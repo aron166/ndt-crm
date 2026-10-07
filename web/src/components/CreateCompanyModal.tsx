@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createCompany } from "@/app/actions/companies";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { COMPANY_ATTR_DEFS } from "@/lib/companies/attributes";
 import { FormField } from "@/components/ui/FormField";
 
 interface Props {
@@ -59,17 +60,13 @@ export function CreateCompanyModal({ open, onClose }: Props) {
             </FormField>
             <FormField label="Státusz">
               <select name="status" className="input-ds">
-                <option value="active">Aktív</option>
-                <option value="inactive">Inaktív</option>
-                <option value="fa">F.A.</option>
+                {COMPANY_ATTR_DEFS.status.options!.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
               </select>
             </FormField>
             <FormField label="Partner kategória">
               <select name="accountType" className="input-ds">
                 <option value="">-</option>
-                <option value="Prospect">Prospect</option>
-                <option value="Customer">Ügyfél</option>
-                <option value="Vendor">Szállító</option>
+                {COMPANY_ATTR_DEFS.account_type.options!.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
               </select>
             </FormField>
             <FormField label="Város">

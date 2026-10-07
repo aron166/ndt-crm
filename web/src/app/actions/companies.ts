@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { geocode } from "@/lib/integrations/google_maps";
 import { audit } from "@/lib/audit";
+import { normalizeAccountType, normalizeStatus } from "@/lib/import/normalize";
 
 import { requireCrmUser } from "@/lib/actor";
 
@@ -28,6 +29,11 @@ export async function createCompany(data: {
 
   const vatNumber = data.vatNumber?.trim() || null;
 
+  const status = normalizeStatus(data.status);
+  if (status === undefined) return { error: `Ismeretlen státusz: ${data.status}` };
+  const accountType = normalizeAccountType(data.accountType);
+  if (accountType === undefined) return { error: `Ismeretlen partner kategória: ${data.accountType}` };
+
   if (vatNumber) {
     const existing = await db.company.findFirst({
       where: { tenantId: TENANT_ID, vatNumber, deletedAt: null },
@@ -41,8 +47,8 @@ export async function createCompany(data: {
       tenantId: TENANT_ID,
       name,
       vatNumber,
-      status:      data.status?.trim()      || "active",
-      accountType: data.accountType?.trim() || null,
+      status:      status ?? "active",
+      accountType,
       city:        data.city?.trim()        || null,
       county:      data.county?.trim()      || null,
       address:     data.address?.trim()     || null,
@@ -80,15 +86,25 @@ export async function updateCompany(
   });
   if (!company) return { error: "Cég nem található" };
 
-  const before = { name: company.name, status: company.status, city: company.city };
+  // An unchanged value passes through untouched, so a legacy non-canonical value
+  // never blocks an unrelated edit (the inline editor sends every field).
+  const status = data.status === undefined || data.status === company.status ? null : normalizeStatus(data.status);
+  if (status === undefined) return { error: `Ismeretlen státusz: ${data.status}` };
+  const accountType = data.accountType === undefined || data.accountType === company.accountType
+    ? undefined : normalizeAccountType(data.accountType);
+  if (accountType === undefined && data.accountType !== undefined && data.accountType !== company.accountType) {
+    return { error: `Ismeretlen partner kategória: ${data.accountType}` };
+  }
+
+  const before = { name: company.name, status: company.status, accountType: company.accountType, city: company.city };
 
   const updated = await db.company.update({
     where: { id },
     data: {
       name:           data.name?.trim()          ?? company.name,
       vatNumber:      data.vatNumber?.trim()      ?? company.vatNumber,
-      status:         data.status?.trim()         ?? company.status,
-      accountType:    data.accountType?.trim()    ?? company.accountType,
+      status:         status ?? company.status,
+      accountType:    accountType === undefined ? company.accountType : accountType,
       city:           data.city?.trim()           ?? company.city,
       county:         data.county?.trim()         ?? company.county,
       address:        data.address?.trim()        ?? company.address,
@@ -99,7 +115,7 @@ export async function updateCompany(
     },
   });
   await audit("company", id, "update", before, {
-    name: updated.name, status: updated.status, city: updated.city,
+    name: updated.name, status: updated.status, accountType: updated.accountType, city: updated.city,
   });
 
   revalidatePath("/companies");
