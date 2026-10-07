@@ -45,7 +45,7 @@ function matchCompany(
 ): number | undefined {
   if (vat) {
     const hit = idx.byVat.get(vat);
-    if (hit) return hit;
+    if (hit !== undefined) return hit;
   }
   return idx.byName.get(stripLegalSuffix(normalizeName(name)));
 }
@@ -76,12 +76,13 @@ export async function runCompanyImport(
     }
 
     const existing = matchCompany(idx, r.vatNumber, r.name);
-    if (existing) {
+    if (existing !== undefined) {
       res.matched++;
       pushSample(res, rowNum, "meglévő", r.name, "már létezik: kihagyva");
       continue;
     }
 
+    let newId = -1;
     if (!opts.dryRun) {
       const created = await db.company.create({
         data: {
@@ -97,13 +98,15 @@ export async function runCompanyImport(
         select: { id: true },
       });
       await audit("company", created.id, "create", null, { name: r.name, source: "import" }, { tenantId: opts.tenantId });
-      // dedupe within this same file
-      if (r.vatNumber) idx.byVat.set(r.vatNumber, created.id);
-      const key = stripLegalSuffix(normalizeName(r.name));
-      if (key && !idx.byName.has(key)) idx.byName.set(key, created.id);
+      newId = created.id;
     }
+    // dedupe within this same file, in dry run too (placeholder id -1) so the preview matches the real run
+    if (r.vatNumber) idx.byVat.set(r.vatNumber, newId);
+    const key = stripLegalSuffix(normalizeName(r.name));
+    if (key && !idx.byName.has(key)) idx.byName.set(key, newId);
     res.created++;
-    pushSample(res, rowNum, "új", r.name, opts.dryRun ? "új cég lesz" : "létrehozva");
+    const note = opts.dryRun ? "új cég lesz" : "létrehozva";
+    pushSample(res, rowNum, "új", r.name, built.warnings ? `${note}; ${built.warnings.join("; ")}` : note);
   }
   return res;
 }
@@ -163,6 +166,12 @@ export async function runPersonImport(
         res.companiesCreated++;
       } else if (!companyId && r.companyName && opts.dryRun) {
         res.companiesCreated++;
+        // Dry run mirrors the real run with a unique negative placeholder id, so
+        // in-file dedupe and the contact count match what the commit would do.
+        companyId = -rowNum;
+        if (r.companyVat) idx.byVat.set(r.companyVat, companyId);
+        const key = stripLegalSuffix(normalizeName(r.companyName));
+        if (key && !idx.byName.has(key)) idx.byName.set(key, companyId);
       }
     }
 
@@ -178,8 +187,10 @@ export async function runPersonImport(
         });
         await audit("person", p.id, "create", null, { name: label, source: "import" }, { tenantId: opts.tenantId });
         personId = p.id;
-        if (nameKey) personByName.set(nameKey, p.id);
+      } else {
+        personId = -rowNum; // dry-run placeholder, see company branch above
       }
+      if (nameKey) personByName.set(nameKey, personId);
       res.created++;
     } else {
       res.matched++;
