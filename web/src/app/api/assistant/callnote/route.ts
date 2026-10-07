@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return json({ error: "Validation failed", details: parsed.error.flatten() }, 400);
   const b = parsed.data;
 
-  const callId = callNoteCallId(b.transcript, b.lead_id != null ? `lead:${b.lead_id}` : `company:${b.company ?? ""}`);
+  let callId = callNoteCallId(b.transcript, b.lead_id != null ? `lead:${b.lead_id}` : `company:${b.company ?? ""}`);
   try {
     // Idempotency: the same transcript for the same lead/company was already applied -> no model call, no second write.
     const prior = await db.interaction.findFirst({ where: { tenantId, callId }, select: { id: true, leadId: true } });
@@ -83,7 +83,17 @@ export async function POST(request: Request) {
     const lead = await resolveCallNoteLead(tenantId, b.lead_id ?? null, b.company ?? proposed.company);
     if (!lead.ok) return json({ error: lead.error, proposed, candidates: lead.candidates }, lead.status);
 
+    // Resolved by company/transcript: key on the lead we landed on, so a retry with lead_id hits the pre-check.
+    if (b.lead_id == null) {
+      callId = callNoteCallId(b.transcript, `lead:${lead.leadId}`);
+      if (b.apply) {
+        const again = await db.interaction.findFirst({ where: { tenantId, callId }, select: { id: true, leadId: true } });
+        if (again) return json({ ok: true, applied: true, existed: true, interaction_id: again.id, lead_id: again.leadId });
+      }
+    }
+    const owner = await db.lead.findFirst({ where: { id: lead.leadId, tenantId }, select: { assignedToId: true } });
     const payload = toCallOutcomeInput(proposed, { transcript: b.transcript, callId, ...(b.occurred_at ? { occurredAt: new Date(b.occurred_at) } : {}) });
+    if (owner?.assignedToId != null) payload.assignedToId = owner.assignedToId;
     if (!b.apply) return json({ ok: true, applied: false, lead_id: lead.leadId, proposed, payload });
 
     const res = await logLeadCallOutcome(lead.leadId, payload, auth.ctx);

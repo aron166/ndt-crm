@@ -35,7 +35,7 @@ describe("usage and cap", () => {
   it("sums tokens, tenant scoped, since month start", async () => {
     agg(100, 50, 0.5, 3);
     expect(await monthUsage(1, new Date("2026-10-07T10:00:00Z"))).toEqual({ calls: 3, tokens: 150, costUsd: 0.5 });
-    expect(db.assistantCall.aggregate.mock.calls[0][0].where).toMatchObject({ tenantId: 1 });
+    expect(db.assistantCall.aggregate.mock.calls[0][0].where).toMatchObject({ tenantId: 1, purpose: { not: "execute" } });
   });
   it("exceeded exactly at the cap", async () => {
     db.tenant.findUnique.mockResolvedValue({ settings: { assistantMonthlyTokenCap: 150 } });

@@ -12,6 +12,8 @@ export type PageData = {
   now: Date;
   /** Queue capped or inbox has more pages. */
   truncated?: boolean;
+  /** getInbox `mine` ids (includes rule-bounced items); absent in tests. */
+  mineIds?: number[];
 };
 
 /** ~2K tokens: Groq free tier is 8K tokens per minute, shared with history and the reply. */
@@ -45,7 +47,7 @@ export function renderPageContext(input: PageData, opts: { budgetChars?: number 
   ];
 
   const own = input.items
-    .filter((i) => (i.status === "in_review" || i.status === "draft") && i.verdicts.some((v) => v.reviewerId === userId && v.verdict === null))
+    .filter((i) => input.mineIds ? input.mineIds.includes(i.id) : (i.status === "in_review" || i.status === "draft") && i.verdicts.some((v) => v.reviewerId === userId && v.verdict === null))
     .map((i) => `#${i.id} ${clean(i.title)}`);
   const ownBlock = `ÖNRE VÁR:\n${own.length ? own.join("\n") : "(semmi)"}`;
 
@@ -76,7 +78,7 @@ export function renderPageContext(input: PageData, opts: { budgetChars?: number 
   return text;
 }
 
-export async function loadPageData(tenantId: number, userId: number, now = new Date()): Promise<PageData & { truncated: boolean }> {
+export async function loadPageData(tenantId: number, userId: number, now = new Date()): Promise<PageData & { truncated: boolean; mineIds: number[] }> {
   const [inbox, queue] = await Promise.all([getInbox(tenantId, userId), getDecisionQueue(tenantId, now)]);
   const seen = new Set<number>();
   const items = [...inbox.mine, ...inbox.otherReviewer, ...inbox.aiWorking, ...inbox.changesRequested, ...inbox.live]
@@ -96,7 +98,7 @@ export async function loadPageData(tenantId: number, userId: number, now = new D
     if (typeof dl === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dl)) deadlines.set(m.id, dl);
   }
   return {
-    userId, items, now,
+    userId, items, now, mineIds: inbox.mine.map((r) => r.id),
     decisions: flat.map((d) => ({ ...d, deadline: deadlines.get(d.item.id) ?? null })),
     truncated: queue.truncated || inbox.hasMore,
   };

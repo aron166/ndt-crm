@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { db } from "@/lib/db";
 import { getActor } from "@/lib/actor";
 import { getContentReviewers } from "@/lib/content/reviewers";
-import { createItem } from "@/lib/content/service";
+import { addChecks, createItem } from "@/lib/content/service";
 import { submitContentReview, setContentCheck } from "@/app/actions/content";
 import { loadPageData } from "@/lib/assistant/page-context";
 import {
@@ -27,6 +27,7 @@ vi.mock("@/lib/content/reviewers", () => ({ getContentReviewers: vi.fn() }));
 vi.mock("@/lib/content/service", async () => ({
   ...(await vi.importActual<typeof import("@/lib/content/service")>("@/lib/content/service")),
   createItem: vi.fn(),
+  addChecks: vi.fn(),
 }));
 vi.mock("@/app/actions/content", () => ({ submitContentReview: vi.fn(), setContentCheck: vi.fn() }));
 vi.mock("@/lib/assistant/ticket", async () => ({
@@ -120,13 +121,31 @@ describe("executeAction as a CRM user", () => {
   it("create_decision creates the item and its check in one transaction", async () => {
     mock(getContentReviewers).mockResolvedValue([5]);
     m.assistantCall.create.mockResolvedValue({});
-    const tx = { contentCheck: { create: vi.fn() } };
+    const tx = {};
+    mock(addChecks).mockResolvedValue({ ok: true, created: 1 });
     mock(db.$transaction).mockImplementation(async (fn: (t: unknown) => unknown) => fn(tx));
     mock(createItem).mockResolvedValue({ ok: true, itemId: 12 });
     const r = await executeAction({ type: "create_decision", question: "Mehet?", context: "c", options: ["a"], decidedBy: "peter" });
     expect(r).toMatchObject({ ok: true, href: "/marketing/12" });
     expect(createItem).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx);
-    expect(tx.contentCheck.create).toHaveBeenCalledWith({ data: { tenantId: 1, itemId: 12, question: "Mehet?", forWhom: "peter", source: "decision" } });
+    expect(addChecks).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: 1, userId: 5 }), 12, [{ question: "Mehet?", forWhom: "peter", source: "decision" }], tx,
+    );
+  });
+  it("create_decision returns the error when addChecks fails (transaction rolls back)", async () => {
+    mock(getContentReviewers).mockResolvedValue([5]);
+    mock(db.$transaction).mockImplementation(async (fn: (t: unknown) => unknown) => fn({}));
+    mock(createItem).mockResolvedValue({ ok: true, itemId: 12 });
+    mock(addChecks).mockResolvedValue({ ok: false, error: "Nem található" });
+    const r = await executeAction({ type: "create_decision", question: "Mehet?", context: "c", options: ["a"], decidedBy: "peter" });
+    expect(r).toEqual({ error: "Nem található" });
+    expect(m.assistantCall.create).not.toHaveBeenCalled();
+  });
+  it("answer_decision on an already resolved question is NOT_FOUND and writes nothing", async () => {
+    m.contentCheck.findFirst.mockResolvedValue(null);
+    expect(await executeAction({ type: "answer_decision", checkId: 2, answer: "igen" })).toEqual({ error: "Nem található" });
+    expect(m.contentCheck.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ state: "open" }) }));
+    expect(setContentCheck).not.toHaveBeenCalled();
   });
 });
 
@@ -153,5 +172,13 @@ describe("whatsWaiting", () => {
     m.user.findFirst.mockResolvedValue({ name: "Valaki" });
     expect(await whatsWaiting()).toEqual({ ok: true, waiting: { items: [], decisions: [] } });
     expect(loadPageData).not.toHaveBeenCalled();
+  });
+  it("lists exactly the items in mineIds", async () => {
+    mock(getContentReviewers).mockResolvedValue([5]);
+    m.user.findFirst.mockResolvedValue({ name: "Péter" });
+    const row = (id: number) => ({ id, title: `T${id}`, status: "in_review", waitingSince: null, verdicts: [] });
+    mock(loadPageData).mockResolvedValue({ now: new Date(), items: [row(1), row(2)], decisions: [], mineIds: [2] });
+    const r = await whatsWaiting();
+    expect(r).toMatchObject({ ok: true, waiting: { items: [{ id: 2 }], decisions: [] } });
   });
 });

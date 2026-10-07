@@ -734,9 +734,10 @@ export interface CheckInput {
  * (the import is re-runnable). Returns how many were created.
  */
 export async function addChecks(
-  actor: ContentActor, itemId: number, checks: CheckInput[],
+  actor: ContentActor, itemId: number, checks: CheckInput[], tx?: Prisma.TransactionClient,
 ): Promise<{ ok: true; created: number } | Fail> {
-  const item = await db.contentItem.findFirst({ where: { id: itemId, tenantId: actor.tenantId }, select: { id: true } });
+  const q = tx ?? db;
+  const item = await q.contentItem.findFirst({ where: { id: itemId, tenantId: actor.tenantId }, select: { id: true } });
   if (!item) return fail(404, "Nem található");
   const clean = checks
     .map((c) => ({
@@ -746,13 +747,14 @@ export async function addChecks(
     }))
     .filter((c) => c.question.length > 0);
   if (clean.length === 0) return { ok: true, created: 0 };
-  const res = await db.contentCheck.createMany({
+  const res = await q.contentCheck.createMany({
     data: clean.map((c) => ({ tenantId: actor.tenantId, itemId, ...c })),
     skipDuplicates: true,
   });
   if (res.count > 0) {
-    await db.$transaction((tx) =>
-      writeAudit(tx, actor, "content_item", itemId, "create", null, { checksCreated: res.count }));
+    const audit = (t: Prisma.TransactionClient) =>
+      writeAudit(t, actor, "content_item", itemId, "create", null, { checksCreated: res.count });
+    await (tx ? audit(tx) : db.$transaction(audit));
   }
   return { ok: true, created: res.count };
 }

@@ -11,7 +11,7 @@ export type ItemContext = {
   purpose: string | null;
   status: string;
   body: string;
-  checks: { question: string; state: string; answer: string | null }[];
+  checks: { id: number; question: string; state: string; answer: string | null }[];
 };
 
 const BODY_MAX = 6000;
@@ -24,7 +24,7 @@ export async function loadItemContext(tenantId: number, itemId: number): Promise
     select: {
       id: true, title: true, category: true, purpose: true, status: true, body: true,
       currentVersion: { select: { body: true } },
-      checks: { orderBy: { id: "asc" }, take: CHECKS_MAX, select: { question: true, state: true, answer: true } },
+      checks: { orderBy: { id: "asc" }, take: CHECKS_MAX, select: { id: true, question: true, state: true, answer: true } },
     },
   });
   if (!item) return null;
@@ -77,10 +77,10 @@ export function buildSystemPrompt(input: { pathname: string; item: ItemContext |
   if (input.item) {
     const i = input.item;
     const checks = i.checks.length
-      ? i.checks.map((c) => `- [${c.state}] ${clean(c.question)}${c.answer ? ` => ${clean(c.answer)}` : ""}`).join("\n")
+      ? i.checks.map((c) => `- kérdés #${c.id} [${c.state}] ${clean(c.question)}${c.answer ? ` => ${clean(c.answer)}` : ""}`).join("\n")
       : "(nincs)";
     parts.push(
-      `<item>\nCím: ${clean(i.title)}\nKategória: ${CATEGORY_LABEL[i.category as ContentCategory] ?? i.category}\nCél: ${i.purpose ? clean(i.purpose) : "(nincs megadva)"}\nÁllapot: ${STATUS_LABELS[i.status as ContentStatus] ?? i.status}\nTisztázandó kérdések:\n${checks}\nSzöveg:\n${clean(i.body)}\n</item>`,
+      `<item>\nAzonosító: #${i.id}\nCím: ${clean(i.title)}\nKategória: ${CATEGORY_LABEL[i.category as ContentCategory] ?? i.category}\nCél: ${i.purpose ? clean(i.purpose) : "(nincs megadva)"}\nÁllapot: ${STATUS_LABELS[i.status as ContentStatus] ?? i.status}\nTisztázandó kérdések:\n${checks}\nSzöveg:\n${clean(i.body)}\n</item>`,
     );
   }
   return parts.join("\n\n");

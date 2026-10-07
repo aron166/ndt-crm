@@ -8,7 +8,7 @@ import { AssistantError, RATE_LIMITED, assistantConfig, chatCompletion, estimate
 import { loadPageData, renderPageContext } from "@/lib/assistant/page-context";
 import { ACTION_INSTRUCTION, ActionProposalSchema, decisionBody, describeProposal, parseActionProposal, type ActionProposal } from "@/lib/assistant/actions";
 import { submitContentReview, setContentCheck } from "@/app/actions/content";
-import { createItem } from "@/lib/content/service";
+import { addChecks, createItem } from "@/lib/content/service";
 import { revalidatePath } from "next/cache";
 import { CAP_EXCEEDED, capState } from "@/lib/assistant/cap";
 import { buildSystemPrompt, loadItemContext, pageKind } from "@/lib/assistant/context";
@@ -76,7 +76,7 @@ async function run(userId: number, input: AssistantInput, purpose: Purpose): Pro
     capState(TENANT_ID),
     db.user.findFirst({ where: { id: userId, tenantId: TENANT_ID }, select: { role: true, name: true } }),
     getContentReviewers(TENANT_ID),
-    withPage ? loadPageData(TENANT_ID, userId).then((d) => renderPageContext(d)) : Promise.resolve(null),
+    withPage ? loadPageData(TENANT_ID, userId).then((d) => renderPageContext(d, input.itemId !== null ? { budgetChars: 3000 } : {})) : Promise.resolve(null),
   ]);
   if (input.itemId !== null && !item) return { error: NOT_FOUND };
   if (cap.exceeded) return { error: CAP_EXCEEDED };
@@ -190,7 +190,7 @@ export async function whatsWaiting(): Promise<{ ok: true; waiting: WaitingView }
     ok: true,
     waiting: {
       items: d.items
-        .filter((i) => (i.status === "in_review" || i.status === "draft") && i.verdicts.some((v) => v.reviewerId === userId && v.verdict === null))
+        .filter((i) => (d.mineIds ?? []).includes(i.id))
         .map((i) => ({
           id: i.id, title: i.title, href: `/marketing/${i.id}`,
           days: i.waitingSince ? Math.floor((now - Date.parse(i.waitingSince)) / 86_400_000) : null,
@@ -262,7 +262,7 @@ export async function executeAction(raw: ActionProposal): Promise<{ ok: true; me
     return { ok: true, message: r.wentLive ? "Rögzítve, az anyag élesbe került." : "Rögzítve.", href: `/marketing/${p.itemId}` };
   }
   if (p.type === "answer_decision") {
-    const c = await db.contentCheck.findFirst({ where: { id: p.checkId, tenantId: TENANT_ID }, select: { itemId: true } });
+    const c = await db.contentCheck.findFirst({ where: { id: p.checkId, tenantId: TENANT_ID, state: "open" }, select: { itemId: true } });
     if (!c) return { error: NOT_FOUND };
     const r = await setContentCheck({ checkId: p.checkId, state: "resolved", text: p.answer });
     if (!r.ok) return { error: r.error };
@@ -279,9 +279,10 @@ export async function executeAction(raw: ActionProposal): Promise<{ ok: true; me
         source: "assistant", ...(p.deadline ? { sourceMeta: { deadline: p.deadline } } : {}),
       }, tx);
       if (!c.ok) return c;
-      await tx.contentCheck.create({ data: { tenantId: TENANT_ID, itemId: c.itemId, question: p.question, forWhom: p.decidedBy, source: "decision" } });
+      const k = await addChecks(actor, c.itemId, [{ question: p.question, forWhom: p.decidedBy, source: "decision" }], tx);
+      if (!k.ok) throw new Error(k.error);
       return c;
-    });
+    }).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : "Hiba" }));
     if (!created.ok) return { error: created.error };
     await logExecuted(userId, "create_decision", created.itemId);
     revalidatePath("/marketing");

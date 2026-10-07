@@ -76,6 +76,31 @@ describe("POST /api/assistant/callnote", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, applied: true, existed: true, interaction_id: 77, lead_id: 3 });
   });
+  it("applied without lead_id, then retried with the resolved lead_id: existed, no model call", async () => {
+    m.lead.findMany.mockResolvedValue([{ id: 3, company: { name: "Teszt Kft." } }]);
+    const first = await POST(req({ transcript: T, apply: true }));
+    expect(first.status).toBe(201);
+    const x = (mock(logLeadCallOutcome).mock.calls[0][1] as { callId: string }).callId;
+    expect(chatCompletion).toHaveBeenCalledTimes(1);
+    m.interaction.findFirst.mockImplementation(async ({ where }: { where: { callId: string } }) => (where.callId === x ? { id: 11, leadId: 3 } : null));
+    const retry = await POST(req({ transcript: T, lead_id: 3, apply: true }));
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toMatchObject({ existed: true, interaction_id: 11, lead_id: 3 });
+    expect(chatCompletion).toHaveBeenCalledTimes(1);
+  });
+  it("post-resolution replay (same company transcript again) returns existed after the model call", async () => {
+    m.lead.findMany.mockResolvedValue([{ id: 3, company: { name: "Teszt Kft." } }]);
+    m.interaction.findFirst.mockImplementation(async ({ where }: { where: { callId: string } }) => (where.callId.startsWith("callnote:") && where.callId !== (m.interaction.findFirst.mock.calls[0][0].where.callId) ? { id: 11, leadId: 3 } : null));
+    const res = await POST(req({ transcript: T, apply: true }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ existed: true, interaction_id: 11, lead_id: 3 });
+    expect(logLeadCallOutcome).not.toHaveBeenCalled();
+  });
+  it("payload carries the lead's assignedToId", async () => {
+    m.lead.findFirst.mockResolvedValue({ id: 3, assignedToId: 8 });
+    await POST(req({ transcript: T, lead_id: 3, apply: true }));
+    expect(logLeadCallOutcome).toHaveBeenCalledWith(3, expect.objectContaining({ assignedToId: 8 }), expect.anything());
+  });
   it("401 without a key", async () => {
     mock(validateAppKey).mockResolvedValue(null);
     expect((await POST(req({ transcript: T }))).status).toBe(401);

@@ -120,10 +120,6 @@ export function parseCallNote(text: string): { ok: true; note: CallNote } | { ok
   return r.success ? { ok: true, note: r.data } : { ok: false, error: "model output failed validation", issues: r.error.issues };
 }
 
-export function transcriptHash(transcript: string): string {
-  return createHash("sha256").update(transcript.trim()).digest("hex");
-}
-
 /** Idempotency key: the transcript AND the lead it targets, so one dictation may be applied to two leads. */
 export function callNoteCallId(transcript: string, target: string): string {
   return `callnote:${createHash("sha256").update(`${transcript.trim()}|${target.trim().toLowerCase()}`).digest("hex").slice(0, 40)}`;
