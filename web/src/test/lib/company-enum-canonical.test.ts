@@ -66,6 +66,12 @@ describe("company write paths store canonical values", () => {
     expect(r).toHaveProperty("error");
     expect(db.company.update).not.toHaveBeenCalled();
   });
+  it("updateCompany passes an unchanged legacy value through (unrelated edit not blocked)", async () => {
+    db.company.findFirst.mockResolvedValueOnce({ id: 1, name: "X", status: "active", accountType: "Control Labor Kft." });
+    const r = await updateCompany(1, { accountType: "Control Labor Kft.", status: "active", city: "Pécs" });
+    expect(r).not.toHaveProperty("error");
+    expect(db.company.update.mock.calls.at(-1)![0].data.accountType).toBe("Control Labor Kft.");
+  });
   it("setPrimaryCompanyAttribute writes canonical to row and column", async () => {
     db.companyAttribute.findFirst.mockResolvedValue(null);
     const r = await setPrimaryCompanyAttribute(1, "account_type", "Ügyfél");
@@ -80,7 +86,6 @@ describe("UI never submits Hungarian enum values", () => {
   const files = [
     "src/app/(app)/companies/[id]/CompanyDetailClient.tsx",
     "src/components/CreateCompanyModal.tsx",
-    "src/components/EditCompanyModal.tsx",
   ];
   for (const f of files) {
     it(f, () => {

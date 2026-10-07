@@ -1,6 +1,7 @@
 // One-off, idempotent backfill: rewrites company enum values stored under a
 // Hungarian label (or the legacy "F.A.") to the canonical value, in companies
-// and in the current company_attributes rows. Tenant-scoped, one audit_log row
+// (trim + case insensitive) and in the CURRENT company_attributes rows (history
+// rows stay as recorded, decision #13). Tenant-scoped, one audit_log row
 // per changed company (actor_agent_id "backfill-company-enums").
 // Dry run by default. Usage (from web/):
 //   node scripts/backfill-company-enums.mjs --tenant 1 [--apply]
@@ -37,16 +38,16 @@ try {
   for (const [col, map] of Object.entries(MAP)) {
     for (const [from, to] of Object.entries(map)) {
       const rows = (await c.query(
-        `SELECT id FROM companies WHERE tenant_id = $1 AND ${col} = $2`, [tenant, from])).rows;
+        `SELECT id FROM companies WHERE tenant_id = $1 AND lower(btrim(${col})) = lower($2)`, [tenant, from])).rows;
       const attrs = (await c.query(
-        `SELECT count(*)::int n FROM company_attributes WHERE tenant_id = $1 AND attr_type = $2 AND value = $3`,
+        `SELECT count(*)::int n FROM company_attributes WHERE tenant_id = $1 AND attr_type = $2 AND lower(btrim(value)) = lower($3) AND valid_to IS NULL`,
         [tenant, col, from])).rows[0].n;
       if (!rows.length && !attrs) continue;
       console.log(`${col}: "${from}" -> "${to}": ${rows.length} companies, ${attrs} attribute rows`);
       total += rows.length + attrs;
       if (!apply) continue;
-      await c.query(`UPDATE companies SET ${col} = $3 WHERE tenant_id = $1 AND ${col} = $2`, [tenant, from, to]);
-      await c.query(`UPDATE company_attributes SET value = $4 WHERE tenant_id = $1 AND attr_type = $2 AND value = $3`,
+      await c.query(`UPDATE companies SET ${col} = $3 WHERE tenant_id = $1 AND lower(btrim(${col})) = lower($2)`, [tenant, from, to]);
+      await c.query(`UPDATE company_attributes SET value = $4 WHERE tenant_id = $1 AND attr_type = $2 AND lower(btrim(value)) = lower($3) AND valid_to IS NULL`,
         [tenant, col, from, to]);
       for (const { id } of rows) {
         await c.query(

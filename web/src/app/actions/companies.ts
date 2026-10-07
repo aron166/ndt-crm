@@ -86,14 +86,17 @@ export async function updateCompany(
   });
   if (!company) return { error: "Cég nem található" };
 
-  const status = data.status === undefined ? null : normalizeStatus(data.status);
+  // An unchanged value passes through untouched, so a legacy non-canonical value
+  // never blocks an unrelated edit (the inline editor sends every field).
+  const status = data.status === undefined || data.status === company.status ? null : normalizeStatus(data.status);
   if (status === undefined) return { error: `Ismeretlen státusz: ${data.status}` };
-  const accountType = data.accountType === undefined ? undefined : normalizeAccountType(data.accountType);
-  if (accountType === undefined && data.accountType !== undefined) {
+  const accountType = data.accountType === undefined || data.accountType === company.accountType
+    ? undefined : normalizeAccountType(data.accountType);
+  if (accountType === undefined && data.accountType !== undefined && data.accountType !== company.accountType) {
     return { error: `Ismeretlen partner kategória: ${data.accountType}` };
   }
 
-  const before = { name: company.name, status: company.status, city: company.city };
+  const before = { name: company.name, status: company.status, accountType: company.accountType, city: company.city };
 
   const updated = await db.company.update({
     where: { id },
@@ -112,7 +115,7 @@ export async function updateCompany(
     },
   });
   await audit("company", id, "update", before, {
-    name: updated.name, status: updated.status, city: updated.city,
+    name: updated.name, status: updated.status, accountType: updated.accountType, city: updated.city,
   });
 
   revalidatePath("/companies");

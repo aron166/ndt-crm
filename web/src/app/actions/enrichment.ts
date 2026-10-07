@@ -483,12 +483,16 @@ export async function applyProposal(proposalId: number, approvedFields: string[]
   const changes = proposal.changes as unknown as ChangesMap;
   const allFields = Object.keys(changes);
   const updateData: Record<string, unknown> = {};
-  for (const field of approvedFields) {
+  approvedFields = [...approvedFields];
+  for (const field of [...approvedFields]) {
     if (!changes[field]) continue;
     let proposed: unknown = changes[field].proposed;
     if (field === "status" && proposal.entityType === "company") {
       proposed = normalizeStatus(String(proposed ?? ""));
-      if (!proposed) continue; // unknown or blank: skip this field
+      if (!proposed) { // unknown or blank: not written, so recorded as rejected
+        approvedFields = approvedFields.filter((f) => f !== field);
+        continue;
+      }
     }
     updateData[field] = proposed;
   }
