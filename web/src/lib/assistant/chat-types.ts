@@ -20,6 +20,7 @@ export type ChatRequest = { conversationId: number | null; pathname: string; ite
  *   start  { conversationId }               conversation row exists (new or existing)
  *   status { text }                         e.g. "Megnyitom: #12" while the read tool runs
  *   delta  { text }                         next piece of the answer text
+ *   reset  {}                               drop the streamed text so far (strict fallback restarted it)
  *   done   { answer, actions: ActionCard[] } final, validated; the turn is persisted
  *   error  { message }                      Hungarian, user-facing; the stream ends
  */
@@ -27,6 +28,7 @@ export type ChatEvent =
   | { type: "start"; conversationId: number }
   | { type: "status"; text: string }
   | { type: "delta"; text: string }
+  | { type: "reset" }
   | { type: "done"; answer: string; actions: ActionCard[] }
   | { type: "error"; message: string };
 

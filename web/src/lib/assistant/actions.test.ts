@@ -87,7 +87,7 @@ describe("MODEL_RESPONSE_SCHEMA", () => {
     const it = s.properties.actions.items;
     expect(it.additionalProperties).toBe(false);
     expect(it.required).toEqual(Object.keys(it.properties));
-    expect(it.properties.verdict.enum).toContain(null);
+    expect(it.properties.verdict.anyOf).toContainEqual({ type: "null" });
   });
 });
 

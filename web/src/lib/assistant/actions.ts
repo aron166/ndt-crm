@@ -97,8 +97,9 @@ export function decisionBody(p: Extract<ActionProposal, { type: "create_decision
   ].join("\n\n");
 }
 
-const nullable = (t: string, extra: Record<string, unknown> = {}) => ({ type: [t, "null"], ...extra });
-const nullEnum = (vals: readonly string[]) => ({ type: ["string", "null"], enum: [...vals, null] });
+// Nullable as anyOf with null: Groq strict mode documents union types, not type arrays.
+const nullable = (t: string, extra: Record<string, unknown> = {}) => ({ anyOf: [{ type: t, ...extra }, { type: "null" }] });
+const nullEnum = (vals: readonly string[]) => ({ anyOf: [{ type: "string", enum: [...vals] }, { type: "null" }] });
 const FLAT_PROPS = {
   type: { type: "string", enum: ["open_item", "navigate", "waiting", "review", "answer_decision", "create_decision", "note", "ticket"] },
   item_id: nullable("integer"),
@@ -110,7 +111,7 @@ const FLAT_PROPS = {
   text: nullable("string"),
   title: nullable("string"),
   context: nullable("string"),
-  options: { type: ["array", "null"], items: { type: "string" } },
+  options: nullable("array", { items: { type: "string" } }),
   recommendation: nullable("string"),
   deadline: nullable("string"),
   decided_by: nullEnum(CHECK_FOR),

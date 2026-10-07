@@ -137,11 +137,14 @@ export async function POST(request: Request) {
           let wantRead: number[] | null = null;
           const r = await chatCompletionStream(cfg, messages, {
             schema, maxTokens: 1800,
+            accept: (t) => parseModelResponse(t) !== null || (completeIntArrayField(t, "read_item_ids")?.length ?? 0) > 0,
             onText: (soFar) => {
               const ids = completeIntArrayField(soFar, "read_item_ids");
               const answer = partialStringField(soFar, "answer") ?? "";
               // Read requested before any answer text: stop this call and fetch the items.
               if (hop === 0 && ids && ids.length > 0 && answer === "") { wantRead = ids; return "stop"; }
+              // The strict fallback may restart the text: tell the panel to drop what it showed.
+              if (!answer.startsWith(emitted)) { send({ type: "reset" }); emitted = ""; }
               if (answer.length > emitted.length) { send({ type: "delta", text: answer.slice(emitted.length) }); emitted = answer; }
             },
           });

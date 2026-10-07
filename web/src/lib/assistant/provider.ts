@@ -105,14 +105,17 @@ export async function chatCompletionStream(
     fetchImpl?: typeof fetch;
     sleep?: (ms: number) => Promise<void>;
     onText: (soFar: string) => void | "stop";
+    /** Checks the finished streamed text; false triggers the strict one-shot fallback. */
+    accept?: (text: string) => boolean;
   },
 ): Promise<{ text: string; promptTokens: number; completionTokens: number; stopped: boolean; streamed: boolean }> {
   const f = opts.fetchImpl ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const ctrl = new AbortController();
-  const responseFormat = opts.schema
-    ? { response_format: { type: "json_schema", json_schema: { name: opts.schema.name, schema: opts.schema.schema, strict: true } } }
-    : {};
+  // Groq: "Streaming and tool use are not currently supported with Structured Outputs"
+  // (console.groq.com/docs/structured-outputs, 2026-10-07). So the stream carries no
+  // response_format (the prompt asks for the JSON shape) and the strict schema is the
+  // fallback: a one-shot call when the streamed text fails `accept` or the stream is refused.
   const reasoning = cfg.model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {};
   const send = () => f(`${cfg.baseUrl}/chat/completions`, {
     method: "POST",
@@ -125,7 +128,6 @@ export async function chatCompletionStream(
       stream: true,
       stream_options: { include_usage: true },
       ...reasoning,
-      ...responseFormat,
     }),
     signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(60_000)]),
   });
@@ -142,8 +144,7 @@ export async function chatCompletionStream(
     throw new AssistantError("Assistant request failed (network or timeout)");
   }
   if (res.status === 429) throw new AssistantError(RATE_LIMITED, 429);
-  if (res.status >= 400 && res.status < 500) {
-    // Some providers reject stream + json_schema: fall back to one-shot and fake the stream.
+  const oneShot = async (spent: { promptTokens: number; completionTokens: number }) => {
     const r = await chatCompletion(cfg, messages, { schema: opts.schema, maxTokens: opts.maxTokens, fetchImpl: f, sleep });
     let stopped = false;
     for (let n = 24; !stopped; n += 24) {
@@ -151,8 +152,9 @@ export async function chatCompletionStream(
       if (n >= r.text.length) break;
       await sleep(12);
     }
-    return { ...r, stopped, streamed: false };
-  }
+    return { ...r, promptTokens: r.promptTokens + spent.promptTokens, completionTokens: r.completionTokens + spent.completionTokens, stopped, streamed: false };
+  };
+  if (res.status >= 400 && res.status < 500) return oneShot({ promptTokens: 0, completionTokens: 0 });
   if (!res.ok || !res.body) throw new AssistantError(`Assistant HTTP ${res.status}: ${scrub(await res.text().catch(() => ""))}`, res.status);
 
   let text = "";
@@ -195,6 +197,7 @@ export async function chatCompletionStream(
   const est = (chars: number) => Math.ceil(chars / 3);
   const promptTokens = usage?.prompt_tokens ?? est(messages.reduce((n, m) => n + m.content.length, 0));
   const completionTokens = usage?.completion_tokens ?? est(text.length);
+  if (!stopped && opts.schema && opts.accept && !opts.accept(text)) return oneShot({ promptTokens, completionTokens });
   if (!text) throw new AssistantError("Assistant returned no content", res.status, { promptTokens, completionTokens });
   return { text, promptTokens, completionTokens, stopped, streamed: true };
 }

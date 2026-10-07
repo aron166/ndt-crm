@@ -342,6 +342,7 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
           setConv(ev.conversationId);
           setRecent((r) => r.some((c) => c.id === ev.conversationId) ? r : [{ id: ev.conversationId, title: message.slice(0, 60), updatedAt: new Date().toISOString() }, ...r]);
         } else if (ev.type === "status") patchLast((m) => ({ ...m, status: ev.text }));
+        else if (ev.type === "reset") patchLast((m) => ({ ...m, deltas: [] }));
         else if (ev.type === "delta") patchLast((m) => ({ ...m, status: undefined, deltas: [...(m.deltas ?? []), ev.text] }));
         else if (ev.type === "done") {
           finished = true;

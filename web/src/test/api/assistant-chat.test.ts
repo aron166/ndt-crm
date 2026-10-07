@@ -185,12 +185,25 @@ describe("read hop", () => {
 });
 
 describe("failures", () => {
-  it("an unparseable model body gives an error event and persists nothing", async () => {
-    fetchMock.mockImplementation(async () => sse("ez nem json"));
+  it("an unparseable stream falls back to one strict call; both bad gives an error and persists nothing", async () => {
+    fetchMock.mockImplementationOnce(async () => sse("ez nem json"))
+      .mockImplementationOnce(async () => Response.json({ choices: [{ message: { content: "ez sem json" } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }));
     const ev = await events(await POST(req(ok)));
-    expect(ev[ev.length - 1]).toMatchObject({ type: "error", message: "Nem sikerült választ adni. Kérem, fogalmazza meg másképp." });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).response_format.type).toBe("json_schema");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).response_format).toBeUndefined();
+    expect(ev[ev.length - 1].type).toBe("error");
     expect(ev.some((e) => e.type === "done")).toBe(false);
     expect(db.assistantConversation.updateMany).not.toHaveBeenCalled();
+  });
+  it("strict fallback answer resets the streamed text and finishes", async () => {
+    fetchMock.mockImplementationOnce(async () => sse('{"read_item_ids":[],"answer":"Rossz'))
+      .mockImplementationOnce(async () => Response.json({ choices: [{ message: { content: JSON.stringify({ read_item_ids: [], answer: "Jó válasz.", actions: [] }) } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }));
+    const ev = await events(await POST(req(ok)));
+    expect(ev.some((e) => e.type === "reset")).toBe(true);
+    const afterReset = ev.slice(ev.findIndex((e) => e.type === "reset") + 1).filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("");
+    expect(afterReset).toBe("Jó válasz.");
+    expect(ev[ev.length - 1]).toMatchObject({ type: "done", answer: "Jó válasz." });
   });
   it("provider 429 twice gives the rate-limit copy", async () => {
     const sleepless = () => new Response("{}", { status: 429, headers: { "retry-after": "0" } });
