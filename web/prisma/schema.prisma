@@ -48,6 +48,8 @@ model Tenant {
   automationEmailSends   AutomationEmailSend[]
   suppressions           Suppression[]
   patchTestMarks         PatchTestMark[]
+  assistantCalls         AssistantCall[]
+  contentNotes           ContentNote[]
   campaigns              Campaign[]
   contentItems           ContentItem[]
   emailDrafts            EmailDraft[]
@@ -287,6 +289,8 @@ model User {
   contentReviews     ContentReview[]
   resolvedChecks     ContentCheck[]
   patchTestMarks     PatchTestMark[]
+  assistantCalls     AssistantCall[]
+  contentNotes       ContentNote[]
 
   @@map("users")
 }
@@ -1176,6 +1180,7 @@ model ContentItem {
   assets         ContentAsset[]
   versions       ContentVersion[] @relation("ItemVersions")
   checks         ContentCheck[]
+  notes          ContentNote[]
   currentVersion ContentVersion?  @relation("ItemCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   liveVersion    ContentVersion?  @relation("ItemLiveVersion", fields: [liveVersionId], references: [id], onDelete: SetNull)
 
@@ -1438,4 +1443,44 @@ model PatchTestMark {
 
   @@unique([tenantId, userId, repo, prNumber, stepIndex], map: "patch_test_marks_user_step_key")
   @@map("patch_test_marks")
+}
+
+// In-app assistant (ADR/019): one row per model call. The monthly token cap
+// sums these rows; /reports/weekly shows the month's total. Append-only.
+model AssistantCall {
+  id               Int      @id @default(autoincrement())
+  tenantId         Int      @map("tenant_id")
+  userId           Int      @map("user_id")
+  page             String // the pathname the panel was opened on
+  purpose          String // explain | ticket
+  itemId           Int?     @map("item_id") // content item in view, no FK: the log outlives the item
+  model            String
+  promptTokens     Int      @map("prompt_tokens")
+  completionTokens Int      @map("completion_tokens")
+  costUsd          Decimal  @map("cost_usd") @db.Decimal(10, 6)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("assistant_calls")
+}
+
+// A free-text note on a content item (assistant panel, ADR/019). Append-only,
+// like interactions: never updated, never deleted except with the item.
+model ContentNote {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  itemId    Int      @map("item_id")
+  userId    Int      @map("user_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id])
+  item   ContentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, itemId])
+  @@map("content_notes")
 }
