@@ -26,7 +26,9 @@ export function StepChecklist({ repo, prNumber, prTitle, steps, initial }: Props
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
 
-  const confirmed = useRef<Record<number, PatchState>>(initial);
+  const confirmed = useRef<Record<number, PatchState>>({ ...initial });
+  // Latest click per step: only the latest settle may repaint that step.
+  const seq = useRef<Record<number, number>>({});
 
   function apply(i: number, state: PatchState | null | undefined) {
     setMarks((m) => {
@@ -40,6 +42,7 @@ export function StepChecklist({ repo, prNumber, prTitle, steps, initial }: Props
   function set(i: number, state: PatchState | null) {
     setError(null);
     apply(i, state);
+    const mine = (seq.current[i] = (seq.current[i] ?? 0) + 1);
     start(async () => {
       let err: string | null = null;
       try {
@@ -53,8 +56,8 @@ export function StepChecklist({ repo, prNumber, prTitle, steps, initial }: Props
         else confirmed.current[i] = state;
       } else {
         setError(err);
-        apply(i, confirmed.current[i]);
       }
+      if (seq.current[i] === mine) apply(i, confirmed.current[i]);
     });
   }
 

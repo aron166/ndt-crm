@@ -36,6 +36,8 @@ export type Patchnotes = { configured: false } | { configured: true; repos: Repo
 // Cache the TRANSFORMED result, not the fetches: the raw ndt-crm pulls page is
 // ~1.8 MB, at the 2 MB Data Cache item limit. 15 GitHub requests per 10 min.
 // A result with errors is never cached: the wrapped fn throws it, getPatchnotes unwraps it.
+// ponytail: a repo that ALWAYS fails (token lacks access) disables the cache, 15 GitHub calls
+// per view; cache partial results with a short revalidate if that happens.
 class PartialResult extends Error {
   constructor(public result: Patchnotes) {
     super("partial patchnotes result");

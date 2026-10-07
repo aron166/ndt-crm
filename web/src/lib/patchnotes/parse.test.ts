@@ -52,3 +52,9 @@ describe("parseManualTest hardening", () => {
     expect(parseManualTest(body)).toHaveLength(100);
   });
 });
+
+describe("parseManualTest indented list", () => {
+  it("reads a numbered list indented 1 to 3 spaces as separate steps", () => {
+    expect(parseManualTest("## Manual test\n 1. a\n 2. b")).toEqual(["a", "b"]);
+  });
+});

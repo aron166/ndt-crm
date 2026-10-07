@@ -1,7 +1,9 @@
 import { PATCH_OWNER } from "./repos";
 
 const HEADING = /^#{2,3}\s*manual test\s*$/i;
-const ITEM = /^(?:\d+[.)]|[-*])\s+(.*)$/;
+// Numbered items may sit 0-3 spaces in (valid markdown); bullets only at column 0, so an
+// indented "- x" under a numbered step stays part of that step.
+const ITEM = /^(?: {0,3}\d+[.)]|[-*])\s+(.*)$/;
 
 /** Steps from the "Manual test" section of a PR body. Client-safe (no server imports). */
 export function parseManualTest(body: string | null): string[] {
