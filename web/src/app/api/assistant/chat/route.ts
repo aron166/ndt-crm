@@ -21,7 +21,7 @@ import { MAX_CONVERSATION_TURNS, type ChatEvent, type ChatTurn } from "@/lib/ass
  * (read_item_ids, max 3 items, one hop) -> validated actions -> persisted turn.
  * Nothing is written to CRM data here: actions run only from the panel's "Végrehajtom".
  */
-/** Worst case: stream 60 s + one 30 s rate-limit wait + strict fallback 30 s, per hop (two hops). */
+/** Typical turn is seconds; the theoretical worst case (two hops, each with 429 waits, a 60 s stream and a strict fallback) can pass 300 s, where Vercel ends the function. */
 export const maxDuration = 300;
 
 const TENANT_ID = 1;
@@ -117,7 +117,8 @@ export async function POST(request: Request) {
     pathname: input.pathname,
     conversationPage: conv.page !== input.pathname ? conv.page : null,
     item: hop === 0 ? item : null,
-    hub: renderHubContext(hub, { intent, ...(hop === 1 || item ? { budgetChars: HOP_HUB_BUDGET } : {}) }),
+    // A stage question keeps the full budget with an item in view: read_item_ids cannot list a stage.
+    hub: renderHubContext(hub, { intent, ...(hop === 1 || (item && intent.kind !== "stage") ? { budgetChars: HOP_HUB_BUDGET } : {}) }),
     now: new Date(),
   });
   const turnMessages = (hop: 0 | 1): ChatMessage[] => [{ role: "system", content: system(hop) }, ...history(turns), { role: "user", content: input.message }];

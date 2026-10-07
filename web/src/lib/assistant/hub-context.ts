@@ -211,8 +211,9 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number; inten
 
   const head = ["<crm>", "SZAKASZOK:", counts.join("; "), `ÖNRE VÁR: ${d.pendingCount} anyag vár Önre; ${d.mine.checkIds.length} nyitott döntés.`];
   // Pool lines in priority order; `item: true` lines count toward the FIGYELEM omitted number.
-  let pool: { text: string; item?: boolean }[] = [];
+  let pool: { text: string; item?: boolean; header?: boolean }[] = [];
   const L = (text: string, item = false) => ({ text, item });
+  const H = (text: string) => ({ text, header: true });
   if (intent.kind === "waiting") {
     pool = own(10, 5).map((t) => L(t));
   } else if (intent.kind === "stage") {
@@ -230,10 +231,10 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number; inten
     const answered = d.decisions.filter((x) => x.state !== "open").slice(0, 10); // newest first (query order)
     pool = [
       ...own(3, 2).map((t) => L(t)),
-      L("ANYAGOK (legutóbb módosítva):"), ...items.slice(0, 20).map((i) => L(compact(i), true)),
-      L("NYITOTT DÖNTÉSEK:"), ...open.slice(0, 5).map((x) => L(decShort(x))),
-      L("LEZÁRT DÖNTÉSEK (legutóbbiak):"), ...answered.map((x) => L(decAnswered(x))),
-      ...items.slice(20).map((i) => L(compact(i), true)),
+      H("ANYAGOK (legutóbb módosítva):"), ...items.slice(0, 20).map((i) => L(compact(i), true)),
+      H("NYITOTT DÖNTÉSEK:"), ...open.slice(0, 5).map((x) => L(decShort(x))),
+      H("LEZÁRT DÖNTÉSEK (legutóbbiak):"), ...answered.map((x) => L(decAnswered(x))),
+      H("TOVÁBBI ANYAGOK:"), ...items.slice(20).map((i) => L(compact(i), true)),
     ];
   }
 
@@ -245,7 +246,7 @@ export function renderHubContext(d: HubData, opts: { budgetChars?: number; inten
   let used = head.join("\n").length + "\n</crm>".length + note(totalItems || 1)[0].length + 1;
   let n = 0;
   for (; n < pool.length && used + pool[n].text.length + 1 <= budget; n++) used += pool[n].text.length + 1;
-  const kept = pool.slice(0, n).filter((p, k, arr) => !(p.text.endsWith(":") && !p.item && (k === arr.length - 1 || arr[k + 1].text.endsWith(":"))));
+  const kept = pool.slice(0, n).filter((p, k, arr) => !(p.header && (k === arr.length - 1 || arr[k + 1].header)));
   const omitted = totalItems - pool.slice(0, n).filter((p) => p.item).length;
   return [...head, ...kept.map((p) => p.text), ...note(omitted), "</crm>"].join("\n");
 }

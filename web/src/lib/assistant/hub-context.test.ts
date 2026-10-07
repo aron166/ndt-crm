@@ -125,6 +125,14 @@ describe("renderHubContext", () => {
     for (const l of lines) expect(l).toMatch(/^#(\d+) (\| )?Cím \1( \||\s\[)/);
     for (const l of t.split("\n").filter((x) => x.startsWith("kérdés #"))) expect(l).toMatch(/^kérdés #(\d+) (\| )?Kérdés \1\b/);
   });
+  it("items past the first 20 sit under their own header, not under closed decisions", () => {
+    const items = Array.from({ length: 24 }, (_, k) => item(k + 1, { title: `Cím ${k + 1}` }));
+    const decisions = [{ checkId: 9, itemId: 1, question: "Kész?", forWhom: "aron" as const, state: "resolved", deadline: null, daysWaiting: 0, answer: "Igen:" }];
+    const t = renderHubContext(data(items, { decisions }), { budgetChars: 10_000 });
+    const lines = t.split("\n");
+    expect(lines.indexOf("TOVÁBBI ANYAGOK:")).toBeGreaterThan(lines.findIndex((l) => l.startsWith("kérdés #9")));
+    expect(lines[lines.indexOf("TOVÁBBI ANYAGOK:") + 1]).toMatch(/^#\d+ Cím/);
+  });
   it("totals line survives budget 1500 and own lines stay within it", () => {
     const { t } = mineData(50, 1500);
     expect(t).toContain("ÖNRE VÁR: 34 anyag vár Önre; 16 nyitott döntés.");
