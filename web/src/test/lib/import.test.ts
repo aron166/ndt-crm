@@ -45,8 +45,8 @@ describe("normalize", () => {
   });
 
   it("normalizeCompanyStatus flags dissolved entities", () => {
-    expect(normalizeCompanyStatus("F.A.")).toEqual({ status: "F.A.", dissolved: true });
-    expect(normalizeCompanyStatus("felszámolás alatt")).toEqual({ status: "F.A.", dissolved: true });
+    expect(normalizeCompanyStatus("F.A.")).toEqual({ status: "fa", dissolved: true });
+    expect(normalizeCompanyStatus("felszámolás alatt")).toEqual({ status: "fa", dissolved: true });
     expect(normalizeCompanyStatus("inaktív")).toEqual({ status: "inactive", dissolved: true });
     expect(normalizeCompanyStatus("aktív")).toEqual({ status: "active", dissolved: false });
     expect(normalizeCompanyStatus("")).toEqual({ status: "active", dissolved: false });

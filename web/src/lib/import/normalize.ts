@@ -73,7 +73,7 @@ export function normalizeCompanyStatus(raw: string | null | undefined): {
   const s = normalizeName(raw);
   if (!s) return { status: "active", dissolved: false };
   if (s.includes("f a") || s.includes("felszamol") || s === "fa") {
-    return { status: "F.A.", dissolved: true };
+    return { status: "fa", dissolved: true };
   }
   if (/\b(nem|not|non)\b/.test(s) || s.includes("inaktiv") || s.includes("inactive") || s.includes("megszunt") || s.includes("vegelszamol") || s.includes("torolt") || s.includes("dissolved")) {
     return { status: "inactive", dissolved: true };
@@ -87,6 +87,13 @@ export function normalizeCompanyStatus(raw: string | null | undefined): {
 const ACCOUNT_TYPES: Record<string, string> = {
   prospect: "Prospect", customer: "Customer", ugyfel: "Customer",
   vendor: "Vendor", szallito: "Vendor", lead: "Lead",
+  competitor: "Competitor", versenytars: "Competitor",
+};
+// Strict status map for UI/action write paths (the importer keeps the fuzzy
+// normalizeCompanyStatus above). "F.A." normalises to "f a".
+const STATUSES: Record<string, string> = {
+  active: "active", aktiv: "active", inactive: "inactive", inaktiv: "inactive",
+  fa: "fa", "f a": "fa", "felszamolas alatt": "fa",
 };
 const WARMTHS: Record<string, string> = {
   cold: "cold", hideg: "cold", warm: "warm", langyos: "warm", meleg: "warm", hot: "hot", forro: "hot",
@@ -100,3 +107,4 @@ function mapEnum(table: Record<string, string>, raw: string | null | undefined):
 }
 export const normalizeAccountType = (raw: string | null | undefined) => mapEnum(ACCOUNT_TYPES, raw);
 export const normalizeWarmth = (raw: string | null | undefined) => mapEnum(WARMTHS, raw);
+export const normalizeStatus = (raw: string | null | undefined) => mapEnum(STATUSES, raw);

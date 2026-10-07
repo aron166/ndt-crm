@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateCompany } from "@/app/actions/companies";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { COMPANY_ATTR_DEFS } from "@/lib/companies/attributes";
 import { FormField } from "@/components/ui/FormField";
 
 interface Company {
@@ -78,17 +79,13 @@ export function EditCompanyModal({ open, onClose, company }: Props) {
             </FormField>
             <FormField label="Státusz">
               <select name="status" className="input-ds" defaultValue={company.status ?? "active"}>
-                <option value="active">Aktív</option>
-                <option value="inactive">Inaktív</option>
-                <option value="fa">F.A.</option>
+                {COMPANY_ATTR_DEFS.status.options!.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
               </select>
             </FormField>
             <FormField label="Partner kategória">
               <select name="accountType" className="input-ds" defaultValue={company.accountType ?? ""}>
                 <option value="">-</option>
-                <option value="Prospect">Prospect</option>
-                <option value="Customer">Ügyfél</option>
-                <option value="Vendor">Szállító</option>
+                {COMPANY_ATTR_DEFS.account_type.options!.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
               </select>
             </FormField>
             <FormField label="Pipeline státusz">

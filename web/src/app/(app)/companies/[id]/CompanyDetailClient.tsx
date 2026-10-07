@@ -9,6 +9,7 @@ import { SendEmailButton } from "@/components/SendEmailButton";
 import { NewQuoteDialog } from "@/app/(app)/quotes/NewQuoteDialog";
 import { AddContactModal } from "./AddContactModal";
 import { personLeftCompany } from "@/app/actions/contacts";
+import { COMPANY_ATTR_DEFS, attrValueLabel } from "@/lib/companies/attributes";
 import { TagInput } from "@/components/tags/TagInput";
 import { AuditLogEntries } from "@/components/AuditLogTab";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
@@ -289,7 +290,7 @@ export function CompanyDetailClient({
               )}
               {company.accountType && (
                 <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, background: "var(--bg-3)", color: "var(--fg-mute)" }}>
-                  {company.accountType}
+                  {attrValueLabel("account_type", company.accountType)}
                 </span>
               )}
               {company.teaorCode && (
@@ -468,9 +469,7 @@ export function CompanyDetailClient({
                     style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
                   >
                     <option value="">-</option>
-                    <option value="active">Aktív</option>
-                    <option value="inactive">Inaktív</option>
-                    <option value="fa">F.A.</option>
+                    {COMPANY_ATTR_DEFS.status.options!.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                   </select>
                 </div>
                 <div>
@@ -481,9 +480,7 @@ export function CompanyDetailClient({
                     style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
                   >
                     <option value="">-</option>
-                    <option value="Prospect">Prospect</option>
-                    <option value="Ügyfél">Ügyfél</option>
-                    <option value="Szállító">Szállító</option>
+                    {COMPANY_ATTR_DEFS.account_type.options!.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                   </select>
                 </div>
                 <div>

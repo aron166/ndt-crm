@@ -8,6 +8,11 @@ import { audit } from "@/lib/audit";
 import {
   COMPANY_ATTR_DEFS, isCompanyAttrType, type CompanyAttrType,
 } from "@/lib/companies/attributes";
+import { normalizeAccountType, normalizeStatus, normalizeWarmth } from "@/lib/import/normalize";
+
+const ENUM_NORMALISERS: Partial<Record<CompanyAttrType, (raw: string) => string | null | undefined>> = {
+  warmth: normalizeWarmth, account_type: normalizeAccountType, status: normalizeStatus,
+};
 
 const TENANT_ID = 1;
 
@@ -41,8 +46,14 @@ export async function setPrimaryCompanyAttribute(
   const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };
   if (!isCompanyAttrType(attrType)) return { error: "Ismeretlen attribútum típus" };
-  const v = value.trim();
+  let v = value.trim();
   if (!v) return { error: "Az érték kötelező" };
+  const norm = ENUM_NORMALISERS[attrType];
+  if (norm) {
+    const c = norm(v);
+    if (!c) return { error: `Ismeretlen érték: ${v}` };
+    v = c;
+  }
   const lbl = label?.trim() || null;
   const def = COMPANY_ATTR_DEFS[attrType];
 
