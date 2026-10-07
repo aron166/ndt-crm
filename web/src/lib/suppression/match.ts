@@ -27,6 +27,34 @@ export function normalizeDomain(v: string): string | null {
 }
 
 /**
+ * Routes a pasted target: any "@" past the first character means an email, else a domain.
+ * Rejects (null) a second address outside "<...>", more than one "@", and whitespace in
+ * the address. A leading display name of 2+ letters ("Name info@ceg.hu") is allowed; a
+ * stray single letter ("a b@c.hu") is not.
+ */
+export function parseSuppressionTarget(input: string): { email: string } | { domain: string } | null {
+  let s = input.trim();
+  const angle = s.match(/<([^<>]*)>/);
+  if (angle) {
+    if (s.replace(angle[0], "").includes("@")) return null;
+    s = angle[1];
+  } else {
+    const tokens = s.split(/\s+/);
+    const last = tokens.pop() ?? "";
+    if (tokens.length && (!last.includes("@") || !tokens.every((t) => /^\p{L}{2,}\.?$/u.test(t)))) return null;
+    s = last;
+  }
+  s = clean(s);
+  if (/\s/.test(s) || s.split("@").length > 2) return null;
+  if (s.indexOf("@") > 0) {
+    const email = normalizeEmail(s);
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ? { email } : null;
+  }
+  const domain = normalizeDomain(s);
+  return domain ? { domain } : null;
+}
+
+/**
  * True when the address itself, or its domain, or any parent domain is on the
  * list: a "ne keressenek minket" from ceg.hu also covers kozpont.ceg.hu.
  * An empty or missing address is never suppressed (it cannot be sent to anyway).

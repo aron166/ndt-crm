@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { isAddressSuppressed, isSuppressed, loadSuppressionSet, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { gateDraft, gateOn, templatesForCampaign, templatesForCampaigns, templateIsStale } from "@/lib/outreach/template";
 import { audit } from "@/lib/audit";
@@ -102,7 +103,7 @@ export async function markDraftSentManually(
 
   const row = await db.emailDraft.findFirst({ where: { id: draftId, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
-  if (await isAddressSuppressed(TENANT_ID, row.toEmail)) return { ok: false, error: SUPPRESSED_ERROR };
+  if (await isAddressSuppressed(TENANT_ID, await resolveDraftRecipient(TENANT_ID, row))) return { ok: false, error: SUPPRESSED_ERROR };
   if (!MANUAL_SENDABLE_STATUSES.includes(row.status as DraftStatus)) {
     return { ok: false, error: "Előbb hagyd jóvá, vagy ez az érintés már elment" };
   }
@@ -292,7 +293,7 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
     orderBy: [{ senderUserId: "asc" }, { dueAt: "asc" }, { step: "asc" }],
     select: {
       id: true, companyId: true, campaign: true, wave: true, step: true, subject: true,
-      status: true, dueAt: true, senderUserId: true, toEmail: true,
+      status: true, dueAt: true, senderUserId: true, toEmail: true, personId: true,
       company: { select: { name: true } },
       person: { select: { firstName: true, lastName: true } },
     },
@@ -307,7 +308,13 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
   const answeredKey = new Set(answered.map((a) => `${a.campaign}:${a.companyId}`));
 
   const suppressed = await loadSuppressionSet(TENANT_ID);
-  const visible = rows.filter((r) => !answeredKey.has(`${r.campaign}:${r.companyId}`) && !isSuppressed(r.toEmail, suppressed));
+  const visible: typeof rows = [];
+  for (const r of rows) {
+    if (answeredKey.has(`${r.campaign}:${r.companyId}`)) continue;
+    // ponytail: one lookup per row; batch when the due list is hundreds
+    if (isSuppressed(await resolveDraftRecipient(TENANT_ID, r), suppressed)) continue;
+    visible.push(r);
+  }
 
   // §6b: ONE query for every campaign on this screen, never one per row.
   const templatesByCampaign = await templatesForCampaigns(

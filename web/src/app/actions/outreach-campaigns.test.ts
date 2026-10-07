@@ -31,6 +31,7 @@ vi.mock("@/lib/db", () => ({
     company: { updateMany: vi.fn() },
     campaign: { findMany: vi.fn() },
     suppression: { findMany: vi.fn().mockResolvedValue([]) },
+    contact: { findFirst: vi.fn().mockResolvedValue(null) },
     savedView: { findFirst: vi.fn() },
     // §6b template gate: no slot configured means the gate passes.
     contentItem: { findFirst: vi.fn().mockResolvedValue(null) },

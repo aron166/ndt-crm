@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { audit } from "@/lib/audit";
+import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { isSuppressed, loadSuppressionSet } from "@/lib/suppression";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { draftsUpsertSchema, canEdit, type DraftStatus } from "@/lib/outreach/drafts";
@@ -144,7 +145,7 @@ export async function POST(request: Request) {
     }
 
     // A suppressed address never gets a draft the external sender could claim.
-    if (isSuppressed(item.toEmail, suppressed)) {
+    if (isSuppressed(await resolveDraftRecipient(key.tenantId, { toEmail: item.toEmail ?? null, personId: item.personId ?? null, companyId: item.companyId }), suppressed)) {
       skipped.push({ companyId: item.companyId, campaign: item.campaign, step: item.step, reason: "suppressed" });
       continue;
     }

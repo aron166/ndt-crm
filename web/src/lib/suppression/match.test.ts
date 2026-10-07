@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSuppressed, normalizeDomain, normalizeEmail } from "./match";
+import { isSuppressed, parseSuppressionTarget, normalizeDomain, normalizeEmail } from "./match";
 
 const set = { emails: new Set(["nem@ceg.hu"]), domains: new Set(["tilos.hu"]) };
 
@@ -41,5 +41,17 @@ describe("normalisation", () => {
     expect(normalizeDomain("mailto:a@ceg.hu")).toBe("ceg.hu");
     expect(normalizeDomain("<@ceg.hu>")).toBe("ceg.hu");
     expect(normalizeDomain("ceg.hu.")).toBe("ceg.hu");
+  });
+});
+
+describe("parseSuppressionTarget", () => {
+  it("routes and rejects pasted targets", () => {
+    expect(parseSuppressionTarget("Name info@ceg.hu")).toEqual({ email: "info@ceg.hu" });
+    expect(parseSuppressionTarget("Név <A@b.hu>")).toEqual({ email: "a@b.hu" });
+    expect(parseSuppressionTarget("a@b.hu <c@d.hu>")).toBeNull();
+    expect(parseSuppressionTarget("ceg.hu")).toEqual({ domain: "ceg.hu" });
+    expect(parseSuppressionTarget("@ceg.hu")).toEqual({ domain: "ceg.hu" });
+    expect(parseSuppressionTarget("a b@c.hu")).toBeNull();
+    expect(parseSuppressionTarget("a@b@c.hu")).toBeNull();
   });
 });

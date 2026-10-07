@@ -15,7 +15,7 @@ vi.mock("@/lib/marketing/audience-query", () => ({ audienceWhere: vi.fn() }));
 const { db } = vi.hoisted(() => ({
   db: {
     company: { findMany: vi.fn() },
-    contact: { findMany: vi.fn() },
+    contact: { findMany: vi.fn(), findFirst: vi.fn().mockResolvedValue(null) },
     campaign: { findMany: vi.fn() },
     suppression: { findMany: vi.fn() },
     user: { findMany: vi.fn() },

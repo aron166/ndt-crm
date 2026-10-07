@@ -1,10 +1,11 @@
 "use server";
 
+import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
-import { isSuppressed, normalizeDomain, normalizeEmail } from "@/lib/suppression";
+import { isSuppressed, parseSuppressionTarget } from "@/lib/suppression";
 
 const TENANT_ID = 1;
 const CHANNELS = ["email", "phone", "linkedin", "in_person"];
@@ -21,16 +22,10 @@ export async function addSuppression(formData: FormData) {
   if (denied) return { error: denied };
 
   const target = ((formData.get("target") as string) || "").trim();
-  let email: string | null = null;
-  let domain: string | null = null;
-  const hasLocal = /^(?:[^<]*<)?(?:mailto:)?[^@\s<>]+@/i.test(target);
-  if (hasLocal) {
-    email = normalizeEmail(target);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { error: "Érvénytelen email cím." };
-  } else {
-    domain = normalizeDomain(target);
-    if (!domain) return { error: "Érvénytelen email cím vagy domain." };
-  }
+  const parsed = parseSuppressionTarget(target);
+  if (!parsed) return { error: "Érvénytelen email cím." };
+  const email = "email" in parsed ? parsed.email : null;
+  const domain = "domain" in parsed ? parsed.domain : null;
 
   const requestedRaw = ((formData.get("requestedAt") as string) || "").trim();
   const requestedAt = new Date(`${requestedRaw}T00:00:00.000Z`);
@@ -64,13 +59,14 @@ export async function addSuppression(formData: FormData) {
 
   // Queued drafts to the new entry must not go out: cancel them now.
   const queued = await db.emailDraft.findMany({
-    where: { tenantId: TENANT_ID, status: { in: ["draft", "approved", "failed"] }, toEmail: { not: null } },
-    select: { id: true, status: true, toEmail: true },
+    where: { tenantId: TENANT_ID, status: { in: ["draft", "approved", "failed"] } },
+    select: { id: true, status: true, toEmail: true, personId: true, companyId: true },
   });
   const set = { emails: new Set(email ? [email] : []), domains: new Set(domain ? [domain] : []) };
   let cancelled = 0;
   for (const d of queued) {
-    if (!isSuppressed(d.toEmail, set)) continue;
+    // ponytail: one lookup per row; batch when the queue is hundreds
+    if (!isSuppressed(await resolveDraftRecipient(TENANT_ID, d), set)) continue;
     const res = await db.emailDraft.updateMany({
       where: { id: d.id, tenantId: TENANT_ID, status: d.status },
       data: { status: "cancelled" },
