@@ -18,6 +18,7 @@ const { db } = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => ({ db }));
 
 import { GET } from "./route";
+import { NOT_FA } from "@/lib/companies/filters";
 import { validateAppKey } from "@/lib/app-key-auth";
 import { audienceWhere } from "@/lib/marketing/audience-query";
 
@@ -49,7 +50,7 @@ describe("GET /api/outreach/targets - audience resolution", () => {
     const body = await res.json();
     expect(body.audience).toBeNull();
     expect(db.company.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.not.objectContaining({ AND: expect.anything() }) }),
+      expect.objectContaining({ where: expect.objectContaining({ AND: [NOT_FA] }) }),
     );
   });
 
@@ -92,7 +93,7 @@ describe("GET /api/outreach/targets - audience resolution", () => {
     const body = await res.json();
     expect(body.audience).toEqual({ viewId: 5, name: "Segment", isArchived: true });
     expect(db.company.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ AND: [{ county: "Pest" }] }) }),
+      expect.objectContaining({ where: expect.objectContaining({ AND: [NOT_FA, { county: "Pest" }] }) }),
     );
   });
 
@@ -111,7 +112,7 @@ describe("GET /api/outreach/targets - audience resolution", () => {
 
     const where = db.company.findMany.mock.calls[0][0].where;
     expect(where.pipelineStatus).toEqual({ in: ["1", "2", "3", "5", "6"] });
-    expect(where.AND).toEqual([{ pipelineStatus: "0" }]);
+    expect(where.AND).toEqual([NOT_FA, { pipelineStatus: "0" }]);
     // Prisma ANDs every top-level key together, so pipelineStatus (CALLABLE_STATUSES)
     // and AND[0].pipelineStatus ("0") both have to hold - a KUKA company can never
     // satisfy both, so the audience clause cannot re-admit it.
