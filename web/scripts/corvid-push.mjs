@@ -57,7 +57,16 @@ function noteLine(p) {
  * New entities carry a `ref`; links to existing ones carry `*_id`, links to planned ones `*_ref`.
  * @returns {any}
  */
+// Only Corvid's betonscan workspace may reach the CRM (Aron, 2026-10-19). A row without the stamp, or from any other
+// workspace, refuses the whole push before anything is planned or written.
+export const CRM_WORKSPACE = "betonscan";
+export function assertWorkspace(rows) {
+  const bad = rows.filter((r) => r?.workspace !== CRM_WORKSPACE);
+  if (bad.length) throw new Error(`refusing push: ${bad.length} row(s) not from Corvid workspace ${CRM_WORKSPACE}`);
+}
+
 export function planPush(rows, crm, opts) {
+  assertWorkspace(rows);
   const { campaign, sender } = opts;
   /** @type {any} */
   const plan = {
@@ -297,6 +306,7 @@ async function main() {
   const opts = { tenant: Number(arg("--tenant", 1)), sender: Number(arg("--sender", 3)), campaign: arg("--campaign", "corvid-betonscan-w1") };
   const dry = args.includes("--dry-run");
   const rows = JSON.parse(fs.readFileSync(file, "utf8"));
+  assertWorkspace(rows);
   const envFile = new URL("../.env.local", import.meta.url);
   const env = { ...process.env };
   if (fs.existsSync(envFile)) {

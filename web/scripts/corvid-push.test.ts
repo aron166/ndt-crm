@@ -12,12 +12,21 @@ const person = (o: Record<string, unknown> = {}) => ({
   email: "janos@example.hu", ...o,
 });
 const row = (o: Record<string, unknown> = {}) => ({
-  lead_id: "L1", score: 70, kind: "contractor", company_name: "Alpha Kft.", adoszam: null, website: "https://alpha.hu",
+  workspace: "betonscan", lead_id: "L1", score: 70, kind: "contractor", company_name: "Alpha Kft.", adoszam: null, website: "https://alpha.hu",
   city: "Győr", person: person(), subject: "Tárgy", body: "Szia\n", ...o,
 });
 const crm = (o: Record<string, unknown> = {}) => ({
   companies: [] as any[], persons: [] as any[], contacts: [] as any[], drafts: [] as any[],
   suppression: { emails: new Set<string>(), domains: new Set<string>() }, gate: { ok: true }, footer: "Lábléc" as string | null, ...o,
+});
+
+describe("planPush workspace guard", () => {
+  it("refuses any row not stamped with the betonscan workspace", () => {
+    for (const ws of ["docktape", undefined, "Betonscan"]) {
+      expect(() => planPush([row(), row({ lead_id: "L2", workspace: ws })], crm(), opts)).toThrow(/refusing push/);
+    }
+    expect(() => planPush([row()], crm(), opts)).not.toThrow();
+  });
 });
 
 describe("planPush companies", () => {
