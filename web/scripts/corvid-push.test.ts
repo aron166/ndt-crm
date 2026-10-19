@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { gateOn as realGate } from "@/lib/outreach/template";
 import { withFooter as realFooter } from "@/lib/outreach/drafts";
-import { gateOn, planPush, splitPerson, withFooter } from "./corvid-push.mjs";
+import { applyPlan, gateOn, isMobile, planPush, splitPerson, withFooter } from "./corvid-push.mjs";
 
 const opts = { tenant: 1, sender: 3, campaign: "corvid-betonscan-w1" };
 const CAMP = opts.campaign;
@@ -215,5 +215,45 @@ describe("parity with the app helpers", () => {
       expect(a.ok).toBe(b.ok);
       if (!b.ok) expect(a.error).toBe((b as { error: string }).error);
     }
+  });
+});
+
+describe("Vanda round 3: mobiles and audit", () => {
+  it("isMobile reads every Hungarian mobile form, landlines pass", () => {
+    for (const m of ["+36 20 123 4567", "+36 30 123 4567", "06-70-123-4567", "0036 31 1234567", "36 30 123 4567", "36301234567", "+36 50 123 4567", "30 123 4567"]) {
+      expect(isMobile(m), m).toBe(true);
+    }
+    for (const l of ["+36 1 234 5678", "+36 36 312 345", "36 312 345", "3612345678", "", null]) expect(isMobile(l), String(l)).toBe(false);
+  });
+  it("a mobile never reaches persons or contacts; a landline does", () => {
+    const p = planPush([row({ person: person({ phone: "36 30 123 4567" }) }),
+      row({ lead_id: "L2", company_name: "Beta Kft.", website: "https://beta.hu", person: person({ name: "Nagy Béla", email: "b@beta.hu", phone: "+36 1 234 5678" }) })], crm(), opts);
+    expect(p.persons.create.map((x: any) => x.phone)).toEqual([null, "+36 1 234 5678"]);
+    expect(p.contacts.create.map((x: any) => x.phone)).toEqual([null, "+36 1 234 5678"]);
+  });
+  it("applyPlan audits contact inserts and person note updates", async () => {
+    const qs: { sql: string; args: any[] }[] = [];
+    let id = 100;
+    const client = {
+      query: async (sql: string, args: any[] = []) => {
+        qs.push({ sql, args });
+        if (/^select 1 from users/.test(sql)) return { rowCount: 1, rows: [{}] };
+        if (/^select notes from persons/.test(sql)) return { rowCount: 1, rows: [{ notes: "régi" }] };
+        if (/returning id/.test(sql)) return { rowCount: 1, rows: [{ id: ++id }] };
+        return { rowCount: 1, rows: [] };
+      },
+    };
+    const plan = {
+      companies: { create: [] }, persons: { create: [], update: [{ id: 5, notes: "régi\núj" }] },
+      contacts: { create: [{ person_id: 5, person_ref: null, company_id: 7, company_ref: null, role: "ügyvezető", email: "a@x.hu", phone: null }] },
+      drafts: { create: [] },
+    };
+    await applyPlan(client, plan, opts);
+    const audits = qs.filter((q) => /insert into audit_log/.test(q.sql)).map((q) => [q.args[1], q.args[2], q.args[4], JSON.parse(q.args[3])]);
+    expect(audits).toEqual([
+      ["person", 5, "update", { before: { notes: "régi" }, after: { notes: "régi\núj" } }],
+      ["contact", 101, "create", { before: null, after: { personId: 5, companyId: 7, role: "ügyvezető", email: "a@x.hu", phone: null } }],
+    ]);
+    expect(qs.at(-1)?.sql).toBe("COMMIT");
   });
 });

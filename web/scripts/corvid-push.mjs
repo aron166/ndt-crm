@@ -44,6 +44,16 @@ export function splitPerson(full) {
   return { first_name: toks[toks.length - 1], last_name: toks.slice(0, -1).join(" "), honorifics };
 }
 
+// Mirror of growth packs/betonscan/pack.py is_mobile: +36 20/30/31/50/70 in any of 0036, +36, bare 36, 06 or national form.
+const MOBILE = new Set(["20", "30", "31", "50", "70"]);
+export function isMobile(phone) {
+  let d = String(phone || "").replace(/\D/g, "");
+  d = d.startsWith("0036") ? d.slice(4) : d.startsWith("06") || (d.startsWith("36") && d.length > 9) ? d.slice(2) : d;
+  return MOBILE.has(d.slice(0, 2));
+}
+// A named person's mobile is personal data: never written to persons or contacts (Aron's call pending). Landlines pass.
+const officePhone = (phone) => (phone && !isMobile(phone) ? phone : null);
+
 const nameKey = (first, last) => normalizeName(`${first} ${last}`).split(" ").filter(Boolean).sort().join(" ");
 const day = (s) => (s || "").slice(0, 10);
 
@@ -182,7 +192,7 @@ export function planPush(rows, crm, opts) {
       per = { ref: `p${++np}` };
       newPersonByEmail.set(email, per.ref);
       plan.persons.create.push({
-        ref: per.ref, first_name: sp.first_name, last_name: sp.last_name, email: p.email, phone: p.phone || null,
+        ref: per.ref, first_name: sp.first_name, last_name: sp.last_name, email: p.email, phone: officePhone(p.phone),
         linkedin_url: p.linkedin || null, notes: note,
       });
     }
@@ -192,7 +202,7 @@ export function planPush(rows, crm, opts) {
     if (!hasLink) {
       plan.contacts.create.push({
         person_id: per.id ?? null, person_ref: per.ref ?? null, company_id: co.id ?? null, company_ref: co.ref ?? null,
-        role: p.title || null, email: p.email, phone: p.phone || null, is_primary: false,
+        role: p.title || null, email: p.email, phone: officePhone(p.phone), is_primary: false,
       });
     }
 
@@ -236,9 +246,9 @@ export async function applyPlan(client, plan, opts) {
   const n = { companies: 0, persons: 0, notes: 0, contacts: 0, drafts: 0 };
   const ok = await client.query("select 1 from users where id = $1 and tenant_id = $2", [opts.sender, t]);
   if (!ok.rowCount) throw new Error(`sender user ${opts.sender} is not a user of tenant ${t}`);
-  const audit = (entity, id, after) => client.query(
+  const audit = (entity, id, after, before = null, action = "create") => client.query(
     `insert into audit_log (tenant_id, actor_agent_id, action, entity_type, entity_id, changes, occurred_at)
-     values ($1, 'corvid-push', 'create', $2, $3, $4, now())`, [t, entity, id, JSON.stringify({ before: null, after })]);
+     values ($1, 'corvid-push', $5, $2, $3, $4, now())`, [t, entity, id, JSON.stringify({ before, after }), action]);
   await client.query("BEGIN");
   try {
     for (const c of plan.companies.create) {
@@ -258,16 +268,20 @@ export async function applyPlan(client, plan, opts) {
       await audit("person", r.rows[0].id, { firstName: p.first_name, lastName: p.last_name, email: p.email });
     }
     for (const u of plan.persons.update) {
+      const old = await client.query("select notes from persons where id = $1 and tenant_id = $2 for update", [u.id, t]);
+      if (!old.rowCount) throw new Error(`person ${u.id} is not in tenant ${t}`);
       await client.query("update persons set notes = $1, updated_at = now() where id = $2 and tenant_id = $3", [u.notes, u.id, t]);
       n.notes++;
+      await audit("person", u.id, { notes: u.notes }, { notes: old.rows[0].notes }, "update");
     }
     const cid = (x) => x.company_id ?? ids.c.get(x.company_ref), pid = (x) => x.person_id ?? ids.p.get(x.person_ref);
     for (const c of plan.contacts.create) {
-      await client.query(
+      const r = await client.query(
         `insert into contacts (tenant_id, person_id, company_id, role, email, phone, is_primary, created_at)
-         values ($1,$2,$3,$4,$5,$6,false,now())`,
+         values ($1,$2,$3,$4,$5,$6,false,now()) returning id`,
         [t, pid(c), cid(c), c.role, c.email, c.phone]);
       n.contacts++;
+      await audit("contact", r.rows[0].id, { personId: pid(c), companyId: cid(c), role: c.role, email: c.email, phone: c.phone });
     }
     for (const d of plan.drafts.create) {
       const r = await client.query(
