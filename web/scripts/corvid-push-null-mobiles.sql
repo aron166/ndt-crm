@@ -1,3 +1,4 @@
+\set ON_ERROR_STOP on
 -- Null the Hungarian mobile numbers corvid-push wrote into persons.phone and contacts.phone (Vanda, PR #155 P1).
 -- NOT RUN. Aron decides whether this runs against prod. Tenant 1 (Controllabor).
 -- Part 1 is read-only. Part 2 ends in ROLLBACK: check the counts it prints, then change ROLLBACK to COMMIT to apply.
@@ -14,6 +15,9 @@
 with pushed_person as (
   select entity_id as id from audit_log
   where tenant_id = 1 and actor_agent_id = 'corvid-push' and action = 'create' and entity_type = 'person'
+    and not exists (select 1 from audit_log u where u.tenant_id = 1 and u.entity_type = 'person'
+      and u.entity_id = audit_log.entity_id and u.action = 'update'
+      and u.actor_agent_id is distinct from 'corvid-push')  -- skip persons a human edited after the push
 ), pushed_draft as (
   select d.person_id, d.company_id, d.created_at from email_drafts d
   join audit_log a on a.tenant_id = d.tenant_id and a.entity_type = 'email_draft' and a.entity_id = d.id
@@ -43,6 +47,9 @@ create temp table corvid_mobiles on commit drop as
 with pushed_person as (
   select entity_id as id from audit_log
   where tenant_id = 1 and actor_agent_id = 'corvid-push' and action = 'create' and entity_type = 'person'
+    and not exists (select 1 from audit_log u where u.tenant_id = 1 and u.entity_type = 'person'
+      and u.entity_id = audit_log.entity_id and u.action = 'update'
+      and u.actor_agent_id is distinct from 'corvid-push')  -- skip persons a human edited after the push
 ), pushed_draft as (
   select d.person_id, d.company_id, d.created_at from email_drafts d
   join audit_log a on a.tenant_id = d.tenant_id and a.entity_type = 'email_draft' and a.entity_id = d.id
