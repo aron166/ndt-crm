@@ -141,6 +141,34 @@ describe("dedupe beyond VAT and name", () => {
   });
 });
 
+describe("Vanda pass: never touch a person or VAT the CRM already owns elsewhere", () => {
+  it("a person with an open draft at another company is skipped, and nothing is planned for the row", () => {
+    const p = planPush([row()], crm({
+      persons: [{ id: 50, first_name: "János", last_name: "Kovács", email: person().email, notes: null }],
+      drafts: [{ company_id: 999, campaign: "cold-email-v0", status: "sent", step: 1, person_id: 50, to_email: person().email }],
+    }), opts);
+    expect(p.drafts.skipped.map((s: any) => s.reason)).toEqual(["person in open campaign"]);
+    expect([p.companies.create, p.persons.create, p.contacts.create, p.drafts.create]).toEqual([[], [], [], []]);
+  });
+  it("a VAT that only lives on a deleted company is skipped, not inserted into the unique index", () => {
+    const p = planPush([row({ adoszam: "12345678-2-41" })], crm({ deletedVats: ["12345678241"] }), opts);
+    expect(p.companies.skipped[0].reason).toBe("VAT on a deleted company");
+    expect(p.companies.create).toEqual([]);
+  });
+  it("a name match with a different VAT is not the same company", () => {
+    const p = planPush([row({ adoszam: "11111111-2-41" })], crm({ companies: [{ id: 7, name: "Alpha Kft.", vat_number: "22222222", website: null }] }), opts);
+    expect(p.companies.skipped[0].reason).toMatch(/VAT differs/);
+  });
+  it("near-duplicate names inside the input become one company", () => {
+    const p = planPush([
+      row({ lead_id: "A", company_name: "TERRA-21 Kft.", website: null, person: person({ email: "a@t.hu" }) }),
+      row({ lead_id: "B", company_name: "TERRA-21 Közmű Kft.", website: null, person: person({ email: "b@t.hu" }) }),
+    ], crm(), opts);
+    expect(p.companies.create).toHaveLength(1);
+    expect(p.companies.skipped[0].reason).toMatch(/possible duplicate/);
+  });
+});
+
 describe("rerun", () => {
   it("creates nothing once the first plan is in the CRM", () => {
     const rows = [row({ adoszam: "12345678-2-41" }), row({ lead_id: "L3", company_name: "Gamma Zrt.", website: "https://gamma.hu", person: person({ name: "Szabó Éva", email: "eva@gamma.hu" }) })];
