@@ -8,6 +8,7 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { companyKey, normalizeName, normalizeVat } from "../src/lib/import/normalize.ts";
 import { isSuppressed } from "../src/lib/suppression/match.ts";
+import { domainOf } from "./duplicate-companies.mjs";
 
 const OTHER_OPEN = new Set(["draft", "approved", "sending", "sent", "replied"]);
 // Mirror of lib/outreach/drafts.ts withFooter (extensionless imports cannot load under plain Node); parity-tested.
@@ -66,12 +67,18 @@ export function planPush(rows, crm, opts) {
     drafts: { create: [], skipped: [] },
     already: 0,
   };
-  const byVat = new Map(), byKey = new Map();
+  const byVat = new Map(), byKey = new Map(), byDomain = new Map();
   for (const c of crm.companies) {
-    const v = normalizeVat(c.vat_number), k = companyKey(c.name);
+    const v = normalizeVat(c.vat_number), k = companyKey(c.name), d = domainOf(c.website);
     if (v && !byVat.has(v)) byVat.set(v, c);
     if (k && !byKey.has(k)) byKey.set(k, c);
+    if (d && !byDomain.has(d)) byDomain.set(d, c);
   }
+  // "TERRA-21. KFT." vs "TERRA-21. Közmű és Mélyépítő Kft.": one key a prefix of the other is a possible duplicate.
+  // Without a VAT number to prove otherwise we skip it rather than create a second company.
+  const prefixOf = (key) => key && key.length >= 5
+    ? crm.companies.find((c) => { const k = companyKey(c.name); return k && k.length >= 5 && (k.startsWith(key) || key.startsWith(k)); })
+    : null;
   const personByEmail = new Map(crm.persons.filter((p) => p.email).map((p) => [p.email.toLowerCase(), p]));
   const personById = new Map(crm.persons.map((p) => [p.id, p]));
   const linked = new Set(crm.contacts.map((c) => `${c.person_id}:${c.company_id}`));
@@ -91,9 +98,15 @@ export function planPush(rows, crm, opts) {
     if (!p.email) { skipDraft("no email"); continue; }
     if (isSuppressed(p.email, crm.suppression)) { skipDraft("suppressed"); continue; }
 
-    const existing = (vat && byVat.get(vat)) || (key && byKey.get(key)) || null;
-    const keys = [vat && `v:${vat}`, key && `k:${key}`, existing && `id:${existing.id}`].filter(Boolean);
+    const dom = domainOf(row.website);
+    const existing = (vat && byVat.get(vat)) || (key && byKey.get(key)) || (dom && byDomain.get(dom)) || null;
+    const keys = [vat && `v:${vat}`, key && `k:${key}`, dom && `d:${dom}`, `e:${p.email.toLowerCase()}`,
+      existing && `id:${existing.id}`].filter(Boolean);
     if (keys.some((k) => seen.has(k))) { skipCompany("duplicate in input"); continue; }
+    if (!existing && !vat) {
+      const near = prefixOf(key);
+      if (near) { skipCompany(`possible duplicate of company ${near.id} (${near.name})`); keys.forEach((k) => seen.add(k)); continue; }
+    }
     if (existing) {
       const ds = draftsBy.get(existing.id) || [];
       if (ds.some((d) => d.campaign === campaign && d.step === 1)) { plan.already++; keys.forEach((k) => seen.add(k)); continue; }

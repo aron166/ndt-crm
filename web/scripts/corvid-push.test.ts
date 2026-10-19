@@ -117,9 +117,33 @@ describe("planPush gates", () => {
   });
 });
 
+describe("dedupe beyond VAT and name", () => {
+  it("same website or same person email in the input is one company", () => {
+    const p = planPush([
+      row({ lead_id: "A", company_name: "Fővárosi Önkormányzat", website: "https://budapest.hu/" }),
+      row({ lead_id: "B", company_name: "Budapest Főváros Önkormányzata", website: "https://www.budapest.hu", person: person({ email: "x@budapest.hu" }) }),
+      row({ lead_id: "C", company_name: "Zalaegerszeg MJV Önkormányzata", website: null, person: person({ email: "v@zeg.hu" }) }),
+      row({ lead_id: "D", company_name: "Zalaegerszeg Megyei Jogú Város Önkormányzata", website: null, person: person({ email: "v@zeg.hu" }) }),
+    ], crm(), opts);
+    expect(p.companies.create.map((c: any) => c.name)).toEqual(["Fővárosi Önkormányzat", "Zalaegerszeg MJV Önkormányzata"]);
+    expect(p.companies.skipped.map((s: any) => s.reason)).toEqual(["duplicate in input", "duplicate in input"]);
+  });
+  it("matches an existing company by website domain", () => {
+    const p = planPush([row({ company_name: "Alpha Építő Zrt.", website: "https://www.alpha.hu/kapcsolat" })],
+      crm({ companies: [{ id: 5, name: "ALFA KFT.", vat_number: null, website: "alpha.hu" }] }), opts);
+    expect(p.companies.matched.map((c: any) => c.id)).toEqual([5]);
+  });
+  it("a name-key prefix without VAT is a possible duplicate: skipped, never created", () => {
+    const p = planPush([row({ company_name: "TERRA-21. Közmű és Mélyépítő Kft.", website: "https://terra21.hu/" })],
+      crm({ companies: [{ id: 1170, name: "TERRA-21. KFT.", vat_number: null, website: null }] }), opts);
+    expect(p.companies.create).toEqual([]);
+    expect(p.companies.skipped[0].reason).toMatch(/possible duplicate of company 1170/);
+  });
+});
+
 describe("rerun", () => {
   it("creates nothing once the first plan is in the CRM", () => {
-    const rows = [row({ adoszam: "12345678-2-41" }), row({ lead_id: "L3", company_name: "Gamma Zrt.", person: person({ name: "Szabó Éva", email: "eva@gamma.hu" }) })];
+    const rows = [row({ adoszam: "12345678-2-41" }), row({ lead_id: "L3", company_name: "Gamma Zrt.", website: "https://gamma.hu", person: person({ name: "Szabó Éva", email: "eva@gamma.hu" }) })];
     const first = planPush(rows, crm(), opts);
     expect(first.drafts.create).toHaveLength(2);
     const cid = new Map(first.companies.create.map((c: any, i: number) => [c.ref, 100 + i]));
