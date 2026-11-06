@@ -1,6 +1,8 @@
 import { budapestParts, budapestYmd } from "@/lib/time";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { claimDailySend } from "@/lib/daily-send";
+import { appBaseUrl } from "@/lib/app-url";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
 import { getContentReviewers } from "./reviewers";
@@ -122,14 +124,8 @@ export async function sendContentDigests(
   // resends) bypasses the claim entirely.
   if (!opts.force) {
     const today = budapestYmd(now);
-    const claimed = await db.$executeRaw`
-      UPDATE "tenants"
-         SET "settings" = jsonb_set(
-               CASE WHEN jsonb_typeof("settings") = 'object' THEN "settings" ELSE '{}'::jsonb END,
-               '{contentDigestLastSentOn}', to_jsonb(${today}::text), true)
-       WHERE "id" = ${tenantId}
-         AND COALESCE("settings"->>'contentDigestLastSentOn', '') <> ${today}`;
-    if (claimed === 0) {
+    const claimed = await claimDailySend(tenantId, "contentDigestLastSentOn", today);
+    if (!claimed) {
       return { sent: 0, skipped: 0, reason: "already_sent" };
     }
   }
@@ -139,7 +135,7 @@ export async function sendContentDigests(
 
   const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
   const optOut = digestOptOutFromSettings(tenant?.settings);
-  const baseUrl = process.env.APP_BASE_URL ?? "https://ndt-crm.vercel.app";
+  const baseUrl = appBaseUrl();
 
   let sent = 0;
   let skipped = 0;

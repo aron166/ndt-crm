@@ -1,5 +1,7 @@
 import { budapestParts, budapestYmd } from "@/lib/time";
 import { db } from "@/lib/db";
+import { claimDailySend } from "@/lib/daily-send";
+import { appBaseUrl } from "@/lib/app-url";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
 import { getContentReviewers } from "@/lib/content/reviewers";
@@ -103,7 +105,7 @@ export async function sendWeeklyReports(
   const recipientIds = await getContentReviewers(tenantId);
   if (recipientIds.length === 0) return { sent: 0, skipped: 0, reason: "no_reviewers" };
 
-  const baseUrl = process.env.APP_BASE_URL ?? "https://ndt-crm.vercel.app";
+  const baseUrl = appBaseUrl();
   // Fetched once: the same numbers go to every recipient.
   const [report, statuses] = await Promise.all([
     getWeeklyReport(tenantId, previousBudapestWeek(now)),
@@ -115,14 +117,8 @@ export async function sendWeeklyReports(
   // row; only the caller that flips it from "not today" sends. `force` bypasses.
   if (!opts.force) {
     const today = budapestYmd(now);
-    const claimed = await db.$executeRaw`
-      UPDATE "tenants"
-         SET "settings" = jsonb_set(
-               CASE WHEN jsonb_typeof("settings") = 'object' THEN "settings" ELSE '{}'::jsonb END,
-               '{weeklyReportLastSentOn}', to_jsonb(${today}::text), true)
-       WHERE "id" = ${tenantId}
-         AND COALESCE("settings"->>'weeklyReportLastSentOn', '') <> ${today}`;
-    if (claimed === 0) {
+    const claimed = await claimDailySend(tenantId, "weeklyReportLastSentOn", today);
+    if (!claimed) {
       return { sent: 0, skipped: 0, reason: "already_sent" };
     }
   }
