@@ -8,7 +8,6 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { buildCompanyChanges, buildPersonChanges, type ChangesMap } from "@/lib/enrichment/sources";
 
-export type { FieldChange, ChangesMap } from "@/lib/enrichment/sources";
 
 // ─── Bulk trigger ─────────────────────────────────────────────────────────────
 

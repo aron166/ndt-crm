@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Check, Sparkles } from "lucide-react";
 import { applyProposal } from "@/app/actions/enrichment";
-import type { FieldChange, ChangesMap } from "@/app/actions/enrichment";
+import type { FieldChange, ChangesMap } from "@/lib/enrichment/sources";
 
 interface Proposal {
   id: number;
