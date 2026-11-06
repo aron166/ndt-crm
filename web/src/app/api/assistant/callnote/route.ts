@@ -1,6 +1,7 @@
 import { TZ } from "@/lib/time";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { reportError } from "@/lib/report-error";
 import { json, readJson } from "@/lib/api/http";
 import { leadApiCtx } from "@/lib/leads/api";
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
     return json({ ok: true, applied: true, lead_id: lead.leadId, interaction_id: res.interactionId, task_id: res.taskId }, 201);
   } catch (err) {
     // A concurrent duplicate trips the unique call_id inside the transaction: report it as the replay it is.
-    if ((err as { code?: string })?.code === "P2002") {
+    if (isUniqueViolation(err)) {
       const dup = await db.interaction.findFirst({ where: { tenantId, callId }, select: { id: true, leadId: true } }).catch(() => null);
       if (dup) return json({ ok: true, applied: true, existed: true, interaction_id: dup.id, lead_id: dup.leadId });
       return json({ error: "Duplicate transcript (already applied)" }, 409);

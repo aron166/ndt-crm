@@ -2,8 +2,8 @@
 import { LEAD_NOT_FOUND } from "@/lib/leads/service";
 import { TENANT_ID } from "@/lib/tenant";
 
-import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { quoteTotals, lineAmount } from "@/lib/quotes/calc";
@@ -190,7 +190,7 @@ export async function createQuote(
       revalidatePath("/quotes");
       return { id: created.id };
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") continue;
+      if (isUniqueViolation(e)) continue;
       throw e;
     }
   }

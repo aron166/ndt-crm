@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { reportError } from "@/lib/report-error";
 import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
 import { leadIntakeSchema } from "@/lib/leads/schema";
@@ -111,8 +111,7 @@ export async function POST(request: Request) {
     const hitThreadKeyIndex =
       Array.isArray(target) ? target.includes("thread_key") : String(target ?? "").includes("thread_key");
     if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2002" &&
+      isUniqueViolation(err) &&
       hitThreadKeyIndex &&
       parsed.data.thread_key
     ) {

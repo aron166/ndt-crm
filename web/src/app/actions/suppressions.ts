@@ -3,6 +3,7 @@ import { TENANT_ID } from "@/lib/tenant";
 
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { requireCrmUserId } from "@/lib/actor";
@@ -47,7 +48,7 @@ export async function addSuppression(formData: FormData) {
       data: { tenantId: TENANT_ID, email, domain, requestedAt, channel, source, note, createdById: userId },
     });
   } catch (e) {
-    if ((e as { code?: string }).code === "P2002") return { error: "Ez a cím vagy domain már tiltólistán van." };
+    if (isUniqueViolation(e)) return { error: "Ez a cím vagy domain már tiltólistán van." };
     throw e;
   }
 

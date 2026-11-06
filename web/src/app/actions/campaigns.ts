@@ -2,12 +2,12 @@
 import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { WAVE_MAX } from "@/lib/outreach/steps";
 import { audit } from "@/lib/audit";
 import { requireCrmUser } from "@/lib/actor";
-import { Prisma } from "@prisma/client";
 import { slugify } from "@/lib/slug";
 
 // A campaign row is the ONE campaign identity: the marketing content queue AND
@@ -132,7 +132,7 @@ export async function createCampaign(input: {
   try {
     campaign = await db.campaign.create({ data, select: { id: true } });
   } catch (err) {
-    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
+    if (!isUniqueViolation(err)) throw err;
     const retrySlug = await uniqueSlug(slugifyName(typed || name));
     data.slug = retrySlug;
     campaign = await db.campaign.create({ data, select: { id: true } });

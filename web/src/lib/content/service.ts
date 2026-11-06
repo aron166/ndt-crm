@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { loadSuppressionSet, isSuppressed } from "@/lib/suppression";
 import { applyEvent, isClaimStale, type ItemState } from "./transitions";
 import { getApprovalRule, getContentReviewers } from "./reviewers";
@@ -209,7 +210,7 @@ export async function createItem(
   } catch (err) {
     // Concurrent create with the same externalRef: the unique index wins; hand
     // back the item the other request created (only possible without an outer tx).
-    if (!tx && input.externalRef && (err as { code?: string }).code === "P2002") {
+    if (!tx && input.externalRef && isUniqueViolation(err)) {
       const existing = await db.contentItem.findFirst({
         where: { tenantId: actor.tenantId, externalRef: input.externalRef },
         select: { id: true, currentVersionId: true, status: true },
@@ -592,7 +593,7 @@ export async function setOutreachSlot(
       // The partial unique index is the real gate; the lookup above only lets
       // us name the occupying item. A concurrent assignment loses here, and
       // must read as the designed 409, not a 500 (Vanda, #105).
-      if ((err as { code?: string }).code === "P2002") {
+      if (isUniqueViolation(err)) {
         return fail(409, "Ezt a lépést közben betöltötte egy másik tartalom");
       }
       throw err;
