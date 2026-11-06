@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
@@ -16,6 +15,7 @@ import { NOTE_PREVIEW_LEN } from "@/lib/calls/transcript";
 import { reportError } from "@/lib/report-error";
 import { writeAuditLog } from "@/lib/audit";
 import { TZ } from "@/lib/time";
+import { isUniqueViolation } from "@/lib/db-errors";
 
 // Call-result intake. The external transcription/analysis pipeline (Make:
 // recorder → Drive → Whisper → AI) posts the finished transcript + analysis
@@ -32,10 +32,6 @@ import { TZ } from "@/lib/time";
 const api = jsonApi("POST, OPTIONS");
 const json = api.json;
 export const OPTIONS = api.OPTIONS;
-
-function isUniqueViolation(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
-}
 
 /** Suggested-outcome description for the confirm task — every field is a suggestion, nothing is applied. */
 function composeConfirmDescription(parsed: ParsedCall, reasonLabel: string): string {
@@ -265,7 +261,8 @@ async function handleLeadOutcome(
       },
       options: { tenantId, actor: "agent", actorAgentId: appSlug },
     });
-    await recomputeCloseness({ tenantId, companyId: lead.companyId, personId });
+    // An applied outcome went through logLeadCallOutcome, which already recomputed.
+    if (!result.applied) await recomputeCloseness({ tenantId, companyId: lead.companyId, personId });
 
     if (lead.companyId) revalidatePath(`/companies/${lead.companyId}`);
     if (personId) revalidatePath(`/persons/${personId}`);
