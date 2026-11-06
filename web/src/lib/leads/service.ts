@@ -78,19 +78,46 @@ export async function completeOpenLeadCallTasks(
   return count;
 }
 
-/** Move a lead to another column. Fires lead_status_changed automations. */
+/** Move a lead to another column and fire lead_status_changed automations. */
 export async function changeLeadStatus(
   leadId: number,
   newStatus: string,
   ctx: LeadCtx,
-  opts: { fireAutomations?: boolean } = {},
 ): Promise<Result<{ changed: boolean }>> {
+  const r = await writeLeadStatus(leadId, newStatus, ctx);
+  if (r.error !== undefined) return { error: r.error };
+  const { before } = r;
+  if (!before) return { success: true, changed: false };
+  await runAutomations({
+    type: "lead_status_changed",
+    tenantId: ctx.tenantId,
+    leadId,
+    companyId: before.companyId,
+    personId: before.contact?.personId ?? null,
+    companyName: before.company?.name ?? null,
+    toStatus: newStatus,
+    fields: eventFields(before, { status: newStatus }),
+  });
+  return { success: true, changed: true };
+}
+
+/**
+ * Move a lead without firing automations: for the automation engine's own
+ * change_lead_status action, so a rule's move cannot trigger rules again.
+ */
+export async function applyLeadStatus(leadId: number, newStatus: string, ctx: LeadCtx): Promise<Result<{ changed: boolean }>> {
+  const r = await writeLeadStatus(leadId, newStatus, ctx);
+  return r.error !== undefined ? { error: r.error } : { success: true, changed: r.before != null };
+}
+
+/** The move itself; `before` is the lead as it was, or null when nothing changed. */
+async function writeLeadStatus(leadId: number, newStatus: string, ctx: LeadCtx) {
   const statuses = await getLeadStatuses(ctx.tenantId);
   if (!statuses.some((s) => s.key === newStatus)) return { error: "Ismeretlen státusz" };
 
   const before = await loadLead(leadId, ctx.tenantId);
   if (!before) return { error: LEAD_NOT_FOUND };
-  if (before.status === newStatus) return { success: true, changed: false };
+  if (before.status === newStatus) return { success: true as const, before: null };
 
   // Moving the card is acting on the lead → its open callback task is done.
   // EXCEPT into `recall`, which IS "call this back later": closing the reminder
@@ -108,20 +135,7 @@ export async function changeLeadStatus(
     { status: before.status, statusLabel: leadStatusLabel(before.status, statuses) },
     { status: newStatus, statusLabel: leadStatusLabel(newStatus, statuses) },
     auditOpts(ctx));
-
-  if (opts.fireAutomations !== false) {
-    await runAutomations({
-      type: "lead_status_changed",
-      tenantId: ctx.tenantId,
-      leadId,
-      companyId: before.companyId,
-      personId: before.contact?.personId ?? null,
-      companyName: before.company?.name ?? null,
-      toStatus: newStatus,
-      fields: eventFields(before, { status: newStatus }),
-    });
-  }
-  return { success: true, changed: true };
+  return { success: true as const, before };
 }
 
 /** Set the lead's responsible user (null = unassigned). */

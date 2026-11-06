@@ -4,6 +4,7 @@ import { agentCtx } from "@/lib/ctx";
 import { SUPPRESSED_ERROR } from "@/lib/suppression";
 import { reportError } from "@/lib/report-error";
 import { isHttpsUrl } from "@/lib/url";
+import { isUniqueViolation } from "@/lib/db-errors";
 import type {
   AutomationEvent,
   Condition,
@@ -232,8 +233,9 @@ export async function runLeadAction(
   if (actionType === "change_lead_status") {
     const cfg = actionConfig as ChangeLeadStatusActionConfig;
     if (!cfg?.toStatus) return false;
-    const { changeLeadStatus } = await import("@/lib/leads/service");
-    const r = await changeLeadStatus(ev.leadId, cfg.toStatus, agentCtx(ev.tenantId, "automation"), { fireAutomations: false });
+    // Dynamic: lib/leads/service imports this engine to fire its own events.
+    const { applyLeadStatus } = await import("@/lib/leads/service");
+    const r = await applyLeadStatus(ev.leadId, cfg.toStatus, agentCtx(ev.tenantId, "automation"));
     if ("error" in r) throw new Error(r.error);
     return true;
   }
@@ -304,7 +306,7 @@ export async function runAutomationAction(
       try {
         await db.automationEmailSend.create({ data: { tenantId: ev.tenantId, ruleId: rule.id, recipient } });
       } catch (err) {
-        if ((err as { code?: string }).code !== "P2002") {
+        if (!isUniqueViolation(err)) {
           reportError("automations.email_send_record", err, { ruleId: rule.id });
         }
       }
