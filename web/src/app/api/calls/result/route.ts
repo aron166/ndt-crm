@@ -15,6 +15,7 @@ import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { NOTE_PREVIEW_LEN } from "@/lib/calls/transcript";
 import { reportError } from "@/lib/report-error";
 import { writeAuditLog } from "@/lib/audit";
+import { TZ } from "@/lib/time";
 
 // Call-result intake. The external transcription/analysis pipeline (Make:
 // recorder → Drive → Whisper → AI) posts the finished transcript + analysis
@@ -46,7 +47,7 @@ function composeConfirmDescription(parsed: ParsedCall, reasonLabel: string): str
   ];
   if (parsed.callback_at) {
     parts.push(
-      `Javasolt visszahívás: ${new Date(parsed.callback_at).toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}`,
+      `Javasolt visszahívás: ${new Date(parsed.callback_at).toLocaleString("hu-HU", { timeZone: TZ })}`,
     );
   }
   if (parsed.answers && Object.keys(parsed.answers).length > 0) {
