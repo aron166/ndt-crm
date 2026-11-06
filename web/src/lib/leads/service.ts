@@ -91,14 +91,15 @@ export async function changeLeadStatus(
   if (!before) return { error: LEAD_NOT_FOUND };
   if (before.status === newStatus) return { success: true, changed: false };
 
-  await db.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data: { status: newStatus } });
   // Moving the card is acting on the lead → its open callback task is done.
   // EXCEPT into `recall`, which IS "call this back later": closing the reminder
   // there would silently delete the only thing telling anyone to call.
+  // One transaction: the move and the task close land together or not at all.
   const now = new Date();
-  const closedTasks = newStatus === RECALL_STATUS
-    ? 0
-    : await completeOpenLeadCallTasks(db, leadId, ctx.tenantId, now);
+  const closedTasks = await db.$transaction(async (tx) => {
+    await tx.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data: { status: newStatus } });
+    return newStatus === RECALL_STATUS ? 0 : completeOpenLeadCallTasks(tx, leadId, ctx.tenantId, now);
+  });
   if (closedTasks > 0) {
     audit("lead", leadId, "update", { openCallTasks: closedTasks }, { openCallTasks: 0 }, auditOpts(ctx));
   }
