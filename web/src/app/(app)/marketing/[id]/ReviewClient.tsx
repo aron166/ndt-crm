@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import { MAX_STEP, isValidStep } from "@/lib/outreach/steps";
 import "./review.css";
 import { isHttpUrl } from "@/lib/url";
+import { useTimedFlag } from "@/lib/use-debounced-callback";
 
 // Bucket name duplicated here on purpose: storage.ts is server-only and must
 // never be imported into a client component (spec instruction).
@@ -115,7 +116,7 @@ export function ReviewClient({
   const [slotPending, setSlotPending] = useState(false);
 
   const [publishUrl, setPublishUrl] = useState(item.externalUrl ?? "");
-  const [copied, setCopied] = useState(false);
+  const [copied, flashCopied] = useTimedFlag(2000);
   const [metrics, setMetrics] = useState<Record<string, string>>(
     Object.fromEntries(METRIC_FIELDS.map((f) => [f.key, item.metrics?.[f.key]?.toString() ?? ""])),
   );
@@ -217,8 +218,7 @@ export function ReviewClient({
     if (!liveVersion) return;
     try {
       await navigator.clipboard.writeText(liveVersion.body);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      flashCopied();
     } catch {
       // Clipboard can fail silently (permissions/non-secure context) — nothing to recover here.
     }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Paperclip } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UI, CATEGORY_LABEL } from "@/lib/content/labels";
 import { CONTENT_CATEGORIES, type ContentCategory } from "@/lib/content/types";
 import type { LibraryRow } from "@/lib/content/queries";
+import { useTimedFlag } from "@/lib/use-debounced-callback";
 
 const selectStyle: React.CSSProperties = {
   padding: "6px 10px", fontSize: 14, minHeight: 44, maxWidth: "100%",
@@ -27,15 +28,14 @@ function plainTextPreview(body: string): string {
 }
 
 function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, flashCopied] = useTimedFlag(1500);
   return (
     <button
       onClick={async (e) => {
         e.preventDefault();
         e.stopPropagation();
         await navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        flashCopied();
       }}
       className="btn sm"
       style={{ minHeight: 44 }}
