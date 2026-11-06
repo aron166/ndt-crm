@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { agentCtx } from "@/lib/ctx";
 import { SUPPRESSED_ERROR } from "@/lib/suppression";
 import { reportError } from "@/lib/report-error";
 import type {
@@ -232,7 +233,7 @@ export async function runLeadAction(
     const cfg = actionConfig as ChangeLeadStatusActionConfig;
     if (!cfg?.toStatus) return false;
     const { changeLeadStatus } = await import("@/lib/leads/service");
-    const r = await changeLeadStatus(ev.leadId, cfg.toStatus, systemCtx(ev.tenantId), { fireAutomations: false });
+    const r = await changeLeadStatus(ev.leadId, cfg.toStatus, agentCtx(ev.tenantId, "automation"), { fireAutomations: false });
     if ("error" in r) throw new Error(r.error);
     return true;
   }
@@ -240,15 +241,11 @@ export async function runLeadAction(
     const cfg = actionConfig as AssignLeadActionConfig;
     if (cfg?.assignedToId == null) return false;
     const { assignLead } = await import("@/lib/leads/service");
-    const r = await assignLead(ev.leadId, Number(cfg.assignedToId), systemCtx(ev.tenantId));
+    const r = await assignLead(ev.leadId, Number(cfg.assignedToId), agentCtx(ev.tenantId, "automation"));
     if ("error" in r) throw new Error(r.error);
     return true;
   }
   return false;
-}
-
-function systemCtx(tenantId: number) {
-  return { tenantId, userId: null, actor: "agent" as const, actorAgentId: "automation" };
 }
 
 /**

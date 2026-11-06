@@ -17,21 +17,13 @@ import { reportError } from "@/lib/report-error";
 import { DEFAULT_BOOKING_MINUTES, conflictsFor } from "@/lib/booking/conflicts";
 import { loadBookings, resolveDemoHost } from "@/lib/booking/queries";
 import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
+import type { LeadCtx } from "@/lib/ctx";
 
 // The ONE write path for lead process changes — used by the server actions (UI)
 // and the public /api/leads routes alike, so the rules can't drift between the
 // two. Transport-agnostic: no FormData, no NextResponse, no revalidatePath.
 
 export const LEAD_NOT_FOUND = "Lead nem található";
-
-export interface LeadCtx {
-  tenantId: number;
-  /** `users.id` of the acting human, null for app/agent callers. */
-  userId: number | null;
-  actor: "user" | "agent";
-  /** App slug / agent id for audit attribution when actor = agent. */
-  actorAgentId?: string;
-}
 
 function auditOpts(ctx: LeadCtx): AuditOptions {
   return { tenantId: ctx.tenantId, actor: ctx.actor, actorAgentId: ctx.actorAgentId };

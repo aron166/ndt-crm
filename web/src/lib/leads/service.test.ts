@@ -1,7 +1,8 @@
 import type { AnswerSources } from "./qualification";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { db } from "@/lib/db";
-import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, setLeadQualification, type LeadCtx } from "./service";
+import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, setLeadQualification } from "./service";
+import type { LeadCtx } from "@/lib/ctx";
 import { resolveDemoHost, loadBookings } from "@/lib/booking/queries";
 
 // The task ↔ kanban sync (Péter, BRIEFING addendum 2026-09-07 P0 #4). Both

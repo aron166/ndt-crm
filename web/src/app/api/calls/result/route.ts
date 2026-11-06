@@ -8,7 +8,8 @@ import { analyzeCallTranscript } from "@/lib/calls/analyze";
 import {
   decideAutoOutcome, toCallOutcome, AUTO_OUTCOME_LABELS, AUTO_OUTCOME_REASON_LABEL, type ParsedCall,
 } from "@/lib/calls/auto-outcome";
-import { logLeadCallOutcome, setLeadQualification, type LeadCtx } from "@/lib/leads/service";
+import { logLeadCallOutcome, setLeadQualification } from "@/lib/leads/service";
+import { agentCtx } from "@/lib/ctx";
 import { callOutcomeLabel } from "@/lib/leads/outcomes";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { NOTE_PREVIEW_LEN } from "@/lib/calls/transcript";
@@ -200,7 +201,7 @@ async function handleLeadOutcome(
 
     const now = new Date();
     const decision = decideAutoOutcome(parsed);
-    const ctx: LeadCtx = { tenantId, userId: null, actor: "agent", actorAgentId: appSlug };
+    const ctx = agentCtx(tenantId, appSlug);
 
     let result: {
       applied: boolean;

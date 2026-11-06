@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { requireAppKey } from "@/lib/api/http";
-import type { LeadCtx } from "./service";
+import { agentCtx, type LeadCtx } from "@/lib/ctx";
 import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
 import { answersRecordSchema } from "./qualification";
 
@@ -13,7 +13,7 @@ import { answersRecordSchema } from "./qualification";
 export async function leadApiCtx(request: Request): Promise<{ ctx: LeadCtx } | { res: NextResponse }> {
   const key = await requireAppKey(request);
   if (key instanceof NextResponse) return { res: key };
-  return { ctx: { tenantId: key.tenantId, userId: null, actor: "agent", actorAgentId: key.appSlug } };
+  return { ctx: agentCtx(key.tenantId, key.appSlug) };
 }
 
 const emptyToUndef = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);

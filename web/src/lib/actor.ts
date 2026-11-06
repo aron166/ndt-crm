@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { crmUserIdForEmail } from "./crm-user";
 import { createClient } from "./supabase/server";
-import type { LeadCtx } from "./leads/service";
+import type { LeadCtx } from "./ctx";
 
 // Who is acting, as a `users` row id (the FK interactions.user_id /
 // tasks.assigned_to_id need). Supabase Auth is the identity source; the `users`
