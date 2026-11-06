@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { readJson, requireAppKey } from "@/lib/api/http";
 import { conversationIntakeSchema } from "@/lib/hub/schema";
+import { hubRefsInTenant, isMissingRef, FOREIGN_REF_ERROR, MISSING_REF_ERROR } from "@/lib/hub/refs";
 import { reportError } from "@/lib/report-error";
 
 // Agent-conversation ingestion (conversations + messages).
@@ -27,15 +27,8 @@ export async function POST(request: Request) {
 
   const tenantId = ctx.tenantId;
 
-  // Every referenced entity must belong to the key's tenant — a foreign id is
-  // a caller bug (or a probe), never a cross-tenant write.
-  const [agentOk, personOk, companyOk] = await Promise.all([
-    body.agentId ? db.agent.findFirst({ where: { id: body.agentId }, select: { id: true } }) /* agents are portfolio-global */ : true,
-    body.personId ? db.person.findFirst({ where: { id: body.personId, tenantId, deletedAt: null }, select: { id: true } }) : true,
-    body.companyId ? db.company.findFirst({ where: { id: body.companyId, tenantId, deletedAt: null }, select: { id: true } }) : true,
-  ]);
-  if (!agentOk || !personOk || !companyOk) {
-    return NextResponse.json({ error: "Unknown agentId, personId, or companyId for this tenant" }, { status: 400 });
+  if (!(await hubRefsInTenant(tenantId, body))) {
+    return NextResponse.json({ error: FOREIGN_REF_ERROR }, { status: 400 });
   }
 
   try {
@@ -70,12 +63,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, conversation }, { status: 201 });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
-      return NextResponse.json(
-        { error: "Unknown agentId, personId, or companyId reference" },
-        { status: 400 },
-      );
-    }
+    if (isMissingRef(err)) return NextResponse.json({ error: MISSING_REF_ERROR }, { status: 400 });
     reportError("conversations.ingest", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
