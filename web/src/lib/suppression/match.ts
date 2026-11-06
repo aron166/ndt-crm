@@ -75,3 +75,11 @@ export function isSuppressed(email: string | null | undefined, set: SuppressionS
   }
   return false;
 }
+
+/** A contact is reachable only if neither its own address nor its person's is suppressed. */
+export function isContactSuppressed(
+  contact: { email: string | null; person: { email: string | null } },
+  set: SuppressionSet,
+): boolean {
+  return isSuppressed(contact.email ?? contact.person.email, set) || isSuppressed(contact.person.email, set);
+}

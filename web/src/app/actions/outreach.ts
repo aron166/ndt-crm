@@ -4,7 +4,7 @@ import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { NOT_FA } from "@/lib/companies/filters";
 import { requireCrmUser } from "@/lib/actor";
-import { loadSuppressionSet, isSuppressed } from "@/lib/suppression";
+import { loadSuppressionSet, isContactSuppressed } from "@/lib/suppression";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import {
@@ -18,6 +18,7 @@ import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import type { Prisma } from "@prisma/client";
 import { reportError } from "@/lib/report-error";
 import { formatDuration } from "@/lib/calls/result";
+import { CURRENT_CONTACTS } from "@/lib/outreach/recipient";
 
 // Companies the cockpit will call: callable status, alive, not under liquidation.
 const CALLABLE_WHERE: Prisma.CompanyWhereInput = {
@@ -110,8 +111,7 @@ export async function getCallQueue(viewId?: number | null): Promise<CallCard[]> 
       pipelineStatus: true,
       lastInteractionDate: true,
       contacts: {
-        where: { endedAt: null },
-        orderBy: [{ isPrimary: "desc" }, { startedAt: "desc" }],
+        ...CURRENT_CONTACTS,
         select: {
           role: true,
           phone: true,
@@ -132,7 +132,7 @@ export async function getCallQueue(viewId?: number | null): Promise<CallCard[]> 
   const suppressed = await loadSuppressionSet(TENANT_ID);
   return rows.map((c) => {
     const contacts: CallCardContact[] = c.contacts
-      .filter((ct) => !isSuppressed(ct.email ?? ct.person.email, suppressed) && !isSuppressed(ct.person.email, suppressed))
+      .filter((ct) => !isContactSuppressed(ct, suppressed))
       .map((ct) => ({
       personId: ct.person.id,
       name: `${ct.person.lastName} ${ct.person.firstName}`.trim(),
