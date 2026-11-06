@@ -25,6 +25,7 @@ import {
 } from "@/lib/content/storage";
 import { generateThumbnail } from "@/lib/content/thumbnails";
 import type { NewAssetInput } from "@/lib/content/service";
+import { isHttpUrl } from "@/lib/url";
 
 // Content approval — human side (spec 2026-09-17). Every action resolves the
 // CRM user itself; review writes are additionally gated on the configured
@@ -152,10 +153,6 @@ export async function requestAssetUpload(input: {
     reportError("content.requestAssetUpload", err, { itemId });
     return { ok: false, error: "A feltöltés most nem indítható" };
   }
-}
-
-function isHttpUrl(u: string): boolean {
-  try { const p = new URL(u); return p.protocol === "http:" || p.protocol === "https:"; } catch { return false; }
 }
 
 async function resolveAssets(

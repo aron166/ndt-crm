@@ -1,6 +1,7 @@
 "use client";
 
-import { readDossier, sortDossierItems, safeHttpUrl } from "@/lib/enrichment/dossier";
+import { readDossier, sortDossierItems } from "@/lib/enrichment/dossier";
+import { safeHttpUrl } from "@/lib/url";
 import { formatDate } from "@/lib/utils";
 
 interface Props {
@@ -61,6 +62,7 @@ export function DossierTab({ enrichment, closenessScore, enrichmentUpdatedAt, em
               <div className="field-label" style={{ marginBottom: 8 }}>Előzmények</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {sortDossierItems(dossier!.items!).map((item, i) => {
+                  // The dossier is written by an external research agent: untrusted.
                   const href = safeHttpUrl(item.url);
                   return (
                     <div key={i} style={{ borderBottom: "1px solid var(--line-soft)", paddingBottom: 10 }}>

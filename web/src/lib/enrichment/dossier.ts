@@ -71,18 +71,6 @@ export function dossierDigest(value: unknown): { items: number; has_summary: boo
   };
 }
 
-/** Only render a URL as a link when it actually parses as http/https — the
- * dossier is written by an external research agent, treat it as untrusted. */
-export function safeHttpUrl(url: string | undefined): string | null {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Newest first. Undated items sink to the bottom, keeping their order. */
 export function sortDossierItems(items: DossierItem[]): DossierItem[] {
   return [...items].sort((a, b) => {

@@ -21,6 +21,7 @@ import { publishContent, saveContentMetrics } from "@/app/actions/marketing";
 import { createClient } from "@/lib/supabase/client";
 import { MAX_STEP, isValidStep } from "@/lib/outreach/steps";
 import "./review.css";
+import { isHttpUrl } from "@/lib/url";
 
 // Bucket name duplicated here on purpose: storage.ts is server-only and must
 // never be imported into a client component (spec instruction).
@@ -46,15 +47,6 @@ const METRIC_FIELDS: { key: string; label: string }[] = [
 
 function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
-}
-
-function isHttpUrl(u: string): boolean {
-  try {
-    const p = new URL(u);
-    return p.protocol === "http:" || p.protocol === "https:";
-  } catch {
-    return false;
-  }
 }
 
 function fileNameOf(path: string): string {

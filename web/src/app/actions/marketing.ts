@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { requireCrmUserId } from "@/lib/actor";
 import { createVersion } from "@/lib/content/service";
+import { isHttpUrl } from "@/lib/url";
 
 // Legacy marketing actions (pre content-approval). Approve / reject / back to
 // edit are GONE — status now only changes through lib/content/service.ts
@@ -79,17 +80,8 @@ export async function publishContent(id: number, externalUrl: string) {
 
   const url = externalUrl?.trim();
   if (!url) return { error: "A megjelenés linkje kötelező" };
-  // Only http(s) — new URL() also accepts javascript:/data:, which would become
-  // a stored XSS sink once rendered into an href.
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return { error: "Érvénytelen URL" };
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return { error: "Csak http/https link engedélyezett" };
-  }
+  if (!URL.canParse(url)) return { error: "Érvénytelen URL" };
+  if (!isHttpUrl(url)) return { error: "Csak http/https link engedélyezett" };
 
   const publishedAt = new Date();
   await db.contentItem.update({ where: { id }, data: { publishedAt, externalUrl: url } });
