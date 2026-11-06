@@ -18,6 +18,7 @@ import { getLeadStatuses } from "@/lib/leads/queries";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 import { slugify } from "@/lib/slug";
+import { isHttpsUrl } from "@/lib/url";
 
 
 export async function deleteLead(
@@ -426,7 +427,7 @@ export async function saveQualificationQuestions(
 
   const url = (introUrl ?? "").trim();
   // https-only, same rule as webhook_out: this link goes out in customer email.
-  if (url && !/^https:\/\//i.test(url)) return { error: "A termékismertető linkje https:// címmel kezdődjön" };
+  if (url && !isHttpsUrl(url)) return { error: "A termékismertető linkje https:// címmel kezdődjön" };
   if (url.length > 500) return { error: "A link túl hosszú" };
 
   const next = {
