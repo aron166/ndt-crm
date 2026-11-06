@@ -142,7 +142,7 @@ export const callOutcomeSchema = z
       ctx.addIssue({ code: "custom", path: ["occurredAt"], message: "A hívás időpontja nem lehet a jövőben" });
     }
     if (isLostCallOutcome(d.outcome) && (d.lostReason ?? "").length < LOST_REASON_MIN) {
-      ctx.addIssue({ code: "custom", path: ["lostReason"], message: "Az elvesztés oka kötelező (min. 3 karakter)" });
+      ctx.addIssue({ code: "custom", path: ["lostReason"], message: `Az elvesztés oka kötelező (min. ${LOST_REASON_MIN} karakter)` });
     }
   });
 export type CallOutcomeInput = z.infer<typeof callOutcomeSchema>;
@@ -256,7 +256,7 @@ export function promptLostReason(): string | null {
   const raw = window.prompt("Miért veszett el a lead? (kötelező)");
   const reason = raw?.trim() ?? "";
   if (reason.length < LOST_REASON_MIN) {
-    if (raw !== null) window.alert("Az elvesztés oka kötelező (min. 3 karakter).");
+    if (raw !== null) window.alert(`Az elvesztés oka kötelező (min. ${LOST_REASON_MIN} karakter).`);
     return null;
   }
   return reason.slice(0, LOST_REASON_MAX);

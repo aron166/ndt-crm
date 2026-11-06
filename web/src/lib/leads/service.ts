@@ -219,7 +219,7 @@ export async function setLeadOutcome(
   if (outcome === "lost") {
     reason = lostReason?.trim() || before.lostReason?.trim() || undefined;
     if (!reason || reason.length < LOST_REASON_MIN) {
-      return { error: "A vesztett kimenetelhez indok kötelező (min. 3 karakter)" };
+      return { error: `A vesztett kimenetelhez indok kötelező (min. ${LOST_REASON_MIN} karakter)` };
     }
     reason = reason.slice(0, LOST_REASON_MAX);
   }
