@@ -13,9 +13,6 @@ import { z } from "zod";
 
 import { DRAFT_STATUSES, MAX_STEP, WAVE_MAX, type DraftStatus } from "./steps";
 
-// Type-only re-export: app/api/outreach/drafts/route.ts (off limits) imports it from here.
-export type { DraftStatus } from "./steps";
-
 export function isDraftStatus(v: unknown): v is DraftStatus {
   return typeof v === "string" && (DRAFT_STATUSES as readonly string[]).includes(v);
 }

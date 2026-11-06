@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
-import { json, leadApiCtx, readJson } from "@/lib/leads/api";
+import { json, readJson } from "@/lib/api/http";
+import { leadApiCtx } from "@/lib/leads/api";
 import { logLeadCallOutcome } from "@/lib/leads/service";
 import { AssistantError, assistantConfig, chatCompletion, estimateCostUsd } from "@/lib/assistant/provider";
 import { capState } from "@/lib/assistant/cap";

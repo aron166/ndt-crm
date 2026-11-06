@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { reportError } from "@/lib/report-error";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
 import { createVersion } from "@/lib/content/service";
 
 // POST /api/content/:id/versions — the content-revise skill posts a rewrite.
@@ -9,20 +9,9 @@ import { createVersion } from "@/lib/content/service";
 // app actors); `based_on_version_id` must be the item's CURRENT version or the
 // service returns 409 (race rule, spec §1).
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+const api = jsonApi("POST, OPTIONS");
+const json = api.json;
+export const OPTIONS = api.OPTIONS;
 
 const versionSchema = z.object({
   body: z.string().trim().min(1).max(50000),
@@ -41,20 +30,15 @@ const versionSchema = z.object({
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: Params) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
-  if (!rateLimit(key.keyId)) return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
   const idStr = (await params).id;
   const id = Number(idStr);
   if (!Number.isInteger(id) || id <= 0) return json({ error: "Invalid id" }, 400);
 
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400);
-  }
+  const raw = await readJson(request, json);
+  if (raw instanceof NextResponse) return raw;
   const parsed = versionSchema.safeParse(raw);
   if (!parsed.success) {
     return json({ error: "Validation failed", details: parsed.error.flatten() }, 400);

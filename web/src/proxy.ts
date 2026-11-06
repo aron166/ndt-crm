@@ -85,7 +85,7 @@ export async function proxy(request: NextRequest) {
 
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth/");
-  // Service-to-service ingestion endpoints authenticate with a service-role
+  // Service-to-service ingestion endpoints authenticate with a per-app
   // Bearer key (validated in-route), not a session cookie. Without this bypass
   // the session gate redirects their callers to /login, so external apps
   // (VeloQuote, agents, BirdsView webhooks) can never reach them. The cron

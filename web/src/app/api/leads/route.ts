@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { reportError } from "@/lib/report-error";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
 import { leadIntakeSchema } from "@/lib/leads/schema";
 import { ingestLead } from "@/lib/leads/ingest";
 import { sendIntroMaterial, type IntroResult } from "@/lib/leads/intro";
@@ -16,26 +16,14 @@ import { leadListQuerySchema, LEAD_API_SELECT } from "@/lib/leads/api";
 // Supabase service-role key is NOT accepted here. The key is the gate, so CORS
 // is open to POST from any origin — landing pages post cross-origin.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+const api = jsonApi("GET, POST, OPTIONS");
+const json = api.json;
+export const OPTIONS = api.OPTIONS;
 
 /** GET /api/leads?status=&outcome=&assigned_to=&page=&page_size= — paginated, newest first. */
 export async function GET(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
-  if (!rateLimit(key.keyId)) return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
   const q = leadListQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if (!q.success) return json({ error: "Validation failed", details: q.error.flatten() }, 400);
@@ -55,19 +43,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
-  if (!rateLimit(key.keyId)) {
-    return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
-  }
-
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400);
-  }
+  const raw = await readJson(request, json);
+  if (raw instanceof NextResponse) return raw;
 
   const parsed = leadIntakeSchema.safeParse(raw);
   if (!parsed.success) {

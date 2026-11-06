@@ -1,15 +1,11 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { json, requireAppKey } from "@/lib/api/http";
 import { dossierSchema } from "./dossier";
 
 // Shared bits of the enrichment write API (/api/companies/:id, /api/persons/:id).
 // Same per-app-key auth as the lead ingestion routes: the key carries the
 // tenant; the service-role key is NOT accepted. snake_case on the wire.
-
-export function json(body: unknown, status = 200) {
-  return NextResponse.json(body, { status });
-}
 
 export interface EnrichmentCtx {
   tenantId: number;
@@ -18,23 +14,11 @@ export interface EnrichmentCtx {
 
 /** Authenticate + rate-limit; returns the ctx or the error response. */
 export async function enrichmentApiCtx(request: Request): Promise<{ ctx: EnrichmentCtx } | { res: NextResponse }> {
-  const key = await validateAppKey(request);
-  if (!key) return { res: json({ error: "Unauthorized" }, 401) };
-  if (!rateLimit(key.keyId)) return { res: json({ error: "Rate limit exceeded (30 req/min)" }, 429) };
+  const key = await requireAppKey(request);
+  if (key instanceof NextResponse) return { res: key };
   return { ctx: { tenantId: key.tenantId, actorAgentId: key.appSlug } };
 }
 
-export function parseEntityId(raw: string): number | null {
-  return /^\d+$/.test(raw) ? parseInt(raw, 10) : null;
-}
-
-export async function readJson(request: Request): Promise<unknown | NextResponse> {
-  try {
-    return await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400);
-  }
-}
 
 const enrichmentBodySchema = z
   .object({

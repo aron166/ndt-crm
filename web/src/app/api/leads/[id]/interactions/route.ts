@@ -1,5 +1,6 @@
 import { reportError } from "@/lib/report-error";
-import { json, leadApiCtx, parseLeadId, readJson, leadInteractionWireSchema, toCallOutcomeInput } from "@/lib/leads/api";
+import { json, parseId, readJson } from "@/lib/api/http";
+import { leadApiCtx, leadInteractionWireSchema, toCallOutcomeInput } from "@/lib/leads/api";
 import { logLeadCallOutcome } from "@/lib/leads/service";
 
 /**
@@ -11,7 +12,7 @@ import { logLeadCallOutcome } from "@/lib/leads/service";
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await leadApiCtx(request);
   if ("res" in auth) return auth.res;
-  const id = parseLeadId((await params).id);
+  const id = parseId((await params).id);
   if (id == null) return json({ error: "Invalid id" }, 400);
 
   const raw = await readJson(request);

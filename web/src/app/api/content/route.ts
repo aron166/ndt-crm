@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
 import { contentIntakeSchema, resolveCampaignSlug, defaultCategory } from "@/lib/marketing/schema";
 import { createItem, addChecks } from "@/lib/content/service";
 import { extractWarnings } from "@/lib/content/warnings";
@@ -16,35 +16,16 @@ import { extractWarnings } from "@/lib/content/warnings";
 // path for the approval pipeline) — this route only resolves the campaign,
 // then attaches assets to the new version.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+const api = jsonApi("POST, OPTIONS");
+const json = api.json;
+export const OPTIONS = api.OPTIONS;
 
 export async function POST(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
-  if (!rateLimit(key.keyId)) {
-    return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
-  }
-
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400);
-  }
+  const raw = await readJson(request, json);
+  if (raw instanceof NextResponse) return raw;
 
   const parsed = contentIntakeSchema.safeParse(raw);
   if (!parsed.success) {

@@ -1,8 +1,7 @@
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { rateLimit } from "@/lib/app-key-auth";
-import { authenticateIngest } from "@/lib/hub/ingest-auth";
+import { readJson, requireAppKey } from "@/lib/api/http";
 import { conversationIntakeSchema } from "@/lib/hub/schema";
 
 // Agent-conversation ingestion (conversations + messages).
@@ -10,19 +9,11 @@ import { conversationIntakeSchema } from "@/lib/hub/schema";
 // Auth: Authorization: Bearer <per-app key> — tenant comes from the key.
 
 export async function POST(request: Request) {
-  const ctx = await authenticateIngest(request);
-  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ctx = await requireAppKey(request);
+  if (ctx instanceof NextResponse) return ctx;
 
-  if (!rateLimit(ctx.keyId)) {
-    return NextResponse.json({ error: "Rate limit exceeded (30 req/min)" }, { status: 429 });
-  }
-
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const raw = await readJson(request);
+  if (raw instanceof NextResponse) return raw;
 
   const parsed = conversationIntakeSchema.safeParse(raw);
   if (!parsed.success) {

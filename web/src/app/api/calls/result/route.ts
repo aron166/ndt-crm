@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
 import { callResultSchema, composeCallNotes, type CallResultInput } from "@/lib/calls/result";
 import { analyzeCallTranscript } from "@/lib/calls/analyze";
 import {
@@ -26,20 +26,9 @@ import { reportError } from "@/lib/report-error";
 //     whether it may be applied; either way it routes through the ONE lead
 //     write path (lib/leads/service.ts) — never a hand-rolled write here.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+const api = jsonApi("POST, OPTIONS");
+const json = api.json;
+export const OPTIONS = api.OPTIONS;
 
 function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
@@ -67,19 +56,11 @@ function composeConfirmDescription(parsed: ParsedCall, reasonLabel: string): str
 }
 
 export async function POST(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
-  if (!rateLimit(key.keyId)) {
-    return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
-  }
-
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400);
-  }
+  const raw = await readJson(request, json);
+  if (raw instanceof NextResponse) return raw;
 
   const parsedBody = callResultSchema.safeParse(raw);
   if (!parsedBody.success) {
