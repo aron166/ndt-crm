@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 
 interface CompaniesSearchProps {
   search: string;
@@ -35,13 +36,11 @@ function CompaniesSearchInner({ search, includeFA }: CompaniesSearchProps) {
     [router, pathname, searchParams]
   );
 
+  const [debouncedPush] = useDebouncedCallback(push, 300);
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setValue(e.target.value);
-    clearTimeout((window as unknown as { _searchTimer: ReturnType<typeof setTimeout> })._searchTimer);
-    (window as unknown as { _searchTimer: ReturnType<typeof setTimeout> })._searchTimer = setTimeout(
-      () => push(e.target.value, includeFA),
-      300
-    );
+    debouncedPush(e.target.value, includeFA);
   }
 
   return (

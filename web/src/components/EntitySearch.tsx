@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { X } from "lucide-react";
 
 interface Option {
@@ -30,7 +31,17 @@ export function EntitySearch({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [fetchOptions, cancelFetch] = useDebouncedCallback(async (q: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setOptions(data);
+      setOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  }, 200);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -45,19 +56,8 @@ export function EntitySearch({
   function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
     const q = e.target.value;
     setQuery(q);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (!q.trim()) { setOptions([]); setOpen(false); return; }
-    timerRef.current = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        setOptions(data);
-        setOpen(true);
-      } finally {
-        setLoading(false);
-      }
-    }, 200);
+    if (!q.trim()) { cancelFetch(); setOptions([]); setOpen(false); return; }
+    fetchOptions(q);
   }
 
   function handleSelect(opt: Option) {

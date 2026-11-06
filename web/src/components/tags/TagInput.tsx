@@ -2,6 +2,7 @@
 
 import { useState, useRef, useTransition } from "react";
 import { TagChip } from "./TagChip";
+import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { addTag, removeTag, type TaggableType } from "@/app/actions/tags";
 
 const PRESET_COLORS = [
@@ -25,7 +26,6 @@ export function TagInput({ taggableType, taggableId, initialTags }: TagInputProp
   const [open, setOpen] = useState(false);
   const [pendingColor, setPendingColor] = useState(PRESET_COLORS[0]);
   const [isPending, startTransition] = useTransition();
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   async function fetchSuggestions(q: string) {
@@ -36,12 +36,13 @@ export function TagInput({ taggableType, taggableId, initialTags }: TagInputProp
     setOpen(true);
   }
 
+  const [debouncedFetch, cancelFetch] = useDebouncedCallback((q: string) => fetchSuggestions(q), 150);
+
   function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
     const q = e.target.value;
     setQuery(q);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (!q.trim()) { setSuggestions([]); setOpen(false); return; }
-    timerRef.current = setTimeout(() => fetchSuggestions(q), 150);
+    if (!q.trim()) { cancelFetch(); setSuggestions([]); setOpen(false); return; }
+    debouncedFetch(q);
   }
 
   function applyTag(tag: Tag) {
