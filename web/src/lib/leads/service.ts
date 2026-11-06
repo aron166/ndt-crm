@@ -16,6 +16,7 @@ import { computeTier } from "./tier";
 import { reportError } from "@/lib/report-error";
 import { DEFAULT_BOOKING_MINUTES, conflictsFor } from "@/lib/booking/conflicts";
 import { loadBookings, resolveDemoHost } from "@/lib/booking/queries";
+import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
 
 // The ONE write path for lead process changes — used by the server actions (UI)
 // and the public /api/leads routes alike, so the rules can't drift between the
@@ -76,7 +77,7 @@ export async function completeOpenLeadCallTasks(
   now: Date,
 ): Promise<number> {
   const { count } = await tx.task.updateMany({
-    where: { tenantId, leadId, type: "call", status: { in: ["created", "in_progress"] } },
+    where: { tenantId, leadId, type: "call", status: { in: [...OPEN_TASK_STATUSES] } },
     data: { status: "done", completedAt: now },
   });
   return count;

@@ -3,8 +3,10 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { audit } from "@/lib/audit";
 import { serializeDates } from "@/lib/serialize";
-import { json, leadApiCtx, parseLeadId, readJson, leadPatchSchema, LEAD_API_SELECT } from "@/lib/leads/api";
+import { json, parseId, readJson } from "@/lib/api/http";
+import { leadApiCtx, leadPatchSchema, LEAD_API_SELECT } from "@/lib/leads/api";
 import { changeLeadStatus, setLeadOutcome, assignLead, setLeadQualification } from "@/lib/leads/service";
+import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,7 +14,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(request: Request, { params }: Params) {
   const auth = await leadApiCtx(request);
   if ("res" in auth) return auth.res;
-  const id = parseLeadId((await params).id);
+  const id = parseId((await params).id);
   if (id == null) return json({ error: "Invalid id" }, 400);
   const { tenantId } = auth.ctx;
 
@@ -27,7 +29,7 @@ export async function GET(request: Request, { params }: Params) {
       take: 50,
     }),
     db.task.findMany({
-      where: { tenantId, leadId: id, status: { in: ["created", "in_progress"] } },
+      where: { tenantId, leadId: id, status: { in: [...OPEN_TASK_STATUSES] } },
       select: { id: true, title: true, type: true, status: true, dueDate: true, assignedToId: true },
       orderBy: { dueDate: "asc" },
       take: 20,
@@ -40,7 +42,7 @@ export async function GET(request: Request, { params }: Params) {
 export async function PATCH(request: Request, { params }: Params) {
   const auth = await leadApiCtx(request);
   if ("res" in auth) return auth.res;
-  const id = parseLeadId((await params).id);
+  const id = parseId((await params).id);
   if (id == null) return json({ error: "Invalid id" }, 400);
   const { ctx } = auth;
 

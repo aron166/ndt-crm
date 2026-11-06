@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
 
 // Server-side per-lead extras for the board card + lead_idle: days since last
 // contact and the next open callback. One groupBy per dimension (lead / company
@@ -8,7 +9,7 @@ export interface LeadRef { id: number; companyId: number | null; personId: numbe
 
 /** The open-call-task predicate: a call task that is still owed (not done/cancelled). Shared so /drive doesn't grow a second copy with a status value that doesn't exist in the schema. */
 export function openCallTaskWhere(tenantId: number) {
-  return { tenantId, type: "call", status: { in: ["created", "in_progress"] as string[] } };
+  return { tenantId, type: "call", status: { in: [...OPEN_TASK_STATUSES] as string[] } };
 }
 
 export interface LeadExtras {

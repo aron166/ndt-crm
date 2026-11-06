@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { CheckCircle2, RotateCcw, Pencil, Trash2, Plus } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { isClosedTaskStatus } from "@/lib/tasks/status";
 
 interface Task {
   id: number;
@@ -38,7 +39,7 @@ interface TasksClientProps {
 }
 
 function isOverdue(dueDate: Date | null, status: string) {
-  if (!dueDate || status === "done" || status === "cancelled") return false;
+  if (!dueDate || isClosedTaskStatus(status)) return false;
   return new Date(dueDate) < new Date(new Date().toDateString());
 }
 

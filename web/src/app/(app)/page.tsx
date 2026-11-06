@@ -7,7 +7,7 @@ import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { getActor } from "@/lib/actor";
 import { countPendingForReviewer } from "@/lib/content/queries";
 import { UI } from "@/lib/content/labels";
-
+import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
 
 const FRESHNESS_COLOR: Record<string, string> = {
   mint: "var(--mint)", mute: "var(--fg-mute)", amber: "var(--amber)", coral: "var(--coral)",
@@ -42,19 +42,19 @@ export default async function DashboardPage() {
     statInteractionsWeek,
   ] = await Promise.all([
     db.task.findMany({
-      where: { tenantId: TENANT_ID, status: { in: ["created", "in_progress"] }, dueDate: { lt: todayStart }, parentTaskId: null },
+      where: { tenantId: TENANT_ID, status: { in: [...OPEN_TASK_STATUSES] }, dueDate: { lt: todayStart }, parentTaskId: null },
       include: { company: { select: { id: true, name: true } } },
       orderBy: { dueDate: "asc" },
       take: 8,
     }),
     db.task.findMany({
-      where: { tenantId: TENANT_ID, status: { in: ["created", "in_progress"] }, dueDate: { gte: todayStart, lt: new Date(todayStart.getTime() + 86400000) }, parentTaskId: null },
+      where: { tenantId: TENANT_ID, status: { in: [...OPEN_TASK_STATUSES] }, dueDate: { gte: todayStart, lt: new Date(todayStart.getTime() + 86400000) }, parentTaskId: null },
       include: { company: { select: { id: true, name: true } } },
       orderBy: { dueDate: "asc" },
       take: 10,
     }),
     db.task.count({
-      where: { tenantId: TENANT_ID, status: { in: ["created", "in_progress"] }, dueDate: { gte: todayStart, lt: weekEnd }, parentTaskId: null },
+      where: { tenantId: TENANT_ID, status: { in: [...OPEN_TASK_STATUSES] }, dueDate: { gte: todayStart, lt: weekEnd }, parentTaskId: null },
     }),
     db.interaction.findMany({
       where: { tenantId: TENANT_ID },
@@ -88,7 +88,7 @@ export default async function DashboardPage() {
     `,
     db.company.count({ where: { tenantId: TENANT_ID, AND: [NOT_FA] } }),
     db.deal.count({ where: { tenantId: TENANT_ID, stage: { isTerminalWon: false, isTerminalLost: false } } }),
-    db.task.count({ where: { tenantId: TENANT_ID, status: { in: ["created", "in_progress"] }, parentTaskId: null } }),
+    db.task.count({ where: { tenantId: TENANT_ID, status: { in: [...OPEN_TASK_STATUSES] }, parentTaskId: null } }),
     db.interaction.count({ where: { tenantId: TENANT_ID, occurredAt: { gte: weekStart } } }),
   ]);
 

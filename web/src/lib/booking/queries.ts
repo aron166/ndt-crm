@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import type { SlotBooking } from "./slots";
+import { CLOSED_TASK_STATUSES } from "@/lib/tasks/status";
 
 /**
  * Who holds the demo for `demo_with` (PR #97 finding 3): the booking task goes
@@ -48,7 +49,7 @@ export async function loadBookings(
       tenantId,
       assignedToId,
       startsAt: { gte: from, lt: to },
-      status: { notIn: ["done", "cancelled"] },
+      status: { notIn: [...CLOSED_TASK_STATUSES] },
       ...(excludeTaskId != null ? { id: { not: excludeTaskId } } : {}),
     },
     select: {

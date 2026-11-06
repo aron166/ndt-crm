@@ -8,7 +8,7 @@ import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { formatDate } from "@/lib/utils";
 import { serializeDates } from "@/lib/serialize";
 import { AnalyticsClient } from "./AnalyticsClient";
-
+import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
 
 const PIPELINE_COLORS: Record<number, string> = {
   0: "var(--fg-faint)",
@@ -65,7 +65,7 @@ export default async function AnalyticsPage({
     db.task.count({
       where: {
         tenantId: TENANT_ID,
-        status: { in: ["created", "in_progress"] },
+        status: { in: [...OPEN_TASK_STATUSES] },
         parentTaskId: null,
       },
     }),

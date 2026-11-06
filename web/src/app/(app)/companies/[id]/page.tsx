@@ -11,7 +11,7 @@ import { getCompanyAttributes } from "@/app/actions/company-attributes";
 import { serializeDates } from "@/lib/serialize";
 import { serializeTaskCost } from "@/lib/tasks/costing";
 import { isConnected } from "@/lib/integrations/google_maps";
-
+import { isClosedTaskStatus } from "@/lib/tasks/status";
 
 const AVATAR_PALETTE = [
   "var(--indigo)", "var(--mint)", "var(--amber)",
@@ -89,7 +89,7 @@ export default async function CompanyDetailPage({
   }
 
   // KPI strip
-  const openTasks = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled").length;
+  const openTasks = tasks.filter((t) => !isClosedTaskStatus(t.status)).length;
   const kpis = [
     { label: "Számlák",         value: invoices.length,                   accent: "var(--mint)"   },
     { label: "Kapcsolatok",     value: contacts.filter(c => !c.endedAt).length, accent: "var(--indigo)" },
