@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { readJson, requireAppKey } from "@/lib/api/http";
 import { conversationIntakeSchema } from "@/lib/hub/schema";
+import { reportError } from "@/lib/report-error";
 
 // Agent-conversation ingestion (conversations + messages).
 //
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[/api/conversations] ingest failed:", err);
+    reportError("conversations.ingest", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

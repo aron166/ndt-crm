@@ -1,5 +1,6 @@
 import "server-only";
 import Groq from "groq-sdk";
+import { reportError } from "@/lib/report-error";
 
 // Server-side AI analysis of a call transcript. Reuses the same Groq free-tier
 // model the enrichment pipeline uses (actions/enrichment.ts). Best-effort: if
@@ -32,7 +33,9 @@ export async function analyzeCallTranscript(transcript: string): Promise<string 
       max_tokens: 400,
     });
     return completion.choices[0]?.message?.content?.trim() || null;
-  } catch {
+  } catch (err) {
+    // Best effort: the call is still recorded without the summary.
+    reportError("calls.analyzeTranscript", err);
     return null;
   }
 }

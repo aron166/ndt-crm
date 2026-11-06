@@ -7,6 +7,7 @@ import { z } from "zod";
 import { WAVE_MAX } from "@/lib/outreach/steps";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { Prisma } from "@prisma/client";
 
 // A campaign row is the ONE campaign identity: the marketing content queue AND
 // the cold-email batch. `slug` is the key stored in email_drafts.campaign /
@@ -139,7 +140,8 @@ export async function createCampaign(input: {
   let campaign: { id: number };
   try {
     campaign = await db.campaign.create({ data, select: { id: true } });
-  } catch {
+  } catch (err) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
     const retrySlug = await uniqueSlug(slugify(typed || name));
     data.slug = retrySlug;
     campaign = await db.campaign.create({ data, select: { id: true } });

@@ -137,7 +137,8 @@ export async function POST(request: Request) {
     revalidatePath("/calls");
 
     return json({ ok: true, interactionId: interaction.id }, 201);
-  } catch {
+  } catch (err) {
+    reportError("calls.result.company", err, { companyId: input.company_id });
     return json({ error: "Failed to record call result" }, 500);
   }
 }

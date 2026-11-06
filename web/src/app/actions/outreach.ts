@@ -16,6 +16,7 @@ import {
 import { audienceWhere } from "@/lib/marketing/audience-query";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import type { Prisma } from "@prisma/client";
+import { reportError } from "@/lib/report-error";
 
 // Companies the cockpit will call: callable status, alive, not under liquidation.
 const CALLABLE_WHERE: Prisma.CompanyWhereInput = {
@@ -215,7 +216,8 @@ export async function startCall(
       body: JSON.stringify(payload),
     });
     if (!res.ok) return { error: `Webhook hiba (${res.status})` };
-  } catch {
+  } catch (err) {
+    reportError("calls.startCall.webhook", err, { callId });
     return { error: "Webhook nem elérhető" };
   }
   return { callId };
