@@ -1,3 +1,4 @@
+import { TZ, budapestYmd } from "@/lib/time";
 import { db } from "@/lib/db";
 import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
 
@@ -35,14 +36,14 @@ export interface ReportWindow { from: Date; to: Date }
 
 /** UTC instant of 00:00 Europe/Budapest on `now`'s Budapest calendar date (CET/CEST aware). */
 export function budapestMidnight(now: Date): Date {
-  const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(now);
+  const date = budapestYmd(now);
   const guess = new Date(`${date}T00:00:00Z`);
   // Offset of Budapest at that instant, read back from Intl (ponytail: one correction
   // pass is exact except when midnight itself sits in a DST gap, which Budapest never does).
   const at = (d: Date) => {
     const p = Object.fromEntries(
       new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Europe/Budapest", hourCycle: "h23",
+        timeZone: TZ, hourCycle: "h23",
         year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric",
       }).formatToParts(d).map((x) => [x.type, x.value]),
     );

@@ -1,3 +1,4 @@
+import { budapestParts, budapestYmd } from "@/lib/time";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
@@ -85,14 +86,7 @@ export function buildDigest(input: DigestInput): { subject: string; text: string
  */
 export const DIGEST_HOURS = [7, 8];
 export function isDigestTime(now: Date): boolean {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Budapest",
-    hour: "numeric",
-    hour12: false,
-    weekday: "short",
-  }).formatToParts(now);
-  const hour = Number(parts.find((p) => p.type === "hour")?.value);
-  const weekday = parts.find((p) => p.type === "weekday")?.value;
+  const { hour, weekday } = budapestParts(now);
   const isWeekday = weekday !== undefined && weekday !== "Sat" && weekday !== "Sun";
   return isWeekday && DIGEST_HOURS.includes(hour);
 }
@@ -127,7 +121,7 @@ export async function sendContentDigests(
   // the caller that flips it from "not today" actually sends. `force` (manual
   // resends) bypasses the claim entirely.
   if (!opts.force) {
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(now);
+    const today = budapestYmd(now);
     const claimed = await db.$executeRaw`
       UPDATE "tenants"
          SET "settings" = jsonb_set(

@@ -1,4 +1,5 @@
 // Hungarian copy is PROPOSAL until Áron approves.
+import { TZ } from "@/lib/time";
 import { CATEGORY_LABEL, UI, VERDICT_ACTION } from "@/lib/content/labels";
 import { STATUS_LABELS } from "@/lib/marketing/types";
 import type { ContentCategory, ContentStatus } from "@/lib/content/types";
@@ -40,7 +41,7 @@ const ACTIONS = `MŰVELETEK: Válaszoljon KIZÁRÓLAG egyetlen JSON objektummal,
 // Data never contains "<": no nested or spaced variant can rebuild a tag (Vanda r3).
 const clean = (s: string) => s.replace(/</g, "‹");
 
-const fmtDate = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Budapest" }).format(d);
+const fmtDate = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: TZ }).format(d);
 const firstName = (n: string) => n.trim().split(/\s+/)[0] || n;
 
 function itemBlock(i: ItemContext): string {

@@ -1,3 +1,4 @@
+import { TZ } from "@/lib/time";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
@@ -29,7 +30,7 @@ const bodySchema = z.object({
 const ROUTE = "/api/assistant/callnote";
 const bpNow = (d: Date) =>
   new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "long", hourCycle: "h23",
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "long", hourCycle: "h23",
   }).format(d);
 
 export async function POST(request: Request) {

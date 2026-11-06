@@ -1,3 +1,4 @@
+import { TZ } from "@/lib/time";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { LOST_REASON_MAX, LOST_REASON_MIN, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
@@ -126,7 +127,7 @@ export function callNoteCallId(transcript: string, target: string): string {
 }
 
 const bpFmt = new Intl.DateTimeFormat("en-US", {
-  timeZone: "Europe/Budapest",
+  timeZone: TZ,
   hourCycle: "h23",
   year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
 });

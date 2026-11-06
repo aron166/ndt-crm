@@ -1,3 +1,4 @@
+import { budapestParts, budapestYmd } from "@/lib/time";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
@@ -13,8 +14,6 @@ import { getWeeklyReport, previousBudapestWeek, type WeeklyReport } from "./week
  * Monday weekly report email. Same split as lib/content/digest: the builder and
  * the time gate are pure, sendWeeklyReports is the only part touching the DB.
  */
-
-const budapestDate = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(d);
 
 export function buildWeeklyReportEmail(input: {
   report: WeeklyReport;
@@ -50,7 +49,7 @@ export function buildWeeklyReportEmail(input: {
 
   const text = [
     `Kedves ${firstName(recipientName)}!`,
-    `Időszak: ${budapestDate(r.from)} - ${budapestDate(new Date(r.to.getTime() - 1))}`,
+    `Időszak: ${budapestYmd(r.from)} - ${budapestYmd(new Date(r.to.getTime() - 1))}`,
     "",
     ...section(`${U.leadsCreated}: ${r.leadsTotal}`, bySource),
     ...section(U.tierA, tierA),
@@ -83,14 +82,7 @@ export function buildWeeklyReportEmail(input: {
  */
 export const WEEKLY_REPORT_HOURS = [6, 7, 8];
 export function isWeeklyReportTime(now: Date): boolean {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Budapest",
-    hour: "numeric",
-    hour12: false,
-    weekday: "short",
-  }).formatToParts(now);
-  const hour = Number(parts.find((p) => p.type === "hour")?.value);
-  const weekday = parts.find((p) => p.type === "weekday")?.value;
+  const { hour, weekday } = budapestParts(now);
   return weekday === "Mon" && WEEKLY_REPORT_HOURS.includes(hour);
 }
 
@@ -122,7 +114,7 @@ export async function sendWeeklyReports(
   // fetch does not burn the day. Atomically claim today's Budapest date on the tenant
   // row; only the caller that flips it from "not today" sends. `force` bypasses.
   if (!opts.force) {
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(now);
+    const today = budapestYmd(now);
     const claimed = await db.$executeRaw`
       UPDATE "tenants"
          SET "settings" = jsonb_set(
