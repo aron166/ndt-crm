@@ -19,7 +19,7 @@ import {
   canMarkReplied, markRepliedSchema, markSentSchema,
   buildFunnel, type CampaignFunnel, type ReplyType,
 } from "@/lib/outreach/campaign";
-import { ingestLead } from "@/lib/leads/ingest";
+import { ingestLead, leadCreatedEvent } from "@/lib/leads/ingest";
 import { leadIntakeSchema } from "@/lib/leads/schema";
 import { campaignBySlug, resolveAudience } from "@/lib/outreach/registry";
 import { countAudience } from "@/lib/marketing/audience-query";
@@ -233,19 +233,7 @@ export async function markDraftReplied(
     if (!res.deduped) {
       audit("email_draft", draftId, "update", { status: row.status }, { status: "replied", replyType, leadId: res.leadId }, auditOpts);
       // Same post-commit step as POST /api/leads: the follow-up task rules.
-      await runAutomations({
-        type: "lead_created",
-        tenantId: TENANT_ID,
-        leadId: res.leadId,
-        companyId: res.companyId,
-        personId: res.personId,
-        companyName: row.company.name,
-        fields: {
-          company: row.company.name, source: "cold_email_reply", channel: "cold_email",
-          campaign: row.campaign, serviceInterest: null, message: note ?? null,
-          sourceApp: "crm-ui", tier: res.tier, replyType,
-        },
-      });
+      await runAutomations(leadCreatedEvent(intake.data, res, { tenantId: TENANT_ID, sourceApp: "crm-ui" }, { replyType }));
     }
     revalidatePath("/outreach");
     revalidatePath("/leads");

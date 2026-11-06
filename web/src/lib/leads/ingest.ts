@@ -3,6 +3,7 @@ import type { LeadIntake } from "./schema";
 import { normalizeIntakeAnswers, withAnswers, effectiveAnswers } from "./qualification";
 import { UNSENT_STATUSES } from "@/lib/outreach/steps";
 import { computeTier, type LeadTier } from "./tier";
+import type { AutomationEvent } from "@/lib/automations/types";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
 //
@@ -390,5 +391,38 @@ export async function ingestLead(
     personId: person.id,
     companyReused,
     personReused,
+  };
+}
+
+/**
+ * The `lead_created` automation event for an intake that created a lead (not a
+ * deduped one). Callers fire it with runAutomations() after the transaction
+ * commits, so an automation failure never rolls back the intake.
+ */
+export function leadCreatedEvent(
+  input: LeadIntake,
+  res: IngestResult,
+  ctx: { tenantId: number; sourceApp: string },
+  extraFields: Record<string, unknown> = {},
+): AutomationEvent {
+  return {
+    type: "lead_created",
+    tenantId: ctx.tenantId,
+    leadId: res.leadId,
+    companyId: res.companyId,
+    personId: res.personId,
+    companyName: input.company_name,
+    fields: {
+      company: input.company_name,
+      source: input.source ?? null,
+      channel: input.channel,
+      campaign: input.campaign ?? null,
+      serviceInterest: input.service_interest ?? null,
+      message: input.message ?? null,
+      sourceApp: ctx.sourceApp,
+      // Derived qualification tier (A-E): lets a rule target e.g. tier D.
+      tier: res.tier,
+      ...extraFields,
+    },
   };
 }

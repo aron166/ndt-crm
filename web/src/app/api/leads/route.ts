@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { reportError } from "@/lib/report-error";
 import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
 import { leadIntakeSchema } from "@/lib/leads/schema";
-import { ingestLead } from "@/lib/leads/ingest";
+import { ingestLead, leadCreatedEvent } from "@/lib/leads/ingest";
 import { sendIntroMaterial, type IntroResult } from "@/lib/leads/intro";
 import { runAutomations } from "@/lib/automations/engine";
 import { serializeDates } from "@/lib/serialize";
@@ -88,25 +88,7 @@ export async function POST(request: Request) {
     // Fire task-automation rules for the new lead (e.g. the seeded follow-up
     // task). Runs post-commit and is itself fail-safe, so it never blocks or
     // fails the intake response.
-    await runAutomations({
-      type: "lead_created",
-      tenantId: key.tenantId,
-      leadId: result.leadId,
-      companyId: result.companyId,
-      personId: result.personId,
-      companyName: parsed.data.company_name,
-      fields: {
-        company: parsed.data.company_name,
-        source: parsed.data.source ?? null,
-        channel: parsed.data.channel,
-        campaign: parsed.data.campaign ?? null,
-        serviceInterest: parsed.data.service_interest ?? null,
-        message: parsed.data.message ?? null,
-        sourceApp: key.appSlug,
-        // Derived qualification tier (A–E) — lets a rule target e.g. tier D.
-        tier: result.tier,
-      },
-    });
+    await runAutomations(leadCreatedEvent(parsed.data, result, { tenantId: key.tenantId, sourceApp: key.appSlug }));
 
     return json(
       {
