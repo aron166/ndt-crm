@@ -76,7 +76,8 @@ export function composeCallNotes(input: {
   return parts.join("\n\n");
 }
 
-function formatDuration(sec: number): string {
+/** m:ss for a call length in seconds. */
+export function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}:${String(s).padStart(2, "0")}`;

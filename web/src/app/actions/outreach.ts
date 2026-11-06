@@ -17,6 +17,7 @@ import { audienceWhere } from "@/lib/marketing/audience-query";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import type { Prisma } from "@prisma/client";
 import { reportError } from "@/lib/report-error";
+import { formatDuration } from "@/lib/calls/result";
 
 // Companies the cockpit will call: callable status, alive, not under liquidation.
 const CALLABLE_WHERE: Prisma.CompanyWhereInput = {
@@ -271,7 +272,7 @@ export async function recordCall(
   // append-only log still says what happened. Append the call length when known.
   const base = input.notes?.trim() || meta.label;
   const dur = input.durationSec && input.durationSec > 0 ? Math.round(input.durationSec) : null;
-  const notes = dur ? `${base} · ${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, "0")}` : base;
+  const notes = dur ? `${base} · ${formatDuration(dur)}` : base;
   const now = new Date();
 
   const followupRaw = input.followupDate?.trim();
