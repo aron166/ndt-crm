@@ -19,7 +19,7 @@ import {
 } from "@/app/actions/content";
 import { publishContent, saveContentMetrics } from "@/app/actions/marketing";
 import { createClient } from "@/lib/supabase/client";
-import { MAX_STEP } from "@/lib/outreach/steps";
+import { MAX_STEP, isValidStep } from "@/lib/outreach/steps";
 import "./review.css";
 
 // Bucket name duplicated here on purpose: storage.ts is server-only and must
@@ -266,7 +266,7 @@ export function ReviewClient({
   async function saveSlot() {
     const campaign = slotCampaign.trim();
     const step = parseInt(slotStep, 10);
-    if (!campaign || !Number.isInteger(step) || step < 1 || step > MAX_STEP) {
+    if (!campaign || !isValidStep(step)) {
       setSlotError(UI.outreachSlotInvalid);
       return;
     }

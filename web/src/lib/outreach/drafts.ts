@@ -11,28 +11,13 @@
 
 import { z } from "zod";
 
-// `sending` is a CLAIM, not a user-visible stage: sendDraft moves the row into
-// it in one conditional UPDATE before it talks to Resend, so a double-click, a
-// second tab, or a retried server-action POST finds nothing left to claim. A row
-// stuck in `sending` means the process died mid-send — deliberately NOT
-// re-sendable, because we cannot know whether the mail went out. (Vanda, #88.)
-// `cancelled` is the terminal state for a queued touch that has been overtaken
-// by events — today, the prospect replied, so touches 2-4 must not go out.
-// Without it a reply flipped only the SENT rows and a human could still send
-// cold touch 3 to someone who already answered. (Vanda, #89.)
-export const DRAFT_STATUSES = ["draft", "approved", "sending", "sent", "failed", "replied", "cancelled"] as const;
-export type DraftStatus = (typeof DRAFT_STATUSES)[number];
+import { DRAFT_STATUSES, MAX_STEP, WAVE_MAX, type DraftStatus } from "./steps";
+
+// Type-only re-export: app/api/outreach/drafts/route.ts (off limits) imports it from here.
+export type { DraftStatus } from "./steps";
 
 export function isDraftStatus(v: unknown): v is DraftStatus {
   return typeof v === "string" && (DRAFT_STATUSES as readonly string[]).includes(v);
-}
-
-// The sequence step (1-4) a draft belongs to within a campaign.
-export { MAX_STEP } from "./steps";
-import { MAX_STEP } from "./steps";
-
-export function isValidStep(v: unknown): boolean {
-  return typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= MAX_STEP;
 }
 
 // The only authority on state transitions — UI and server actions both call
@@ -44,13 +29,6 @@ export function canEdit(status: DraftStatus): boolean {
 export function canApprove(status: DraftStatus): boolean {
   return status === "draft";
 }
-
-export function canSend(status: DraftStatus): boolean {
-  return status === "approved" || status === "failed";
-}
-
-/** The statuses sendDraft is allowed to claim. Keep in step with canSend(). */
-export const CLAIMABLE_STATUSES: DraftStatus[] = DRAFT_STATUSES.filter((s) => canSend(s));
 
 /**
  * Deterministic thread key for campaign+company, e.g. ("BirdsView Q4", 12) ->
@@ -85,21 +63,6 @@ export function withFooter(body: string, footer: string | null | undefined): str
   return `${trimmedBody}${FOOTER_SEPARATOR}${trimmedFooter}`;
 }
 
-export interface DraftUpsert {
-  companyId: number;
-  personId?: number | null;
-  campaign: string;
-  step: number;
-  subject: string;
-  body: string;
-  toEmail?: string | null;
-  senderUserId?: number | null;
-  wave?: number | null;
-  dueAt?: Date | null;
-  /** §6b: the live template version this personalised draft was built from. */
-  templateVersionId?: number | null;
-}
-
 export const draftUpsertSchema = z.object({
   companyId: z.number().int().positive(),
   personId: z.number().int().positive().nullable().optional(),
@@ -110,7 +73,7 @@ export const draftUpsertSchema = z.object({
   toEmail: z.string().email().nullable().optional(),
   // Campaign tracking (2026-09-17): whose inbox sends it, which wave, when due.
   senderUserId: z.number().int().positive().nullable().optional(),
-  wave: z.number().int().min(1).max(52).nullable().optional(),
+  wave: z.number().int().min(1).max(WAVE_MAX).nullable().optional(),
   dueAt: z.coerce.date().nullable().optional(),
   // §6b: which live template version this draft was built from. Validated
   // against the item sitting in that campaign+step slot, so an agent cannot
@@ -123,13 +86,3 @@ export const draftUpsertSchema = z.object({
 export const MAX_BULK_DRAFTS = 200;
 
 export const draftsUpsertSchema = z.array(draftUpsertSchema).max(MAX_BULK_DRAFTS);
-
-export function validateUpsert(
-  raw: unknown,
-): { ok: true; value: DraftUpsert } | { ok: false; error: string } {
-  const result = draftUpsertSchema.safeParse(raw);
-  if (result.success) return { ok: true, value: result.data };
-  const first = result.error.issues[0];
-  const field = String(first?.path[0] ?? "value");
-  return { ok: false, error: `Invalid ${field}: ${first?.message ?? "validation failed"}` };
-}

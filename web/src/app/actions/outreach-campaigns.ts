@@ -11,11 +11,12 @@ import { gateDraft, gateOn, templatesForCampaign, templatesForCampaigns, templat
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
-import { threadKeyFor, MAX_STEP, type DraftStatus } from "@/lib/outreach/drafts";
+import { threadKeyFor } from "@/lib/outreach/drafts";
+import { MAX_STEP, WAVE_MAX, UNSENT_STATUSES, CLAIMABLE_STATUSES, type DraftStatus } from "@/lib/outreach/steps";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import { runAutomations } from "@/lib/automations/engine";
 import {
-  canMarkReplied, markRepliedSchema, markSentSchema, MANUAL_SENDABLE_STATUSES,
+  canMarkReplied, markRepliedSchema, markSentSchema,
   buildFunnel, type CampaignFunnel, type ReplyType,
 } from "@/lib/outreach/campaign";
 import { ingestLead } from "@/lib/leads/ingest";
@@ -61,7 +62,7 @@ export async function setCampaignTarget(input: {
     campaign: z.string().trim().min(1).max(80),
     companyId: z.number().int().positive(),
     senderUserId: z.number().int().positive().nullable().optional(),
-    wave: z.number().int().min(1).max(52).nullable().optional(),
+    wave: z.number().int().min(1).max(WAVE_MAX).nullable().optional(),
   }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
   const { campaign, companyId, senderUserId, wave } = parsed.data;
@@ -75,7 +76,7 @@ export async function setCampaignTarget(input: {
   if (wave !== undefined) data.wave = wave;
   if (Object.keys(data).length === 0) return { ok: true, count: 0 };
 
-  const where = { tenantId: TENANT_ID, campaign, companyId, status: { in: ["draft", "approved", "failed"] } };
+  const where = { tenantId: TENANT_ID, campaign, companyId, status: { in: [...UNSENT_STATUSES] } };
   const rows = await db.emailDraft.findMany({ where, select: { id: true, senderUserId: true, wave: true } });
   if (rows.length === 0) return { ok: true, count: 0 };
   await db.emailDraft.updateMany({ where: { ...where, id: { in: rows.map((r) => r.id) } }, data });
@@ -104,7 +105,7 @@ export async function markDraftSentManually(
   const row = await db.emailDraft.findFirst({ where: { id: draftId, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (await isAddressSuppressed(TENANT_ID, await resolveDraftRecipient(TENANT_ID, row))) return { ok: false, error: SUPPRESSED_ERROR };
-  if (!MANUAL_SENDABLE_STATUSES.includes(row.status as DraftStatus)) {
+  if (!CLAIMABLE_STATUSES.includes(row.status as DraftStatus)) {
     return { ok: false, error: "Előbb hagyd jóvá, vagy ez az érintés már elment" };
   }
 
@@ -129,7 +130,7 @@ export async function markDraftSentManually(
 
   const nextDueAt = await db.$transaction(async (tx) => {
     const claim = await tx.emailDraft.updateMany({
-      where: { id: draftId, tenantId: TENANT_ID, status: { in: MANUAL_SENDABLE_STATUSES } },
+      where: { id: draftId, tenantId: TENANT_ID, status: { in: CLAIMABLE_STATUSES } },
       data: {
         status: "sent", sentAt: now, sentVia: "manual",
         senderUserId: row.senderUserId ?? me.userId,
@@ -286,7 +287,7 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
   const rows = await db.emailDraft.findMany({
     where: {
       tenantId: TENANT_ID,
-      status: { in: ["draft", "approved", "failed"] },
+      status: { in: [...UNSENT_STATUSES] },
       dueAt: { lte: endOfToday },
       ...(campaign ? { campaign } : {}),
     },
@@ -381,7 +382,7 @@ export async function getCampaignStats(input: {
   const parsed = z.object({
     campaign: z.string().trim().min(1).max(80),
     senderUserId: z.number().int().positive().nullable().optional(),
-    wave: z.number().int().min(1).max(52).nullable().optional(),
+    wave: z.number().int().min(1).max(WAVE_MAX).nullable().optional(),
   }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
   const { campaign, senderUserId, wave } = parsed.data;

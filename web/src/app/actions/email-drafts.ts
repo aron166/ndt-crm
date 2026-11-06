@@ -13,17 +13,13 @@ import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import {
-  type DraftStatus,
   isDraftStatus,
-  isValidStep,
   canEdit,
   canApprove,
-  canSend,
   threadKeyFor,
   withFooter,
-  CLAIMABLE_STATUSES,
 } from "@/lib/outreach/drafts";
-
+import { type DraftStatus, isValidStep, canSend, CLAIMABLE_STATUSES } from "@/lib/outreach/steps";
 
 const AUDIT_TYPE = "email_draft" as const;
 

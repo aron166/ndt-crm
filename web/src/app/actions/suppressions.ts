@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { UNSENT_STATUSES } from "@/lib/outreach/steps";
 import { isSuppressed, parseSuppressionTarget } from "@/lib/suppression";
 
 const CHANNELS = ["email", "phone", "linkedin", "in_person"];
@@ -59,7 +60,7 @@ export async function addSuppression(formData: FormData) {
 
   // Queued drafts to the new entry must not go out: cancel them now.
   const queued = await db.emailDraft.findMany({
-    where: { tenantId: TENANT_ID, status: { in: ["draft", "approved", "failed"] } },
+    where: { tenantId: TENANT_ID, status: { in: [...UNSENT_STATUSES] } },
     select: { id: true, status: true, toEmail: true, personId: true, companyId: true },
   });
   const set = { emails: new Set(email ? [email] : []), domains: new Set(domain ? [domain] : []) };

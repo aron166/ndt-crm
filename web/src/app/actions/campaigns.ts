@@ -4,6 +4,7 @@ import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { WAVE_MAX } from "@/lib/outreach/steps";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 
@@ -14,7 +15,6 @@ import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 // Every action checks the CRM user itself. A server action is callable by id,
 // so the (app) layout's login redirect is not an authorization check. These
 // four had no check at all before 2026-09-20.
-
 
 /**
  * Every action returns this one shape. Declared, not inferred: the callers read
@@ -80,13 +80,11 @@ function revalidate(id?: number) {
 }
 
 /**
- * Outreach fields shared by create and setCampaignOutreach. `wave` is capped
- * at 52 to match setCampaignTarget in actions/outreach-campaigns.ts: the two
- * write the same concept and must not disagree on what a valid wave is.
+ * Outreach fields shared by create and setCampaignOutreach.
  */
 const outreachSchema = z.object({
   senderUserId: z.number().int().positive().nullable().optional(),
-  currentWave: z.number().int().min(1).max(52).nullable().optional(),
+  currentWave: z.number().int().min(1).max(WAVE_MAX).nullable().optional(),
 });
 
 /** A sender must be a user of THIS tenant; anything else is refused, not dropped. */

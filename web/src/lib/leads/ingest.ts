@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import type { LeadIntake } from "./schema";
 import { normalizeIntakeAnswers, withAnswers, effectiveAnswers } from "./qualification";
+import { UNSENT_STATUSES } from "@/lib/outreach/steps";
 import { computeTier, type LeadTier } from "./tier";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
@@ -356,8 +357,8 @@ export async function ingestLead(
         tenantId,
         companyId: draft.companyId,
         campaign: draft.campaign,
-        // `failed` too: it is sendable by hand (MANUAL_SENDABLE_STATUSES).
-        status: { in: ["draft", "approved", "failed"] },
+        // `failed` too: it is sendable by hand (CLAIMABLE_STATUSES).
+        status: { in: [...UNSENT_STATUSES] },
       },
       data: { status: "cancelled" },
     });

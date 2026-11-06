@@ -1,6 +1,5 @@
 import { z } from "zod";
-import type { DraftStatus } from "./drafts";
-import { MAX_STEP, CLAIMABLE_STATUSES } from "./drafts";
+import { MAX_STEP, SEQUENCE_OFFSET_DAYS, type DraftStatus } from "./steps";
 
 /**
  * Campaign tracking (Kai/Áron P0, 2026-09-17) — PURE module, no DB.
@@ -13,8 +12,6 @@ import { MAX_STEP, CLAIMABLE_STATUSES } from "./drafts";
  * `buildFunnel` — there is no cached counter anywhere.
  */
 
-/** Touch N is due this many days after touch 1 went out (SEND_PLAN: day 1/4/8/15). */
-export const SEQUENCE_OFFSET_DAYS = [0, 3, 7, 14] as const;
 /** Touches go out in the morning window (SEND_PLAN §1: 8:00–9:00, server-local = Budapest). */
 export const SEND_HOUR = 8;
 
@@ -29,15 +26,6 @@ export function dueAtForStep(firstSentAt: Date, nextStep: number): Date | null {
   d.setDate(d.getDate() + offset);
   d.setHours(SEND_HOUR, 0, 0, 0);
   return d;
-}
-
-/**
- * "Kézzel elküldve" is allowed from exactly the states the Resend path may send
- * from — a human still approves the copy first.
- */
-export const MANUAL_SENDABLE_STATUSES: DraftStatus[] = CLAIMABLE_STATUSES;
-export function canMarkSent(status: DraftStatus): boolean {
-  return MANUAL_SENDABLE_STATUSES.includes(status);
 }
 
 /** Only a touch that went out can be answered. */
