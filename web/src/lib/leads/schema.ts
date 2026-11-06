@@ -8,7 +8,6 @@ import { emptyToUndef } from "@/lib/zod-helpers";
 // Landing pages (BetonScan/BirdsView) and automations (n8n) post this shape.
 // snake_case on the wire — that's what external HTML forms / webhooks emit.
 
-
 const optStr = z.preprocess(emptyToUndef, z.string().trim().max(2000).optional());
 
 export const leadIntakeSchema = z

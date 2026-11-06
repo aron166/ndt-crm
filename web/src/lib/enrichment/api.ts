@@ -19,7 +19,6 @@ export async function enrichmentApiCtx(request: Request): Promise<{ ctx: Enrichm
   return { ctx: { tenantId: key.tenantId, actorAgentId: key.appSlug } };
 }
 
-
 const enrichmentBodySchema = z
   .object({
     enrichment: dossierSchema.nullable(),

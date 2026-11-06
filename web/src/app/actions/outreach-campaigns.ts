@@ -228,7 +228,7 @@ export async function markDraftReplied(
     if (!res.deduped) {
       audit("email_draft", draftId, "update", { status: row.status }, { status: "replied", replyType, leadId: res.leadId }, auditOpts);
       // Same post-commit step as POST /api/leads: the follow-up task rules.
-      await runAutomations(leadCreatedEvent(intake.data, res, { tenantId: TENANT_ID, sourceApp: "crm-ui" }, { replyType }));
+      await runAutomations(leadCreatedEvent(intake.data, res, { tenantId: TENANT_ID, sourceApp: "crm-ui" }, { replyType, message: note ?? null }));
     }
     revalidatePath("/outreach");
     revalidatePath("/leads");

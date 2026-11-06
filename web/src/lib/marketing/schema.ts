@@ -8,7 +8,6 @@ import { slugify } from "@/lib/slug";
 // external scheduled job) posts this shape; same per-app-key auth as
 // /api/leads. snake_case on the wire to match the other ingestion endpoints.
 
-
 const optStr = z.preprocess(emptyToUndef, z.string().trim().max(10000).optional());
 
 // z.coerce.boolean() is a footgun: it's just Boolean(v), so the string "false"

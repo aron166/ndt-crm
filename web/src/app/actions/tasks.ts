@@ -40,9 +40,10 @@ export async function createTask(formData: FormData) {
   const personIdStr  = formData.get("personId") as string | null;
   const parentIdStr  = formData.get("parentTaskId") as string | null;
 
-  const companyId = companyIdStr ? parseInt(companyIdStr, 10) : null;
-  const personId = personIdStr ? parseInt(personIdStr, 10) : null;
-  const parentTaskId = parentIdStr ? parseInt(parentIdStr, 10) : null;
+  const optId = (raw: string | null) => (raw && /^\d+$/.test(raw) ? parseInt(raw, 10) : null);
+  const companyId = optId(companyIdStr);
+  const personId = optId(personIdStr);
+  const parentTaskId = optId(parentIdStr);
   const refErr = await foreignIdError(TENANT_ID, { companyId, personId, taskId: parentTaskId });
   if (refErr) return { error: refErr };
 

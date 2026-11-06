@@ -97,8 +97,10 @@ function toDTO(q: {
 // Person, lead and deal ids from input must belong to this tenant.
 async function linkedIdError(input: QuoteInput): Promise<string | null> {
   const { personId, leadId, dealId } = input;
+  const personErr = await foreignIdError(TENANT_ID, { personId });
+  if (personErr) return personErr;
   if (leadId != null && !(await db.lead.findFirst({ where: { id: leadId, tenantId: TENANT_ID }, select: { id: true } }))) return LEAD_NOT_FOUND;
-  return foreignIdError(TENANT_ID, { personId, dealId });
+  return foreignIdError(TENANT_ID, { dealId });
 }
 
 export async function getQuotes(): Promise<QuoteListItem[]> {

@@ -12,7 +12,7 @@ describe("budapest clock", () => {
     ["2026-06-30T22:30:00Z", 0, "Wed", "2026-07-01"], // date rolls over in Budapest first
   ])("%s", (iso, hour, weekday, ymd) => {
     const d = new Date(iso);
-    expect(budapestParts(d)).toEqual({ hour, weekday, ymd });
+    expect(budapestParts(d)).toEqual({ hour, weekday });
     expect(budapestYmd(d)).toBe(ymd);
   });
 });

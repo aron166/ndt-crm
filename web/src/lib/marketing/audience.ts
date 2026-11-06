@@ -1,5 +1,6 @@
-// Feature E2 part 2: turning a campaign's audience (a saved company segment) into
 import { slugify } from "@/lib/slug";
+
+// Feature E2 part 2: turning a campaign's audience (a saved company segment) into
 // an exportable list. The CSV builder is pure → unit-testable; the live
 // resolution (filters → where → companies) reuses lib/companies/resolve.
 

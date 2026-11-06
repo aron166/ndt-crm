@@ -12,7 +12,6 @@ import { emptyToUndef } from "@/lib/zod-helpers";
 // only, as before) and the auto-outcome skill (lead_id + parsed — an outcome
 // lives on a LEAD, never a bare company, so `parsed` requires `lead_id`).
 
-
 export const callResultSchema = z
   .object({
     // Which company/person the call belonged to. The Make scenario carries these
