@@ -4,6 +4,7 @@ import { requireAppKey } from "@/lib/api/http";
 import { agentCtx, type LeadCtx } from "@/lib/ctx";
 import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
 import { answersRecordSchema } from "./qualification";
+import { emptyToUndef } from "@/lib/zod-helpers";
 
 // Shared bits of the lead write API (/api/leads/:id*). Same per-app-key auth
 // as POST /api/leads: the key carries the tenant; the service-role key is NOT
@@ -16,7 +17,6 @@ export async function leadApiCtx(request: Request): Promise<{ ctx: LeadCtx } | {
   return { ctx: agentCtx(key.tenantId, key.appSlug) };
 }
 
-const emptyToUndef = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
 const optInt = z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional());
 
 export const PAGE_SIZE_MAX = 100;

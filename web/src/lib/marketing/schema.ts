@@ -1,13 +1,12 @@
 import { z } from "zod";
 import { CONTENT_CHANNELS, CONTENT_TYPES, ASSET_KINDS } from "./types";
 import { CONTENT_CATEGORIES, type ContentCategory } from "@/lib/content/types";
+import { emptyToUndef } from "@/lib/zod-helpers";
 
 // Inbound content-draft payload (POST /api/content). The content factory (an
 // external scheduled job) posts this shape; same per-app-key auth as
 // /api/leads. snake_case on the wire to match the other ingestion endpoints.
 
-const emptyToUndef = (v: unknown) =>
-  typeof v === "string" && v.trim() === "" ? undefined : v;
 
 const optStr = z.preprocess(emptyToUndef, z.string().trim().max(10000).optional());
 

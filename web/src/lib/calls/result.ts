@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parsedCallSchema } from "./auto-outcome";
+import { emptyToUndef } from "@/lib/zod-helpers";
 
 // Inbound call-result payload (POST /api/calls/result). After a call is recorded
 // and transcribed/analyzed by the external pipeline (Make scenario: recorder →
@@ -11,8 +12,6 @@ import { parsedCallSchema } from "./auto-outcome";
 // only, as before) and the auto-outcome skill (lead_id + parsed — an outcome
 // lives on a LEAD, never a bare company, so `parsed` requires `lead_id`).
 
-const emptyToUndef = (v: unknown) =>
-  typeof v === "string" && v.trim() === "" ? undefined : v;
 
 export const callResultSchema = z
   .object({
