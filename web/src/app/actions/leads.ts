@@ -19,6 +19,7 @@ import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 import { slugify } from "@/lib/slug";
 import { isHttpsUrl } from "@/lib/url";
+import { initialStatusKey } from "@/lib/leads/initial-status";
 
 
 export async function deleteLead(
@@ -330,8 +331,7 @@ export async function deleteLeadStatus(id: number) {
   if (remaining <= 1) return { error: "Legalább egy státusznak maradnia kell." };
 
   // Reassign any leads in this column to the initial status so none are orphaned.
-  const initial = await db.leadStatus.findFirst({ where: { tenantId: TENANT_ID, isInitial: true } });
-  const fallbackKey = initial?.key ?? "new";
+  const fallbackKey = await initialStatusKey(db, TENANT_ID);
   await db.lead.updateMany({
     where: { tenantId: TENANT_ID, status: status.key },
     data: { status: fallbackKey },

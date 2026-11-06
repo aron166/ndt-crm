@@ -5,6 +5,7 @@ import { UNSENT_STATUSES } from "@/lib/outreach/steps";
 import { computeTier, type LeadTier } from "./tier";
 import type { AutomationEvent } from "@/lib/automations/types";
 import { writeAuditLog } from "@/lib/audit";
+import { initialStatusKey } from "./initial-status";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
 //
@@ -236,11 +237,7 @@ export async function ingestLead(
   // 4. Create the Lead at the tenant's INITIAL status (the configurable entry
   //    column of the lead pipeline; falls back to "new"). Marketing passthrough
   //    + contact snapshot live on custom_fields, mirroring the deals pattern.
-  const initialStatus = await tx.leadStatus.findFirst({
-    where: { tenantId, isInitial: true },
-    orderBy: { position: "asc" },
-  });
-  const statusKey = initialStatus?.key ?? "new";
+  const statusKey = await initialStatusKey(tx, tenantId);
 
   const customFields: Record<string, unknown> = {};
   const passthrough: (keyof LeadIntake)[] = [
