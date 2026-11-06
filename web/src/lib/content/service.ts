@@ -6,6 +6,7 @@ import { getApprovalRule, getContentReviewers } from "./reviewers";
 import { runContentRules } from "./rules";
 import { isReviewReason, reasonRequiredFor, type ReviewReason } from "./reasons";
 import { MAX_STEP, isValidStep } from "@/lib/outreach/steps";
+import { readOutreachSettings } from "@/lib/outreach/settings";
 import {
   CLAIM_TTL_MS, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX,
   isContentStatus, type ContentCategory, type ContentStatus, type Verdict,
@@ -682,8 +683,7 @@ async function ruleContextFor(
   item: { id: number; category: string; format?: string | null; campaignId?: number | null; internal?: boolean },
   body: string,
 ): Promise<Parameters<typeof reconcileRuleChecks>[3]> {
-  const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
-  const footer = (tenant?.settings as Record<string, unknown> | null)?.outreachFooter;
+  const { footer } = await readOutreachSettings(tenantId, tx);
   // Only the opening of each sibling is needed (duplicate-hook detection), so
   // the bodies are truncated in SQL instead of loaded whole (Vanda, #104).
   const siblings = item.campaignId

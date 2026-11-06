@@ -20,6 +20,7 @@ import {
   withFooter,
 } from "@/lib/outreach/drafts";
 import { type DraftStatus, isValidStep, canSend, CLAIMABLE_STATUSES } from "@/lib/outreach/steps";
+import { readOutreachSettings, type OutreachSettings } from "@/lib/outreach/settings";
 
 const AUDIT_TYPE = "email_draft" as const;
 
@@ -171,20 +172,9 @@ export async function getDraftBody(id: number): Promise<{ ok: true; body: string
   return { ok: true, body: row.body };
 }
 
-export interface OutreachSettings {
-  replyTo: string | null;
-  footer: string | null;
-}
-
-/** tenants.settings.outreachReplyTo / outreachFooter. */
 export async function getOutreachSettings(): Promise<OutreachSettings> {
   if (!(await isCrmUser())) return { replyTo: null, footer: null };
-  const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  const s = (tenant?.settings as Record<string, unknown> | null) ?? {};
-  return {
-    replyTo: typeof s.outreachReplyTo === "string" ? s.outreachReplyTo : null,
-    footer: typeof s.outreachFooter === "string" ? s.outreachFooter : null,
-  };
+  return readOutreachSettings(TENANT_ID);
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -320,7 +310,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   // The consent/unsubscribe line is not optional. Without this guard a tenant
   // who never opened the settings panel cold-emails with no opt-out at all —
   // the placeholder in the UI is an HTML attribute, not a stored value.
-  const settings = await getOutreachSettings();
+  const settings = await readOutreachSettings(TENANT_ID);
   const footer = settings.footer?.trim();
   if (!footer) {
     return { ok: false, error: "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban" };

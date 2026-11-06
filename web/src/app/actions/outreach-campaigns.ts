@@ -24,6 +24,7 @@ import { leadIntakeSchema } from "@/lib/leads/schema";
 import { campaignBySlug, resolveAudience } from "@/lib/outreach/registry";
 import { countAudience } from "@/lib/marketing/audience-query";
 import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
+import { readOutreachSettings } from "@/lib/outreach/settings";
 
 // Campaign tracking (Kai/Áron P0, 2026-09-17). Round one is sent BY HAND from
 // Gmail; these actions are how the CRM is told. Every action checks the CRM
@@ -116,9 +117,8 @@ export async function markDraftSentManually(
 
   // Same rule as the Resend path: no unsubscribe line, no cold email. The copy
   // button appends it; this refuses to book a send while none is configured.
-  const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  const footer = (tenant?.settings as Record<string, unknown> | null)?.outreachFooter;
-  if (typeof footer !== "string" || !footer.trim()) {
+  const { footer } = await readOutreachSettings(TENANT_ID);
+  if (!footer?.trim()) {
     return { ok: false, error: "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban" };
   }
 

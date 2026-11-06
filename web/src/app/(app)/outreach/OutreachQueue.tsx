@@ -18,8 +18,8 @@ import {
   getDraftBody,
   saveOutreachSettings,
   type DraftListRow,
-  type OutreachSettings,
 } from "@/app/actions/email-drafts";
+import type { OutreachSettings } from "@/lib/outreach/settings";
 import { setCampaignTarget, markDraftReplied } from "@/app/actions/outreach-campaigns";
 import { canEdit, canApprove, withFooter } from "@/lib/outreach/drafts";
 import { DRAFT_STATUSES, MAX_STEP, canSend, type DraftStatus } from "@/lib/outreach/steps";
