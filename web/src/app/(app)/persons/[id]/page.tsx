@@ -9,7 +9,6 @@ import { getEntityHistory } from "@/app/actions/audit";
 import { serializeDates } from "@/lib/serialize";
 import { serializeTaskCost } from "@/lib/tasks/costing";
 
-
 const AVATAR_PALETTE = [
   "var(--indigo)", "var(--mint)", "var(--amber)",
   "var(--sky)", "var(--violet)", "var(--coral)",

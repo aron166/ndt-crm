@@ -9,7 +9,6 @@ import { InboxClient } from "./InboxClient";
 import { BoardClient } from "./BoardClient";
 import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
-
 export const dynamic = "force-dynamic";
 
 interface SearchParams {

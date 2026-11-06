@@ -4,7 +4,6 @@ import { getQuote } from "@/app/actions/quotes";
 import { renderQuotePdf } from "@/lib/quotes/pdf";
 import { reportError } from "@/lib/report-error";
 
-
 /**
  * GET /quotes/[id]/pdf — download the árajánlat as a PDF.
  * Auth: gated by proxy.ts like every (app) route. Tenant-scoped via getQuote.

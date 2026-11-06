@@ -4,7 +4,6 @@ import { MarketingTabs } from "../MarketingTabs";
 import { CampaignsClient } from "./CampaignsClient";
 import { listSenders } from "@/app/actions/outreach-campaigns";
 
-
 export const dynamic = "force-dynamic";
 
 export default async function CampaignsPage() {

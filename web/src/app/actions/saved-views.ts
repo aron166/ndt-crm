@@ -12,7 +12,6 @@ import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 // deleted by bare id. A server action is callable by id regardless of the
 // (app) layout's login redirect, so that was a delete-anything primitive.
 
-
 async function requireUser(): Promise<{ error: string } | null> {
   const { userId } = await getActor(TENANT_ID);
   return userId == null ? { error: NOT_A_CRM_USER } : null;

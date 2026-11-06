@@ -9,7 +9,6 @@ import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 import { requireCrmUser } from "@/lib/actor";
 
-
 // Foreign ids taken from input must belong to this tenant before they are
 // written onto a deal. Returns an error message or null.
 async function foreignIdError(ids: {

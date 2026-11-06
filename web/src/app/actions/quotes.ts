@@ -10,7 +10,6 @@ import { nextQuoteNumber } from "@/lib/quotes/number";
 import { QUOTE_STATUSES, type QuoteStatus } from "@/lib/quotes/status";
 import { requireCrmUser } from "@/lib/actor";
 
-
 // NOTE: QuoteStatus / QUOTE_STATUSES live in lib/quotes/status (pure module) — a
 // "use server" file may only export async functions, and Next's action transform
 // rejects even a type re-export here. Import QuoteStatus straight from status.

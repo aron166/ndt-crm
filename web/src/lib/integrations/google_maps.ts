@@ -2,7 +2,6 @@ import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { decrypt, isEncrypted } from "@/lib/crypto";
 
-
 async function getApiKey(): Promise<string | null> {
   const cred = await db.integrationCredential.findUnique({
     where: { tenantId_integrationSlug: { tenantId: TENANT_ID, integrationSlug: "google_maps" } },

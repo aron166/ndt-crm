@@ -8,7 +8,6 @@ import { logLeadCallOutcome } from "@/lib/leads/service";
 import { audit } from "@/lib/audit";
 import { NOTE_PREVIEW_LEN, validateTranscript } from "@/lib/calls/transcript";
 
-
 /**
  * Store a dictated call transcript as ONE append-only Interaction. This is a
  * fact, not an outcome: `outcome: "transcribed"` is what makes it visible to

@@ -15,7 +15,6 @@ const ENUM_NORMALISERS: Partial<Record<CompanyAttrType, (raw: string) => string 
   warmth: normalizeWarmth, account_type: normalizeAccountType, status: normalizeStatus,
 };
 
-
 /** All metadata rows (current + history) for a company, tenant-scoped. */
 export async function getCompanyAttributes(companyId: number) {
   const denied = await requireCrmUser(TENANT_ID);

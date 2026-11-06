@@ -12,7 +12,6 @@ import { createVersion } from "@/lib/content/service";
 // (reviews, versions). What remains: edit (= a new version), and recording a
 // manual publication of a LIVE item, which no longer changes its status.
 
-
 async function requireUser(): Promise<{ userId: number } | { error: string }> {
   const { userId } = await getActor(TENANT_ID);
   return userId == null ? { error: NOT_A_CRM_USER } : { userId };

@@ -8,7 +8,6 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import Groq from "groq-sdk";
 
-
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 const FETCH_TIMEOUT_MS = 8000;
 

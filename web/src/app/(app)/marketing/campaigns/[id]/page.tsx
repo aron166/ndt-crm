@@ -7,7 +7,6 @@ import { audienceWhere, countAudience, listAudience } from "@/lib/marketing/audi
 import { AUDIENCE_PREVIEW_LIMIT } from "@/lib/marketing/audience";
 import { CampaignDetailClient } from "./CampaignDetailClient";
 
-
 export const dynamic = "force-dynamic";
 
 export default async function CampaignDetailPage({

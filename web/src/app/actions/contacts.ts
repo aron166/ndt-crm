@@ -8,7 +8,6 @@ import { createCompany } from "@/app/actions/companies";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { requireCrmUser } from "@/lib/actor";
 
-
 export async function addContact(formData: FormData) {
   const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };

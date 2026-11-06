@@ -5,7 +5,6 @@ import { serializeDates } from "@/lib/serialize";
 import { DealsKanban } from "./DealsKanban";
 import { Settings } from "lucide-react";
 
-
 interface SearchParams { pipeline?: string; }
 
 export default async function DealsPage({

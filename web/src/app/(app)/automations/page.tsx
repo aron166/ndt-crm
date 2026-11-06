@@ -4,7 +4,6 @@ import { getLeadStatuses } from "@/lib/leads/queries";
 import { serializeDates } from "@/lib/serialize";
 import { AutomationsClient } from "./AutomationsClient";
 
-
 export default async function AutomationsPage() {
   const [rules, leadStatuses, pipelines, users] = await Promise.all([
     db.automationRule.findMany({

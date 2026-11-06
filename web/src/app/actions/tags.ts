@@ -6,7 +6,6 @@ import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 
-
 export type TaggableType = "company" | "person" | "deal" | "task" | "interaction";
 
 function revalidateEntity(type: TaggableType, id: number) {

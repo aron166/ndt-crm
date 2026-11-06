@@ -17,7 +17,6 @@ import { audienceWhere } from "@/lib/marketing/audience-query";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import type { Prisma } from "@prisma/client";
 
-
 // Companies the cockpit will call: callable status, alive, not under liquidation.
 const CALLABLE_WHERE: Prisma.CompanyWhereInput = {
   tenantId: TENANT_ID,

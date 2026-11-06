@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import type { Theme } from "@/lib/theme";
 
-
 /**
  * Persist the signed-in user's theme on their `users` row.
  *

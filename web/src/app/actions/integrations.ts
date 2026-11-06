@@ -8,7 +8,6 @@ import { encrypt } from "@/lib/crypto";
 import { audit } from "@/lib/audit";
 import { requireCrmUser } from "@/lib/actor";
 
-
 export async function saveIntegrationCredential(slug: string, credentials: Record<string, string>) {
   const denied = await requireCrmUser(TENANT_ID);
   if (denied) return { error: denied };

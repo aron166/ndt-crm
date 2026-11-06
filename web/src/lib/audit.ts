@@ -4,7 +4,6 @@ import { TENANT_ID } from "./tenant";
 import { reportError } from "./report-error";
 import { createClient } from "./supabase/server";
 
-
 export type AuditAction = "create" | "update" | "delete";
 
 // The audit invariant: every audited mutation must use one of these entity types.

@@ -12,7 +12,6 @@ import {
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { requireCrmUser } from "@/lib/actor";
 
-
 // Fail CLOSED on malformed JSON: an unparseable triggerConfig/conditions must
 // abort the write, never silently fall back to a broad (filter-less) rule.
 // Empty/absent input is legitimately "no value" → ok with null.

@@ -8,7 +8,6 @@ import { listOutreachCampaignKeys } from "@/app/actions/content";
 import { ReviewClient } from "./ReviewClient";
 import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
-
 export const dynamic = "force-dynamic";
 
 export default async function ContentReviewPage({

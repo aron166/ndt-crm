@@ -5,7 +5,6 @@ import { db } from "@/lib/db";
 import { requireCrmUser } from "@/lib/actor";
 import { employerState, employerLabel } from "@/lib/persons/employer";
 
-
 const LIMIT = 5; // results per group
 
 export interface SearchResults {

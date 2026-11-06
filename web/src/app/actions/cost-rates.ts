@@ -7,7 +7,6 @@ import { audit } from "@/lib/audit";
 import { COST_CODES } from "@/lib/tasks/costing";
 import { requireCrmUser } from "@/lib/actor";
 
-
 export interface CostRateEntry {
   code: string;
   unit: string | null;

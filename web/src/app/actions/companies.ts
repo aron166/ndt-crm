@@ -9,7 +9,6 @@ import { normalizeAccountType, normalizeStatus } from "@/lib/import/normalize";
 
 import { requireCrmUser } from "@/lib/actor";
 
-
 export async function createCompany(data: {
   name: string;
   vatNumber?: string;

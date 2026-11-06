@@ -7,7 +7,6 @@ import { MarketingTabs } from "../MarketingTabs";
 import { DecisionsClient } from "./DecisionsClient";
 import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
-
 export const dynamic = "force-dynamic";
 
 export default async function DecisionsPage() {

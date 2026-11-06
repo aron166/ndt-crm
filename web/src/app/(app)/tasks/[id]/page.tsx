@@ -10,7 +10,6 @@ import { EntityTags } from "@/components/tags/EntityTags";
 import { AuditLogTab } from "@/components/AuditLogTab";
 import { ArrowLeft, Clock, Building2, User } from "lucide-react";
 
-
 export default async function TaskDetailPage({
   params,
 }: {

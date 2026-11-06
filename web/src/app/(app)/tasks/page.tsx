@@ -7,7 +7,6 @@ import { NewTaskButton } from "./NewTaskButton";
 import { ViewToggle } from "./ViewToggle";
 import { serializeTaskCost } from "@/lib/tasks/costing";
 
-
 interface SearchParams {
   status?: string;
   due?: string;

@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 
-
 interface SearchParams {
   year?: string;
   search?: string;

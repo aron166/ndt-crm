@@ -5,7 +5,6 @@ import { ArrowLeft } from "lucide-react";
 import { PipelineSetupClient } from "./PipelineSetupClient";
 import { serializeDates } from "@/lib/serialize";
 
-
 export default async function PipelineSetupPage() {
   const pipelines = await db.pipeline.findMany({
     where: { tenantId: TENANT_ID },

@@ -7,7 +7,6 @@ import { audit } from "@/lib/audit";
 
 import { requireCrmUser } from "@/lib/actor";
 
-
 export async function createPerson(data: {
   firstName: string;
   lastName: string;

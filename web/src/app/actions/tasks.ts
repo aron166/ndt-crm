@@ -7,7 +7,6 @@ import { audit, diff } from "@/lib/audit";
 import { computeCostAmount } from "@/lib/tasks/costing";
 import { requireCrmUser } from "@/lib/actor";
 
-
 /**
  * Parse the optional cost-line fields off a task form. Cost code carries a
  * measurable amount (quantity × unit rate → HUF) — decisions.md #15. Returns

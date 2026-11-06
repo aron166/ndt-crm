@@ -7,7 +7,6 @@ import { audit } from "@/lib/audit";
 import { generateAppKey, hashAppKey } from "@/lib/app-key-auth";
 import { requireCrmUser } from "@/lib/actor";
 
-
 export interface AppKeyRow {
   id: number;
   appSlug: string;
