@@ -1,16 +1,12 @@
 import { runIdleAutomations } from "@/lib/automations/idle";
 import { reportError } from "@/lib/report-error";
+import { requireCronSecret } from "@/lib/api/http";
 
 // Scheduled evaluator for time-based automations (deal_idle_in_stage).
-// Invoked by Vercel Cron (see web/vercel.json). Vercel attaches
-// `Authorization: Bearer <CRON_SECRET>` when the CRON_SECRET env var is set;
-// we reject anything else so the endpoint can't be triggered externally.
+// Invoked by Vercel Cron (see web/vercel.json).
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const auth = request.headers.get("authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const denied = requireCronSecret(request);
+  if (denied) return denied;
 
   try {
     const result = await runIdleAutomations();
