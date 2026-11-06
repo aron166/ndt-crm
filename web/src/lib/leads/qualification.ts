@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { slugify } from "@/lib/slug";
 
 // The tenant's question model, and the per-lead answers keyed by it.
 //
@@ -227,15 +228,7 @@ export const DEFAULT_QUALIFICATION_QUESTIONS: QualificationQuestion[] = [
 
 /** Slug for a freshly typed question. Same rules as slugifyStatusKey. */
 export function slugifyQuestion(s: string): string {
-  return (
-    s
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 50) || "kerdes"
-  );
+  return slugify(s, { sep: "_", max: 50, fallback: "kerdes" });
 }
 
 // ── Question list parsing ───────────────────────────────────────────

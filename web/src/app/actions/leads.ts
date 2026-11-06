@@ -17,6 +17,7 @@ import { parseScriptBlocks } from "@/lib/leads/scripts";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
+import { slugify } from "@/lib/slug";
 
 
 export async function deleteLead(
@@ -229,15 +230,7 @@ export async function updateLead(id: number, formData: FormData) {
 // ── Lead status (pipeline column) management ───────────────────────
 
 function slugifyStatusKey(s: string): string {
-  return (
-    s
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "") // strip combining accents (á→a, ő→o)
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 50) || "status"
-  );
+  return slugify(s, { sep: "_", max: 50, fallback: "status" });
 }
 
 export async function createLeadStatus(formData: FormData) {

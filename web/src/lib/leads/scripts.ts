@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { slugify } from "@/lib/slug";
 
 /**
  * Call-script variants — the A/B gate on "a manual stage is only ready to hand
@@ -67,14 +68,7 @@ export function scriptVariantsFromSettings(settings: unknown): ScriptVariant[] {
 }
 
 export function slugifyScriptKey(raw: string): string {
-  return raw
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, SCRIPT_KEY_MAX);
+  return slugify(raw, { sep: "_", max: SCRIPT_KEY_MAX, fallback: "" });
 }
 
 /**

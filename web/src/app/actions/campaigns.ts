@@ -8,6 +8,7 @@ import { WAVE_MAX } from "@/lib/outreach/steps";
 import { audit } from "@/lib/audit";
 import { requireCrmUser } from "@/lib/actor";
 import { Prisma } from "@prisma/client";
+import { slugify } from "@/lib/slug";
 
 // A campaign row is the ONE campaign identity: the marketing content queue AND
 // the cold-email batch. `slug` is the key stored in email_drafts.campaign /
@@ -24,13 +25,8 @@ import { Prisma } from "@prisma/client";
  */
 type CampaignResult = { error?: string; success?: true; id?: number; slug?: string };
 
-function slugify(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
+function slugifyName(name: string): string {
+  return slugify(name, { sep: "-", fallback: "" });
 }
 
 /** A tenant-unique slug: base, then base-2, base-3… (the table enforces uniqueness). */
@@ -120,7 +116,7 @@ export async function createCampaign(input: {
   // typed key already exists as an outreach key, adopt it verbatim.
   const typed = input.slug?.trim();
   const adopted = typed ? await existingOutreachKey(typed) : null;
-  const slug = adopted ?? (await uniqueSlug(slugify(typed || name)));
+  const slug = adopted ?? (await uniqueSlug(slugifyName(typed || name)));
   const data = {
     tenantId: TENANT_ID,
     name,
@@ -137,7 +133,7 @@ export async function createCampaign(input: {
     campaign = await db.campaign.create({ data, select: { id: true } });
   } catch (err) {
     if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
-    const retrySlug = await uniqueSlug(slugify(typed || name));
+    const retrySlug = await uniqueSlug(slugifyName(typed || name));
     data.slug = retrySlug;
     campaign = await db.campaign.create({ data, select: { id: true } });
   }
