@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       // rather than a server error. (Vanda, #89.)
       try {
         const winner = await db.lead.findFirst({
-          where: { tenantId: key.tenantId, threadKey: parsed.data.thread_key.trim().toLowerCase() },
+          where: { tenantId: key.tenantId, threadKey: parsed.data.thread_key }, // the schema trimmed and lowercased it
           select: { id: true, companyId: true },
         });
         if (winner) {

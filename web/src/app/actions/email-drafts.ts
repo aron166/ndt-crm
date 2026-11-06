@@ -16,7 +16,7 @@ import {
   isDraftStatus,
   canEdit,
   canApprove,
-  threadKeyFor,
+  draftThreadKey,
   withFooter,
 } from "@/lib/outreach/drafts";
 import { type DraftStatus, isValidStep, canSend, CLAIMABLE_STATUSES } from "@/lib/outreach/steps";
@@ -366,7 +366,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
             sentAt,
             sentVia: "resend",
             providerMessageId: result.id,
-            threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
+            threadKey: draftThreadKey(row),
             lastError: result.warning ?? null,
           },
         });
@@ -380,7 +380,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
       await db.emailDraft.update({
         where: { id },
         data: { lastError: `Elküldve (${result.id}), de a rögzítés nem sikerült: ellenőrizd` },
-      }).catch(() => {});
+      }).catch((noteErr) => reportError("outreach.sendDraft.lastError", noteErr, { draftId: id }));
       revalidatePath("/outreach");
       return { ok: false, error: "Elküldve, de a rögzítés nem sikerült: ellenőrizd a Resend naplót" };
     }

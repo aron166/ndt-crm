@@ -44,6 +44,11 @@ export function threadKeyFor(campaign: string, companyId: number): string {
   return `${slug || "campaign"}:${companyId}`;
 }
 
+/** The key a draft row answers to: the stamped one, else the deterministic campaign+company key. */
+export function draftThreadKey(row: { threadKey: string | null; campaign: string; companyId: number }): string {
+  return row.threadKey ?? threadKeyFor(row.campaign, row.companyId);
+}
+
 const FOOTER_SEPARATOR = "\n\n-- \n";
 
 /**

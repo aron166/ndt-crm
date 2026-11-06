@@ -11,7 +11,7 @@ import { gateDraft, gateOn, templatesForCampaign, templatesForCampaigns, templat
 import { audit } from "@/lib/audit";
 import { requireCrmUserId } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
-import { threadKeyFor } from "@/lib/outreach/drafts";
+import { draftThreadKey } from "@/lib/outreach/drafts";
 import { MAX_STEP, WAVE_MAX, UNSENT_STATUSES, CLAIMABLE_STATUSES, type DraftStatus, type ReplyType } from "@/lib/outreach/steps";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import { runAutomations } from "@/lib/automations/engine";
@@ -129,7 +129,7 @@ export async function markDraftSentManually(
       data: {
         status: "sent", sentAt: now, sentVia: "manual",
         senderUserId: row.senderUserId ?? me.userId,
-        threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
+        threadKey: draftThreadKey(row),
         ...(externalThreadId ? { externalThreadId } : {}),
         lastError: null,
       },
@@ -199,7 +199,7 @@ export async function markDraftReplied(
   });
   if (already) return { ok: false, error: "Erre a megkeresésre már rögzítettünk választ" };
 
-  const draftKey = row.threadKey ?? threadKeyFor(row.campaign, row.companyId);
+  const draftKey = draftThreadKey(row);
   // One lead per CONVERSATION: the Gmail thread id when it was pasted, else one
   // manual key per outreach (campaign + company), so a second click dedupes. ponytail: if the reply-intake skill later reads the
   // same Gmail thread and no id was pasted, it creates a second lead — paste
