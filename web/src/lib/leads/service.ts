@@ -5,10 +5,11 @@ import { runAutomations } from "@/lib/automations/engine";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { getLeadStatuses, getQualificationQuestions, getScriptVariants } from "./queries";
 import { leadStatusLabel } from "./statuses";
+import { callOutcomeSchema, planCallOutcome, bookingIssue } from "./outcomes";
 import {
-  callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
-  RECALL_STATUS, bookingIssue, type LeadOutcome,
-} from "./outcomes";
+  LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX, RECALL_STATUS, LEAD_CALL_TASK, isLeadActive,
+  type LeadOutcome,
+} from "./vocab";
 import {
   parseAnswers, answersFrom, answerSourcesFrom, withAnswers, effectiveAnswers, legacyAnswers,
 } from "./qualification";
@@ -71,7 +72,7 @@ export async function completeOpenLeadCallTasks(
   now: Date,
 ): Promise<number> {
   const { count } = await tx.task.updateMany({
-    where: { tenantId, leadId, type: "call", status: { in: [...OPEN_TASK_STATUSES] } },
+    where: { tenantId, leadId, type: LEAD_CALL_TASK.type, status: { in: [...OPEN_TASK_STATUSES] } },
     data: { status: "done", completedAt: now },
   });
   return count;
@@ -377,7 +378,7 @@ export async function logLeadCallOutcome(
 
   const lead = await loadLead(leadId, ctx.tenantId);
   if (!lead) return { error: LEAD_NOT_FOUND };
-  if (lead.outcome !== "open" || lead.convertedDealId) {
+  if (!isLeadActive(lead)) {
     return { error: "A lead már lezárt: előbb nyisd újra" };
   }
   // The row this one supersedes must be THIS lead's, in THIS tenant. Both
@@ -448,7 +449,7 @@ export async function logLeadCallOutcome(
           data: {
             tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId,
             assignedToId: input.assignedToId ?? ctx.userId,
-            title: `Visszahívás: ${who}`, type: "call", category: "revenue_generating",
+            title: `Visszahívás: ${who}`, ...LEAD_CALL_TASK,
             status: "created", dueDate: plan.callbackAt,
           },
           select: { id: true },

@@ -1,69 +1,17 @@
 import { z } from "zod";
 import { SCRIPT_KEY_MAX } from "./scripts";
 import { BOOKING_KINDS } from "@/lib/booking/priority";
+import {
+  CALL_OUTCOMES, CALL_STAGE_CHAIN, DEMO_HOSTS, DEMO_STATUS, LOST_REASON_MAX, LOST_REASON_MIN,
+  RECALL_STATUS, TECHNOLOGY_WORD_MAX, isLostCallOutcome, type CallOutcomeKey,
+} from "./vocab";
 
 // Lead call-outcome logging — PURE module (no DB), shared by the UI modal, the
 // server action and the public API. The note-required / callback rules live in
 // the Zod schema here; the stage/outcome transition lives in planCallOutcome.
 // The DB side (one shared server function) is lib/leads/service.ts.
 
-export const LEAD_OUTCOMES = ["open", "won", "lost"] as const;
-export type LeadOutcome = (typeof LEAD_OUTCOMES)[number];
-export const LEAD_OUTCOME_LABEL: Record<LeadOutcome, string> = {
-  open: "Nyitott",
-  won: "Nyert",
-  lost: "Vesztett",
-};
-
-export const CALL_OUTCOMES = [
-  { key: "no_answer",          label: "Nem vette fel" },
-  { key: "wrong_number",       label: "Rossz szám" },
-  { key: "not_interested",     label: "Nem érdekli" },
-  { key: "disqualified",       label: "Diszkvalifikált" },
-  { key: "callback_requested", label: "Visszahívást kért" },
-  { key: "meeting_booked",     label: "Foglalt meeting" },
-] as const;
-export type CallOutcomeKey = (typeof CALL_OUTCOMES)[number]["key"];
-/**
- * The call outcomes that CLOSE the lead as lost. Péter's rule (BRIEFING addendum
- * 2026-09-07): "mandatory note on every outcome, INCLUDING a reason for
- * lost/disqualified" — the outcome key on its own is not a reason, so these two
- * additionally require a short free-text `lostReason`.
- */
-export const LOST_CALL_OUTCOMES: readonly CallOutcomeKey[] = ["not_interested", "disqualified"];
-export function isLostCallOutcome(key: string): boolean {
-  return (LOST_CALL_OUTCOMES as readonly string[]).includes(key);
-}
-/**
- * Outcomes whose `.superRefine` rule above requires an extra field beyond the
- * note (callbackAt / demoWith / lostReason) — the client uses this only to
- * decide which field to reveal; the schema above is what actually enforces it.
- */
-export const CALL_OUTCOMES_NEEDING_DETAIL: readonly CallOutcomeKey[] = [
-  "callback_requested",
-  "meeting_booked",
-  "not_interested",
-  "disqualified",
-];
-/** Shortest reason we accept anywhere. "x" is not a reason. */
-export const LOST_REASON_MIN = 3;
-export const LOST_REASON_MAX = 500;
-export const TECHNOLOGY_WORD_MAX = 120;
 const CALL_OUTCOME_KEYS = CALL_OUTCOMES.map((o) => o.key) as [CallOutcomeKey, ...CallOutcomeKey[]];
-
-export function callOutcomeLabel(key: string | null): string {
-  return CALL_OUTCOMES.find((o) => o.key === key)?.label ?? key ?? "-";
-}
-
-export const DEMO_STATUS: Record<"aron" | "peter", string> = {
-  aron: "demo_aron",
-  peter: "demo_peter",
-};
-
-/** `no_answer` walks the lead along this chain (one step per attempt). */
-export const CALL_STAGE_CHAIN = ["new", "call_1", "call_2", "call_3", "call_3_plus"] as const;
-/** Stage a lead lands in when it asks for a callback. */
-export const RECALL_STATUS = "recall";
 
 // Wire/UI payload. Server-side validation: a note is ALWAYS required; a callback
 // needs an explicit date+time; a booked meeting needs to say with whom.
@@ -74,7 +22,7 @@ export const callOutcomeSchema = z
     /** ISO datetime — required when outcome = callback_requested. */
     callbackAt: z.coerce.date().optional(),
     /** Required when outcome = meeting_booked. */
-    demoWith: z.enum(["aron", "peter"]).optional(),
+    demoWith: z.enum(DEMO_HOSTS).optional(),
     /** meeting_booked: when the demo/visit starts. Required for UI users only (bookingIssue). */
     bookingAt: z.coerce.date().optional(),
     /** Goes with bookingAt — the priority rung (lib/booking/priority.ts). */

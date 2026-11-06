@@ -13,7 +13,8 @@ import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/le
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
-import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
+import { callbackTone, promptLostReason } from "@/lib/leads/outcomes";
+import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, TRANSCRIBED_OUTCOME, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/vocab";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
@@ -79,7 +80,7 @@ interface Lead {
 // CALL_OUTCOMES, so the raw English key must never reach the chip.
 const TRANSCRIBED_OUTCOME_LABEL = "Átirat rögzítve";
 function outcomeChipLabel(outcome: string): string {
-  return outcome === "transcribed" ? TRANSCRIBED_OUTCOME_LABEL : callOutcomeLabel(outcome);
+  return outcome === TRANSCRIBED_OUTCOME ? TRANSCRIBED_OUTCOME_LABEL : callOutcomeLabel(outcome);
 }
 
 const MARKETING_KEYS = [

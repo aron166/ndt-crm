@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { conditionsPass, buildCreateTaskData, auditRuleTask, runAutomationAction } from "./engine";
+import { ACTIVE_LEAD_WHERE } from "@/lib/leads/vocab";
 import { getLeadExtras } from "@/lib/leads/board";
 import type { AutomationEvent, CreateTaskActionConfig, TriggerConfig } from "./types";
 
@@ -141,7 +142,7 @@ async function runLeadIdleRule(rule: Rule, now: Date): Promise<number> {
 
   const leads = await db.lead.findMany({
     where: {
-      tenantId: rule.tenantId, outcome: "open", convertedDealId: null,
+      tenantId: rule.tenantId, ...ACTIVE_LEAD_WHERE,
       createdAt: { lte: cutoff },
       ...(tc.status ? { status: tc.status } : {}),
       firings: { none: { ruleId: rule.id } },

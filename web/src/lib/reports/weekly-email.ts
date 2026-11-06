@@ -5,7 +5,7 @@ import { appBaseUrl } from "@/lib/app-url";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
 import { getContentReviewers } from "@/lib/content/reviewers";
-import { callOutcomeLabel } from "@/lib/leads/outcomes";
+import { callOutcomeLabel } from "@/lib/leads/vocab";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { firstName } from "@/lib/content/digest";

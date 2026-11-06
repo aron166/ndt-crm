@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MEETING_BOOKED_OUTCOME } from "@/lib/leads/vocab";
 import { MAX_STEP, SEQUENCE_OFFSET_DAYS, type DraftStatus, REPLY_TYPES } from "./steps";
 
 /**
@@ -127,7 +128,7 @@ export function buildFunnel(
   let meetings = 0;
   for (const it of interactions) {
     if (it.type === "call") calls += 1;
-    if (it.type === "meeting" || it.type === "site_visit" || it.outcome === "meeting_booked") meetings += 1;
+    if (it.type === "meeting" || it.type === "site_visit" || it.outcome === MEETING_BOOKED_OUTCOME) meetings += 1;
   }
 
   const replyRate = contacted.size > 0 ? replied.size / contacted.size : null;

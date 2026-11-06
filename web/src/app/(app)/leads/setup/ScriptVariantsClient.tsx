@@ -7,7 +7,7 @@ import { saveScriptVariants } from "@/app/actions/leads";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { formatScriptBlocks, type ScriptVariant } from "@/lib/leads/scripts";
-import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES } from "@/lib/leads/vocab";
 import type { ScriptStatRow } from "@/lib/leads/script-stats";
 
 export function ScriptVariantsClient({

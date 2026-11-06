@@ -16,6 +16,7 @@ import {
 import { audienceWhere } from "@/lib/marketing/audience-query";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import type { Prisma } from "@prisma/client";
+import { LEAD_CALL_TASK } from "@/lib/leads/vocab";
 import { reportError } from "@/lib/report-error";
 import { formatDuration } from "@/lib/calls/result";
 import { CURRENT_CONTACTS } from "@/lib/outreach/recipient";
@@ -315,8 +316,7 @@ export async function recordCall(
           companyId: company.id,
           personId,
           title: `Visszahívás: ${company.name}`,
-          type: "call",
-          category: "revenue_generating",
+          ...LEAD_CALL_TASK,
           status: "created",
           dueDate: followupDate,
         },

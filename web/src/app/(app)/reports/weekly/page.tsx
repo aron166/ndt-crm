@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { requireCrmUser } from "@/lib/actor";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
-import { callOutcomeLabel } from "@/lib/leads/outcomes";
+import { callOutcomeLabel } from "@/lib/leads/vocab";
 import { getWeeklyReport, lastDays, type WeeklyReport } from "@/lib/reports/weekly";
 import { monthUsage } from "@/lib/assistant/cap";
 import { REPORT_UI, formatMinutesOrDash } from "@/lib/reports/labels";

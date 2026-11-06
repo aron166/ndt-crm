@@ -3,6 +3,7 @@ import { LEAD_NOT_FOUND } from "@/lib/leads/service";
 import { TENANT_ID } from "@/lib/tenant";
 
 import { z } from "zod";
+import { DEMO_HOSTS } from "@/lib/leads/vocab";
 import { db } from "@/lib/db";
 import { userLeadCtx } from "@/lib/actor";
 import { proposeSlots } from "@/lib/booking/slots";
@@ -13,7 +14,7 @@ const PROPOSAL_WINDOW_DAYS = 21;
 
 const argsSchema = z.object({
   leadId: z.number().int().positive(),
-  demoWith: z.enum(["aron", "peter"]),
+  demoWith: z.enum(DEMO_HOSTS),
   minutes: z.number().int().min(15).max(600).optional(),
 });
 

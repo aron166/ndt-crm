@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ACTIVE_LEAD_WHERE } from "./vocab";
 import { TIERS } from "./tier";
 import { openCallTaskWhere } from "./board";
 import { readDossier } from "@/lib/enrichment/dossier";
@@ -47,8 +48,7 @@ export async function getDriveQueue(tenantId: number, limit = 25): Promise<Drive
 
   const leadWhere = {
     tenantId,
-    outcome: "open",
-    convertedDealId: null,
+    ...ACTIVE_LEAD_WHERE,
     // company is a nullable relation — an inner-join-shaped filter here would
     // silently drop every lead with no company at all.
     OR: [{ companyId: null }, { company: { deletedAt: null } }] as Array<Record<string, unknown>>,

@@ -10,7 +10,7 @@ import {
 } from "@/lib/calls/auto-outcome";
 import { logLeadCallOutcome, setLeadQualification } from "@/lib/leads/service";
 import { agentCtx } from "@/lib/ctx";
-import { callOutcomeLabel } from "@/lib/leads/outcomes";
+import { LEAD_CALL_TASK, TRANSCRIBED_OUTCOME, callOutcomeLabel } from "@/lib/leads/vocab";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { NOTE_PREVIEW_LEN } from "@/lib/calls/transcript";
 import { reportError } from "@/lib/report-error";
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
         personId: input.person_id ?? null,
         type: "call",
         direction: "outbound",
-        outcome: "transcribed",
+        outcome: TRANSCRIBED_OUTCOME,
         notes,
         occurredAt,
       },
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
 
     await writeAuditLog({
       entityType: "interaction", entityId: interaction.id, action: "create", before: null,
-      after: { type: "call", outcome: "transcribed", source: key.appSlug, callId: input.call_id ?? null },
+      after: { type: "call", outcome: TRANSCRIBED_OUTCOME, source: key.appSlug, callId: input.call_id ?? null },
       options: { tenantId, actor: "agent", actorAgentId: key.appSlug },
     });
     await recomputeCloseness({ tenantId, companyId: company.id, personId: input.person_id ?? null });
@@ -183,7 +183,7 @@ async function handleLeadOutcome(
     let pending: { id: number } | null = null;
     if (input.pending_interaction_id) {
       const found = await db.interaction.findFirst({
-        where: { id: input.pending_interaction_id, tenantId, leadId, type: "call", outcome: "transcribed" },
+        where: { id: input.pending_interaction_id, tenantId, leadId, type: "call", outcome: TRANSCRIBED_OUTCOME },
         select: { id: true, supersededBy: { select: { id: true }, take: 1 } },
       });
       if (!found) return json({ error: "Pending interaction not found" }, 404);
@@ -257,7 +257,7 @@ async function handleLeadOutcome(
       entityType: "interaction", entityId: result.interactionId, action: "create", before: null,
       after: {
         type: "call",
-        outcome: result.applied ? parsed.outcome : "transcribed",
+        outcome: result.applied ? parsed.outcome : TRANSCRIBED_OUTCOME,
         source: appSlug,
         callId: input.call_id ?? null,
         leadId,
@@ -355,7 +355,7 @@ async function createConfirmTask(
         personId,
         type: "call",
         direction: "outbound",
-        outcome: "transcribed",
+        outcome: TRANSCRIBED_OUTCOME,
         notes,
         campaign: lead.campaign,
         // When the transcript came from the queue it already lives on the
@@ -377,8 +377,7 @@ async function createConfirmTask(
         assignedToId: lead.assignedToId ?? null,
         title: `${AUTO_OUTCOME_LABELS.confirmTaskTitle}: ${who}`,
         description: composeConfirmDescription(parsed, reasonLabel),
-        type: "call",
-        category: "revenue_generating",
+        ...LEAD_CALL_TASK,
         status: "created",
         dueDate: now,
       },

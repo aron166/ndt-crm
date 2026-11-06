@@ -9,7 +9,7 @@ import { DEFAULT_LEAD_STATUSES, STAGE_DESCRIPTION_PLACEHOLDER, STAGE_DESCRIPTION
 import {
   LEAD_NOT_FOUND, changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome, setLeadQualification,
 } from "@/lib/leads/service";
-import type { LeadOutcome } from "@/lib/leads/outcomes";
+import { isLeadActive, type LeadOutcome } from "@/lib/leads/vocab";
 import { userLeadCtx } from "@/lib/actor";
 import { setTenantSettings } from "@/lib/tenant-settings";
 import { parseQuestionList, parseQuestionSets } from "@/lib/leads/qualification";
@@ -496,7 +496,7 @@ export async function getLeadStagePrompt(taskId: number) {
   });
   if (!lead) return null;
   // A closed lead has left the board; there is no stage to pick.
-  if (lead.outcome !== "open" || lead.convertedDealId) return null;
+  if (!isLeadActive(lead)) return null;
 
   const p = lead.contact?.person;
   const who = p ? `${p.lastName ?? ""} ${p.firstName ?? ""}`.trim() : null;

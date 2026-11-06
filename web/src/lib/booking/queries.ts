@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { DemoHost } from "@/lib/leads/vocab";
 import { db } from "@/lib/db";
 import type { SlotBooking } from "./slots";
 import { CLOSED_TASK_STATUSES } from "@/lib/tasks/status";
@@ -20,7 +21,7 @@ export function demoHostsFromSettings(settings: unknown): DemoHosts {
 }
 
 /** The host's users.id, verified to be a user of this tenant; null when unconfigured. */
-export async function resolveDemoHost(tenantId: number, demoWith: "aron" | "peter"): Promise<number | null> {
+export async function resolveDemoHost(tenantId: number, demoWith: DemoHost): Promise<number | null> {
   const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
   const id = demoHostsFromSettings(tenant?.settings)[demoWith];
   if (id == null) return null;

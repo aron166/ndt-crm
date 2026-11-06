@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { jsonApi, requireAppKey } from "@/lib/api/http";
+import { TRANSCRIBED_OUTCOME } from "@/lib/leads/vocab";
 import { reportError } from "@/lib/report-error";
 import { getQualificationQuestions } from "@/lib/leads/queries";
 import { questionsInSet, phoneWording, SET_DISCOVERY } from "@/lib/leads/qualification";
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
       where: {
         tenantId: key.tenantId,
         type: "call",
-        outcome: "transcribed",
+        outcome: TRANSCRIBED_OUTCOME,
         leadId: { not: null },
         supersededBy: { none: {} },
         transcript: { not: null },

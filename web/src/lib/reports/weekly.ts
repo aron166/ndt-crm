@@ -1,6 +1,6 @@
 import { TZ, budapestYmd } from "@/lib/time";
 import { db } from "@/lib/db";
-import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES } from "@/lib/leads/vocab";
 
 /**
  * Weekly sales-engine report (growth playbook M7). Pure read, tenant-scoped,

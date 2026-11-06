@@ -2,7 +2,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { requireAppKey } from "@/lib/api/http";
 import { agentCtx, type LeadCtx } from "@/lib/ctx";
-import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
+import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./vocab";
 import { answersRecordSchema } from "./qualification";
 import { emptyToUndef } from "@/lib/zod-helpers";
 
