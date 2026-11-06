@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -27,7 +28,6 @@ import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
 // Gmail; these actions are how the CRM is told. Every action checks the CRM
 // user itself — the proxy's login redirect is not an authorization check.
 
-const TENANT_ID = 1;
 type Fail = { ok: false; error: string };
 
 async function requireUser(): Promise<{ userId: number } | Fail> {

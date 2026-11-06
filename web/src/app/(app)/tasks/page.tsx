@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { TasksClient } from "./TasksClient";
@@ -6,7 +7,6 @@ import { NewTaskButton } from "./NewTaskButton";
 import { ViewToggle } from "./ViewToggle";
 import { serializeTaskCost } from "@/lib/tasks/costing";
 
-const TENANT_ID = 1;
 
 interface SearchParams {
   status?: string;

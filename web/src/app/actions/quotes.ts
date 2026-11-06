@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -9,7 +10,6 @@ import { nextQuoteNumber } from "@/lib/quotes/number";
 import { QUOTE_STATUSES, type QuoteStatus } from "@/lib/quotes/status";
 import { requireCrmUser } from "@/lib/actor";
 
-const TENANT_ID = 1;
 
 // NOTE: QuoteStatus / QUOTE_STATUSES live in lib/quotes/status (pure module) — a
 // "use server" file may only export async functions, and Next's action transform

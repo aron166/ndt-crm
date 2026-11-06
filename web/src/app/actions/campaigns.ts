@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -14,7 +15,6 @@ import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 // so the (app) layout's login redirect is not an authorization check. These
 // four had no check at all before 2026-09-20.
 
-const TENANT_ID = 1;
 
 /**
  * Every action returns this one shape. Declared, not inferred: the callers read

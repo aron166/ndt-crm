@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getActor } from "@/lib/actor";
@@ -7,7 +8,6 @@ import { listOutreachCampaignKeys } from "@/app/actions/content";
 import { ReviewClient } from "./ReviewClient";
 import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
-const TENANT_ID = 1;
 
 export const dynamic = "force-dynamic";
 

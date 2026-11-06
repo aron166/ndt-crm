@@ -1,11 +1,11 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 
-const TENANT_ID = 1;
 
 export type TaggableType = "company" | "person" | "deal" | "task" | "interaction";
 

@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -23,7 +24,6 @@ import {
   CLAIMABLE_STATUSES,
 } from "@/lib/outreach/drafts";
 
-const TENANT_ID = 1;
 
 const AUDIT_TYPE = "email_draft" as const;
 

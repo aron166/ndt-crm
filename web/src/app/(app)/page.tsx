@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { formatRelativeTime, contactFreshness } from "@/lib/utils";
@@ -7,7 +8,6 @@ import { getActor } from "@/lib/actor";
 import { countPendingForReviewer } from "@/lib/content/queries";
 import { UI } from "@/lib/content/labels";
 
-const TENANT_ID = 1;
 
 const FRESHNESS_COLOR: Record<string, string> = {
   mint: "var(--mint)", mute: "var(--fg-mute)", amber: "var(--amber)", coral: "var(--coral)",

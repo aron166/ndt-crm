@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { getActor } from "@/lib/actor";
 import { getDecisionQueue } from "@/lib/content/queries";
 import { getContentReviewers } from "@/lib/content/reviewers";
@@ -6,7 +7,6 @@ import { MarketingTabs } from "../MarketingTabs";
 import { DecisionsClient } from "./DecisionsClient";
 import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
-const TENANT_ID = 1;
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,7 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { SuppressionForm } from "./SuppressionForm";
 
-const TENANT_ID = 1;
 export const metadata = { title: "Tiltólista: Helm CRM" };
 export const dynamic = "force-dynamic";
 

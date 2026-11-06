@@ -1,7 +1,7 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { decrypt, isEncrypted } from "@/lib/crypto";
 
-const TENANT_ID = 1;
 
 async function getApiKey(): Promise<string | null> {
   const cred = await db.integrationCredential.findUnique({

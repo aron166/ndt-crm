@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { AreaChart } from "@/components/viz/AreaChart";
@@ -8,7 +9,6 @@ import { formatDate } from "@/lib/utils";
 import { serializeDates } from "@/lib/serialize";
 import { AnalyticsClient } from "./AnalyticsClient";
 
-const TENANT_ID = 1;
 
 const PIPELINE_COLORS: Record<number, string> = {
   0: "var(--fg-faint)",

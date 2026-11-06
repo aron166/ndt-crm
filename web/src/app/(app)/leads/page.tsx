@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { serializeDates } from "@/lib/serialize";
@@ -11,7 +12,6 @@ import { minutesToFirstContact, tierAFlag } from "@/lib/leads/first-contact";
 import { LEAD_OUTCOME_LABEL, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/outcomes";
 import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 
-const TENANT_ID = 1;
 const PAGE_SIZE = 30;
 // ponytail: per-column cap (newest first) + "N / total" badge — a kanban has no
 // natural page; add per-column "load more" when a column actually exceeds this.

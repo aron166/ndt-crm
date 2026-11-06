@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -6,7 +7,6 @@ import { userLeadCtx } from "@/lib/actor";
 import { proposeSlots } from "@/lib/booking/slots";
 import { resolveDemoHost, loadBookings } from "@/lib/booking/queries";
 
-const TENANT_ID = 1;
 /** How far out Péter books (see slots.ts) plus a little slack for "no free day found". */
 const PROPOSAL_WINDOW_DAYS = 21;
 

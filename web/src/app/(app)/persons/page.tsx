@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { PersonsSearch } from "./PersonsSearch";
@@ -8,7 +9,6 @@ import { getSavedViews } from "@/app/actions/saved-views";
 import { employerState } from "@/lib/persons/employer";
 
 const PAGE_SIZE = 30;
-const TENANT_ID = 1;
 
 function avatarBg(id: number) {
   const palette = [

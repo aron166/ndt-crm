@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -10,7 +11,6 @@ import { getIntroMaterialUrl } from "@/lib/leads/intro";
 import { getScriptStats } from "@/lib/leads/script-stats";
 import { getTechnologyWordCounts } from "@/lib/leads/technology-words";
 
-const TENANT_ID = 1;
 
 export default async function LeadStatusSetupPage() {
   const [statuses, questionModel, introUrl, scriptVariants] = await Promise.all([

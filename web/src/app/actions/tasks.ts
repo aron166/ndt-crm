@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -6,7 +7,6 @@ import { audit, diff } from "@/lib/audit";
 import { computeCostAmount } from "@/lib/tasks/costing";
 import { requireCrmUser } from "@/lib/actor";
 
-const TENANT_ID = 1;
 
 /**
  * Parse the optional cost-line fields off a task form. Cost code carries a

@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -6,7 +7,6 @@ import { audit } from "@/lib/audit";
 import { generateAppKey, hashAppKey } from "@/lib/app-key-auth";
 import { requireCrmUser } from "@/lib/actor";
 
-const TENANT_ID = 1;
 
 export interface AppKeyRow {
   id: number;

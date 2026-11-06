@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -11,7 +12,6 @@ import { createVersion } from "@/lib/content/service";
 // (reviews, versions). What remains: edit (= a new version), and recording a
 // manual publication of a LIVE item, which no longer changes its status.
 
-const TENANT_ID = 1;
 
 async function requireUser(): Promise<{ userId: number } | { error: string }> {
   const { userId } = await getActor(TENANT_ID);

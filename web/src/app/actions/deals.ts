@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -8,7 +9,6 @@ import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 import { requireCrmUser } from "@/lib/actor";
 
-const TENANT_ID = 1;
 
 // Foreign ids taken from input must belong to this tenant before they are
 // written onto a deal. Returns an error message or null.

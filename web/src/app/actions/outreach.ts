@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { NOT_FA } from "@/lib/companies/filters";
@@ -16,7 +17,6 @@ import { audienceWhere } from "@/lib/marketing/audience-query";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import type { Prisma } from "@prisma/client";
 
-const TENANT_ID = 1;
 
 // Companies the cockpit will call: callable status, alive, not under liquidation.
 const CALLABLE_WHERE: Prisma.CompanyWhereInput = {

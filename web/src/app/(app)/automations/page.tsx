@@ -1,9 +1,9 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { serializeDates } from "@/lib/serialize";
 import { AutomationsClient } from "./AutomationsClient";
 
-const TENANT_ID = 1;
 
 export default async function AutomationsPage() {
   const [rules, leadStatuses, pipelines, users] = await Promise.all([

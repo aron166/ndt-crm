@@ -6,11 +6,6 @@ import { reportError } from "@/lib/report-error";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 
-// ponytail: no ctx system yet (tenant-decoupling is queued item #1), so callers
-// that genuinely have no tenant in hand still pass DEFAULT_TENANT_ID. The point
-// of threading it is that the ONE caller with a real tenant — the app-key'd
-// public /api/leads intake — stops silently sending through tenant 1's account.
-export const DEFAULT_TENANT_ID = 1;
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 export interface ResendConfig {

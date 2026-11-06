@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -10,7 +11,6 @@ import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact } from "@/lib/leads/first-contact";
 import { LeadDetailClient } from "./LeadDetailClient";
 
-const TENANT_ID = 1;
 
 export default async function LeadDetailPage({
   params,

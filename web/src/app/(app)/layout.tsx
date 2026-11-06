@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/layout/AppShell";
@@ -29,14 +30,14 @@ export default async function AppLayout({
   const [overdueCount, defaultPipeline, marketingReviewCount] = await Promise.all([
     db.task.count({
       where: {
-        tenantId: 1,
+        tenantId: TENANT_ID,
         status: { in: ["created", "not_started", "in_progress"] },
         dueDate: { lt: new Date(new Date().toDateString()) },
         parentTaskId: null,
       },
     }),
     db.pipeline.findFirst({
-      where: { tenantId: 1, isArchived: false },
+      where: { tenantId: TENANT_ID, isArchived: false },
       include: { stages: { orderBy: { position: "asc" } }, customFields: { orderBy: { position: "asc" } } },
       orderBy: { position: "asc" },
     }),

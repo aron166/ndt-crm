@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -11,7 +12,6 @@ import { serializeDates } from "@/lib/serialize";
 import { serializeTaskCost } from "@/lib/tasks/costing";
 import { isConnected } from "@/lib/integrations/google_maps";
 
-const TENANT_ID = 1;
 
 const AVATAR_PALETTE = [
   "var(--indigo)", "var(--mint)", "var(--amber)",

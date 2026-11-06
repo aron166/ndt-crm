@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { employerState, employerLabel } from "@/lib/persons/employer";
@@ -9,7 +10,7 @@ export async function GET(request: Request) {
 
   const results = await db.person.findMany({
     where: {
-      tenantId: 1,
+      tenantId: TENANT_ID,
       OR: [
         { firstName: { contains: q, mode: "insensitive" } },
         { lastName:  { contains: q, mode: "insensitive" } },

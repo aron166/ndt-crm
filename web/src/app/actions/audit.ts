@@ -1,10 +1,10 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { requireCrmUser } from "@/lib/actor";
 import type { AuditEntityType } from "@/lib/audit";
 
-const TENANT_ID = 1;
 
 export async function getEntityHistory(type: AuditEntityType, id: number) {
   const denied = await requireCrmUser(TENANT_ID);

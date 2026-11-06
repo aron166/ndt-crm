@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { getSavedViews } from "@/app/actions/saved-views";
@@ -6,7 +7,6 @@ import { audienceWhere, countAudience, listAudience } from "@/lib/marketing/audi
 import { AUDIENCE_PREVIEW_LIMIT } from "@/lib/marketing/audience";
 import { CampaignDetailClient } from "./CampaignDetailClient";
 
-const TENANT_ID = 1;
 
 export const dynamic = "force-dynamic";
 

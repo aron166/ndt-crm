@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -7,7 +8,6 @@ import { logLeadCallOutcome } from "@/lib/leads/service";
 import { audit } from "@/lib/audit";
 import { NOTE_PREVIEW_LEN, validateTranscript } from "@/lib/calls/transcript";
 
-const TENANT_ID = 1;
 
 /**
  * Store a dictated call transcript as ONE append-only Interaction. This is a

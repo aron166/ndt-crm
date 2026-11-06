@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -8,7 +9,6 @@ import { normalizeAccountType, normalizeStatus } from "@/lib/import/normalize";
 
 import { requireCrmUser } from "@/lib/actor";
 
-const TENANT_ID = 1;
 
 export async function createCompany(data: {
   name: string;

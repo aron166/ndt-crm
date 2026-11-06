@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { NextRequest, NextResponse } from "next/server";
 import { requireCrmUser } from "@/lib/actor";
 import { runImport } from "@/lib/import/commit";
@@ -6,9 +7,6 @@ import type { RawRow, Mapping } from "@/lib/import/build";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// Single tenant today (decisions.md #12 — kept as a transport-layer literal; the
-// import lib itself takes tenantId as input, so it's ctx-ready).
-const TENANT_ID = 1;
 const MAX_ROWS = 10000;
 
 export async function POST(req: NextRequest) {

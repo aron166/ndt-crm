@@ -1,7 +1,7 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { sendContentDigests } from "@/lib/content/digest";
 import { reportError } from "@/lib/report-error";
 
-const TENANT_ID = 1;
 
 // Scheduled daily digest for content reviewers (spec §5). Same auth as
 // /api/cron/automations. Fired twice a day (06:00 and 07:00 UTC, see

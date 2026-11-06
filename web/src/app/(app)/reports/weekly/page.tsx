@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireCrmUser } from "@/lib/actor";
@@ -8,7 +9,6 @@ import { getWeeklyReport, lastDays, type WeeklyReport } from "@/lib/reports/week
 import { monthUsage } from "@/lib/assistant/cap";
 import { REPORT_UI, formatMinutesOrDash } from "@/lib/reports/labels";
 
-const TENANT_ID = 1;
 // Hungarian copy (lib/reports/labels.ts) is PROPOSAL until Áron approves.
 
 const R = { textAlign: "right" } as const;

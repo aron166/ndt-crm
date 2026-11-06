@@ -1,10 +1,10 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getQuote } from "@/app/actions/quotes";
 import { getCostRates } from "@/app/actions/cost-rates";
 import { QuoteBuilderClient } from "./QuoteBuilderClient";
 
-const TENANT_ID = 1;
 export const dynamic = "force-dynamic";
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {

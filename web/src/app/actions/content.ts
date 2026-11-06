@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -30,7 +31,6 @@ import type { NewAssetInput } from "@/lib/content/service";
 // reviewer list inside the service. There is deliberately no action that sets
 // `live` directly: live is only ever the result of two approvals.
 
-const TENANT_ID = 1;
 type Fail = { ok: false; error: string };
 
 async function userActor(): Promise<UserActor | Fail> {

@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -7,7 +8,6 @@ import { createCompany } from "@/app/actions/companies";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { requireCrmUser } from "@/lib/actor";
 
-const TENANT_ID = 1;
 
 export async function addContact(formData: FormData) {
   const denied = await requireCrmUser(TENANT_ID);

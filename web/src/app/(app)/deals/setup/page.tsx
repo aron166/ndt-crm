@@ -1,10 +1,10 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PipelineSetupClient } from "./PipelineSetupClient";
 import { serializeDates } from "@/lib/serialize";
 
-const TENANT_ID = 1;
 
 export default async function PipelineSetupPage() {
   const pipelines = await db.pipeline.findMany({

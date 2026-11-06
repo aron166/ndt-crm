@@ -1,7 +1,7 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { sendWeeklyReports } from "@/lib/reports/weekly-email";
 import { reportError } from "@/lib/report-error";
 
-const TENANT_ID = 1;
 
 // Monday weekly sales report for the tenant's reviewers. Same auth as
 // /api/cron/automations. Fires once at 05:00 UTC Monday (see vercel.json);

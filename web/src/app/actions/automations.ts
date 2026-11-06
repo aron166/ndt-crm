@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -11,7 +12,6 @@ import {
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { requireCrmUser } from "@/lib/actor";
 
-const TENANT_ID = 1;
 
 // Fail CLOSED on malformed JSON: an unparseable triggerConfig/conditions must
 // abort the write, never silently fall back to a broad (filter-less) rule.

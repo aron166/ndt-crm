@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -17,7 +18,6 @@ import { getLeadStatuses } from "@/lib/leads/queries";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 
-const TENANT_ID = 1;
 
 export async function deleteLead(
   id: number,

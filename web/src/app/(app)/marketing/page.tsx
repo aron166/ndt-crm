@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import Link from "next/link";
 import { LayoutGrid, List } from "lucide-react";
 import { getActor } from "@/lib/actor";
@@ -8,7 +9,6 @@ import { InboxClient } from "./InboxClient";
 import { BoardClient } from "./BoardClient";
 import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
-const TENANT_ID = 1;
 
 export const dynamic = "force-dynamic";
 

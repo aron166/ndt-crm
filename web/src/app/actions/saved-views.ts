@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -11,7 +12,6 @@ import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 // deleted by bare id. A server action is callable by id regardless of the
 // (app) layout's login redirect, so that was a delete-anything primitive.
 
-const TENANT_ID = 1;
 
 async function requireUser(): Promise<{ error: string } | null> {
   const { userId } = await getActor(TENANT_ID);

@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { db } from "@/lib/db";
@@ -7,7 +8,6 @@ import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { isSuppressed, parseSuppressionTarget } from "@/lib/suppression";
 
-const TENANT_ID = 1;
 const CHANNELS = ["email", "phone", "linkedin", "in_person"];
 
 // Same gate as tasks.ts: message only, each action builds its own literal.
