@@ -14,6 +14,7 @@ import { callOutcomeLabel } from "@/lib/leads/outcomes";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { NOTE_PREVIEW_LEN } from "@/lib/calls/transcript";
 import { reportError } from "@/lib/report-error";
+import { writeAuditLog } from "@/lib/audit";
 
 // Call-result intake. The external transcription/analysis pipeline (Make:
 // recorder → Drive → Whisper → AI) posts the finished transcript + analysis
@@ -118,18 +119,10 @@ export async function POST(request: Request) {
       select: { id: true },
     });
 
-    await db.auditLog.create({
-      data: {
-        tenantId,
-        actorUserId: null,
-        action: "create",
-        entityType: "interaction",
-        entityId: interaction.id,
-        changes: {
-          before: null,
-          after: { type: "call", outcome: "transcribed", source: key.appSlug, callId: input.call_id ?? null },
-        } as Prisma.InputJsonValue,
-      },
+    await writeAuditLog({
+      entityType: "interaction", entityId: interaction.id, action: "create", before: null,
+      after: { type: "call", outcome: "transcribed", source: key.appSlug, callId: input.call_id ?? null },
+      options: { tenantId, actor: "agent", actorAgentId: key.appSlug },
     });
     await recomputeCloseness({ tenantId, companyId: company.id, personId: input.person_id ?? null });
 
@@ -259,25 +252,17 @@ async function handleLeadOutcome(
       );
     }
 
-    await db.auditLog.create({
-      data: {
-        tenantId,
-        actorUserId: null,
-        action: "create",
-        entityType: "interaction",
-        entityId: result.interactionId,
-        changes: {
-          before: null,
-          after: {
-            type: "call",
-            outcome: result.applied ? parsed.outcome : "transcribed",
-            source: appSlug,
-            callId: input.call_id ?? null,
-            leadId,
-            confidence: parsed.confidence,
-          },
-        } as Prisma.InputJsonValue,
+    await writeAuditLog({
+      entityType: "interaction", entityId: result.interactionId, action: "create", before: null,
+      after: {
+        type: "call",
+        outcome: result.applied ? parsed.outcome : "transcribed",
+        source: appSlug,
+        callId: input.call_id ?? null,
+        leadId,
+        confidence: parsed.confidence,
       },
+      options: { tenantId, actor: "agent", actorAgentId: appSlug },
     });
     await recomputeCloseness({ tenantId, companyId: lead.companyId, personId });
 

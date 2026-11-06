@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { TENANT_ID } from "./tenant";
 import { reportError } from "./report-error";
@@ -46,10 +47,13 @@ interface WriteAuditInput {
   options: AuditOptions;
 }
 
+type AuditClient = { auditLog: { create(args: { data: Prisma.AuditLogUncheckedCreateInput }): Promise<unknown> } };
+
 // The actual persistence step. Extracted from `audit()` so it can be unit-tested
 // directly (the `after()` callback in `audit()` only runs inside a request).
-// This is the single write path for the audit trail — keep it that way.
-export async function writeAuditLog(input: WriteAuditInput): Promise<void> {
+// This is the single write path for the audit trail; a write that must be atomic
+// with its mutation passes the transaction client.
+export async function writeAuditLog(input: WriteAuditInput, client: AuditClient = db): Promise<void> {
   const { entityType, entityId, action, before, after: after_data, options } = input;
   const tenantId = options.tenantId ?? TENANT_ID;
   const actor = options.actor ?? "user";
@@ -63,7 +67,7 @@ export async function writeAuditLog(input: WriteAuditInput): Promise<void> {
     actorUserId = data.user?.id ?? null;
   }
 
-  await db.auditLog.create({
+  await client.auditLog.create({
     data: {
       tenantId,
       actorUserId,

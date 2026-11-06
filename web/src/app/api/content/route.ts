@@ -7,6 +7,7 @@ import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
 import { contentIntakeSchema, resolveCampaignSlug, defaultCategory } from "@/lib/marketing/schema";
 import { createItem, addChecks } from "@/lib/content/service";
 import { extractWarnings } from "@/lib/content/warnings";
+import { writeAuditLog } from "@/lib/audit";
 
 // Content-draft intake endpoint (Marketing module). Same per-app-key auth as
 // POST /api/leads — the content factory posts drafts here; the shared
@@ -61,16 +62,14 @@ export async function POST(request: Request) {
             select: { id: true },
           });
           campaignId = created.id;
-          await tx.auditLog.create({
-            data: {
-              tenantId,
-              actorUserId: null,
-              action: "create",
-              entityType: "campaign",
-              entityId: created.id,
-              changes: { before: null, after: { slug, source: sourceApp } } as Prisma.InputJsonValue,
+          await writeAuditLog(
+            {
+              entityType: "campaign", entityId: created.id, action: "create", before: null,
+              after: { slug, source: sourceApp },
+              options: { tenantId, actor: "agent", actorAgentId: sourceApp },
             },
-          });
+            tx,
+          );
         }
       }
 

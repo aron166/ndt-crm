@@ -4,6 +4,7 @@ import { normalizeIntakeAnswers, withAnswers, effectiveAnswers } from "./qualifi
 import { UNSENT_STATUSES } from "@/lib/outreach/steps";
 import { computeTier, type LeadTier } from "./tier";
 import type { AutomationEvent } from "@/lib/automations/types";
+import { writeAuditLog } from "@/lib/audit";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
 //
@@ -306,27 +307,22 @@ export async function ingestLead(
   });
 
   // 5. Audit (append-only). Attributed to the source app, no user.
-  await tx.auditLog.create({
-    data: {
-      tenantId,
-      actorUserId: null,
-      action: "create",
-      entityType: "lead",
-      entityId: lead.id,
-      changes: {
-        before: null,
-        after: {
-          companyId: company.id,
-          personId: person.id,
-          contactId: contact.id,
-          source: input.source,
-          sourceApp,
-          channel: input.channel,
-          status: statusKey,
-        },
-      } as Prisma.InputJsonValue,
+  await writeAuditLog(
+    {
+      entityType: "lead", entityId: lead.id, action: "create", before: null,
+      after: {
+        companyId: company.id,
+        personId: person.id,
+        contactId: contact.id,
+        source: input.source,
+        sourceApp,
+        channel: input.channel,
+        status: statusKey,
+      },
+      options: { tenantId, actor: "agent", actorAgentId: sourceApp },
     },
-  });
+    tx,
+  );
 
   // 5b. The answered draft is now `replied`. Scoped to the tenant AND to the
   // statuses a reply can legitimately arrive on — only a draft we actually SENT
