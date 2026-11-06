@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { audit, diff } from "@/lib/audit";
 import { computeCostAmount } from "@/lib/tasks/costing";
 import { requireCrmUser } from "@/lib/actor";
+import { foreignIdError } from "@/lib/tenant-refs";
 
 /**
  * Parse the optional cost-line fields off a task form. Cost code carries a
@@ -39,6 +40,12 @@ export async function createTask(formData: FormData) {
   const personIdStr  = formData.get("personId") as string | null;
   const parentIdStr  = formData.get("parentTaskId") as string | null;
 
+  const companyId = companyIdStr ? parseInt(companyIdStr, 10) : null;
+  const personId = personIdStr ? parseInt(personIdStr, 10) : null;
+  const parentTaskId = parentIdStr ? parseInt(parentIdStr, 10) : null;
+  const refErr = await foreignIdError(TENANT_ID, { companyId, personId, taskId: parentTaskId });
+  if (refErr) return { error: refErr };
+
   const cost = parseCostFields(formData);
 
   const task = await db.task.create({
@@ -51,9 +58,9 @@ export async function createTask(formData: FormData) {
       description: (formData.get("description") as string) || null,
       dueDate: dueDateStr ? new Date(dueDateStr) : null,
       estimatedMinutes: estStr ? parseInt(estStr, 10) : null,
-      companyId: companyIdStr ? parseInt(companyIdStr, 10) : null,
-      personId: personIdStr ? parseInt(personIdStr, 10) : null,
-      parentTaskId: parentIdStr ? parseInt(parentIdStr, 10) : null,
+      companyId,
+      personId,
+      parentTaskId,
       ...cost,
     },
   });
@@ -134,14 +141,15 @@ export async function completeTask(id: number) {
     where: { id, tenantId: TENANT_ID },
     select: { status: true, companyId: true, personId: true },
   });
+  if (!before) return;
   await db.task.updateMany({
     where: { id, tenantId: TENANT_ID },
     data: { status: "done", completedAt: new Date(), updatedAt: new Date() },
   });
-  await audit("task", id, "update", { status: before?.status }, { status: "done" });
+  await audit("task", id, "update", { status: before.status }, { status: "done" });
   revalidatePath("/tasks");
-  if (before?.companyId) revalidatePath(`/companies/${before.companyId}`);
-  if (before?.personId)  revalidatePath(`/persons/${before.personId}`);
+  if (before.companyId) revalidatePath(`/companies/${before.companyId}`);
+  if (before.personId)  revalidatePath(`/persons/${before.personId}`);
 }
 
 export async function reopenTask(id: number) {
@@ -151,11 +159,12 @@ export async function reopenTask(id: number) {
     where: { id, tenantId: TENANT_ID },
     select: { status: true, companyId: true, personId: true },
   });
+  if (!before) return;
   await db.task.updateMany({
     where: { id, tenantId: TENANT_ID },
     data: { status: "created", completedAt: null, updatedAt: new Date() },
   });
-  await audit("task", id, "update", { status: before?.status }, { status: "created" });
+  await audit("task", id, "update", { status: before.status }, { status: "created" });
   revalidatePath("/tasks");
   if (before?.companyId) revalidatePath(`/companies/${before.companyId}`);
   if (before?.personId)  revalidatePath(`/persons/${before.personId}`);
@@ -191,7 +200,8 @@ export async function deleteTask(id: number) {
     where: { id, tenantId: TENANT_ID },
     select: { title: true, status: true },
   });
+  if (!task) return;
   await db.task.deleteMany({ where: { id, tenantId: TENANT_ID } });
-  await audit("task", id, "delete", { title: task?.title, status: task?.status }, null);
+  await audit("task", id, "delete", { title: task.title, status: task.status }, null);
   revalidatePath("/tasks");
 }

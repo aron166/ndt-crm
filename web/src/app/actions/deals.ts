@@ -8,19 +8,7 @@ import { runAutomations } from "@/lib/automations/engine";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 import { requireCrmUser } from "@/lib/actor";
-
-// Foreign ids taken from input must belong to this tenant before they are
-// written onto a deal. Returns an error message or null.
-async function foreignIdError(ids: {
-  companyId?: number | null; personId?: number | null; pipelineId?: number | null; stageId?: number | null;
-}): Promise<string | null> {
-  const { companyId, personId, pipelineId, stageId } = ids;
-  if (companyId != null && !(await db.company.findFirst({ where: { id: companyId, tenantId: TENANT_ID }, select: { id: true } }))) return "Cég nem található";
-  if (personId != null && !(await db.person.findFirst({ where: { id: personId, tenantId: TENANT_ID }, select: { id: true } }))) return "Személy nem található";
-  if (pipelineId != null && !(await db.pipeline.findFirst({ where: { id: pipelineId, tenantId: TENANT_ID }, select: { id: true } }))) return "Pipeline nem található";
-  if (stageId != null && !(await db.pipelineStage.findFirst({ where: { id: stageId, pipeline: { tenantId: TENANT_ID } }, select: { id: true } }))) return "Szakasz nem található";
-  return null;
-}
+import { foreignIdError } from "@/lib/tenant-refs";
 
 export async function createDeal(formData: FormData) {
   const denied = await requireCrmUser(TENANT_ID);
@@ -42,7 +30,7 @@ export async function createDeal(formData: FormData) {
     if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
   }
 
-  const refErr = await foreignIdError({
+  const refErr = await foreignIdError(TENANT_ID, {
     companyId: parseInt(companyIdStr),
     personId: personIdStr ? parseInt(personIdStr) : null,
     pipelineId: pipelineIdStr ? parseInt(pipelineIdStr) : null,
@@ -94,7 +82,7 @@ export async function updateDeal(id: number, formData: FormData) {
     if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
   }
 
-  const refErr = await foreignIdError({
+  const refErr = await foreignIdError(TENANT_ID, {
     personId: personIdStr ? parseInt(personIdStr) : null,
     stageId: stageIdStr ? parseInt(stageIdStr) : null,
   });
@@ -144,10 +132,11 @@ export async function moveDeal(
     select: { name: true },
   });
   if (!newStage) throw new Error("Szakasz nem található");
+  if (!deal) return;
 
   // Only a real stage change resets the idle clock (drags within the same
   // column reorder but keep the deal in its stage).
-  const stageChanged = !!deal && deal.stageId !== newStageId;
+  const stageChanged = deal.stageId !== newStageId;
 
   await db.deal.updateMany({
     where: { id: dealId, tenantId: TENANT_ID },
@@ -158,11 +147,11 @@ export async function moveDeal(
   });
 
   audit("deal", dealId, "update",
-    { stageId: deal?.stageId, stageName: deal?.stage?.name },
-    { stageId: newStageId, stageName: newStage?.name }
+    { stageId: deal.stageId, stageName: deal.stage?.name },
+    { stageId: newStageId, stageName: newStage.name }
   );
 
-  if (stageChanged && deal) {
+  if (stageChanged) {
     await runAutomations({
       type: "deal_stage_changed",
       tenantId: TENANT_ID,
@@ -227,7 +216,8 @@ export async function upsertStage(formData: FormData) {
   const stageIdStr  = formData.get("stageId") as string | null;
   const name        = (formData.get("name") as string)?.trim();
   const color       = (formData.get("color") as string) || "#6366f1";
-  const probability = parseInt(formData.get("probability") as string) || 50;
+  const parsedProbability = parseInt(formData.get("probability") as string);
+  const probability = Number.isNaN(parsedProbability) ? 50 : parsedProbability;
   const position    = parseInt(formData.get("position") as string) || 0;
   const isTerminalWon  = formData.get("isTerminalWon") === "true";
   const isTerminalLost = formData.get("isTerminalLost") === "true";

@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
 import { TENANT_ID } from "@/lib/tenant";
 import { sendEmail, sendTestEmail } from "@/lib/integrations/resend";
 import { requireCrmUser } from "@/lib/actor";
+import { foreignIdError } from "@/lib/tenant-refs";
 
 export async function sendResendTest() {
   const denied = await requireCrmUser(TENANT_ID);
@@ -33,12 +33,8 @@ export async function sendCrmEmail(input: {
   if (!input.subject?.trim()) return { error: "Hiányzó tárgy." };
   if (!input.text?.trim()) return { error: "Az üzenet nem lehet üres." };
   // sendEmail writes these ids onto the interaction, so they must be ours.
-  if (input.companyId != null && !(await db.company.findFirst({ where: { id: input.companyId, tenantId: TENANT_ID }, select: { id: true } }))) {
-    return { error: "Cég nem található" };
-  }
-  if (input.personId != null && !(await db.person.findFirst({ where: { id: input.personId, tenantId: TENANT_ID }, select: { id: true } }))) {
-    return { error: "Személy nem található" };
-  }
+  const refErr = await foreignIdError(TENANT_ID, { companyId: input.companyId, personId: input.personId });
+  if (refErr) return { error: refErr };
 
   let result;
   try {

@@ -10,6 +10,7 @@ import { quoteTotals, lineAmount } from "@/lib/quotes/calc";
 import { nextQuoteNumber } from "@/lib/quotes/number";
 import { QUOTE_STATUSES, type QuoteStatus } from "@/lib/quotes/status";
 import { requireCrmUser } from "@/lib/actor";
+import { foreignIdError } from "@/lib/tenant-refs";
 
 // NOTE: QuoteStatus / QUOTE_STATUSES live in lib/quotes/status (pure module) — a
 // "use server" file may only export async functions, and Next's action transform
@@ -161,10 +162,8 @@ function toDTO(q: {
 // Person, lead and deal ids from input must belong to this tenant.
 async function linkedIdError(input: QuoteInput): Promise<string | null> {
   const { personId, leadId, dealId } = input;
-  if (personId != null && !(await db.person.findFirst({ where: { id: personId, tenantId: TENANT_ID }, select: { id: true } }))) return "Személy nem található";
   if (leadId != null && !(await db.lead.findFirst({ where: { id: leadId, tenantId: TENANT_ID }, select: { id: true } }))) return LEAD_NOT_FOUND;
-  if (dealId != null && !(await db.deal.findFirst({ where: { id: dealId, tenantId: TENANT_ID }, select: { id: true } }))) return "Üzlet nem található";
-  return null;
+  return foreignIdError(TENANT_ID, { personId, dealId });
 }
 
 export async function getQuotes(): Promise<QuoteListItem[]> {
