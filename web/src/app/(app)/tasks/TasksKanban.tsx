@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Plus, Clock } from "lucide-react";
 import { moveTask } from "@/app/actions/tasks";
 import { useTaskCompletion } from "@/components/useTaskCompletion";
-import { TaskModal } from "./TaskModal";
+import { TaskModal } from "@/components/TaskModal";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { BOOKING_KIND_LABEL, isBookingKind } from "@/lib/booking/priority";

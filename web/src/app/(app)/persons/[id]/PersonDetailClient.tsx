@@ -12,7 +12,7 @@ import { SendEmailButton } from "@/components/SendEmailButton";
 import { TagInput } from "@/components/tags/TagInput";
 import { ContextTasksTab } from "@/components/ContextTasksTab";
 import { AuditLogEntries } from "@/components/AuditLogTab";
-import { TaskModal } from "@/app/(app)/tasks/TaskModal";
+import { TaskModal } from "@/components/TaskModal";
 import { SetEmployerModal } from "./SetEmployerModal";
 import { DossierTab } from "@/components/DossierTab";
 import { formatDate, formatDateTime } from "@/lib/utils";

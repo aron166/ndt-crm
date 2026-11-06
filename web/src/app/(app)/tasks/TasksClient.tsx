@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { TaskModal } from "./TaskModal";
+import { TaskModal } from "@/components/TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { reopenTask, deleteTask } from "@/app/actions/tasks";
 import { useTaskCompletion } from "@/components/useTaskCompletion";
