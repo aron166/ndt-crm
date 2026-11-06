@@ -1,7 +1,7 @@
 import { reportError } from "@/lib/report-error";
 import { json, parseId, readJson } from "@/lib/api/http";
 import { leadApiCtx, leadInteractionWireSchema, toCallOutcomeInput } from "@/lib/leads/api";
-import { logLeadCallOutcome } from "@/lib/leads/service";
+import { LEAD_NOT_FOUND, logLeadCallOutcome } from "@/lib/leads/service";
 
 /**
  * POST /api/leads/:id/interactions — log a call outcome. Same payload + rules
@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const res = await logLeadCallOutcome(id, toCallOutcomeInput(wire.data), auth.ctx);
     if ("error" in res) {
-      const notFound = res.error === "Lead nem található";
+      const notFound = res.error === LEAD_NOT_FOUND;
       return json({ error: res.error, ...("issues" in res ? { details: res.issues } : {}) }, notFound ? 404 : 400);
     }
     const { success: _s, ...rest } = res;

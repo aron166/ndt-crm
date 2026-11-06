@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { json, readJson } from "@/lib/api/http";
 import { leadApiCtx } from "@/lib/leads/api";
-import { logLeadCallOutcome } from "@/lib/leads/service";
+import { LEAD_NOT_FOUND, logLeadCallOutcome } from "@/lib/leads/service";
 import { AssistantError, assistantConfig, chatCompletion, estimateCostUsd } from "@/lib/assistant/provider";
 import { capState } from "@/lib/assistant/cap";
 import {
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
 
     const res = await logLeadCallOutcome(lead.leadId, payload, auth.ctx);
     if ("error" in res) {
-      return json({ error: res.error, ...("issues" in res ? { details: res.issues } : {}) }, res.error === "Lead nem található" ? 404 : 400);
+      return json({ error: res.error, ...("issues" in res ? { details: res.issues } : {}) }, res.error === LEAD_NOT_FOUND ? 404 : 400);
     }
     return json({ ok: true, applied: true, lead_id: lead.leadId, interaction_id: res.interactionId, task_id: res.taskId }, 201);
   } catch (err) {

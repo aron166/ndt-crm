@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { DEFAULT_LEAD_STATUSES, STAGE_DESCRIPTION_PLACEHOLDER, STAGE_DESCRIPTION_MAX } from "@/lib/leads/statuses";
 import {
-  changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome, setLeadQualification,
+  LEAD_NOT_FOUND, changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome, setLeadQualification,
 } from "@/lib/leads/service";
 import type { LeadOutcome } from "@/lib/leads/outcomes";
 import { userLeadCtx } from "@/lib/actor";
@@ -34,7 +34,7 @@ export async function deleteLead(
       companyId: true, contact: { select: { personId: true } },
     },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
 
   // Leads are thin process trackers — deleting one removes the tracker only;
   // the company, person/contact, interactions and any converted deal persist
@@ -153,7 +153,7 @@ export async function updateLead(id: number, formData: FormData) {
       campaign: true,
     },
   });
-  if (!before) return { error: "Lead nem található" };
+  if (!before) return { error: LEAD_NOT_FOUND };
 
   // Absent key → field not submitted, leave unchanged. Empty string → clear to null.
   const text = (k: string): string | null | undefined => {

@@ -1,4 +1,5 @@
 "use server";
+import { LEAD_NOT_FOUND } from "@/lib/leads/service";
 import { TENANT_ID } from "@/lib/tenant";
 
 import { z } from "zod";
@@ -35,7 +36,7 @@ export async function proposeBookingSlots(leadId: number, demoWith: string, minu
     where: { id: leadId, tenantId: TENANT_ID },
     select: { company: { select: { lat: true, lng: true } } },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
 
   // No same-day proposals: earliest slot is the start of tomorrow, server-local.
   const from = new Date();

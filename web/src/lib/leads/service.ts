@@ -22,6 +22,8 @@ import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
 // and the public /api/leads routes alike, so the rules can't drift between the
 // two. Transport-agnostic: no FormData, no NextResponse, no revalidatePath.
 
+export const LEAD_NOT_FOUND = "Lead nem található";
+
 export interface LeadCtx {
   tenantId: number;
   /** `users.id` of the acting human, null for app/agent callers. */
@@ -94,7 +96,7 @@ export async function changeLeadStatus(
   if (!statuses.some((s) => s.key === newStatus)) return { error: "Ismeretlen státusz" };
 
   const before = await loadLead(leadId, ctx.tenantId);
-  if (!before) return { error: "Lead nem található" };
+  if (!before) return { error: LEAD_NOT_FOUND };
   if (before.status === newStatus) return { success: true, changed: false };
 
   await db.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data: { status: newStatus } });
@@ -135,7 +137,7 @@ export async function assignLead(
   ctx: LeadCtx,
 ): Promise<Result> {
   const before = await loadLead(leadId, ctx.tenantId);
-  if (!before) return { error: "Lead nem található" };
+  if (!before) return { error: LEAD_NOT_FOUND };
   if (assignedToId != null) {
     const user = await db.user.findFirst({ where: { id: assignedToId, tenantId: ctx.tenantId }, select: { id: true } });
     if (!user) return { error: "Felhasználó nem található" };
@@ -157,7 +159,7 @@ export async function convertLeadToDeal(leadId: number, ctx: LeadCtx): Promise<R
     where: { id: leadId, tenantId },
     include: { company: { select: { id: true, name: true } }, contact: { select: { personId: true } } },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
   if (lead.convertedDealId) return { success: true, dealId: lead.convertedDealId };
   if (!lead.companyId || !lead.company) return { error: "A leadhez nincs cég társítva" };
 
@@ -217,7 +219,7 @@ export async function setLeadOutcome(
 ): Promise<Result<{ dealId?: number }>> {
   if (!LEAD_OUTCOMES.includes(outcome)) return { error: "Ismeretlen kimenetel" };
   const before = await loadLead(leadId, ctx.tenantId);
-  if (!before) return { error: "Lead nem található" };
+  if (!before) return { error: LEAD_NOT_FOUND };
 
   // A reason is MANDATORY on lost (Péter, 2026-09-07) — no "manual" placeholder.
   // An already-lost lead keeps its stored reason if the caller sends none.
@@ -273,7 +275,7 @@ export async function setLeadQualification(
     where: { id: leadId, tenantId: ctx.tenantId },
     select: { qualification: true, answerSources: true, tier: true },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
 
   const questions = await getQualificationQuestions(ctx.tenantId);
   const parsed = parseAnswers(answers, questions);
@@ -381,7 +383,7 @@ export async function logLeadCallOutcome(
   if (bIssue) return { error: bIssue.message, issues: { [bIssue.path]: [bIssue.message] } };
 
   const lead = await loadLead(leadId, ctx.tenantId);
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
   if (lead.outcome !== "open" || lead.convertedDealId) {
     return { error: "A lead már lezárt: előbb nyisd újra" };
   }

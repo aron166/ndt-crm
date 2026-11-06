@@ -1,4 +1,5 @@
 "use server";
+import { LEAD_NOT_FOUND } from "@/lib/leads/service";
 import { TENANT_ID } from "@/lib/tenant";
 
 import { Prisma } from "@prisma/client";
@@ -161,7 +162,7 @@ function toDTO(q: {
 async function linkedIdError(input: QuoteInput): Promise<string | null> {
   const { personId, leadId, dealId } = input;
   if (personId != null && !(await db.person.findFirst({ where: { id: personId, tenantId: TENANT_ID }, select: { id: true } }))) return "Személy nem található";
-  if (leadId != null && !(await db.lead.findFirst({ where: { id: leadId, tenantId: TENANT_ID }, select: { id: true } }))) return "Lead nem található";
+  if (leadId != null && !(await db.lead.findFirst({ where: { id: leadId, tenantId: TENANT_ID }, select: { id: true } }))) return LEAD_NOT_FOUND;
   if (dealId != null && !(await db.deal.findFirst({ where: { id: dealId, tenantId: TENANT_ID }, select: { id: true } }))) return "Üzlet nem található";
   return null;
 }

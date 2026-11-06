@@ -4,7 +4,7 @@ import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { userLeadCtx } from "@/lib/actor";
-import { logLeadCallOutcome } from "@/lib/leads/service";
+import { LEAD_NOT_FOUND, logLeadCallOutcome } from "@/lib/leads/service";
 import { audit } from "@/lib/audit";
 import { NOTE_PREVIEW_LEN, validateTranscript } from "@/lib/calls/transcript";
 
@@ -24,7 +24,7 @@ export async function queueCallTranscript(leadId: number, transcript: string) {
     where: { id: leadId, tenantId: TENANT_ID },
     select: { companyId: true, campaign: true, contact: { select: { personId: true } } },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
 
   const interaction = await db.interaction.create({
     data: {
