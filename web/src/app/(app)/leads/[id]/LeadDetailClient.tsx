@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Building2, User, Mail, Phone, Globe, CheckCircle2, Pencil, Trash2, PhoneCall, CalendarClock } from "lucide-react";
-import { setLeadOutcomeAction, updateLeadStatus, deleteLead, assignLeadAction } from "@/app/actions/leads";
+import { setLeadOutcomeAction, moveLead, deleteLead, assignLeadAction } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
@@ -156,7 +156,7 @@ export function LeadDetailClient({
     setStatus(next);
     setActionError(null);
     startStatus(async () => {
-      const res = await updateLeadStatus(lead.id, next);
+      const res = await moveLead(lead.id, next);
       if (res && "error" in res) { setStatus(prev); setActionError(res.error); return; }
       router.refresh();
     });

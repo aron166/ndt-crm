@@ -62,8 +62,6 @@ export const DEMO_STATUS: Record<"aron" | "peter", string> = {
 
 /** `no_answer` walks the lead along this chain (one step per attempt). */
 export const CALL_STAGE_CHAIN = ["new", "call_1", "call_2", "call_3", "call_3_plus"] as const;
-/** Áron may turn the auto-advance off later — one switch, here. */
-export const AUTO_ADVANCE_ON_NO_ANSWER = true;
 /** Stage a lead lands in when it asks for a callback. */
 export const RECALL_STATUS = "recall";
 
@@ -201,7 +199,6 @@ export function planCallOutcome(
 
   switch (input.outcome) {
     case "no_answer": {
-      if (!AUTO_ADVANCE_ON_NO_ANSWER) break;
       const i = CALL_STAGE_CHAIN.indexOf((currentStatus ?? "new") as (typeof CALL_STAGE_CHAIN)[number]);
       const next = i >= 0 && i < CALL_STAGE_CHAIN.length - 1 ? CALL_STAGE_CHAIN[i + 1] : null;
       if (next && known(next)) plan.status = next;

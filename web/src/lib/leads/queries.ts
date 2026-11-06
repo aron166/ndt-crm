@@ -32,15 +32,6 @@ export async function getLeadStatuses(tenantId: number): Promise<LeadStatusDef[]
   }));
 }
 
-/** Key of the status where inbound leads land; defaults to "new". */
-export async function getInitialLeadStatusKey(tenantId: number): Promise<string> {
-  const initial = await db.leadStatus.findFirst({
-    where: { tenantId, isInitial: true },
-    orderBy: { position: "asc" },
-  });
-  return initial?.key ?? "new";
-}
-
 /**
  * The tenant's setter question list. Falls back to the in-code placeholders when
  * the tenant has never set one (or set a malformed one).
