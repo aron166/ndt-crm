@@ -5,22 +5,17 @@ import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUserId } from "@/lib/actor";
 import { UNSENT_STATUSES } from "@/lib/outreach/steps";
 import { isSuppressed, parseSuppressionTarget } from "@/lib/suppression";
 
 const CHANNELS = ["email", "phone", "linkedin", "in_person"];
 
-// Same gate as tasks.ts: message only, each action builds its own literal.
-async function requireUser(): Promise<{ denied: string | null; userId: number | null }> {
-  const { userId } = await getActor(TENANT_ID);
-  return { denied: userId == null ? NOT_A_CRM_USER : null, userId };
-}
-
 // Add-only by spec: there is deliberately no edit or delete action.
 export async function addSuppression(formData: FormData) {
-  const { denied, userId } = await requireUser();
-  if (denied) return { error: denied };
+  const me = await requireCrmUserId(TENANT_ID);
+  if ("ok" in me) return { error: me.error };
+  const { userId } = me;
 
   const target = ((formData.get("target") as string) || "").trim();
   const parsed = parseSuppressionTarget(target);

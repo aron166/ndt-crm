@@ -2,10 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/actor", () => ({
-  getActor: vi.fn(),
-  NOT_A_CRM_USER: "Ez a fiók nincs felvéve CRM-felhasználóként — kérj hozzáférést Árontól.",
-}));
+vi.mock("@/lib/actor", async () => (await import("@/test/actor-mock")).actorMock("Ez a fiók nincs felvéve CRM-felhasználóként — kérj hozzáférést Árontól."));
 const txExecuteRaw = vi.fn();
 const txTenantFindUnique = vi.fn();
 vi.mock("@/lib/db", () => ({

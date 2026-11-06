@@ -9,9 +9,9 @@ import ts from "typescript";
 // guard name in a comment, a string or a nested function does not count):
 // the FIRST statement of every exported function must await a guard call, e.g.
 //   const denied = await requireCrmUser(TENANT_ID);
-// Guards: requireCrmUser (lib/actor.ts), getActor, userLeadCtx, and the few
-// local wrappers below that call getActor first thing.
-const GUARDS = new Set(["requireCrmUser", "getActor", "userLeadCtx", "requireUser", "userActor", "isCrmUser"]);
+// Guards: the lib/actor.ts gates below, plus a file-local wrapper only when its
+// own first statement awaits one of them (checked, not trusted by name).
+const LIB_GUARDS = new Set(["requireCrmUser", "requireCrmUserId", "getActor", "userLeadCtx"]);
 
 const ROOT = path.join(__dirname, "..", "..", "..");
 
@@ -33,21 +33,21 @@ function sourceFiles(dir: string): ts.SourceFile[] {
   return out;
 }
 
-function isAwaitedGuard(expr: ts.Expression | undefined): boolean {
+function isAwaitedGuard(expr: ts.Expression | undefined, guards: Set<string>): boolean {
   while (expr && (ts.isParenthesizedExpression(expr) || (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken))) {
     expr = ts.isParenthesizedExpression(expr) ? expr.expression : expr.operand;
   }
   if (!expr || !ts.isAwaitExpression(expr)) return false;
   const call = expr.expression;
-  return ts.isCallExpression(call) && ts.isIdentifier(call.expression) && GUARDS.has(call.expression.text);
+  return ts.isCallExpression(call) && ts.isIdentifier(call.expression) && guards.has(call.expression.text);
 }
 
 /** `const x = await guard(...)`, `await guard(...)`, or `if (!(await guard())) return ...`. */
-function isGuardStatement(st: ts.Statement | undefined): boolean {
+function isGuardStatement(st: ts.Statement | undefined, guards: Set<string>): boolean {
   if (!st) return false;
-  if (ts.isVariableStatement(st) && st.declarationList.declarations.length === 1) return isAwaitedGuard(st.declarationList.declarations[0].initializer);
-  if (ts.isExpressionStatement(st)) return isAwaitedGuard(st.expression);
-  if (ts.isIfStatement(st)) return isAwaitedGuard(st.expression);
+  if (ts.isVariableStatement(st) && st.declarationList.declarations.length === 1) return isAwaitedGuard(st.declarationList.declarations[0].initializer, guards);
+  if (ts.isExpressionStatement(st)) return isAwaitedGuard(st.expression, guards);
+  if (ts.isIfStatement(st)) return isAwaitedGuard(st.expression, guards);
   return false;
 }
 
@@ -59,15 +59,19 @@ const hasExport = (n: ts.Node) =>
   ts.canHaveModifiers(n) && (ts.getModifiers(n) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 
 function violations(sf: ts.SourceFile): string[] {
+  const guards = new Set(LIB_GUARDS);
+  for (const st of sf.statements) {
+    if (ts.isFunctionDeclaration(st) && !hasExport(st) && st.name && isGuardStatement(firstStatement(st.body), LIB_GUARDS)) guards.add(st.name.text);
+  }
   const bad: string[] = [];
   for (const st of sf.statements) {
     if (ts.isFunctionDeclaration(st) && hasExport(st)) {
-      if (!isGuardStatement(firstStatement(st.body))) bad.push(st.name?.text ?? "default");
+      if (!isGuardStatement(firstStatement(st.body), guards)) bad.push(st.name?.text ?? "default");
     } else if (ts.isVariableStatement(st) && hasExport(st)) {
       for (const d of st.declarationList.declarations) {
         const init = d.initializer;
         const fn = init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) ? init : undefined;
-        if (!fn || !isGuardStatement(firstStatement(fn.body))) bad.push(d.name.getText(sf));
+        if (!fn || !isGuardStatement(firstStatement(fn.body), guards)) bad.push(d.name.getText(sf));
       }
     } else if (ts.isExportDeclaration(st) && !st.isTypeOnly) {
       // `export { x }` / `export * from`: cannot be checked here, so not allowed.
@@ -101,7 +105,9 @@ describe("server action auth guard", () => {
     expect(src(`export const a = async () => { return 1; };`)).toEqual(["a"]);
     expect(src(`async function b() {}\nexport { b };`)).toEqual(["re-export: export { b };"]);
     expect(src(`export async function a() { const d = await requireCrmUser(1); if (d) return; }`)).toEqual([]);
-    expect(src(`export async function a() { if (!(await isCrmUser())) return null; return 1; }`)).toEqual([]);
+    expect(src(`async function me() { const m = await requireCrmUserId(1); return m; }\nexport async function a() { if (!(await me())) return null; return 1; }`)).toEqual([]);
+    expect(src(`async function me() { return true; }\nexport async function a() { if (!(await me())) return null; return 1; }`)).toEqual(["a"]);
+    expect(src(`export async function a() { if (!(await requireUser())) return null; return 1; }`)).toEqual(["a"]);
     expect(src(`export async function a() { if (x) await requireCrmUser(1); }`)).toEqual(["a"]);
   });
 });

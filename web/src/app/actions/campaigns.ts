@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { WAVE_MAX } from "@/lib/outreach/steps";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 import { Prisma } from "@prisma/client";
 
 // A campaign row is the ONE campaign identity: the marketing content queue AND
@@ -23,11 +23,6 @@ import { Prisma } from "@prisma/client";
  * object literals does not allow.
  */
 type CampaignResult = { error?: string; success?: true; id?: number; slug?: string };
-
-async function requireUser(): Promise<{ error: string } | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? { error: NOT_A_CRM_USER } : null;
-}
 
 function slugify(name: string): string {
   return name
@@ -103,8 +98,8 @@ export async function createCampaign(input: {
   senderUserId?: number | null;
   currentWave?: number | null;
 }): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const name = input.name?.trim();
   if (!name) return { error: "A kampány neve kötelező" };
@@ -161,8 +156,8 @@ export async function setCampaignOutreach(id: number, input: {
   senderUserId?: number | null;
   currentWave?: number | null;
 }): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const campaign = await db.campaign.findFirst({
     where: { id, tenantId: TENANT_ID },
@@ -188,8 +183,8 @@ export async function setCampaignOutreach(id: number, input: {
 }
 
 export async function updateCampaign(id: number, input: { name: string; description?: string }): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const campaign = await db.campaign.findFirst({
     where: { id, tenantId: TENANT_ID },
@@ -212,8 +207,8 @@ export async function updateCampaign(id: number, input: { name: string; descript
 
 /** Set (or clear, when viewId is null) the campaign's target audience segment. */
 export async function setCampaignAudience(id: number, viewId: number | null): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const campaign = await db.campaign.findFirst({
     where: { id, tenantId: TENANT_ID },
@@ -240,8 +235,8 @@ export async function setCampaignAudience(id: number, viewId: number | null): Pr
 }
 
 export async function setCampaignArchived(id: number, isArchived: boolean): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const campaign = await db.campaign.findFirst({
     where: { id, tenantId: TENANT_ID },

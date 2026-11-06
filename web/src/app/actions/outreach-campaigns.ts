@@ -9,7 +9,7 @@ import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { isAddressSuppressed, isSuppressed, loadSuppressionSet, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { gateDraft, gateOn, templatesForCampaign, templatesForCampaigns, templateIsStale } from "@/lib/outreach/template";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUserId } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
 import { threadKeyFor } from "@/lib/outreach/drafts";
 import { MAX_STEP, WAVE_MAX, UNSENT_STATUSES, CLAIMABLE_STATUSES, type DraftStatus } from "@/lib/outreach/steps";
@@ -32,16 +32,11 @@ import { readOutreachSettings } from "@/lib/outreach/settings";
 
 type Fail = { ok: false; error: string };
 
-async function requireUser(): Promise<{ userId: number } | Fail> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? { ok: false, error: NOT_A_CRM_USER } : { userId };
-}
-
 const auditOpts = { tenantId: TENANT_ID, actor: "user" as const };
 
 /** The two senders (and anyone else who is a CRM user) for the sender pickers. */
 export async function listSenders(): Promise<{ id: number; name: string }[]> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return [];
   return db.user.findMany({
     where: { tenantId: TENANT_ID, passwordHash: "supabase-auth" },
@@ -57,7 +52,7 @@ export async function listSenders(): Promise<{ id: number; name: string }[]> {
 export async function setCampaignTarget(input: {
   campaign: string; companyId: number; senderUserId?: number | null; wave?: number | null;
 }): Promise<{ ok: true; count: number } | Fail> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return me;
   const parsed = z.object({
     campaign: z.string().trim().min(1).max(80),
@@ -97,7 +92,7 @@ export async function setCampaignTarget(input: {
 export async function markDraftSentManually(
   input: z.input<typeof markSentSchema>,
 ): Promise<{ ok: true; nextDueAt: string | null } | Fail> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return me;
   const parsed = markSentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
@@ -177,7 +172,7 @@ export async function markDraftSentManually(
 export async function markDraftReplied(
   input: { draftId: number; replyType: ReplyType; note?: string },
 ): Promise<{ ok: true; leadId: number; deduped: boolean } | Fail> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return me;
   const parsed = markRepliedSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
@@ -267,7 +262,7 @@ export interface DueTouch {
  * A company that already answered is excluded even if a row escaped that.
  */
 export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return [];
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
@@ -333,7 +328,7 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
 
 /** Every campaign key the CRM has seen — drafts, leads and tagged interactions. */
 export async function listCampaignKeys(): Promise<string[]> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return [];
   const [d, l, i, c] = await Promise.all([
     db.emailDraft.findMany({ where: { tenantId: TENANT_ID }, distinct: ["campaign"], select: { campaign: true } }),
@@ -365,7 +360,7 @@ export interface CampaignStats extends CampaignFunnel {
 export async function getCampaignStats(input: {
   campaign: string; senderUserId?: number | null; wave?: number | null;
 }): Promise<CampaignStats | Fail> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return me;
   const parsed = z.object({
     campaign: z.string().trim().min(1).max(80),
@@ -462,7 +457,7 @@ export interface CampaignStepTemplate {
  * Rows cover 1..MAX_STEP plus any step actually used by a template or a draft.
  */
 export async function getCampaignStepTemplates(campaign: string): Promise<CampaignStepTemplate[]> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return [];
   const parsed = z.string().trim().min(1).max(80).safeParse(campaign);
   if (!parsed.success) return [];

@@ -8,7 +8,7 @@ const { audit, db } = vi.hoisted(() => ({
 vi.mock("@/lib/audit", () => ({ audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db", () => ({ db }));
-vi.mock("@/lib/actor", () => ({ getActor: vi.fn(), NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
+vi.mock("@/lib/actor", async () => (await import("@/test/actor-mock")).actorMock("NOT_A_CRM_USER"));
 
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { addSuppression } from "@/app/actions/suppressions";

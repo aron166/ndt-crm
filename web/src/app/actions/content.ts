@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUserId } from "@/lib/actor";
 import { setTenantSettings } from "@/lib/tenant-settings";
 import { dispatchApprovalWebhook } from "@/lib/marketing/webhook";
 import { reportError } from "@/lib/report-error";
@@ -34,8 +34,8 @@ import type { NewAssetInput } from "@/lib/content/service";
 type Fail = { ok: false; error: string };
 
 async function userActor(): Promise<UserActor | Fail> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? { ok: false, error: NOT_A_CRM_USER } : { tenantId: TENANT_ID, kind: "user", userId };
+  const me = await requireCrmUserId(TENANT_ID);
+  return "ok" in me ? me : { tenantId: TENANT_ID, kind: "user", userId: me.userId };
 }
 
 function revalidateContent(itemId?: number) {

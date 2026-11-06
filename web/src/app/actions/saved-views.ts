@@ -4,7 +4,7 @@ import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
 
 // A saved COMPANY view is now also a campaign's outreach target list
 // (campaigns.audience_view_id), so these actions decide who gets cold-emailed.
@@ -12,15 +12,10 @@ import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 // deleted by bare id. A server action is callable by id regardless of the
 // (app) layout's login redirect, so that was a delete-anything primitive.
 
-async function requireUser(): Promise<{ error: string } | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? { error: NOT_A_CRM_USER } : null;
-}
-
 export type ViewEntityType = "company" | "person" | "deal" | "task";
 
 export async function getSavedViews(entityType: ViewEntityType) {
-  if (await requireUser()) return [];
+  if (await requireCrmUser(TENANT_ID)) return [];
   return db.savedView.findMany({
     where: { tenantId: TENANT_ID, entityType },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -32,8 +27,8 @@ export async function createSavedView(
   name: string,
   filters: Record<string, string>
 ) {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Név kötelező" };
@@ -52,8 +47,8 @@ export async function createSavedView(
 }
 
 export async function deleteSavedView(id: number): Promise<{ error?: string; success?: true }> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   // Deleting a view that a campaign points at sets campaigns.audience_view_id
   // to NULL (onDelete: SetNull), and a campaign with no audience targets the

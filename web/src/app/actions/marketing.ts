@@ -4,18 +4,13 @@ import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUserId } from "@/lib/actor";
 import { createVersion } from "@/lib/content/service";
 
 // Legacy marketing actions (pre content-approval). Approve / reject / back to
 // edit are GONE — status now only changes through lib/content/service.ts
 // (reviews, versions). What remains: edit (= a new version), and recording a
 // manual publication of a LIVE item, which no longer changes its status.
-
-async function requireUser(): Promise<{ userId: number } | { error: string }> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? { error: NOT_A_CRM_USER } : { userId };
-}
 
 async function loadItem(id: number) {
   return db.contentItem.findFirst({
@@ -34,8 +29,8 @@ function revalidate(id: number) {
 
 /** Edit = a new version (spec decision 3); the title is item metadata. */
 export async function updateContent(id: number, title: string, body: string) {
-  const me = await requireUser();
-  if ("error" in me) return me;
+  const me = await requireCrmUserId(TENANT_ID);
+  if ("ok" in me) return { error: me.error };
   const item = await loadItem(id);
   if (!item) return { error: "Tartalom nem található" };
   if (!item.currentVersionId) return { error: "A tartalomnak nincs verziója" };
@@ -74,8 +69,8 @@ export async function updateContent(id: number, title: string, body: string) {
  * the hidden UI.
  */
 export async function publishContent(id: number, externalUrl: string) {
-  const me = await requireUser();
-  if ("error" in me) return me;
+  const me = await requireCrmUserId(TENANT_ID);
+  if ("ok" in me) return { error: me.error };
   const item = await loadItem(id);
   if (!item) return { error: "Tartalom nem található" };
   if (item.internal) return { error: "Belső tartalom nem publikálható" };
@@ -108,8 +103,8 @@ export async function saveContentMetrics(
   id: number,
   metrics: { impressions?: number; reactions?: number; comments?: number; clicks?: number; leads?: number },
 ) {
-  const me = await requireUser();
-  if ("error" in me) return me;
+  const me = await requireCrmUserId(TENANT_ID);
+  if ("ok" in me) return { error: me.error };
   const item = await loadItem(id);
   if (!item) return { error: "Tartalom nem található" };
   if (!item.publishedAt) return { error: "Metrikák csak megjelent tartalmon" };
