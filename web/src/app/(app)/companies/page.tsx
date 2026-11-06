@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
@@ -17,7 +18,6 @@ import {
 import { resolveCompanyWhere } from "@/lib/companies/resolve";
 
 const PAGE_SIZE = 30;
-const TENANT_ID = 1;
 
 function avatarBg(id: number) {
   const palette = [

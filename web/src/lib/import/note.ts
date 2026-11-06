@@ -1,3 +1,4 @@
+import { TZ } from "@/lib/time";
 import { normalizeVat, normalizeWebsite } from "./normalize";
 
 export const DIFF_FIELDS = [
@@ -58,4 +59,4 @@ export function appendImportNote(existing: string | null | undefined, block: str
 }
 
 export const budapestToday = () =>
-  new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Budapest" });
+  new Date().toLocaleDateString("sv-SE", { timeZone: TZ });

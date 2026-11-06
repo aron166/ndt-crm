@@ -1,9 +1,8 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { getQuote } from "@/app/actions/quotes";
 import { renderQuotePdf } from "@/lib/quotes/pdf";
 import { reportError } from "@/lib/report-error";
-
-const TENANT_ID = 1;
 
 /**
  * GET /quotes/[id]/pdf — download the árajánlat as a PDF.

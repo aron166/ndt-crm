@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  dueAtForStep, canMarkSent, canMarkReplied, buildFunnel,
+  dueAtForStep, canMarkReplied, buildFunnel,
   type FunnelDraftRow, type FunnelLeadRow, type FunnelInteractionRow,
 } from "./campaign";
-import type { DraftStatus } from "./drafts";
+import { canSend as canMarkSent, type DraftStatus } from "./steps";
 
 describe("dueAtForStep", () => {
   it("offsets from touch 1's real send time, at 08:00 local", () => {
@@ -32,7 +32,7 @@ describe("canMarkSent", () => {
 describe("canMarkReplied", () => {
   it("only sent", () => {
     expect(canMarkReplied("sent")).toBe(true);
-    const rejected: DraftStatus[] = ["draft", "approved", "failed", "replied", "cancelled", "sending"];
+    const rejected: DraftStatus[] = ["failed", "approved", "draft", "replied", "cancelled", "sending"];
     for (const s of rejected) expect(canMarkReplied(s)).toBe(false);
   });
 });

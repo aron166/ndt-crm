@@ -1,11 +1,10 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import type { Theme } from "@/lib/theme";
-
-const TENANT_ID = 1;
 
 /**
  * Persist the signed-in user's theme on their `users` row.

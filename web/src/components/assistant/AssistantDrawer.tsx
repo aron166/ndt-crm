@@ -1,5 +1,6 @@
 "use client";
 
+import { TZ } from "@/lib/time";
 import { Fragment, memo, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowRight, Bug, CheckCircle, ExternalLink, Gavel, Inbox, Scale, StickyNote, type LucideIcon } from "lucide-react";
@@ -143,7 +144,7 @@ function turnsToMsgs(c: ConversationView): Msg[] {
   return c.messages.map((t) => (t.role === "user" ? { role: "user", content: t.content } : { role: "assistant", content: t.content, actions: t.actions }));
 }
 
-const budapestDate = (iso: string) => new Date(iso).toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest" });
+const budapestDate = (iso: string) => new Date(iso).toLocaleDateString("hu-HU", { timeZone: TZ });
 
 function WaitingList({ w }: { w: WaitingView }) {
   if (w.items.length === 0 && w.decisions.length === 0) return <p role="status" style={{ fontSize: 14, color: "var(--fg-mute)", margin: 0 }}>{A.nothingWaiting}</p>;
@@ -581,7 +582,7 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
                 {notes.length === 0 && <p style={{ fontSize: 13, color: "var(--fg-faint)", margin: 0 }}>{A.noteEmpty}</p>}
                 {notes.map((n) => (
                   <div key={n.id} style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 8 }}>
-                    <div style={{ ...small, marginBottom: 4 }}>{n.author} {new Date(n.createdAt).toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</div>
+                    <div style={{ ...small, marginBottom: 4 }}>{n.author} {new Date(n.createdAt).toLocaleString("hu-HU", { timeZone: TZ })}</div>
                     <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 14, lineHeight: 1.45 }}>{n.body}</div>
                   </div>
                 ))}

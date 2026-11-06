@@ -22,7 +22,7 @@ import { ThemeMenuItem } from "./ThemeMenuItem";
 // click during the hydration window cost 192-312ms (docs/PERF_2026-09-08_INP.md).
 // They are only ever opened from the "+" menu, so they load on first open.
 const TaskModal = dynamic(
-  () => import("@/app/(app)/tasks/TaskModal").then((m) => m.TaskModal),
+  () => import("@/components/TaskModal").then((m) => m.TaskModal),
   { ssr: false },
 );
 const DealModal = dynamic(

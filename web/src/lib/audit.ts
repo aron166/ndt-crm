@@ -1,13 +1,9 @@
 import { after } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { db } from "./db";
+import { TENANT_ID } from "./tenant";
 import { reportError } from "./report-error";
 import { createClient } from "./supabase/server";
-
-// TODO(ctx): tenant should come from the request context (AppContext) once the
-// ctx system lands (ADR/002 item 1 / current-sprint Platform Foundations #1).
-// Until then, callers may pass an explicit tenantId via AuditOptions; this is the
-// pragmatic default for the single-tenant (Controllabor) deployment.
-const DEFAULT_TENANT_ID = 1;
 
 export type AuditAction = "create" | "update" | "delete";
 
@@ -31,7 +27,7 @@ export type AuditEntityType =
 export type AuditActor = "user" | "agent" | "system";
 
 export interface AuditOptions {
-  // Tenant the mutated entity belongs to. Defaults to DEFAULT_TENANT_ID.
+  // Tenant the mutated entity belongs to. Defaults to TENANT_ID.
   // TODO(ctx): derive from AppContext instead of accepting per-call.
   tenantId?: number;
   // Set when the caller is an agent/system actor rather than a Supabase user.
@@ -51,12 +47,15 @@ interface WriteAuditInput {
   options: AuditOptions;
 }
 
+type AuditClient = { auditLog: { create(args: { data: Prisma.AuditLogUncheckedCreateInput }): Promise<unknown> } };
+
 // The actual persistence step. Extracted from `audit()` so it can be unit-tested
 // directly (the `after()` callback in `audit()` only runs inside a request).
-// This is the single write path for the audit trail — keep it that way.
-export async function writeAuditLog(input: WriteAuditInput): Promise<void> {
+// This is the single write path for the audit trail; a write that must be atomic
+// with its mutation passes the transaction client.
+export async function writeAuditLog(input: WriteAuditInput, client: AuditClient = db): Promise<void> {
   const { entityType, entityId, action, before, after: after_data, options } = input;
-  const tenantId = options.tenantId ?? DEFAULT_TENANT_ID;
+  const tenantId = options.tenantId ?? TENANT_ID;
   const actor = options.actor ?? "user";
 
   let actorUserId: string | null = null;
@@ -68,7 +67,7 @@ export async function writeAuditLog(input: WriteAuditInput): Promise<void> {
     actorUserId = data.user?.id ?? null;
   }
 
-  await db.auditLog.create({
+  await client.auditLog.create({
     data: {
       tenantId,
       actorUserId,
@@ -103,7 +102,7 @@ export function audit(
         entityType,
         entityId,
         action,
-        tenantId: options.tenantId ?? DEFAULT_TENANT_ID,
+        tenantId: options.tenantId ?? TENANT_ID,
         actorAgentId: options.actorAgentId ?? null,
       });
     }

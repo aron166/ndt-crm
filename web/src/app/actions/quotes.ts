@@ -1,84 +1,20 @@
 "use server";
+import { LEAD_NOT_FOUND } from "@/lib/leads/service";
+import { TENANT_ID } from "@/lib/tenant";
 
-import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { quoteTotals, lineAmount } from "@/lib/quotes/calc";
 import { nextQuoteNumber } from "@/lib/quotes/number";
 import { QUOTE_STATUSES, type QuoteStatus } from "@/lib/quotes/status";
+import type { QuoteDTO, QuoteListItem, QuoteInput } from "@/lib/quotes/types";
 import { requireCrmUser } from "@/lib/actor";
+import { foreignIdError } from "@/lib/tenant-refs";
 
-const TENANT_ID = 1;
-
-// NOTE: QuoteStatus / QUOTE_STATUSES live in lib/quotes/status (pure module) — a
-// "use server" file may only export async functions, and Next's action transform
-// rejects even a type re-export here. Import QuoteStatus straight from status.
-
-export interface QuoteLineDTO {
-  costCode: string | null;
-  description: string;
-  quantity: number | null;
-  unit: string | null;
-  unitRate: number | null;
-  amount: number;
-}
-
-export interface QuoteDTO {
-  id: number;
-  companyId: number;
-  companyName: string;
-  personId: number | null;
-  personName: string | null;
-  leadId: number | null;
-  dealId: number | null;
-  quoteNumber: string;
-  title: string;
-  status: QuoteStatus;
-  currency: string;
-  vatRate: number;
-  netAmount: number;
-  vatAmount: number;
-  grossAmount: number;
-  validUntil: Date | null;
-  notes: string | null;
-  sentAt: Date | null;
-  acceptedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  items: QuoteLineDTO[];
-}
-
-export interface QuoteListItem {
-  id: number;
-  quoteNumber: string;
-  title: string;
-  status: QuoteStatus;
-  companyId: number;
-  companyName: string;
-  grossAmount: number;
-  currency: string;
-  validUntil: Date | null;
-  createdAt: Date;
-}
-
-export interface QuoteInput {
-  companyId: number;
-  personId?: number | null;
-  leadId?: number | null;
-  dealId?: number | null;
-  title: string;
-  vatRate: number;
-  validUntil?: string | null; // ISO date (yyyy-mm-dd) or null
-  notes?: string | null;
-  lines: Array<{
-    costCode: string | null;
-    description: string;
-    quantity: number | null;
-    unit: string | null;
-    unitRate: number | null;
-  }>;
-}
+// QuoteStatus lives in lib/quotes/status and the DTOs in lib/quotes/types: a
+// "use server" file may only export async functions.
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v));
 
@@ -161,10 +97,10 @@ function toDTO(q: {
 // Person, lead and deal ids from input must belong to this tenant.
 async function linkedIdError(input: QuoteInput): Promise<string | null> {
   const { personId, leadId, dealId } = input;
-  if (personId != null && !(await db.person.findFirst({ where: { id: personId, tenantId: TENANT_ID }, select: { id: true } }))) return "Személy nem található";
-  if (leadId != null && !(await db.lead.findFirst({ where: { id: leadId, tenantId: TENANT_ID }, select: { id: true } }))) return "Lead nem található";
-  if (dealId != null && !(await db.deal.findFirst({ where: { id: dealId, tenantId: TENANT_ID }, select: { id: true } }))) return "Üzlet nem található";
-  return null;
+  const personErr = await foreignIdError(TENANT_ID, { personId });
+  if (personErr) return personErr;
+  if (leadId != null && !(await db.lead.findFirst({ where: { id: leadId, tenantId: TENANT_ID }, select: { id: true } }))) return LEAD_NOT_FOUND;
+  return foreignIdError(TENANT_ID, { dealId });
 }
 
 export async function getQuotes(): Promise<QuoteListItem[]> {
@@ -254,7 +190,7 @@ export async function createQuote(
       revalidatePath("/quotes");
       return { id: created.id };
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") continue;
+      if (isUniqueViolation(e)) continue;
       throw e;
     }
   }

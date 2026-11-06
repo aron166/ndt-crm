@@ -5,10 +5,11 @@ import { runAutomations } from "@/lib/automations/engine";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { getLeadStatuses, getQualificationQuestions, getScriptVariants } from "./queries";
 import { leadStatusLabel } from "./statuses";
+import { callOutcomeSchema, planCallOutcome, bookingIssue } from "./outcomes";
 import {
-  callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
-  RECALL_STATUS, bookingIssue, type LeadOutcome,
-} from "./outcomes";
+  LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX, RECALL_STATUS, LEAD_CALL_TASK, isLeadActive,
+  type LeadOutcome,
+} from "./vocab";
 import {
   parseAnswers, answersFrom, answerSourcesFrom, withAnswers, effectiveAnswers, legacyAnswers,
 } from "./qualification";
@@ -16,19 +17,14 @@ import { computeTier } from "./tier";
 import { reportError } from "@/lib/report-error";
 import { DEFAULT_BOOKING_MINUTES, conflictsFor } from "@/lib/booking/conflicts";
 import { loadBookings, resolveDemoHost } from "@/lib/booking/queries";
+import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
+import type { LeadCtx } from "@/lib/ctx";
 
 // The ONE write path for lead process changes — used by the server actions (UI)
 // and the public /api/leads routes alike, so the rules can't drift between the
 // two. Transport-agnostic: no FormData, no NextResponse, no revalidatePath.
 
-export interface LeadCtx {
-  tenantId: number;
-  /** `users.id` of the acting human, null for app/agent callers. */
-  userId: number | null;
-  actor: "user" | "agent";
-  /** App slug / agent id for audit attribution when actor = agent. */
-  actorAgentId?: string;
-}
+export const LEAD_NOT_FOUND = "Lead nem található";
 
 function auditOpts(ctx: LeadCtx): AuditOptions {
   return { tenantId: ctx.tenantId, actor: ctx.actor, actorAgentId: ctx.actorAgentId };
@@ -76,34 +72,62 @@ export async function completeOpenLeadCallTasks(
   now: Date,
 ): Promise<number> {
   const { count } = await tx.task.updateMany({
-    where: { tenantId, leadId, type: "call", status: { in: ["created", "in_progress"] } },
+    where: { tenantId, leadId, type: LEAD_CALL_TASK.type, status: { in: [...OPEN_TASK_STATUSES] } },
     data: { status: "done", completedAt: now },
   });
   return count;
 }
 
-/** Move a lead to another column. Fires lead_status_changed automations. */
+/** Move a lead to another column and fire lead_status_changed automations. */
 export async function changeLeadStatus(
   leadId: number,
   newStatus: string,
   ctx: LeadCtx,
-  opts: { fireAutomations?: boolean } = {},
 ): Promise<Result<{ changed: boolean }>> {
+  const r = await writeLeadStatus(leadId, newStatus, ctx);
+  if (r.error !== undefined) return { error: r.error };
+  const { before } = r;
+  if (!before) return { success: true, changed: false };
+  await runAutomations({
+    type: "lead_status_changed",
+    tenantId: ctx.tenantId,
+    leadId,
+    companyId: before.companyId,
+    personId: before.contact?.personId ?? null,
+    companyName: before.company?.name ?? null,
+    toStatus: newStatus,
+    fields: eventFields(before, { status: newStatus }),
+  });
+  return { success: true, changed: true };
+}
+
+/**
+ * Move a lead without firing automations: for the automation engine's own
+ * change_lead_status action, so a rule's move cannot trigger rules again.
+ */
+export async function applyLeadStatus(leadId: number, newStatus: string, ctx: LeadCtx): Promise<Result<{ changed: boolean }>> {
+  const r = await writeLeadStatus(leadId, newStatus, ctx);
+  return r.error !== undefined ? { error: r.error } : { success: true, changed: r.before != null };
+}
+
+/** The move itself; `before` is the lead as it was, or null when nothing changed. */
+async function writeLeadStatus(leadId: number, newStatus: string, ctx: LeadCtx) {
   const statuses = await getLeadStatuses(ctx.tenantId);
   if (!statuses.some((s) => s.key === newStatus)) return { error: "Ismeretlen státusz" };
 
   const before = await loadLead(leadId, ctx.tenantId);
-  if (!before) return { error: "Lead nem található" };
-  if (before.status === newStatus) return { success: true, changed: false };
+  if (!before) return { error: LEAD_NOT_FOUND };
+  if (before.status === newStatus) return { success: true as const, before: null };
 
-  await db.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data: { status: newStatus } });
   // Moving the card is acting on the lead → its open callback task is done.
   // EXCEPT into `recall`, which IS "call this back later": closing the reminder
   // there would silently delete the only thing telling anyone to call.
+  // One transaction: the move and the task close land together or not at all.
   const now = new Date();
-  const closedTasks = newStatus === RECALL_STATUS
-    ? 0
-    : await completeOpenLeadCallTasks(db, leadId, ctx.tenantId, now);
+  const closedTasks = await db.$transaction(async (tx) => {
+    await tx.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data: { status: newStatus } });
+    return newStatus === RECALL_STATUS ? 0 : completeOpenLeadCallTasks(tx, leadId, ctx.tenantId, now);
+  });
   if (closedTasks > 0) {
     audit("lead", leadId, "update", { openCallTasks: closedTasks }, { openCallTasks: 0 }, auditOpts(ctx));
   }
@@ -111,20 +135,7 @@ export async function changeLeadStatus(
     { status: before.status, statusLabel: leadStatusLabel(before.status, statuses) },
     { status: newStatus, statusLabel: leadStatusLabel(newStatus, statuses) },
     auditOpts(ctx));
-
-  if (opts.fireAutomations !== false) {
-    await runAutomations({
-      type: "lead_status_changed",
-      tenantId: ctx.tenantId,
-      leadId,
-      companyId: before.companyId,
-      personId: before.contact?.personId ?? null,
-      companyName: before.company?.name ?? null,
-      toStatus: newStatus,
-      fields: eventFields(before, { status: newStatus }),
-    });
-  }
-  return { success: true, changed: true };
+  return { success: true as const, before };
 }
 
 /** Set the lead's responsible user (null = unassigned). */
@@ -134,7 +145,7 @@ export async function assignLead(
   ctx: LeadCtx,
 ): Promise<Result> {
   const before = await loadLead(leadId, ctx.tenantId);
-  if (!before) return { error: "Lead nem található" };
+  if (!before) return { error: LEAD_NOT_FOUND };
   if (assignedToId != null) {
     const user = await db.user.findFirst({ where: { id: assignedToId, tenantId: ctx.tenantId }, select: { id: true } });
     if (!user) return { error: "Felhasználó nem található" };
@@ -156,7 +167,7 @@ export async function convertLeadToDeal(leadId: number, ctx: LeadCtx): Promise<R
     where: { id: leadId, tenantId },
     include: { company: { select: { id: true, name: true } }, contact: { select: { personId: true } } },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
   if (lead.convertedDealId) return { success: true, dealId: lead.convertedDealId };
   if (!lead.companyId || !lead.company) return { error: "A leadhez nincs cég társítva" };
 
@@ -216,7 +227,7 @@ export async function setLeadOutcome(
 ): Promise<Result<{ dealId?: number }>> {
   if (!LEAD_OUTCOMES.includes(outcome)) return { error: "Ismeretlen kimenetel" };
   const before = await loadLead(leadId, ctx.tenantId);
-  if (!before) return { error: "Lead nem található" };
+  if (!before) return { error: LEAD_NOT_FOUND };
 
   // A reason is MANDATORY on lost (Péter, 2026-09-07) — no "manual" placeholder.
   // An already-lost lead keeps its stored reason if the caller sends none.
@@ -224,7 +235,7 @@ export async function setLeadOutcome(
   if (outcome === "lost") {
     reason = lostReason?.trim() || before.lostReason?.trim() || undefined;
     if (!reason || reason.length < LOST_REASON_MIN) {
-      return { error: "A vesztett kimenetelhez indok kötelező (min. 3 karakter)" };
+      return { error: `A vesztett kimenetelhez indok kötelező (min. ${LOST_REASON_MIN} karakter)` };
     }
     reason = reason.slice(0, LOST_REASON_MAX);
   }
@@ -272,7 +283,7 @@ export async function setLeadQualification(
     where: { id: leadId, tenantId: ctx.tenantId },
     select: { qualification: true, answerSources: true, tier: true },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
 
   const questions = await getQualificationQuestions(ctx.tenantId);
   const parsed = parseAnswers(answers, questions);
@@ -380,8 +391,8 @@ export async function logLeadCallOutcome(
   if (bIssue) return { error: bIssue.message, issues: { [bIssue.path]: [bIssue.message] } };
 
   const lead = await loadLead(leadId, ctx.tenantId);
-  if (!lead) return { error: "Lead nem található" };
-  if (lead.outcome !== "open" || lead.convertedDealId) {
+  if (!lead) return { error: LEAD_NOT_FOUND };
+  if (!isLeadActive(lead)) {
     return { error: "A lead már lezárt: előbb nyisd újra" };
   }
   // The row this one supersedes must be THIS lead's, in THIS tenant. Both
@@ -452,7 +463,7 @@ export async function logLeadCallOutcome(
           data: {
             tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId,
             assignedToId: input.assignedToId ?? ctx.userId,
-            title: `Visszahívás: ${who}`, type: "call", category: "revenue_generating",
+            title: `Visszahívás: ${who}`, ...LEAD_CALL_TASK,
             status: "created", dueDate: plan.callbackAt,
           },
           select: { id: true },

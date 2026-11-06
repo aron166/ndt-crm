@@ -1,14 +1,14 @@
+import { TENANT_ID } from "@/lib/tenant";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireCrmUser } from "@/lib/actor";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
-import { callOutcomeLabel } from "@/lib/leads/outcomes";
+import { callOutcomeLabel } from "@/lib/leads/vocab";
 import { getWeeklyReport, lastDays, type WeeklyReport } from "@/lib/reports/weekly";
 import { monthUsage } from "@/lib/assistant/cap";
 import { REPORT_UI, formatMinutesOrDash } from "@/lib/reports/labels";
 
-const TENANT_ID = 1;
 // Hungarian copy (lib/reports/labels.ts) is PROPOSAL until Áron approves.
 
 const R = { textAlign: "right" } as const;

@@ -1,8 +1,11 @@
+import { TZ } from "@/lib/time";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { reportError } from "@/lib/report-error";
-import { json, leadApiCtx, readJson } from "@/lib/leads/api";
-import { logLeadCallOutcome } from "@/lib/leads/service";
+import { json, readJson } from "@/lib/api/http";
+import { leadApiCtx } from "@/lib/leads/api";
+import { LEAD_NOT_FOUND, logLeadCallOutcome } from "@/lib/leads/service";
 import { AssistantError, assistantConfig, chatCompletion, estimateCostUsd } from "@/lib/assistant/provider";
 import { capState } from "@/lib/assistant/cap";
 import {
@@ -28,7 +31,7 @@ const bodySchema = z.object({
 const ROUTE = "/api/assistant/callnote";
 const bpNow = (d: Date) =>
   new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "long", hourCycle: "h23",
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "long", hourCycle: "h23",
   }).format(d);
 
 export async function POST(request: Request) {
@@ -98,12 +101,12 @@ export async function POST(request: Request) {
 
     const res = await logLeadCallOutcome(lead.leadId, payload, auth.ctx);
     if ("error" in res) {
-      return json({ error: res.error, ...("issues" in res ? { details: res.issues } : {}) }, res.error === "Lead nem található" ? 404 : 400);
+      return json({ error: res.error, ...("issues" in res ? { details: res.issues } : {}) }, res.error === LEAD_NOT_FOUND ? 404 : 400);
     }
     return json({ ok: true, applied: true, lead_id: lead.leadId, interaction_id: res.interactionId, task_id: res.taskId }, 201);
   } catch (err) {
     // A concurrent duplicate trips the unique call_id inside the transaction: report it as the replay it is.
-    if ((err as { code?: string })?.code === "P2002") {
+    if (isUniqueViolation(err)) {
       const dup = await db.interaction.findFirst({ where: { tenantId, callId }, select: { id: true, leadId: true } }).catch(() => null);
       if (dup) return json({ ok: true, applied: true, existed: true, interaction_id: dup.id, lead_id: dup.leadId });
       return json({ error: "Duplicate transcript (already applied)" }, 409);

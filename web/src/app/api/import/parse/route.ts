@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { NextRequest, NextResponse } from "next/server";
 import { requireCrmUser } from "@/lib/actor";
 import * as XLSX from "xlsx";
@@ -25,9 +26,6 @@ function makeColumns(rawHeader: unknown[]): string[] {
     return n === 0 ? name : `${name} (${n + 1})`;
   });
 }
-
-// Single tenant today (decisions.md #12).
-const TENANT_ID = 1;
 
 export async function POST(req: NextRequest) {
   // A session is not enough: the proxy only proves login. Import writes tenant data.

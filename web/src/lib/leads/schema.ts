@@ -1,14 +1,12 @@
 import { z } from "zod";
 import { answersRecordSchema } from "./qualification";
 import { TIERS } from "./tier";
-import { REPLY_TYPES } from "@/lib/outreach/campaign";
+import { REPLY_TYPES } from "@/lib/outreach/steps";
+import { emptyToUndef } from "@/lib/zod-helpers";
 
 // Public lead-intake payload (POST /api/leads).
 // Landing pages (BetonScan/BirdsView) and automations (n8n) post this shape.
 // snake_case on the wire — that's what external HTML forms / webhooks emit.
-
-const emptyToUndef = (v: unknown) =>
-  typeof v === "string" && v.trim() === "" ? undefined : v;
 
 const optStr = z.preprocess(emptyToUndef, z.string().trim().max(2000).optional());
 

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { reportError } from "@/lib/report-error";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
 import { leadIntakeSchema } from "@/lib/leads/schema";
-import { ingestLead } from "@/lib/leads/ingest";
+import { ingestLead, leadCreatedEvent } from "@/lib/leads/ingest";
 import { sendIntroMaterial, type IntroResult } from "@/lib/leads/intro";
 import { runAutomations } from "@/lib/automations/engine";
 import { serializeDates } from "@/lib/serialize";
@@ -16,26 +16,14 @@ import { leadListQuerySchema, LEAD_API_SELECT } from "@/lib/leads/api";
 // Supabase service-role key is NOT accepted here. The key is the gate, so CORS
 // is open to POST from any origin — landing pages post cross-origin.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+const api = jsonApi("GET, POST, OPTIONS");
+const json = api.json;
+export const OPTIONS = api.OPTIONS;
 
 /** GET /api/leads?status=&outcome=&assigned_to=&page=&page_size= — paginated, newest first. */
 export async function GET(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
-  if (!rateLimit(key.keyId)) return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
   const q = leadListQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if (!q.success) return json({ error: "Validation failed", details: q.error.flatten() }, 400);
@@ -55,19 +43,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
-  if (!rateLimit(key.keyId)) {
-    return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
-  }
-
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400);
-  }
+  const raw = await readJson(request, json);
+  if (raw instanceof NextResponse) return raw;
 
   const parsed = leadIntakeSchema.safeParse(raw);
   if (!parsed.success) {
@@ -108,25 +88,7 @@ export async function POST(request: Request) {
     // Fire task-automation rules for the new lead (e.g. the seeded follow-up
     // task). Runs post-commit and is itself fail-safe, so it never blocks or
     // fails the intake response.
-    await runAutomations({
-      type: "lead_created",
-      tenantId: key.tenantId,
-      leadId: result.leadId,
-      companyId: result.companyId,
-      personId: result.personId,
-      companyName: parsed.data.company_name,
-      fields: {
-        company: parsed.data.company_name,
-        source: parsed.data.source ?? null,
-        channel: parsed.data.channel,
-        campaign: parsed.data.campaign ?? null,
-        serviceInterest: parsed.data.service_interest ?? null,
-        message: parsed.data.message ?? null,
-        sourceApp: key.appSlug,
-        // Derived qualification tier (A–E) — lets a rule target e.g. tier D.
-        tier: result.tier,
-      },
-    });
+    await runAutomations(leadCreatedEvent(parsed.data, result, { tenantId: key.tenantId, sourceApp: key.appSlug }));
 
     return json(
       {
@@ -149,8 +111,7 @@ export async function POST(request: Request) {
     const hitThreadKeyIndex =
       Array.isArray(target) ? target.includes("thread_key") : String(target ?? "").includes("thread_key");
     if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2002" &&
+      isUniqueViolation(err) &&
       hitThreadKeyIndex &&
       parsed.data.thread_key
     ) {
@@ -161,7 +122,7 @@ export async function POST(request: Request) {
       // rather than a server error. (Vanda, #89.)
       try {
         const winner = await db.lead.findFirst({
-          where: { tenantId: key.tenantId, threadKey: parsed.data.thread_key.trim().toLowerCase() },
+          where: { tenantId: key.tenantId, threadKey: parsed.data.thread_key }, // the schema trimmed and lowercased it
           select: { id: true, companyId: true },
         });
         if (winner) {

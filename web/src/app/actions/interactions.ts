@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -32,7 +33,7 @@ export async function logInteraction(formData: FormData) {
 
   const interaction = await db.interaction.create({
     data: {
-      tenantId: 1,
+      tenantId: TENANT_ID,
       type,
       direction,
       notes: notes.trim(),
@@ -46,11 +47,11 @@ export async function logInteraction(formData: FormData) {
   });
   await audit("interaction", interaction.id, "create", null,
     { type, direction, companyId, personId, occurredAt });
-  await recomputeCloseness({ tenantId: 1, companyId, personId });
+  await recomputeCloseness({ tenantId: TENANT_ID, companyId, personId });
 
   if (companyId) {
     await db.company.updateMany({
-      where: { id: companyId, tenantId: 1 },
+      where: { id: companyId, tenantId: TENANT_ID },
       data: { lastInteractionDate: new Date(occurredAt), updatedAt: new Date() },
     });
     revalidatePath(`/companies/${companyId}`);

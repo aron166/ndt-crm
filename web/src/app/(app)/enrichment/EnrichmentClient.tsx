@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { applyProposal } from "@/app/actions/enrichment";
 import { formatRelativeTime } from "@/lib/utils";
-import type { FieldChange, ChangesMap } from "@/app/actions/enrichment";
+import type { FieldChange, ChangesMap } from "@/lib/enrichment/sources";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 

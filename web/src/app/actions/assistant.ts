@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 // Hungarian copy is PROPOSAL until Áron approves.
 
 import { db } from "@/lib/db";
@@ -16,7 +17,6 @@ import type { ContentStatus } from "@/lib/content/types";
 import { RECENT_CONVERSATIONS, type ChatTurn, type ConversationSummary, type ConversationView } from "@/lib/assistant/chat-types";
 import { TicketDraftSchema, createGithubIssue, type TicketDraft } from "@/lib/assistant/ticket";
 
-const TENANT_ID = 1;
 const NOT_FOUND = "Nem található";
 const BAD_INPUT = "Érvénytelen kérés.";
 const MODEL_FAILED_WRITE = "Nem sikerült menteni. Kérem, próbálja újra.";

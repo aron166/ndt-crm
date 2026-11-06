@@ -1,3 +1,5 @@
+import { TZ } from "@/lib/time";
+import { TENANT_ID } from "@/lib/tenant";
 import { notFound } from "next/navigation";
 import { getActor } from "@/lib/actor";
 import { db } from "@/lib/db";
@@ -7,10 +9,9 @@ import type { PatchState } from "@/lib/patchnotes/repos";
 import { StepChecklist } from "./StepChecklist";
 
 export const dynamic = "force-dynamic";
-const TENANT_ID = 1;
 // Hungarian copy (lib/patchnotes/labels.ts) is PROPOSAL until Áron approves.
 
-const date = (iso: string) => new Date(iso).toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest" });
+const date = (iso: string) => new Date(iso).toLocaleDateString("hu-HU", { timeZone: TZ });
 const wrap = { overflowWrap: "anywhere" } as const;
 
 function IssueList({ label, items }: { label: string; items: Issue[] }) {

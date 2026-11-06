@@ -14,11 +14,11 @@ import {
 } from "./outreach-campaigns";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/actor", () => ({ getActor: vi.fn(), NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
+vi.mock("@/lib/actor", async () => (await import("@/test/actor-mock")).actorMock("NOT_A_CRM_USER"));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolvedValue(undefined) }));
-vi.mock("@/lib/leads/ingest", () => ({ ingestLead: vi.fn() }));
+vi.mock("@/lib/leads/ingest", async (importOriginal) => ({ ...(await importOriginal<object>()), ingestLead: vi.fn() }));
 vi.mock("@/lib/outreach/registry", () => ({ campaignBySlug: vi.fn(), resolveAudience: vi.fn() }));
 vi.mock("@/lib/marketing/audience-query", () => ({ countAudience: vi.fn() }));
 vi.mock("@/lib/db", () => ({

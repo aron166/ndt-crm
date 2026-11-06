@@ -9,7 +9,7 @@ import { logLeadCall } from "@/app/actions/leads";
 import { correctCallOutcome } from "@/app/actions/calls";
 import { proposeBookingSlots } from "@/app/actions/bookings";
 import type { BookingConflictInfo } from "@/lib/leads/service";
-import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, DEMO_HOSTS, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX, type DemoHost } from "@/lib/leads/vocab";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { FormField } from "@/components/ui/FormField";
 import type { ScriptVariant } from "@/lib/leads/scripts";
@@ -60,7 +60,7 @@ export function CallOutcomeModal({
   const [outcome, setOutcome] = useState<string>("no_answer");
   const [note, setNote] = useState("");
   const [callbackAt, setCallbackAt] = useState("");
-  const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
+  const [demoWith, setDemoWith] = useState<DemoHost>("aron");
   const [bookingAt, setBookingAt] = useState("");
   const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
@@ -192,7 +192,7 @@ export function CallOutcomeModal({
             <>
               <FormField label="Kivel lesz a demó?" required>
                 <div className="flex gap-4" style={{ fontSize: 14 }}>
-                  {(["aron", "peter"] as const).map((w) => (
+                  {DEMO_HOSTS.map((w) => (
                     <label key={w} className="flex items-center gap-1.5" style={{ cursor: "pointer" }}>
                       <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
                       {w === "aron" ? "Áron" : "Péter"}

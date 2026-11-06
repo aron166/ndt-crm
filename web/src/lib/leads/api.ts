@@ -1,39 +1,22 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
-import type { LeadCtx } from "./service";
-import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
+import { requireAppKey } from "@/lib/api/http";
+import { agentCtx, type LeadCtx } from "@/lib/ctx";
+import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./vocab";
 import { answersRecordSchema } from "./qualification";
+import { emptyToUndef } from "@/lib/zod-helpers";
 
 // Shared bits of the lead write API (/api/leads/:id*). Same per-app-key auth
 // as POST /api/leads: the key carries the tenant; the service-role key is NOT
 // accepted. snake_case on the wire like the other public ingestion routes.
 
-export function json(body: unknown, status = 200) {
-  return NextResponse.json(body, { status });
-}
-
 /** Authenticate + rate-limit; returns the LeadCtx or the error response. */
 export async function leadApiCtx(request: Request): Promise<{ ctx: LeadCtx } | { res: NextResponse }> {
-  const key = await validateAppKey(request);
-  if (!key) return { res: json({ error: "Unauthorized" }, 401) };
-  if (!rateLimit(key.keyId)) return { res: json({ error: "Rate limit exceeded (30 req/min)" }, 429) };
-  return { ctx: { tenantId: key.tenantId, userId: null, actor: "agent", actorAgentId: key.appSlug } };
+  const key = await requireAppKey(request);
+  if (key instanceof NextResponse) return { res: key };
+  return { ctx: agentCtx(key.tenantId, key.appSlug) };
 }
 
-export function parseLeadId(raw: string): number | null {
-  return /^\d+$/.test(raw) ? parseInt(raw, 10) : null;
-}
-
-export async function readJson(request: Request): Promise<unknown | NextResponse> {
-  try {
-    return await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400);
-  }
-}
-
-const emptyToUndef = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
 const optInt = z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional());
 
 export const PAGE_SIZE_MAX = 100;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { QuoteListItem } from "@/app/actions/quotes";
+import type { QuoteListItem } from "@/lib/quotes/types";
 import { QUOTE_STATUS_META } from "@/lib/quotes/status";
 import { NewQuoteDialog } from "./NewQuoteDialog";
 import { formatHUF, formatDate, formatRelativeTime } from "@/lib/utils";

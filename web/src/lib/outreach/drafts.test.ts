@@ -1,19 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-  DRAFT_STATUSES,
   MAX_BULK_DRAFTS,
-  MAX_STEP,
   canApprove,
   canEdit,
-  canSend,
   draftsUpsertSchema,
   isDraftStatus,
-  isValidStep,
   threadKeyFor,
-  validateUpsert,
   withFooter,
-  type DraftStatus,
 } from "./drafts";
+import { DRAFT_STATUSES, MAX_STEP, canSend, isValidStep, type DraftStatus } from "./steps";
 
 const validDraft = {
   companyId: 12,
@@ -113,71 +108,6 @@ describe("withFooter", () => {
     expect(withFooter("Hello there", null)).toBe("Hello there");
     expect(withFooter("Hello there", undefined)).toBe("Hello there");
     expect(withFooter("Hello there", "   ")).toBe("Hello there");
-  });
-});
-
-describe("validateUpsert", () => {
-  it("accepts a valid draft", () => {
-    const result = validateUpsert(validDraft);
-    expect(result.ok).toBe(true);
-  });
-
-  it("rejects a non-positive companyId", () => {
-    const result = validateUpsert({ ...validDraft, companyId: 0 });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/companyId/);
-  });
-
-  it("rejects an empty campaign", () => {
-    const result = validateUpsert({ ...validDraft, campaign: "" });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/campaign/);
-  });
-
-  it("rejects a campaign over 80 chars", () => {
-    const result = validateUpsert({ ...validDraft, campaign: "x".repeat(81) });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/campaign/);
-  });
-
-  it("rejects step out of 1..4", () => {
-    const result = validateUpsert({ ...validDraft, step: 5 });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/step/);
-  });
-
-  it("rejects an empty subject", () => {
-    const result = validateUpsert({ ...validDraft, subject: "" });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/subject/);
-  });
-
-  it("rejects a subject over 300 chars", () => {
-    const result = validateUpsert({ ...validDraft, subject: "x".repeat(301) });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/subject/);
-  });
-
-  it("rejects an empty body", () => {
-    const result = validateUpsert({ ...validDraft, body: "" });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/body/);
-  });
-
-  it("rejects a body over 20000 chars", () => {
-    const result = validateUpsert({ ...validDraft, body: "x".repeat(20001) });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/body/);
-  });
-
-  it("rejects an invalid toEmail but allows null/undefined", () => {
-    const bad = validateUpsert({ ...validDraft, toEmail: "not-an-email" });
-    expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.error).toMatch(/toEmail/);
-
-    expect(validateUpsert({ ...validDraft, toEmail: null }).ok).toBe(true);
-    expect(validateUpsert({ ...validDraft, toEmail: undefined }).ok).toBe(true);
-    expect(validateUpsert({ ...validDraft, toEmail: "a@b.com" }).ok).toBe(true);
   });
 });
 

@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Building2, User, Mail, Phone, Globe, CheckCircle2, Pencil, Trash2, PhoneCall, CalendarClock } from "lucide-react";
-import { setLeadOutcomeAction, updateLeadStatus, deleteLead, assignLeadAction } from "@/app/actions/leads";
+import { setLeadOutcomeAction, moveLead, deleteLead, assignLeadAction } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
@@ -13,7 +13,8 @@ import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/le
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
-import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
+import { callbackTone, promptLostReason } from "@/lib/leads/outcomes";
+import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, TRANSCRIBED_OUTCOME, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/vocab";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
@@ -79,7 +80,7 @@ interface Lead {
 // CALL_OUTCOMES, so the raw English key must never reach the chip.
 const TRANSCRIBED_OUTCOME_LABEL = "Átirat rögzítve";
 function outcomeChipLabel(outcome: string): string {
-  return outcome === "transcribed" ? TRANSCRIBED_OUTCOME_LABEL : callOutcomeLabel(outcome);
+  return outcome === TRANSCRIBED_OUTCOME ? TRANSCRIBED_OUTCOME_LABEL : callOutcomeLabel(outcome);
 }
 
 const MARKETING_KEYS = [
@@ -156,7 +157,7 @@ export function LeadDetailClient({
     setStatus(next);
     setActionError(null);
     startStatus(async () => {
-      const res = await updateLeadStatus(lead.id, next);
+      const res = await moveLead(lead.id, next);
       if (res && "error" in res) { setStatus(prev); setActionError(res.error); return; }
       router.refresh();
     });

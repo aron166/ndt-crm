@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -8,38 +9,34 @@ import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { isAddressSuppressed, isSuppressed, loadSuppressionSet, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { gateDraft, gateOn, templatesForCampaign, templatesForCampaigns, templateIsStale } from "@/lib/outreach/template";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUserId } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
-import { threadKeyFor, MAX_STEP, type DraftStatus } from "@/lib/outreach/drafts";
+import { draftThreadKey } from "@/lib/outreach/drafts";
+import { MAX_STEP, WAVE_MAX, UNSENT_STATUSES, CLAIMABLE_STATUSES, type DraftStatus, type ReplyType } from "@/lib/outreach/steps";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import { runAutomations } from "@/lib/automations/engine";
 import {
-  canMarkReplied, markRepliedSchema, markSentSchema, MANUAL_SENDABLE_STATUSES,
-  buildFunnel, type CampaignFunnel, type ReplyType,
+  canMarkReplied, markRepliedSchema, markSentSchema,
+  buildFunnel, type CampaignFunnel,
 } from "@/lib/outreach/campaign";
-import { ingestLead } from "@/lib/leads/ingest";
+import { ingestLead, leadCreatedEvent } from "@/lib/leads/ingest";
 import { leadIntakeSchema } from "@/lib/leads/schema";
 import { campaignBySlug, resolveAudience } from "@/lib/outreach/registry";
 import { countAudience } from "@/lib/marketing/audience-query";
 import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
+import { readOutreachSettings } from "@/lib/outreach/settings";
 
 // Campaign tracking (Kai/Áron P0, 2026-09-17). Round one is sent BY HAND from
 // Gmail; these actions are how the CRM is told. Every action checks the CRM
 // user itself — the proxy's login redirect is not an authorization check.
 
-const TENANT_ID = 1;
 type Fail = { ok: false; error: string };
-
-async function requireUser(): Promise<{ userId: number } | Fail> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? { ok: false, error: NOT_A_CRM_USER } : { userId };
-}
 
 const auditOpts = { tenantId: TENANT_ID, actor: "user" as const };
 
 /** The two senders (and anyone else who is a CRM user) for the sender pickers. */
 export async function listSenders(): Promise<{ id: number; name: string }[]> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return [];
   return db.user.findMany({
     where: { tenantId: TENANT_ID, passwordHash: "supabase-auth" },
@@ -55,13 +52,13 @@ export async function listSenders(): Promise<{ id: number; name: string }[]> {
 export async function setCampaignTarget(input: {
   campaign: string; companyId: number; senderUserId?: number | null; wave?: number | null;
 }): Promise<{ ok: true; count: number } | Fail> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return me;
   const parsed = z.object({
     campaign: z.string().trim().min(1).max(80),
     companyId: z.number().int().positive(),
     senderUserId: z.number().int().positive().nullable().optional(),
-    wave: z.number().int().min(1).max(52).nullable().optional(),
+    wave: z.number().int().min(1).max(WAVE_MAX).nullable().optional(),
   }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
   const { campaign, companyId, senderUserId, wave } = parsed.data;
@@ -75,7 +72,7 @@ export async function setCampaignTarget(input: {
   if (wave !== undefined) data.wave = wave;
   if (Object.keys(data).length === 0) return { ok: true, count: 0 };
 
-  const where = { tenantId: TENANT_ID, campaign, companyId, status: { in: ["draft", "approved", "failed"] } };
+  const where = { tenantId: TENANT_ID, campaign, companyId, status: { in: [...UNSENT_STATUSES] } };
   const rows = await db.emailDraft.findMany({ where, select: { id: true, senderUserId: true, wave: true } });
   if (rows.length === 0) return { ok: true, count: 0 };
   await db.emailDraft.updateMany({ where: { ...where, id: { in: rows.map((r) => r.id) } }, data });
@@ -95,7 +92,7 @@ export async function setCampaignTarget(input: {
 export async function markDraftSentManually(
   input: z.input<typeof markSentSchema>,
 ): Promise<{ ok: true; nextDueAt: string | null } | Fail> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return me;
   const parsed = markSentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
@@ -104,7 +101,7 @@ export async function markDraftSentManually(
   const row = await db.emailDraft.findFirst({ where: { id: draftId, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (await isAddressSuppressed(TENANT_ID, await resolveDraftRecipient(TENANT_ID, row))) return { ok: false, error: SUPPRESSED_ERROR };
-  if (!MANUAL_SENDABLE_STATUSES.includes(row.status as DraftStatus)) {
+  if (!CLAIMABLE_STATUSES.includes(row.status as DraftStatus)) {
     return { ok: false, error: "Előbb hagyd jóvá, vagy ez az érintés már elment" };
   }
 
@@ -115,9 +112,8 @@ export async function markDraftSentManually(
 
   // Same rule as the Resend path: no unsubscribe line, no cold email. The copy
   // button appends it; this refuses to book a send while none is configured.
-  const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  const footer = (tenant?.settings as Record<string, unknown> | null)?.outreachFooter;
-  if (typeof footer !== "string" || !footer.trim()) {
+  const { footer } = await readOutreachSettings(TENANT_ID);
+  if (!footer?.trim()) {
     return { ok: false, error: "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban" };
   }
 
@@ -129,11 +125,11 @@ export async function markDraftSentManually(
 
   const nextDueAt = await db.$transaction(async (tx) => {
     const claim = await tx.emailDraft.updateMany({
-      where: { id: draftId, tenantId: TENANT_ID, status: { in: MANUAL_SENDABLE_STATUSES } },
+      where: { id: draftId, tenantId: TENANT_ID, status: { in: CLAIMABLE_STATUSES } },
       data: {
         status: "sent", sentAt: now, sentVia: "manual",
         senderUserId: row.senderUserId ?? me.userId,
-        threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
+        threadKey: draftThreadKey(row),
         ...(externalThreadId ? { externalThreadId } : {}),
         lastError: null,
       },
@@ -176,7 +172,7 @@ export async function markDraftSentManually(
 export async function markDraftReplied(
   input: { draftId: number; replyType: ReplyType; note?: string },
 ): Promise<{ ok: true; leadId: number; deduped: boolean } | Fail> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return me;
   const parsed = markRepliedSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
@@ -203,7 +199,7 @@ export async function markDraftReplied(
   });
   if (already) return { ok: false, error: "Erre a megkeresésre már rögzítettünk választ" };
 
-  const draftKey = row.threadKey ?? threadKeyFor(row.campaign, row.companyId);
+  const draftKey = draftThreadKey(row);
   // One lead per CONVERSATION: the Gmail thread id when it was pasted, else one
   // manual key per outreach (campaign + company), so a second click dedupes. ponytail: if the reply-intake skill later reads the
   // same Gmail thread and no id was pasted, it creates a second lead — paste
@@ -232,19 +228,7 @@ export async function markDraftReplied(
     if (!res.deduped) {
       audit("email_draft", draftId, "update", { status: row.status }, { status: "replied", replyType, leadId: res.leadId }, auditOpts);
       // Same post-commit step as POST /api/leads: the follow-up task rules.
-      await runAutomations({
-        type: "lead_created",
-        tenantId: TENANT_ID,
-        leadId: res.leadId,
-        companyId: res.companyId,
-        personId: res.personId,
-        companyName: row.company.name,
-        fields: {
-          company: row.company.name, source: "cold_email_reply", channel: "cold_email",
-          campaign: row.campaign, serviceInterest: null, message: note ?? null,
-          sourceApp: "crm-ui", tier: res.tier, replyType,
-        },
-      });
+      await runAutomations(leadCreatedEvent(intake.data, res, { tenantId: TENANT_ID, sourceApp: "crm-ui" }, { replyType, message: note ?? null }));
     }
     revalidatePath("/outreach");
     revalidatePath("/leads");
@@ -278,7 +262,7 @@ export interface DueTouch {
  * A company that already answered is excluded even if a row escaped that.
  */
 export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return [];
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
@@ -286,7 +270,7 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
   const rows = await db.emailDraft.findMany({
     where: {
       tenantId: TENANT_ID,
-      status: { in: ["draft", "approved", "failed"] },
+      status: { in: [...UNSENT_STATUSES] },
       dueAt: { lte: endOfToday },
       ...(campaign ? { campaign } : {}),
     },
@@ -344,7 +328,7 @@ export async function getDueTouches(campaign?: string): Promise<DueTouch[]> {
 
 /** Every campaign key the CRM has seen — drafts, leads and tagged interactions. */
 export async function listCampaignKeys(): Promise<string[]> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return [];
   const [d, l, i, c] = await Promise.all([
     db.emailDraft.findMany({ where: { tenantId: TENANT_ID }, distinct: ["campaign"], select: { campaign: true } }),
@@ -376,12 +360,12 @@ export interface CampaignStats extends CampaignFunnel {
 export async function getCampaignStats(input: {
   campaign: string; senderUserId?: number | null; wave?: number | null;
 }): Promise<CampaignStats | Fail> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return me;
   const parsed = z.object({
     campaign: z.string().trim().min(1).max(80),
     senderUserId: z.number().int().positive().nullable().optional(),
-    wave: z.number().int().min(1).max(52).nullable().optional(),
+    wave: z.number().int().min(1).max(WAVE_MAX).nullable().optional(),
   }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
   const { campaign, senderUserId, wave } = parsed.data;
@@ -473,7 +457,7 @@ export interface CampaignStepTemplate {
  * Rows cover 1..MAX_STEP plus any step actually used by a template or a draft.
  */
 export async function getCampaignStepTemplates(campaign: string): Promise<CampaignStepTemplate[]> {
-  const me = await requireUser();
+  const me = await requireCrmUserId(TENANT_ID);
   if ("ok" in me) return [];
   const parsed = z.string().trim().min(1).max(80).safeParse(campaign);
   if (!parsed.success) return [];

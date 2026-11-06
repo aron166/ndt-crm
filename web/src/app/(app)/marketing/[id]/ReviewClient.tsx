@@ -19,8 +19,10 @@ import {
 } from "@/app/actions/content";
 import { publishContent, saveContentMetrics } from "@/app/actions/marketing";
 import { createClient } from "@/lib/supabase/client";
-import { MAX_STEP } from "@/lib/outreach/steps";
+import { MAX_STEP, isValidStep } from "@/lib/outreach/steps";
 import "./review.css";
+import { isHttpUrl } from "@/lib/url";
+import { useTimedFlag } from "@/lib/use-debounced-callback";
 
 // Bucket name duplicated here on purpose: storage.ts is server-only and must
 // never be imported into a client component (spec instruction).
@@ -46,15 +48,6 @@ const METRIC_FIELDS: { key: string; label: string }[] = [
 
 function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
-}
-
-function isHttpUrl(u: string): boolean {
-  try {
-    const p = new URL(u);
-    return p.protocol === "http:" || p.protocol === "https:";
-  } catch {
-    return false;
-  }
 }
 
 function fileNameOf(path: string): string {
@@ -123,7 +116,7 @@ export function ReviewClient({
   const [slotPending, setSlotPending] = useState(false);
 
   const [publishUrl, setPublishUrl] = useState(item.externalUrl ?? "");
-  const [copied, setCopied] = useState(false);
+  const [copied, flashCopied] = useTimedFlag(2000);
   const [metrics, setMetrics] = useState<Record<string, string>>(
     Object.fromEntries(METRIC_FIELDS.map((f) => [f.key, item.metrics?.[f.key]?.toString() ?? ""])),
   );
@@ -225,8 +218,7 @@ export function ReviewClient({
     if (!liveVersion) return;
     try {
       await navigator.clipboard.writeText(liveVersion.body);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      flashCopied();
     } catch {
       // Clipboard can fail silently (permissions/non-secure context) — nothing to recover here.
     }
@@ -266,7 +258,7 @@ export function ReviewClient({
   async function saveSlot() {
     const campaign = slotCampaign.trim();
     const step = parseInt(slotStep, 10);
-    if (!campaign || !Number.isInteger(step) || step < 1 || step > MAX_STEP) {
+    if (!campaign || !isValidStep(step)) {
       setSlotError(UI.outreachSlotInvalid);
       return;
     }

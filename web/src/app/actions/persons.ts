@@ -1,12 +1,11 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 
 import { requireCrmUser } from "@/lib/actor";
-
-const TENANT_ID = 1;
 
 export async function createPerson(data: {
   firstName: string;

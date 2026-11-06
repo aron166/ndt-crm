@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PATCH_OWNER, PATCH_REPOS } from "@/lib/patchnotes/repos";
+import { reportError } from "@/lib/report-error";
 
 export const TicketDraftSchema = z.object({
   title: z.string().trim().min(5).max(120),
@@ -33,10 +34,15 @@ export async function createGithubIssue(
       body: JSON.stringify({ title: d.title, body: d.body, labels: [d.label] }),
       signal: AbortSignal.timeout(15_000),
     });
-    if (!res.ok) return fallback;
+    if (!res.ok) {
+      reportError("assistant.githubIssue", new Error(`GitHub ${res.status}`), { repo: d.repo });
+      return fallback;
+    }
     const j = (await res.json()) as { html_url?: unknown };
     return typeof j.html_url === "string" ? { ok: true, url: j.html_url } : fallback;
-  } catch {
+  } catch (err) {
+    // The user still gets the prefilled new-issue link; the failure is reported.
+    reportError("assistant.githubIssue", err, { repo: d.repo });
     return fallback;
   }
 }

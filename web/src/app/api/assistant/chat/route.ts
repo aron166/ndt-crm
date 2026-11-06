@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 // Hungarian copy is PROPOSAL until Áron approves.
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -24,7 +25,6 @@ import { MAX_CONVERSATION_TURNS, type ChatEvent, type ChatTurn } from "@/lib/ass
 /** Typical turn is seconds; the theoretical worst case (two hops, each with 429 waits, a 60 s stream and a strict fallback) can pass 300 s, where Vercel ends the function. */
 export const maxDuration = 300;
 
-const TENANT_ID = 1;
 const MAX_USER_TURNS = 20;
 const READ_MAX = 3;
 const READ_BODY_MAX = 1200;

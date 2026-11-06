@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -7,8 +8,6 @@ import { getTagsForEntity } from "@/app/actions/tags";
 import { getEntityHistory } from "@/app/actions/audit";
 import { serializeDates } from "@/lib/serialize";
 import { serializeTaskCost } from "@/lib/tasks/costing";
-
-const TENANT_ID = 1;
 
 const AVATAR_PALETTE = [
   "var(--indigo)", "var(--mint)", "var(--amber)",

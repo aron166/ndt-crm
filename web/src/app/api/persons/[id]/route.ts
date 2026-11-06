@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { audit } from "@/lib/audit";
 import { serializeDates } from "@/lib/serialize";
-import { json, enrichmentApiCtx, parseEntityId, readJson, parseEnrichmentBody } from "@/lib/enrichment/api";
+import { json, parseId, readJson } from "@/lib/api/http";
+import { enrichmentApiCtx, parseEnrichmentBody } from "@/lib/enrichment/api";
 import { dossierDigest } from "@/lib/enrichment/dossier";
 
 type Params = { params: Promise<{ id: string }> };
@@ -16,7 +17,7 @@ const PERSON_SELECT = {
 export async function PATCH(request: Request, { params }: Params) {
   const auth = await enrichmentApiCtx(request);
   if ("res" in auth) return auth.res;
-  const id = parseEntityId((await params).id);
+  const id = parseId((await params).id);
   if (id == null) return json({ error: "Invalid id" }, 400);
   const { ctx } = auth;
 

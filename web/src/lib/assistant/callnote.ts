@@ -1,6 +1,7 @@
+import { TZ } from "@/lib/time";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { LOST_REASON_MAX, LOST_REASON_MIN, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
+import { LOST_REASON_MAX, LOST_REASON_MIN, TECHNOLOGY_WORD_MAX, type DemoHost } from "@/lib/leads/vocab";
 
 // Pure half of the call-note ingest (port of workspace/tools/callnotes/callnotes.py).
 // A dictated post-call transcript -> LLM JSON -> validated CallNote -> call-outcome input.
@@ -126,7 +127,7 @@ export function callNoteCallId(transcript: string, target: string): string {
 }
 
 const bpFmt = new Intl.DateTimeFormat("en-US", {
-  timeZone: "Europe/Budapest",
+  timeZone: TZ,
   hourCycle: "h23",
   year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
 });
@@ -148,7 +149,7 @@ export function budapestLocalToUtc(local: string): Date {
 
 export function toCallOutcomeInput(
   n: CallNote,
-  opts: { transcript: string; callId: string; occurredAt?: Date; demoWith?: "aron" | "peter" },
+  opts: { transcript: string; callId: string; occurredAt?: Date; demoWith?: DemoHost },
 ): Record<string, unknown> {
   const extra = [
     n.next_step && `Következő lépés: ${n.next_step}`,

@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { AreaChart } from "@/components/viz/AreaChart";
@@ -7,8 +8,7 @@ import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { formatDate } from "@/lib/utils";
 import { serializeDates } from "@/lib/serialize";
 import { AnalyticsClient } from "./AnalyticsClient";
-
-const TENANT_ID = 1;
+import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
 
 const PIPELINE_COLORS: Record<number, string> = {
   0: "var(--fg-faint)",
@@ -65,7 +65,7 @@ export default async function AnalyticsPage({
     db.task.count({
       where: {
         tenantId: TENANT_ID,
-        status: { in: ["created", "in_progress"] },
+        status: { in: [...OPEN_TASK_STATUSES] },
         parentTaskId: null,
       },
     }),

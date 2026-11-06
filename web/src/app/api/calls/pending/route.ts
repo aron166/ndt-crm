@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { jsonApi, requireAppKey } from "@/lib/api/http";
+import { TRANSCRIBED_OUTCOME } from "@/lib/leads/vocab";
 import { reportError } from "@/lib/report-error";
 import { getQualificationQuestions } from "@/lib/leads/queries";
 import { questionsInSet, phoneWording, SET_DISCOVERY } from "@/lib/leads/qualification";
@@ -9,28 +10,16 @@ import { questionsInSet, phoneWording, SET_DISCOVERY } from "@/lib/leads/qualifi
 // parsed. Read-only queue, mirrors /api/content/queue. App-key auth, same
 // shape as the rest of the calls API.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+const api = jsonApi("GET, OPTIONS");
+const json = api.json;
+export const OPTIONS = api.OPTIONS;
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 50;
 
 export async function GET(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
-  if (!rateLimit(key.keyId)) return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
   const raw = new URL(request.url).searchParams.get("limit");
   let limit = DEFAULT_LIMIT;
@@ -47,7 +36,7 @@ export async function GET(request: Request) {
       where: {
         tenantId: key.tenantId,
         type: "call",
-        outcome: "transcribed",
+        outcome: TRANSCRIBED_OUTCOME,
         leadId: { not: null },
         supersededBy: { none: {} },
         transcript: { not: null },

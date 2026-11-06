@@ -1,7 +1,10 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { agentCtx } from "@/lib/ctx";
 import { SUPPRESSED_ERROR } from "@/lib/suppression";
 import { reportError } from "@/lib/report-error";
+import { isHttpsUrl } from "@/lib/url";
+import { isUniqueViolation } from "@/lib/db-errors";
 import type {
   AutomationEvent,
   Condition,
@@ -213,10 +216,9 @@ export async function runLeadAction(
 ): Promise<boolean> {
   if (actionType === "webhook_out") {
     const cfg = actionConfig as WebhookOutActionConfig;
-    // HTTPS only — mirrors parseRuleForm. Trim too: rules persisted before that
-    // normalisation landed may still carry surrounding whitespace.
+    // Trim: rules persisted before parseRuleForm normalised them may carry whitespace.
     const url = cfg?.url?.trim() ?? "";
-    if (!/^https:\/\//i.test(url)) return false;
+    if (!isHttpsUrl(url)) return false;
     const { companyName, ...rest } = ev;
     const res = await fetch(url, {
       method: "POST",
@@ -231,8 +233,9 @@ export async function runLeadAction(
   if (actionType === "change_lead_status") {
     const cfg = actionConfig as ChangeLeadStatusActionConfig;
     if (!cfg?.toStatus) return false;
-    const { changeLeadStatus } = await import("@/lib/leads/service");
-    const r = await changeLeadStatus(ev.leadId, cfg.toStatus, systemCtx(ev.tenantId), { fireAutomations: false });
+    // Dynamic: lib/leads/service imports this engine to fire its own events.
+    const { applyLeadStatus } = await import("@/lib/leads/service");
+    const r = await applyLeadStatus(ev.leadId, cfg.toStatus, agentCtx(ev.tenantId, "automation"));
     if ("error" in r) throw new Error(r.error);
     return true;
   }
@@ -240,15 +243,11 @@ export async function runLeadAction(
     const cfg = actionConfig as AssignLeadActionConfig;
     if (cfg?.assignedToId == null) return false;
     const { assignLead } = await import("@/lib/leads/service");
-    const r = await assignLead(ev.leadId, Number(cfg.assignedToId), systemCtx(ev.tenantId));
+    const r = await assignLead(ev.leadId, Number(cfg.assignedToId), agentCtx(ev.tenantId, "automation"));
     if ("error" in r) throw new Error(r.error);
     return true;
   }
   return false;
-}
-
-function systemCtx(tenantId: number) {
-  return { tenantId, userId: null, actor: "agent" as const, actorAgentId: "automation" };
 }
 
 /**
@@ -307,7 +306,7 @@ export async function runAutomationAction(
       try {
         await db.automationEmailSend.create({ data: { tenantId: ev.tenantId, ruleId: rule.id, recipient } });
       } catch (err) {
-        if ((err as { code?: string }).code !== "P2002") {
+        if (!isUniqueViolation(err)) {
           reportError("automations.email_send_record", err, { ruleId: rule.id });
         }
       }

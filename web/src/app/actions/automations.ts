@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -10,8 +11,7 @@ import {
 } from "@/lib/automations/types";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { requireCrmUser } from "@/lib/actor";
-
-const TENANT_ID = 1;
+import { isHttpsUrl } from "@/lib/url";
 
 // Fail CLOSED on malformed JSON: an unparseable triggerConfig/conditions must
 // abort the write, never silently fall back to a broad (filter-less) rule.
@@ -84,7 +84,7 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
     // Trim and store the normalised value; an untrimmed URL passed here but then
     // failed the engine's regex, and the rule silently never fired.
     const url = typeof actionConfig.url === "string" ? actionConfig.url.trim() : "";
-    if (!/^https:\/\//i.test(url)) {
+    if (!isHttpsUrl(url)) {
       return { error: "Érvényes https webhook URL kötelező" };
     }
     actionConfig.url = url;

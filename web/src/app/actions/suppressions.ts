@@ -1,25 +1,22 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUserId } from "@/lib/actor";
+import { UNSENT_STATUSES } from "@/lib/outreach/steps";
 import { isSuppressed, parseSuppressionTarget } from "@/lib/suppression";
 
-const TENANT_ID = 1;
 const CHANNELS = ["email", "phone", "linkedin", "in_person"];
-
-// Same gate as tasks.ts: message only, each action builds its own literal.
-async function requireUser(): Promise<{ denied: string | null; userId: number | null }> {
-  const { userId } = await getActor(TENANT_ID);
-  return { denied: userId == null ? NOT_A_CRM_USER : null, userId };
-}
 
 // Add-only by spec: there is deliberately no edit or delete action.
 export async function addSuppression(formData: FormData) {
-  const { denied, userId } = await requireUser();
-  if (denied) return { error: denied };
+  const me = await requireCrmUserId(TENANT_ID);
+  if ("ok" in me) return { error: me.error };
+  const { userId } = me;
 
   const target = ((formData.get("target") as string) || "").trim();
   const parsed = parseSuppressionTarget(target);
@@ -51,7 +48,7 @@ export async function addSuppression(formData: FormData) {
       data: { tenantId: TENANT_ID, email, domain, requestedAt, channel, source, note, createdById: userId },
     });
   } catch (e) {
-    if ((e as { code?: string }).code === "P2002") return { error: "Ez a cím vagy domain már tiltólistán van." };
+    if (isUniqueViolation(e)) return { error: "Ez a cím vagy domain már tiltólistán van." };
     throw e;
   }
 
@@ -59,7 +56,7 @@ export async function addSuppression(formData: FormData) {
 
   // Queued drafts to the new entry must not go out: cancel them now.
   const queued = await db.emailDraft.findMany({
-    where: { tenantId: TENANT_ID, status: { in: ["draft", "approved", "failed"] } },
+    where: { tenantId: TENANT_ID, status: { in: [...UNSENT_STATUSES] } },
     select: { id: true, status: true, toEmail: true, personId: true, companyId: true },
   });
   const set = { emails: new Set(email ? [email] : []), domains: new Set(domain ? [domain] : []) };

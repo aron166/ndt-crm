@@ -1,4 +1,5 @@
 import type { Instrumentation } from "next";
+import { TZ } from "@/lib/time";
 
 /**
  * Server-local time IS Budapest (Kai ruling 2026-09-17, PR #97 finding 4).
@@ -8,7 +9,7 @@ import type { Instrumentation } from "next";
  * instance before any request — so this fixes all of them at one place.
  * ponytail: a per-tenant timezone replaces this when a non-HU tenant exists.
  */
-export const SERVER_TZ = "Europe/Budapest";
+export const SERVER_TZ = TZ;
 
 export function register() {
   process.env.TZ = SERVER_TZ;

@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -8,31 +9,24 @@ import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
 import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { NOT_A_CRM_USER, requireCrmUser } from "@/lib/actor";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import {
-  type DraftStatus,
   isDraftStatus,
-  isValidStep,
   canEdit,
   canApprove,
-  canSend,
-  threadKeyFor,
+  draftThreadKey,
   withFooter,
-  CLAIMABLE_STATUSES,
 } from "@/lib/outreach/drafts";
-
-const TENANT_ID = 1;
+import { type DraftStatus, isValidStep, canSend, CLAIMABLE_STATUSES } from "@/lib/outreach/steps";
+import { readOutreachSettings, type OutreachSettings } from "@/lib/outreach/settings";
 
 const AUDIT_TYPE = "email_draft" as const;
 
 // Every action checks the CRM user itself (2026-09-17): the proxy's login
 // redirect proves a Supabase session, not a CRM user, and server actions are
 // callable by id.
-async function isCrmUser(): Promise<boolean> {
-  return (await getActor(TENANT_ID)).userId != null;
-}
 const DENIED = { ok: false as const, error: NOT_A_CRM_USER };
 
 export interface DraftRow {
@@ -82,7 +76,7 @@ const MAX_LIST_ROWS = 200;
 export async function listDrafts(
   filter?: DraftFilter,
 ): Promise<{ drafts: DraftListRow[]; campaigns: string[]; truncated: boolean }> {
-  if (!(await isCrmUser())) return { drafts: [], campaigns: [], truncated: false };
+  if (await requireCrmUser(TENANT_ID)) return { drafts: [], campaigns: [], truncated: false };
   const where: Prisma.EmailDraftWhereInput = { tenantId: TENANT_ID };
   if (filter?.campaign) where.campaign = filter.campaign;
   if (filter?.step != null && isValidStep(filter.step)) where.step = filter.step;
@@ -161,7 +155,7 @@ export async function listDrafts(
 
 /** A single draft's body, fetched only when the editor expands a row — tenant-scoped. */
 export async function getDraftBody(id: number): Promise<{ ok: true; body: string } | { ok: false; error: string }> {
-  if (!(await isCrmUser())) return DENIED;
+  if (await requireCrmUser(TENANT_ID)) return DENIED;
   const row = await db.emailDraft.findFirst({
     where: { id, tenantId: TENANT_ID },
     select: { body: true, campaign: true, step: true, toEmail: true, personId: true, companyId: true },
@@ -175,20 +169,9 @@ export async function getDraftBody(id: number): Promise<{ ok: true; body: string
   return { ok: true, body: row.body };
 }
 
-export interface OutreachSettings {
-  replyTo: string | null;
-  footer: string | null;
-}
-
-/** tenants.settings.outreachReplyTo / outreachFooter. */
 export async function getOutreachSettings(): Promise<OutreachSettings> {
-  if (!(await isCrmUser())) return { replyTo: null, footer: null };
-  const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  const s = (tenant?.settings as Record<string, unknown> | null) ?? {};
-  return {
-    replyTo: typeof s.outreachReplyTo === "string" ? s.outreachReplyTo : null,
-    footer: typeof s.outreachFooter === "string" ? s.outreachFooter : null,
-  };
+  if (await requireCrmUser(TENANT_ID)) return { replyTo: null, footer: null };
+  return readOutreachSettings(TENANT_ID);
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -202,7 +185,7 @@ export async function saveOutreachSettings(input: {
   replyTo: string;
   footer: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await isCrmUser())) return DENIED;
+  if (await requireCrmUser(TENANT_ID)) return DENIED;
   const replyTo = input.replyTo.trim();
   if (replyTo && !EMAIL_RE.test(replyTo)) return { ok: false, error: "Érvénytelen válaszcím" };
   const footer = input.footer.trim();
@@ -239,7 +222,7 @@ export async function updateDraft(
   id: number,
   input: { subject: string; body: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await isCrmUser())) return DENIED;
+  if (await requireCrmUser(TENANT_ID)) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!canEdit(row.status as DraftStatus)) {
@@ -258,7 +241,7 @@ export async function updateDraft(
 
 /** Approve a single draft. */
 export async function approveDraft(id: number): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await isCrmUser())) return DENIED;
+  if (await requireCrmUser(TENANT_ID)) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!canApprove(row.status as DraftStatus)) {
@@ -282,7 +265,7 @@ export async function approveAll(
   step?: number,
   opts?: { dryRun?: boolean },
 ): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
-  if (!(await isCrmUser())) return DENIED;
+  if (await requireCrmUser(TENANT_ID)) return DENIED;
   const where: Prisma.EmailDraftWhereInput = {
     tenantId: TENANT_ID,
     campaign,
@@ -311,7 +294,7 @@ export async function approveAll(
  * POST put the same cold email in front of the same company twice. (Vanda, #88.)
  */
 export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await isCrmUser())) return DENIED;
+  if (await requireCrmUser(TENANT_ID)) return DENIED;
   const row = await db.emailDraft.findFirst({ where: { id, tenantId: TENANT_ID } });
   if (!row) return { ok: false, error: "Piszkozat nem található" };
   if (!canSend(row.status as DraftStatus)) {
@@ -324,7 +307,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   // The consent/unsubscribe line is not optional. Without this guard a tenant
   // who never opened the settings panel cold-emails with no opt-out at all —
   // the placeholder in the UI is an HTML attribute, not a stored value.
-  const settings = await getOutreachSettings();
+  const settings = await readOutreachSettings(TENANT_ID);
   const footer = settings.footer?.trim();
   if (!footer) {
     return { ok: false, error: "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban" };
@@ -383,7 +366,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
             sentAt,
             sentVia: "resend",
             providerMessageId: result.id,
-            threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
+            threadKey: draftThreadKey(row),
             lastError: result.warning ?? null,
           },
         });
@@ -397,7 +380,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
       await db.emailDraft.update({
         where: { id },
         data: { lastError: `Elküldve (${result.id}), de a rögzítés nem sikerült: ellenőrizd` },
-      }).catch(() => {});
+      }).catch((noteErr) => reportError("outreach.sendDraft.lastError", noteErr, { draftId: id }));
       revalidatePath("/outreach");
       return { ok: false, error: "Elküldve, de a rögzítés nem sikerült: ellenőrizd a Resend naplót" };
     }

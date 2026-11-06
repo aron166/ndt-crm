@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -6,9 +7,9 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { DEFAULT_LEAD_STATUSES, STAGE_DESCRIPTION_PLACEHOLDER, STAGE_DESCRIPTION_MAX } from "@/lib/leads/statuses";
 import {
-  changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome, setLeadQualification,
+  LEAD_NOT_FOUND, changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome, setLeadQualification,
 } from "@/lib/leads/service";
-import type { LeadOutcome } from "@/lib/leads/outcomes";
+import { isLeadActive, type LeadOutcome } from "@/lib/leads/vocab";
 import { userLeadCtx } from "@/lib/actor";
 import { setTenantSettings } from "@/lib/tenant-settings";
 import { parseQuestionList, parseQuestionSets } from "@/lib/leads/qualification";
@@ -16,8 +17,10 @@ import { parseScriptBlocks } from "@/lib/leads/scripts";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
+import { slugify } from "@/lib/slug";
+import { isHttpsUrl } from "@/lib/url";
+import { initialStatusKey } from "@/lib/leads/initial-status";
 
-const TENANT_ID = 1;
 
 export async function deleteLead(
   id: number,
@@ -34,7 +37,7 @@ export async function deleteLead(
       companyId: true, contact: { select: { personId: true } },
     },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
 
   // Leads are thin process trackers — deleting one removes the tracker only;
   // the company, person/contact, interactions and any converted deal persist
@@ -61,24 +64,6 @@ export async function moveLead(leadId: number, newStatus: string) {
   // completeOpenLeadCallTasks), so the task surfaces are stale too.
   revalidatePath("/tasks");
   return { success: true };
-}
-
-export async function updateLeadStatus(leadId: number, newStatus: string) {
-  const ctx = await userLeadCtx(TENANT_ID);
-  if ("error" in ctx) return ctx;
-  return moveLead(leadId, newStatus);
-}
-
-/** Lead → deal hand-off (the `won` door). Logic lives in lib/leads/service.ts. */
-export async function convertLeadToDeal(leadId: number) {
-  const ctx = await userLeadCtx(TENANT_ID);
-  if ("error" in ctx) return ctx;
-  const res = await setLeadOutcome(leadId, "won", ctx);
-  if ("error" in res) return res;
-  revalidatePath("/leads");
-  revalidatePath(`/leads/${leadId}`);
-  revalidatePath("/deals");
-  return { success: true, dealId: res.dealId };
 }
 
 /** open | won | lost from the card / detail dropdown. */
@@ -153,7 +138,7 @@ export async function updateLead(id: number, formData: FormData) {
       campaign: true,
     },
   });
-  if (!before) return { error: "Lead nem található" };
+  if (!before) return { error: LEAD_NOT_FOUND };
 
   // Absent key → field not submitted, leave unchanged. Empty string → clear to null.
   const text = (k: string): string | null | undefined => {
@@ -247,15 +232,7 @@ export async function updateLead(id: number, formData: FormData) {
 // ── Lead status (pipeline column) management ───────────────────────
 
 function slugifyStatusKey(s: string): string {
-  return (
-    s
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "") // strip combining accents (á→a, ő→o)
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 50) || "status"
-  );
+  return slugify(s, { sep: "_", max: 50, fallback: "status" });
 }
 
 export async function createLeadStatus(formData: FormData) {
@@ -354,8 +331,7 @@ export async function deleteLeadStatus(id: number) {
   if (remaining <= 1) return { error: "Legalább egy státusznak maradnia kell." };
 
   // Reassign any leads in this column to the initial status so none are orphaned.
-  const initial = await db.leadStatus.findFirst({ where: { tenantId: TENANT_ID, isInitial: true } });
-  const fallbackKey = initial?.key ?? "new";
+  const fallbackKey = await initialStatusKey(db, TENANT_ID);
   await db.lead.updateMany({
     where: { tenantId: TENANT_ID, status: status.key },
     data: { status: fallbackKey },
@@ -451,7 +427,7 @@ export async function saveQualificationQuestions(
 
   const url = (introUrl ?? "").trim();
   // https-only, same rule as webhook_out: this link goes out in customer email.
-  if (url && !/^https:\/\//i.test(url)) return { error: "A termékismertető linkje https:// címmel kezdődjön" };
+  if (url && !isHttpsUrl(url)) return { error: "A termékismertető linkje https:// címmel kezdődjön" };
   if (url.length > 500) return { error: "A link túl hosszú" };
 
   const next = {
@@ -520,7 +496,7 @@ export async function getLeadStagePrompt(taskId: number) {
   });
   if (!lead) return null;
   // A closed lead has left the board; there is no stage to pick.
-  if (lead.outcome !== "open" || lead.convertedDealId) return null;
+  if (!isLeadActive(lead)) return null;
 
   const p = lead.contact?.person;
   const who = p ? `${p.lastName ?? ""} ${p.firstName ?? ""}`.trim() : null;

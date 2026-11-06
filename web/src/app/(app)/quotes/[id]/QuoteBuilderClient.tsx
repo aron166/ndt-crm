@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Trash2, Plus, FileText, ArrowLeft, Check, AlertTriangle } from "lucide-react";
-import type { QuoteDTO } from "@/app/actions/quotes";
+import type { QuoteDTO } from "@/lib/quotes/types";
 import { updateQuote, setQuoteStatus, deleteQuote } from "@/app/actions/quotes";
 import type { CostRateEntry } from "@/app/actions/cost-rates";
 import { COST_CODES, costCodeUnitHint } from "@/lib/tasks/costing";

@@ -6,10 +6,11 @@ import Link from "next/link";
 import { Plus, Clock } from "lucide-react";
 import { moveTask } from "@/app/actions/tasks";
 import { useTaskCompletion } from "@/components/useTaskCompletion";
-import { TaskModal } from "./TaskModal";
+import { TaskModal } from "@/components/TaskModal";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { BOOKING_KIND_LABEL, isBookingKind } from "@/lib/booking/priority";
+import { isClosedTaskStatus } from "@/lib/tasks/status";
 
 const COLUMNS = [
   { key: "created",     label: "Kiírva",      color: "var(--fg-mute)",  glow: "var(--mute-glow)" },
@@ -57,7 +58,7 @@ interface Task {
 interface TasksKanbanProps { tasks: Task[]; }
 
 function isOverdue(dueDate: Date | null, status: string) {
-  if (!dueDate || status === "done" || status === "cancelled") return false;
+  if (!dueDate || isClosedTaskStatus(status)) return false;
   return new Date(dueDate) < new Date(new Date().toDateString());
 }
 

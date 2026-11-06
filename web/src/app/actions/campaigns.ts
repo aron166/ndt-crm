@@ -1,10 +1,14 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { WAVE_MAX } from "@/lib/outreach/steps";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUser } from "@/lib/actor";
+import { slugify } from "@/lib/slug";
 
 // A campaign row is the ONE campaign identity: the marketing content queue AND
 // the cold-email batch. `slug` is the key stored in email_drafts.campaign /
@@ -14,8 +18,6 @@ import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 // so the (app) layout's login redirect is not an authorization check. These
 // four had no check at all before 2026-09-20.
 
-const TENANT_ID = 1;
-
 /**
  * Every action returns this one shape. Declared, not inferred: the callers read
  * `res.error` and `res.id` off the value directly, which a union of disjoint
@@ -23,18 +25,8 @@ const TENANT_ID = 1;
  */
 type CampaignResult = { error?: string; success?: true; id?: number; slug?: string };
 
-async function requireUser(): Promise<{ error: string } | null> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? { error: NOT_A_CRM_USER } : null;
-}
-
-function slugify(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
+function slugifyName(name: string): string {
+  return slugify(name, { sep: "-", fallback: "" });
 }
 
 /** A tenant-unique slug: base, then base-2, base-3… (the table enforces uniqueness). */
@@ -80,13 +72,11 @@ function revalidate(id?: number) {
 }
 
 /**
- * Outreach fields shared by create and setCampaignOutreach. `wave` is capped
- * at 52 to match setCampaignTarget in actions/outreach-campaigns.ts: the two
- * write the same concept and must not disagree on what a valid wave is.
+ * Outreach fields shared by create and setCampaignOutreach.
  */
 const outreachSchema = z.object({
   senderUserId: z.number().int().positive().nullable().optional(),
-  currentWave: z.number().int().min(1).max(52).nullable().optional(),
+  currentWave: z.number().int().min(1).max(WAVE_MAX).nullable().optional(),
 });
 
 /** A sender must be a user of THIS tenant; anything else is refused, not dropped. */
@@ -104,8 +94,8 @@ export async function createCampaign(input: {
   senderUserId?: number | null;
   currentWave?: number | null;
 }): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const name = input.name?.trim();
   if (!name) return { error: "A kampány neve kötelező" };
@@ -126,7 +116,7 @@ export async function createCampaign(input: {
   // typed key already exists as an outreach key, adopt it verbatim.
   const typed = input.slug?.trim();
   const adopted = typed ? await existingOutreachKey(typed) : null;
-  const slug = adopted ?? (await uniqueSlug(slugify(typed || name)));
+  const slug = adopted ?? (await uniqueSlug(slugifyName(typed || name)));
   const data = {
     tenantId: TENANT_ID,
     name,
@@ -141,8 +131,9 @@ export async function createCampaign(input: {
   let campaign: { id: number };
   try {
     campaign = await db.campaign.create({ data, select: { id: true } });
-  } catch {
-    const retrySlug = await uniqueSlug(slugify(typed || name));
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    const retrySlug = await uniqueSlug(slugifyName(typed || name));
     data.slug = retrySlug;
     campaign = await db.campaign.create({ data, select: { id: true } });
   }
@@ -161,8 +152,8 @@ export async function setCampaignOutreach(id: number, input: {
   senderUserId?: number | null;
   currentWave?: number | null;
 }): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const campaign = await db.campaign.findFirst({
     where: { id, tenantId: TENANT_ID },
@@ -188,8 +179,8 @@ export async function setCampaignOutreach(id: number, input: {
 }
 
 export async function updateCampaign(id: number, input: { name: string; description?: string }): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const campaign = await db.campaign.findFirst({
     where: { id, tenantId: TENANT_ID },
@@ -212,8 +203,8 @@ export async function updateCampaign(id: number, input: { name: string; descript
 
 /** Set (or clear, when viewId is null) the campaign's target audience segment. */
 export async function setCampaignAudience(id: number, viewId: number | null): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const campaign = await db.campaign.findFirst({
     where: { id, tenantId: TENANT_ID },
@@ -240,8 +231,8 @@ export async function setCampaignAudience(id: number, viewId: number | null): Pr
 }
 
 export async function setCampaignArchived(id: number, isArchived: boolean): Promise<CampaignResult> {
-  const denied = await requireUser();
-  if (denied) return denied;
+  const denied = await requireCrmUser(TENANT_ID);
+  if (denied) return { error: denied };
 
   const campaign = await db.campaign.findFirst({
     where: { id, tenantId: TENANT_ID },

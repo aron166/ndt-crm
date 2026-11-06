@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { isValidStep } from "./drafts";
+import { isValidStep, UNSENT_STATUSES } from "./steps";
 import { dueAtForStep } from "./campaign";
 
 /**
@@ -25,7 +25,7 @@ export async function scheduleNextTouch(
   await tx.emailDraft.updateMany({
     where: {
       tenantId: row.tenantId, companyId: row.companyId, campaign: row.campaign, step: nextStep,
-      status: { in: ["draft", "approved", "failed"] },
+      status: { in: [...UNSENT_STATUSES] },
     },
     data: { dueAt: due },
   });

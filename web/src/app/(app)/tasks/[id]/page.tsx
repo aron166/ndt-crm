@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -8,8 +9,6 @@ import { serializeTaskCost, rollupTaskCost, costCodeLabel } from "@/lib/tasks/co
 import { EntityTags } from "@/components/tags/EntityTags";
 import { AuditLogTab } from "@/components/AuditLogTab";
 import { ArrowLeft, Clock, Building2, User } from "lucide-react";
-
-const TENANT_ID = 1;
 
 export default async function TaskDetailPage({
   params,

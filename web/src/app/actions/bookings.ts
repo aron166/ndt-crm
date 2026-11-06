@@ -1,18 +1,20 @@
 "use server";
+import { LEAD_NOT_FOUND } from "@/lib/leads/service";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { z } from "zod";
+import { DEMO_HOSTS } from "@/lib/leads/vocab";
 import { db } from "@/lib/db";
 import { userLeadCtx } from "@/lib/actor";
 import { proposeSlots } from "@/lib/booking/slots";
 import { resolveDemoHost, loadBookings } from "@/lib/booking/queries";
 
-const TENANT_ID = 1;
 /** How far out Péter books (see slots.ts) plus a little slack for "no free day found". */
 const PROPOSAL_WINDOW_DAYS = 21;
 
 const argsSchema = z.object({
   leadId: z.number().int().positive(),
-  demoWith: z.enum(["aron", "peter"]),
+  demoWith: z.enum(DEMO_HOSTS),
   minutes: z.number().int().min(15).max(600).optional(),
 });
 
@@ -35,7 +37,7 @@ export async function proposeBookingSlots(leadId: number, demoWith: string, minu
     where: { id: leadId, tenantId: TENANT_ID },
     select: { company: { select: { lat: true, lng: true } } },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
 
   // No same-day proposals: earliest slot is the start of tomorrow, server-local.
   const from = new Date();

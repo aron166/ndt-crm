@@ -1,7 +1,8 @@
-import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { reportError } from "@/lib/report-error";
 import { conditionsPass, buildCreateTaskData, auditRuleTask, runAutomationAction } from "./engine";
+import { ACTIVE_LEAD_WHERE } from "@/lib/leads/vocab";
 import { getLeadExtras } from "@/lib/leads/board";
 import type { AutomationEvent, CreateTaskActionConfig, TriggerConfig } from "./types";
 
@@ -96,7 +97,7 @@ export async function runIdleAutomations(now: Date = new Date()): Promise<IdleRu
         } catch (err) {
           // Unique (rule, deal, stageEnteredAt) violation = already fired for this
           // stage entry → expected on every subsequent run, skip silently.
-          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
+          if (isUniqueViolation(err)) continue;
           reportError("automations.idle", err, { ruleId: rule.id, dealId: deal.id });
         }
       }
@@ -141,7 +142,7 @@ async function runLeadIdleRule(rule: Rule, now: Date): Promise<number> {
 
   const leads = await db.lead.findMany({
     where: {
-      tenantId: rule.tenantId, outcome: "open", convertedDealId: null,
+      tenantId: rule.tenantId, ...ACTIVE_LEAD_WHERE,
       createdAt: { lte: cutoff },
       ...(tc.status ? { status: tc.status } : {}),
       firings: { none: { ruleId: rule.id } },
@@ -186,7 +187,7 @@ async function runLeadIdleRule(rule: Rule, now: Date): Promise<number> {
         data: { tenantId: rule.tenantId, ruleId: rule.id, leadId: lead.id, stageEnteredAt: last },
       });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
+      if (isUniqueViolation(err)) continue;
       throw err;
     }
     try {

@@ -4,8 +4,9 @@ import { reportError } from "@/lib/report-error";
 import { audit } from "@/lib/audit";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { isSuppressed, loadSuppressionSet } from "@/lib/suppression";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
-import { draftsUpsertSchema, canEdit, type DraftStatus } from "@/lib/outreach/drafts";
+import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
+import { draftsUpsertSchema, canEdit } from "@/lib/outreach/drafts";
+import type { DraftStatus } from "@/lib/outreach/steps";
 import { validTemplateVersion } from "@/lib/outreach/template";
 import { campaignsBySlugs, outreachDefaults } from "@/lib/outreach/registry";
 
@@ -13,20 +14,9 @@ import { campaignsBySlugs, outreachDefaults } from "@/lib/outreach/registry";
 // Can only ever create/update rows in `draft` status — approving and sending
 // are human actions taken in the /outreach UI, never done here.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+const api = jsonApi("GET, POST, OPTIONS");
+const json = api.json;
+export const OPTIONS = api.OPTIONS;
 
 interface SkippedItem {
   companyId: number;
@@ -36,16 +26,11 @@ interface SkippedItem {
 }
 
 export async function POST(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
-  if (!rateLimit(key.keyId)) return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400);
-  }
+  const raw = await readJson(request, json);
+  if (raw instanceof NextResponse) return raw;
 
   const body = raw as { drafts?: unknown };
   const parsed = draftsUpsertSchema.safeParse(body?.drafts);

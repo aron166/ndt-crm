@@ -1,9 +1,8 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { MarketingTabs } from "../MarketingTabs";
 import { CampaignsClient } from "./CampaignsClient";
 import { listSenders } from "@/app/actions/outreach-campaigns";
-
-const TENANT_ID = 1;
 
 export const dynamic = "force-dynamic";
 

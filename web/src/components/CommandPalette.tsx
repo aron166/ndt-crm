@@ -7,6 +7,7 @@ import { Building2, Users, TrendingUp, CheckSquare, Tag, Search, X } from "lucid
 import { PipelineStatusBadge } from "./PipelineStatusBadge";
 import { TaskStatusBadge } from "./TaskStatusBadge";
 import { cn } from "@/lib/utils";
+import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 
 const EMPTY: SearchResults = { companies: [], persons: [], deals: [], tasks: [], tags: [] };
 
@@ -64,7 +65,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [activeIdx, setActiveIdx] = useState(0);
   const [, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const items = flattenResults(results);
   const hasResults = items.length > 0;
@@ -78,17 +78,17 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   }, [open]);
 
   // Debounced search
+  const [runSearch, cancelSearch] = useDebouncedCallback((q: string) => {
+    startTransition(async () => {
+      const r = await globalSearch(q);
+      setResults(r);
+      setActiveIdx(0);
+    });
+  }, 150);
   const search = useCallback((q: string) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (!q.trim()) { setResults(EMPTY); return; }
-    timerRef.current = setTimeout(() => {
-      startTransition(async () => {
-        const r = await globalSearch(q);
-        setResults(r);
-        setActiveIdx(0);
-      });
-    }, 150);
-  }, []);
+    if (!q.trim()) { cancelSearch(); setResults(EMPTY); return; }
+    runSearch(q);
+  }, [runSearch, cancelSearch]);
 
   function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
     setQuery(e.target.value);

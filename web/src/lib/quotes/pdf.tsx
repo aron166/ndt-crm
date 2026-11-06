@@ -13,7 +13,7 @@ import {
   Font,
   renderToBuffer,
 } from "@react-pdf/renderer";
-import type { QuoteDTO } from "@/app/actions/quotes";
+import type { QuoteDTO } from "./types";
 import { costCodeLabel } from "@/lib/tasks/costing";
 
 // Pinned version (not @latest) so font metrics/glyph coverage can't shift under

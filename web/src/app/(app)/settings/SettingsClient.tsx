@@ -7,6 +7,7 @@ import { createAppApiKey, revokeAppApiKey, type AppKeyRow } from "@/app/actions/
 import { CheckCircle, Circle, ExternalLink, Zap, KeyRound, Copy, Check, Trash2, Plus, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils";
+import { useTimedFlag } from "@/lib/use-debounced-callback";
 
 interface Integration {
   slug: string;
@@ -233,7 +234,7 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
   const [appSlug, setAppSlug] = useState("");
   const [label, setLabel] = useState("");
   const [created, setCreated] = useState<{ plaintext: string; appSlug: string } | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, flashCopied] = useTimedFlag(1500);
   const [isPending, startTransition] = useTransition();
 
   function handleCreate() {
@@ -255,8 +256,7 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
   function copyKey() {
     if (!created) return;
     navigator.clipboard.writeText(created.plaintext);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    flashCopied();
   }
 
   return (

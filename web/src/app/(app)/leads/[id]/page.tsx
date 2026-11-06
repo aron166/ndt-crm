@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -9,8 +10,7 @@ import { answersFrom, answerSourcesFrom } from "@/lib/leads/qualification";
 import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact } from "@/lib/leads/first-contact";
 import { LeadDetailClient } from "./LeadDetailClient";
-
-const TENANT_ID = 1;
+import { OPEN_TASK_STATUSES } from "@/lib/tasks/status";
 
 export default async function LeadDetailPage({
   params,
@@ -64,7 +64,7 @@ export default async function LeadDetailPage({
     getLeadStatuses(TENANT_ID),
     db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     db.task.findMany({
-      where: { tenantId: TENANT_ID, leadId, status: { in: ["created", "in_progress"] } },
+      where: { tenantId: TENANT_ID, leadId, status: { in: [...OPEN_TASK_STATUSES] } },
       select: { id: true, title: true, dueDate: true, type: true, assignedTo: { select: { name: true } } },
       orderBy: { dueDate: "asc" },
       take: 20,

@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { getDueTouches, markDraftSentManually, type DueTouch } from "@/app/actions/outreach-campaigns";
-import { canMarkSent } from "@/lib/outreach/campaign";
-import type { DraftStatus } from "@/lib/outreach/drafts";
+import { canSend, type DraftStatus } from "@/lib/outreach/steps";
 
 type Sender = { id: number; name: string };
 
@@ -152,7 +151,7 @@ export default function DueToday({ touches: initialTouches, senders }: { touches
                       Lejárt
                     </span>
                   )}
-                  {canMarkSent(t.status as DraftStatus) ? (
+                  {canSend(t.status as DraftStatus) ? (
                     <MarkSentControl draftId={t.draftId} onSent={reload} disabledReason={t.templateBlockedReason} />
                   ) : (
                     <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>Jóváhagyásra vár</span>

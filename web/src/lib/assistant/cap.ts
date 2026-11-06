@@ -1,4 +1,5 @@
 // Hungarian copy is PROPOSAL until Áron approves.
+import { budapestYmd } from "@/lib/time";
 import { db } from "@/lib/db";
 import { budapestMidnight } from "@/lib/reports/weekly";
 
@@ -11,7 +12,7 @@ export function capFromSettings(settings: unknown): number {
 
 /** Start of the Europe/Budapest calendar month as a UTC instant. */
 export function monthStart(now: Date): Date {
-  const ym = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(now).slice(0, 7);
+  const ym = budapestYmd(now).slice(0, 7);
   // Midday UTC is on the same Budapest date year-round, so budapestMidnight lands on the 1st.
   return budapestMidnight(new Date(`${ym}-01T12:00:00Z`));
 }

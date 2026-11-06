@@ -18,11 +18,13 @@ import {
   getDraftBody,
   saveOutreachSettings,
   type DraftListRow,
-  type OutreachSettings,
 } from "@/app/actions/email-drafts";
+import type { OutreachSettings } from "@/lib/outreach/settings";
 import { setCampaignTarget, markDraftReplied } from "@/app/actions/outreach-campaigns";
-import { DRAFT_STATUSES, MAX_STEP, canEdit, canApprove, canSend, withFooter, type DraftStatus } from "@/lib/outreach/drafts";
-import { canMarkSent, canMarkReplied, REPLY_TYPES, type ReplyType } from "@/lib/outreach/campaign";
+import { canEdit, canApprove, withFooter } from "@/lib/outreach/drafts";
+import { DRAFT_STATUSES, MAX_STEP, canSend, type DraftStatus } from "@/lib/outreach/steps";
+import { canMarkReplied } from "@/lib/outreach/campaign";
+import { REPLY_TYPES, type ReplyType } from "@/lib/outreach/steps";
 import { REPLY_TYPE_LABEL } from "@/lib/outreach/labels";
 import { MarkSentControl } from "./DueToday";
 
@@ -615,7 +617,7 @@ export default function OutreachQueue({
                       >
                         Küldés
                       </button>
-                      {canMarkSent(row.status) && (
+                      {canSend(row.status) && (
                         <MarkSentControl draftId={row.id} onSent={refetchCurrent} disabledReason={row.templateBlockedReason} />
                       )}
                       {canMarkReplied(row.status) && replyOpenId !== row.id && (

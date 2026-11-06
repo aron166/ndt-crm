@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { isAddressSuppressed } from "@/lib/suppression";
 import { reportError } from "@/lib/report-error";
+import { isHttpsUrl } from "@/lib/url";
 
 // The intro material (termékismertető) hand-off, triggered by `send_intro: true`
 // on POST /api/leads. The qualification model trades the answers FOR this PDF,
@@ -30,7 +31,7 @@ export async function getIntroMaterialUrl(tenantId: number): Promise<string | nu
   const url = (tenant?.settings as { introMaterialUrl?: unknown } | null)?.introMaterialUrl;
   if (typeof url !== "string") return null;
   const trimmed = url.trim();
-  return /^https:\/\//i.test(trimmed) ? trimmed : null;
+  return isHttpsUrl(trimmed) ? trimmed : null;
 }
 
 function introEmail(url: string) {

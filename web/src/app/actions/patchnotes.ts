@@ -1,10 +1,9 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { isPatchRepo, type PatchState } from "@/lib/patchnotes/repos";
-
-const TENANT_ID = 1;
 
 /**
  * Set (or clear, state = null = "not yet") the signed-in user's manual-test

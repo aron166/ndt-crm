@@ -1,8 +1,7 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
-
-const TENANT_ID = 1;
 
 interface SearchParams {
   year?: string;

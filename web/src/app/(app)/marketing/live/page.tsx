@@ -1,8 +1,7 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { getLibrary, getFilterOptions } from "@/lib/content/queries";
 import { MarketingTabs } from "../MarketingTabs";
 import { LibraryClient } from "./LibraryClient";
-
-const TENANT_ID = 1;
 
 export const dynamic = "force-dynamic";
 

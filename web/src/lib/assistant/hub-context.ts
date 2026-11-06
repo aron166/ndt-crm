@@ -1,6 +1,7 @@
 // Hungarian copy is PROPOSAL until Áron approves.
 import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
+import { reportError } from "@/lib/report-error";
 import { CATEGORY_LABEL, UI } from "@/lib/content/labels";
 import { countPendingForReviewer, openDecisionsWhere } from "@/lib/content/queries";
 import { reviewersFromSettings } from "@/lib/content/reviewers";
@@ -108,8 +109,8 @@ export async function loadHubData(tenantId: number, userId: number, userName: st
         backlog: p.repos.reduce((a, r) => a + r.backlog.length, 0),
         decisionAron: p.repos.reduce((a, r) => a + r.decisionAron.length, 0),
       };
-    }).catch(() => null),
-    weeklyCached(tenantId).catch(() => null),
+    }).catch((err) => { reportError("assistant.context.patchnotes", err); return null; }),
+    weeklyCached(tenantId).catch((err) => { reportError("assistant.context.weekly", err); return null; }),
     countPendingForReviewer(tenantId, userId),
   ]);
 

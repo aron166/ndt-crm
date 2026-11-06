@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { crmUserIdForEmail } from "./crm-user";
 import { createClient } from "./supabase/server";
-import type { LeadCtx } from "./leads/service";
+import type { LeadCtx } from "./ctx";
 
 // Who is acting, as a `users` row id (the FK interactions.user_id /
 // tasks.assigned_to_id need). Supabase Auth is the identity source; the `users`
@@ -51,4 +51,13 @@ export async function userLeadCtx(tenantId: number): Promise<LeadCtx | { error: 
 export async function requireCrmUser(tenantId: number): Promise<string | null> {
   const { userId } = await getActor(tenantId);
   return userId == null ? NOT_A_CRM_USER : null;
+}
+
+/**
+ * The gate for actions that need the acting user's id: `{ userId }`, or the
+ * denial as `{ ok: false, error }` ready to return.
+ */
+export async function requireCrmUserId(tenantId: number): Promise<{ userId: number } | { ok: false; error: string }> {
+  const { userId } = await getActor(tenantId);
+  return userId == null ? { ok: false, error: NOT_A_CRM_USER } : { userId };
 }

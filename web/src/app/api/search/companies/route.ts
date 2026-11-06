@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
 
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
 
   const results = await db.company.findMany({
     where: {
-      tenantId: 1,
+      tenantId: TENANT_ID,
       name: { contains: q, mode: "insensitive" },
     },
     select: { id: true, name: true, vatNumber: true },

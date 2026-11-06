@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { logLeadCall } from "@/app/actions/leads";
 import { queueCallTranscript } from "@/app/actions/calls";
 import { AUTO_OUTCOME_LABELS } from "@/lib/calls/auto-outcome";
-import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, DEMO_HOSTS, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX, type CallOutcomeKey, type DemoHost } from "@/lib/leads/vocab";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
@@ -60,7 +60,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   const [note, setNote] = useState("");
   const [selectedOutcome, setSelectedOutcome] = useState<CallOutcomeKey | null>(null);
   const [callbackAt, setCallbackAt] = useState("");
-  const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
+  const [demoWith, setDemoWith] = useState<DemoHost>("aron");
   const [bookingAt, setBookingAt] = useState("");
   const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
@@ -378,7 +378,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           {selectedOutcome === "meeting_booked" && (
             <>
               <div style={{ display: "flex", gap: 16, fontSize: 15, color: "var(--fg)" }}>
-                {(["aron", "peter"] as const).map((w) => (
+                {DEMO_HOSTS.map((w) => (
                   <label key={w} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
                     <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
                     {w === "aron" ? "Áron" : "Péter"}

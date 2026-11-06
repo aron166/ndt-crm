@@ -1,4 +1,11 @@
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+
+/** A company's current contacts, primary first, then the most recent. */
+export const CURRENT_CONTACTS = {
+  where: { endedAt: null },
+  orderBy: [{ isPrimary: "desc" }, { startedAt: "desc" }],
+} satisfies { where: Prisma.ContactWhereInput; orderBy: Prisma.ContactOrderByWithRelationInput[] };
 
 export async function resolveDraftRecipient(
   tenantId: number,
@@ -18,8 +25,8 @@ export async function resolveDraftRecipient(
   }
   if (!to) {
     const contact = await db.contact.findFirst({
-      where: { companyId: row.companyId, tenantId, endedAt: null },
-      orderBy: [{ isPrimary: "desc" }, { startedAt: "desc" }],
+      where: { companyId: row.companyId, tenantId, ...CURRENT_CONTACTS.where },
+      orderBy: CURRENT_CONTACTS.orderBy,
       select: { email: true, person: { select: { email: true } } },
     });
     to = contact?.email?.trim() || contact?.person.email?.trim() || null;

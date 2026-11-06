@@ -1,11 +1,13 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { loadSuppressionSet, isSuppressed } from "@/lib/suppression";
 import { applyEvent, isClaimStale, type ItemState } from "./transitions";
 import { getApprovalRule, getContentReviewers } from "./reviewers";
 import { runContentRules } from "./rules";
 import { isReviewReason, reasonRequiredFor, type ReviewReason } from "./reasons";
-import { MAX_STEP } from "@/lib/outreach/steps";
+import { MAX_STEP, isValidStep } from "@/lib/outreach/steps";
+import { readOutreachSettings } from "@/lib/outreach/settings";
 import {
   CLAIM_TTL_MS, CONTENT_BODY_MAX, CHANGE_NOTE_MAX, REVIEW_COMMENT_MAX,
   isContentStatus, type ContentCategory, type ContentStatus, type Verdict,
@@ -208,7 +210,7 @@ export async function createItem(
   } catch (err) {
     // Concurrent create with the same externalRef: the unique index wins; hand
     // back the item the other request created (only possible without an outer tx).
-    if (!tx && input.externalRef && (err as { code?: string }).code === "P2002") {
+    if (!tx && input.externalRef && isUniqueViolation(err)) {
       const existing = await db.contentItem.findFirst({
         where: { tenantId: actor.tenantId, externalRef: input.externalRef },
         select: { id: true, currentVersionId: true, status: true },
@@ -547,7 +549,7 @@ export async function setOutreachSlot(
 ): Promise<{ ok: true } | Fail> {
   if (slot) {
     if (!slot.campaign.trim()) return fail(400, "Hiányzik a kampány");
-    if (!Number.isInteger(slot.step) || slot.step < 1 || slot.step > MAX_STEP) {
+    if (!isValidStep(slot.step)) {
       return fail(400, `Az érintés sorszáma 1 és ${MAX_STEP} között lehet`);
     }
   }
@@ -591,7 +593,7 @@ export async function setOutreachSlot(
       // The partial unique index is the real gate; the lookup above only lets
       // us name the occupying item. A concurrent assignment loses here, and
       // must read as the designed 409, not a 500 (Vanda, #105).
-      if ((err as { code?: string }).code === "P2002") {
+      if (isUniqueViolation(err)) {
         return fail(409, "Ezt a lépést közben betöltötte egy másik tartalom");
       }
       throw err;
@@ -682,8 +684,7 @@ async function ruleContextFor(
   item: { id: number; category: string; format?: string | null; campaignId?: number | null; internal?: boolean },
   body: string,
 ): Promise<Parameters<typeof reconcileRuleChecks>[3]> {
-  const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
-  const footer = (tenant?.settings as Record<string, unknown> | null)?.outreachFooter;
+  const { footer } = await readOutreachSettings(tenantId, tx);
   // Only the opening of each sibling is needed (duplicate-hook detection), so
   // the bodies are truncated in SQL instead of loaded whole (Vanda, #104).
   const siblings = item.campaignId

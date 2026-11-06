@@ -1,7 +1,11 @@
 import type { Prisma } from "@prisma/client";
 import type { LeadIntake } from "./schema";
 import { normalizeIntakeAnswers, withAnswers, effectiveAnswers } from "./qualification";
+import { UNSENT_STATUSES } from "@/lib/outreach/steps";
 import { computeTier, type LeadTier } from "./tier";
+import type { AutomationEvent } from "@/lib/automations/types";
+import { writeAuditLog } from "@/lib/audit";
+import { initialStatusKey } from "./initial-status";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
 //
@@ -233,11 +237,7 @@ export async function ingestLead(
   // 4. Create the Lead at the tenant's INITIAL status (the configurable entry
   //    column of the lead pipeline; falls back to "new"). Marketing passthrough
   //    + contact snapshot live on custom_fields, mirroring the deals pattern.
-  const initialStatus = await tx.leadStatus.findFirst({
-    where: { tenantId, isInitial: true },
-    orderBy: { position: "asc" },
-  });
-  const statusKey = initialStatus?.key ?? "new";
+  const statusKey = await initialStatusKey(tx, tenantId);
 
   const customFields: Record<string, unknown> = {};
   const passthrough: (keyof LeadIntake)[] = [
@@ -304,27 +304,22 @@ export async function ingestLead(
   });
 
   // 5. Audit (append-only). Attributed to the source app, no user.
-  await tx.auditLog.create({
-    data: {
-      tenantId,
-      actorUserId: null,
-      action: "create",
-      entityType: "lead",
-      entityId: lead.id,
-      changes: {
-        before: null,
-        after: {
-          companyId: company.id,
-          personId: person.id,
-          contactId: contact.id,
-          source: input.source,
-          sourceApp,
-          channel: input.channel,
-          status: statusKey,
-        },
-      } as Prisma.InputJsonValue,
+  await writeAuditLog(
+    {
+      entityType: "lead", entityId: lead.id, action: "create", before: null,
+      after: {
+        companyId: company.id,
+        personId: person.id,
+        contactId: contact.id,
+        source: input.source,
+        sourceApp,
+        channel: input.channel,
+        status: statusKey,
+      },
+      options: { tenantId, actor: "agent", actorAgentId: sourceApp },
     },
-  });
+    tx,
+  );
 
   // 5b. The answered draft is now `replied`. Scoped to the tenant AND to the
   // statuses a reply can legitimately arrive on — only a draft we actually SENT
@@ -356,8 +351,8 @@ export async function ingestLead(
         tenantId,
         companyId: draft.companyId,
         campaign: draft.campaign,
-        // `failed` too: it is sendable by hand (MANUAL_SENDABLE_STATUSES).
-        status: { in: ["draft", "approved", "failed"] },
+        // `failed` too: it is sendable by hand (CLAIMABLE_STATUSES).
+        status: { in: [...UNSENT_STATUSES] },
       },
       data: { status: "cancelled" },
     });
@@ -389,5 +384,38 @@ export async function ingestLead(
     personId: person.id,
     companyReused,
     personReused,
+  };
+}
+
+/**
+ * The `lead_created` automation event for an intake that created a lead (not a
+ * deduped one). Callers fire it with runAutomations() after the transaction
+ * commits, so an automation failure never rolls back the intake.
+ */
+export function leadCreatedEvent(
+  input: LeadIntake,
+  res: IngestResult,
+  ctx: { tenantId: number; sourceApp: string },
+  extraFields: Record<string, unknown> = {},
+): AutomationEvent {
+  return {
+    type: "lead_created",
+    tenantId: ctx.tenantId,
+    leadId: res.leadId,
+    companyId: res.companyId,
+    personId: res.personId,
+    companyName: input.company_name,
+    fields: {
+      company: input.company_name,
+      source: input.source ?? null,
+      channel: input.channel,
+      campaign: input.campaign ?? null,
+      serviceInterest: input.service_interest ?? null,
+      message: input.message ?? null,
+      sourceApp: ctx.sourceApp,
+      // Derived qualification tier (A-E): lets a rule target e.g. tier D.
+      tier: res.tier,
+      ...extraFields,
+    },
   };
 }

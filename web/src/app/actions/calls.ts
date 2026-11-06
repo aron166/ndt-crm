@@ -1,17 +1,17 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { userLeadCtx } from "@/lib/actor";
-import { logLeadCallOutcome } from "@/lib/leads/service";
+import { LEAD_NOT_FOUND, logLeadCallOutcome } from "@/lib/leads/service";
+import { TRANSCRIBED_OUTCOME } from "@/lib/leads/vocab";
 import { audit } from "@/lib/audit";
 import { NOTE_PREVIEW_LEN, validateTranscript } from "@/lib/calls/transcript";
 
-const TENANT_ID = 1;
-
 /**
  * Store a dictated call transcript as ONE append-only Interaction. This is a
- * fact, not an outcome: `outcome: "transcribed"` is what makes it visible to
+ * fact, not an outcome: `outcome: TRANSCRIBED_OUTCOME` is what makes it visible to
  * the (external) parse queue — no lead state changes here.
  */
 export async function queueCallTranscript(leadId: number, transcript: string) {
@@ -25,7 +25,7 @@ export async function queueCallTranscript(leadId: number, transcript: string) {
     where: { id: leadId, tenantId: TENANT_ID },
     select: { companyId: true, campaign: true, contact: { select: { personId: true } } },
   });
-  if (!lead) return { error: "Lead nem található" };
+  if (!lead) return { error: LEAD_NOT_FOUND };
 
   const interaction = await db.interaction.create({
     data: {
@@ -36,7 +36,7 @@ export async function queueCallTranscript(leadId: number, transcript: string) {
       userId: ctx.userId,
       type: "call",
       direction: "outbound",
-      outcome: "transcribed",
+      outcome: TRANSCRIBED_OUTCOME,
       notes: validated.text.slice(0, NOTE_PREVIEW_LEN),
       transcript: validated.text,
       occurredAt: new Date(),
@@ -44,7 +44,7 @@ export async function queueCallTranscript(leadId: number, transcript: string) {
     },
     select: { id: true },
   });
-  audit("interaction", interaction.id, "create", null, { leadId, outcome: "transcribed" });
+  audit("interaction", interaction.id, "create", null, { leadId, outcome: TRANSCRIBED_OUTCOME });
 
   revalidatePath("/drive");
   revalidatePath(`/leads/${leadId}`);

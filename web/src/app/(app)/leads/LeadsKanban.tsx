@@ -10,8 +10,9 @@ import { CallOutcomeModal } from "./CallOutcomeModal";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import {
-  LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, promptLostReason, type LeadOutcome,
+  callbackTone, daysSince, promptLostReason,
 } from "@/lib/leads/outcomes";
+import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, type LeadOutcome } from "@/lib/leads/vocab";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
 import { dataInk } from "@/lib/data-color";

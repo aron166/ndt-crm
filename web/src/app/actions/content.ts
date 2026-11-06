@@ -1,10 +1,11 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
-import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
+import { requireCrmUserId } from "@/lib/actor";
 import { setTenantSettings } from "@/lib/tenant-settings";
 import { dispatchApprovalWebhook } from "@/lib/marketing/webhook";
 import { reportError } from "@/lib/report-error";
@@ -24,18 +25,18 @@ import {
 } from "@/lib/content/storage";
 import { generateThumbnail } from "@/lib/content/thumbnails";
 import type { NewAssetInput } from "@/lib/content/service";
+import { isHttpUrl } from "@/lib/url";
 
 // Content approval — human side (spec 2026-09-17). Every action resolves the
 // CRM user itself; review writes are additionally gated on the configured
 // reviewer list inside the service. There is deliberately no action that sets
 // `live` directly: live is only ever the result of two approvals.
 
-const TENANT_ID = 1;
 type Fail = { ok: false; error: string };
 
 async function userActor(): Promise<UserActor | Fail> {
-  const { userId } = await getActor(TENANT_ID);
-  return userId == null ? { ok: false, error: NOT_A_CRM_USER } : { tenantId: TENANT_ID, kind: "user", userId };
+  const me = await requireCrmUserId(TENANT_ID);
+  return "ok" in me ? me : { tenantId: TENANT_ID, kind: "user", userId: me.userId };
 }
 
 function revalidateContent(itemId?: number) {
@@ -152,10 +153,6 @@ export async function requestAssetUpload(input: {
     reportError("content.requestAssetUpload", err, { itemId });
     return { ok: false, error: "A feltöltés most nem indítható" };
   }
-}
-
-function isHttpUrl(u: string): boolean {
-  try { const p = new URL(u); return p.protocol === "http:" || p.protocol === "https:"; } catch { return false; }
 }
 
 async function resolveAssets(

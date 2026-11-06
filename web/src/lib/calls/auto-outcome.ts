@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CALL_OUTCOMES, type CallOutcomeKey } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, DEMO_HOSTS, TRANSCRIBED_OUTCOME, type CallOutcomeKey } from "@/lib/leads/vocab";
 import { answersRecordSchema } from "@/lib/leads/qualification";
 
 // Auto-outcome from a call transcript — PURE module (no DB, no network).
@@ -57,7 +57,7 @@ export const parsedCallSchema = z.object({
   /** ISO datetime — only meaningful for callback_requested. */
   callback_at: z.string().datetime().optional(),
   /** Read for the suggestion only: these outcomes are never auto-applied. */
-  demo_with: z.enum(["aron", "peter"]).optional(),
+  demo_with: z.enum(DEMO_HOSTS).optional(),
   booking_at: z.string().datetime().optional(),
   lost_reason: z.string().trim().max(500).optional(),
 });
@@ -87,7 +87,7 @@ export function decideAutoOutcome(parsed: ParsedCall, now: Date = new Date()): A
 
 /** An interaction whose OUTCOME was machine-derived (not merely a stored transcript). */
 export function isAutoOutcome(i: { outcome: string | null; autoConfidence: number | null }): boolean {
-  return i.autoConfidence != null && i.outcome != null && i.outcome !== "transcribed";
+  return i.autoConfidence != null && i.outcome != null && i.outcome !== TRANSCRIBED_OUTCOME;
 }
 
 /** The `callOutcomeSchema` shape, from a parse that decideAutoOutcome cleared. */

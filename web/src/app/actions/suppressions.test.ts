@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { addSuppression } from "./suppressions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/actor", () => ({ getActor: vi.fn().mockResolvedValue({ userId: 2 }), NOT_A_CRM_USER: "x" }));
+vi.mock("@/lib/actor", async () => (await import("@/test/actor-mock")).actorMock("x", vi.fn().mockResolvedValue({ userId: 2 })));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   db: {

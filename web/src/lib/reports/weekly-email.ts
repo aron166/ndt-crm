@@ -1,8 +1,11 @@
+import { budapestParts, budapestYmd } from "@/lib/time";
 import { db } from "@/lib/db";
+import { claimDailySend } from "@/lib/daily-send";
+import { appBaseUrl } from "@/lib/app-url";
 import { reportError } from "@/lib/report-error";
 import { sendEmail } from "@/lib/integrations/resend";
 import { getContentReviewers } from "@/lib/content/reviewers";
-import { callOutcomeLabel } from "@/lib/leads/outcomes";
+import { callOutcomeLabel } from "@/lib/leads/vocab";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { firstName } from "@/lib/content/digest";
@@ -13,8 +16,6 @@ import { getWeeklyReport, previousBudapestWeek, type WeeklyReport } from "./week
  * Monday weekly report email. Same split as lib/content/digest: the builder and
  * the time gate are pure, sendWeeklyReports is the only part touching the DB.
  */
-
-const budapestDate = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(d);
 
 export function buildWeeklyReportEmail(input: {
   report: WeeklyReport;
@@ -50,7 +51,7 @@ export function buildWeeklyReportEmail(input: {
 
   const text = [
     `Kedves ${firstName(recipientName)}!`,
-    `Időszak: ${budapestDate(r.from)} - ${budapestDate(new Date(r.to.getTime() - 1))}`,
+    `Időszak: ${budapestYmd(r.from)} - ${budapestYmd(new Date(r.to.getTime() - 1))}`,
     "",
     ...section(`${U.leadsCreated}: ${r.leadsTotal}`, bySource),
     ...section(U.tierA, tierA),
@@ -83,14 +84,7 @@ export function buildWeeklyReportEmail(input: {
  */
 export const WEEKLY_REPORT_HOURS = [6, 7, 8];
 export function isWeeklyReportTime(now: Date): boolean {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Budapest",
-    hour: "numeric",
-    hour12: false,
-    weekday: "short",
-  }).formatToParts(now);
-  const hour = Number(parts.find((p) => p.type === "hour")?.value);
-  const weekday = parts.find((p) => p.type === "weekday")?.value;
+  const { hour, weekday } = budapestParts(now);
   return weekday === "Mon" && WEEKLY_REPORT_HOURS.includes(hour);
 }
 
@@ -111,7 +105,7 @@ export async function sendWeeklyReports(
   const recipientIds = await getContentReviewers(tenantId);
   if (recipientIds.length === 0) return { sent: 0, skipped: 0, reason: "no_reviewers" };
 
-  const baseUrl = process.env.APP_BASE_URL ?? "https://ndt-crm.vercel.app";
+  const baseUrl = appBaseUrl();
   // Fetched once: the same numbers go to every recipient.
   const [report, statuses] = await Promise.all([
     getWeeklyReport(tenantId, previousBudapestWeek(now)),
@@ -122,15 +116,9 @@ export async function sendWeeklyReports(
   // fetch does not burn the day. Atomically claim today's Budapest date on the tenant
   // row; only the caller that flips it from "not today" sends. `force` bypasses.
   if (!opts.force) {
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(now);
-    const claimed = await db.$executeRaw`
-      UPDATE "tenants"
-         SET "settings" = jsonb_set(
-               CASE WHEN jsonb_typeof("settings") = 'object' THEN "settings" ELSE '{}'::jsonb END,
-               '{weeklyReportLastSentOn}', to_jsonb(${today}::text), true)
-       WHERE "id" = ${tenantId}
-         AND COALESCE("settings"->>'weeklyReportLastSentOn', '') <> ${today}`;
-    if (claimed === 0) {
+    const today = budapestYmd(now);
+    const claimed = await claimDailySend(tenantId, "weeklyReportLastSentOn", today);
+    if (!claimed) {
       return { sent: 0, skipped: 0, reason: "already_sent" };
     }
   }

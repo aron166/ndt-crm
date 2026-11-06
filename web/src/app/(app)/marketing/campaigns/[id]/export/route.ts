@@ -1,8 +1,7 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { audienceWhere, listAudience, countAudience } from "@/lib/marketing/audience-query";
 import { companiesToCsv, audienceFileName, MAX_EXPORT_ROWS } from "@/lib/marketing/audience";
-
-const TENANT_ID = 1;
 
 /**
  * GET /marketing/campaigns/[id]/export — download the campaign's audience as CSV.

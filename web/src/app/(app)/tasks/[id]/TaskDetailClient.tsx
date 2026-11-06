@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, CheckCircle2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TaskModal } from "../TaskModal";
+import { TaskModal } from "@/components/TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { reopenTask } from "@/app/actions/tasks";
 import { useTaskCompletion } from "@/components/useTaskCompletion";

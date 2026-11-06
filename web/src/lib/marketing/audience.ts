@@ -1,3 +1,5 @@
+import { slugify } from "@/lib/slug";
+
 // Feature E2 part 2: turning a campaign's audience (a saved company segment) into
 // an exportable list. The CSV builder is pure → unit-testable; the live
 // resolution (filters → where → companies) reuses lib/companies/resolve.
@@ -51,11 +53,6 @@ export function companiesToCsv(rows: AudienceCompany[]): string {
 
 /** Safe ASCII-ish filename slug for the CSV download. */
 export function audienceFileName(campaignName: string): string {
-  const slug = campaignName
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // strip accents
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase() || "kampany";
+  const slug = slugify(campaignName, { sep: "-", fallback: "kampany" });
   return `${slug}-celkozonseg.csv`;
 }

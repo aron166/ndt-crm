@@ -1,13 +1,12 @@
 import { z } from "zod";
 import { CONTENT_CHANNELS, CONTENT_TYPES, ASSET_KINDS } from "./types";
 import { CONTENT_CATEGORIES, type ContentCategory } from "@/lib/content/types";
+import { emptyToUndef } from "@/lib/zod-helpers";
+import { slugify } from "@/lib/slug";
 
 // Inbound content-draft payload (POST /api/content). The content factory (an
 // external scheduled job) posts this shape; same per-app-key auth as
 // /api/leads. snake_case on the wire to match the other ingestion endpoints.
-
-const emptyToUndef = (v: unknown) =>
-  typeof v === "string" && v.trim() === "" ? undefined : v;
 
 const optStr = z.preprocess(emptyToUndef, z.string().trim().max(10000).optional());
 
@@ -87,21 +86,13 @@ export function defaultCategory(contentType: ContentIntake["content_type"]): Con
   return "other";
 }
 
-function slugify(input: string): string {
-  return (
-    input
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "") // strip combining diacritics (á→a)
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 120) || "campaign"
-  );
+function slugifyCampaignKey(input: string): string {
+  return slugify(input, { sep: "_", max: 120, fallback: "campaign" });
 }
 
 /** Resolve the campaign slug to use: explicit slug, else slugified name. */
 export function resolveCampaignSlug(input: ContentIntake): string | null {
-  if (input.campaign_slug) return slugify(input.campaign_slug);
-  if (input.campaign_name) return slugify(input.campaign_name);
+  if (input.campaign_slug) return slugifyCampaignKey(input.campaign_slug);
+  if (input.campaign_name) return slugifyCampaignKey(input.campaign_name);
   return null;
 }

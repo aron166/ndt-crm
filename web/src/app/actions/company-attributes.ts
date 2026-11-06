@@ -1,4 +1,5 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -13,8 +14,6 @@ import { normalizeAccountType, normalizeStatus, normalizeWarmth } from "@/lib/im
 const ENUM_NORMALISERS: Partial<Record<CompanyAttrType, (raw: string) => string | null | undefined>> = {
   warmth: normalizeWarmth, account_type: normalizeAccountType, status: normalizeStatus,
 };
-
-const TENANT_ID = 1;
 
 /** All metadata rows (current + history) for a company, tenant-scoped. */
 export async function getCompanyAttributes(companyId: number) {

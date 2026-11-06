@@ -1,7 +1,8 @@
 import type { AnswerSources } from "./qualification";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { db } from "@/lib/db";
-import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, setLeadQualification, type LeadCtx } from "./service";
+import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, setLeadQualification } from "./service";
+import type { LeadCtx } from "@/lib/ctx";
 import { resolveDemoHost, loadBookings } from "@/lib/booking/queries";
 
 // The task ↔ kanban sync (Péter, BRIEFING addendum 2026-09-07 P0 #4). Both
@@ -79,8 +80,8 @@ describe("card → task: moving the card completes the open callback task", () =
   it("completes open call tasks on a normal stage move", async () => {
     const res = await changeLeadStatus(10, "call_2", ctx);
     expect(res).toEqual({ success: true, changed: true });
-    expect(mockDb.task.updateMany).toHaveBeenCalledTimes(1);
-    expect(mockDb.task.updateMany.mock.calls[0][0]).toMatchObject({
+    expect(txTaskUpdateMany).toHaveBeenCalledTimes(1);
+    expect(txTaskUpdateMany.mock.calls[0][0]).toMatchObject({
       where: { tenantId: 1, leadId: 10, type: "call", status: { in: ["created", "in_progress"] } },
       data: { status: "done" },
     });
@@ -88,19 +89,19 @@ describe("card → task: moving the card completes the open callback task", () =
 
   it("does NOT complete them when moving INTO recall — that IS the reminder", async () => {
     await changeLeadStatus(10, "recall", ctx);
-    expect(mockDb.task.updateMany).not.toHaveBeenCalled();
+    expect(txTaskUpdateMany).not.toHaveBeenCalled();
   });
 
   it("a no-op move touches no task", async () => {
     const res = await changeLeadStatus(10, "call_1", ctx);
     expect(res).toEqual({ success: true, changed: false });
-    expect(mockDb.task.updateMany).not.toHaveBeenCalled();
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
   });
 
   it("an unknown status is rejected before anything is written", async () => {
     expect(await changeLeadStatus(10, "nope", ctx)).toEqual({ error: "Ismeretlen státusz" });
-    expect(mockDb.lead.updateMany).not.toHaveBeenCalled();
-    expect(mockDb.task.updateMany).not.toHaveBeenCalled();
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+    expect(txTaskUpdateMany).not.toHaveBeenCalled();
   });
 });
 

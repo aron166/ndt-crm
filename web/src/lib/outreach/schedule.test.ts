@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { scheduleNextTouch } from "./schedule";
+import { UNSENT_STATUSES } from "./steps";
 
 // scheduleNextTouch — pure-ish scheduling logic, driven through a mock tx.
 
@@ -36,7 +37,7 @@ describe("scheduleNextTouch", () => {
     expect(t.emailDraft.updateMany).toHaveBeenCalledWith({
       where: {
         tenantId: 1, companyId: 7, campaign: "cold-email-v0", step: 2,
-        status: { in: ["draft", "approved", "failed"] },
+        status: { in: [...UNSENT_STATUSES] },
       },
       data: { dueAt: due },
     });

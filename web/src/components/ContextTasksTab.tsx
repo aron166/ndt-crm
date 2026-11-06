@@ -4,12 +4,13 @@ import { useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, CheckCircle2, PencilLine } from "lucide-react";
-import { TaskModal } from "@/app/(app)/tasks/TaskModal";
+import { TaskModal } from "@/components/TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { reopenTask } from "@/app/actions/tasks";
 import { useTaskCompletion } from "@/components/useTaskCompletion";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { isClosedTaskStatus } from "@/lib/tasks/status";
 
 interface Task {
   id: number;
@@ -40,7 +41,7 @@ interface ContextTasksTabProps {
 }
 
 function isOverdue(dueDate: string | Date | null, status: string) {
-  if (!dueDate || status === "done" || status === "cancelled") return false;
+  if (!dueDate || isClosedTaskStatus(status)) return false;
   return new Date(dueDate) < new Date(new Date().toDateString());
 }
 
@@ -75,8 +76,8 @@ export function ContextTasksTab({
     });
   }
 
-  const open = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled");
-  const done = tasks.filter((t) => t.status === "done" || t.status === "cancelled");
+  const open = tasks.filter((t) => !isClosedTaskStatus(t.status));
+  const done = tasks.filter((t) => isClosedTaskStatus(t.status));
 
   return (
     <>

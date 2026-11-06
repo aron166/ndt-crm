@@ -1,10 +1,9 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { serializeDates } from "@/lib/serialize";
 import { DealsKanban } from "./DealsKanban";
 import { Settings } from "lucide-react";
-
-const TENANT_ID = 1;
 
 interface SearchParams { pipeline?: string; }
 

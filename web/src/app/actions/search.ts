@@ -1,10 +1,9 @@
 "use server";
+import { TENANT_ID } from "@/lib/tenant";
 
 import { db } from "@/lib/db";
 import { requireCrmUser } from "@/lib/actor";
 import { employerState, employerLabel } from "@/lib/persons/employer";
-
-const TENANT_ID = 1;
 
 const LIMIT = 5; // results per group
 

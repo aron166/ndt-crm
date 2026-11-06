@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { jsonApi, readJson, requireAppKey } from "@/lib/api/http";
 import { callResultSchema, composeCallNotes, type CallResultInput } from "@/lib/calls/result";
 import { analyzeCallTranscript } from "@/lib/calls/analyze";
 import {
   decideAutoOutcome, toCallOutcome, AUTO_OUTCOME_LABELS, AUTO_OUTCOME_REASON_LABEL, type ParsedCall,
 } from "@/lib/calls/auto-outcome";
-import { logLeadCallOutcome, setLeadQualification, type LeadCtx } from "@/lib/leads/service";
-import { callOutcomeLabel } from "@/lib/leads/outcomes";
+import { logLeadCallOutcome, setLeadQualification } from "@/lib/leads/service";
+import { agentCtx } from "@/lib/ctx";
+import { LEAD_CALL_TASK, TRANSCRIBED_OUTCOME, callOutcomeLabel } from "@/lib/leads/vocab";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { NOTE_PREVIEW_LEN } from "@/lib/calls/transcript";
 import { reportError } from "@/lib/report-error";
+import { writeAuditLog } from "@/lib/audit";
+import { TZ } from "@/lib/time";
+import { isUniqueViolation } from "@/lib/db-errors";
 
 // Call-result intake. The external transcription/analysis pipeline (Make:
 // recorder → Drive → Whisper → AI) posts the finished transcript + analysis
@@ -26,24 +29,9 @@ import { reportError } from "@/lib/report-error";
 //     whether it may be applied; either way it routes through the ONE lead
 //     write path (lib/leads/service.ts) — never a hand-rolled write here.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
-
-function isUniqueViolation(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
-}
+const api = jsonApi("POST, OPTIONS");
+const json = api.json;
+export const OPTIONS = api.OPTIONS;
 
 /** Suggested-outcome description for the confirm task — every field is a suggestion, nothing is applied. */
 function composeConfirmDescription(parsed: ParsedCall, reasonLabel: string): string {
@@ -55,7 +43,7 @@ function composeConfirmDescription(parsed: ParsedCall, reasonLabel: string): str
   ];
   if (parsed.callback_at) {
     parts.push(
-      `Javasolt visszahívás: ${new Date(parsed.callback_at).toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}`,
+      `Javasolt visszahívás: ${new Date(parsed.callback_at).toLocaleString("hu-HU", { timeZone: TZ })}`,
     );
   }
   if (parsed.answers && Object.keys(parsed.answers).length > 0) {
@@ -67,19 +55,11 @@ function composeConfirmDescription(parsed: ParsedCall, reasonLabel: string): str
 }
 
 export async function POST(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
-  if (!rateLimit(key.keyId)) {
-    return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
-  }
-
-  let raw: unknown;
-  try {
-    raw = await request.json();
-  } catch {
-    return json({ error: "Invalid JSON" }, 400);
-  }
+  const raw = await readJson(request, json);
+  if (raw instanceof NextResponse) return raw;
 
   const parsedBody = callResultSchema.safeParse(raw);
   if (!parsedBody.success) {
@@ -129,25 +109,17 @@ export async function POST(request: Request) {
         personId: input.person_id ?? null,
         type: "call",
         direction: "outbound",
-        outcome: "transcribed",
+        outcome: TRANSCRIBED_OUTCOME,
         notes,
         occurredAt,
       },
       select: { id: true },
     });
 
-    await db.auditLog.create({
-      data: {
-        tenantId,
-        actorUserId: null,
-        action: "create",
-        entityType: "interaction",
-        entityId: interaction.id,
-        changes: {
-          before: null,
-          after: { type: "call", outcome: "transcribed", source: key.appSlug, callId: input.call_id ?? null },
-        } as Prisma.InputJsonValue,
-      },
+    await writeAuditLog({
+      entityType: "interaction", entityId: interaction.id, action: "create", before: null,
+      after: { type: "call", outcome: TRANSCRIBED_OUTCOME, source: key.appSlug, callId: input.call_id ?? null },
+      options: { tenantId, actor: "agent", actorAgentId: key.appSlug },
     });
     await recomputeCloseness({ tenantId, companyId: company.id, personId: input.person_id ?? null });
 
@@ -156,7 +128,8 @@ export async function POST(request: Request) {
     revalidatePath("/calls");
 
     return json({ ok: true, interactionId: interaction.id }, 201);
-  } catch {
+  } catch (err) {
+    reportError("calls.result.company", err, { companyId: input.company_id });
     return json({ error: "Failed to record call result" }, 500);
   }
 }
@@ -206,7 +179,7 @@ async function handleLeadOutcome(
     let pending: { id: number } | null = null;
     if (input.pending_interaction_id) {
       const found = await db.interaction.findFirst({
-        where: { id: input.pending_interaction_id, tenantId, leadId, type: "call", outcome: "transcribed" },
+        where: { id: input.pending_interaction_id, tenantId, leadId, type: "call", outcome: TRANSCRIBED_OUTCOME },
         select: { id: true, supersededBy: { select: { id: true }, take: 1 } },
       });
       if (!found) return json({ error: "Pending interaction not found" }, 404);
@@ -218,7 +191,7 @@ async function handleLeadOutcome(
 
     const now = new Date();
     const decision = decideAutoOutcome(parsed);
-    const ctx: LeadCtx = { tenantId, userId: null, actor: "agent", actorAgentId: appSlug };
+    const ctx = agentCtx(tenantId, appSlug);
 
     let result: {
       applied: boolean;
@@ -276,27 +249,20 @@ async function handleLeadOutcome(
       );
     }
 
-    await db.auditLog.create({
-      data: {
-        tenantId,
-        actorUserId: null,
-        action: "create",
-        entityType: "interaction",
-        entityId: result.interactionId,
-        changes: {
-          before: null,
-          after: {
-            type: "call",
-            outcome: result.applied ? parsed.outcome : "transcribed",
-            source: appSlug,
-            callId: input.call_id ?? null,
-            leadId,
-            confidence: parsed.confidence,
-          },
-        } as Prisma.InputJsonValue,
+    await writeAuditLog({
+      entityType: "interaction", entityId: result.interactionId, action: "create", before: null,
+      after: {
+        type: "call",
+        outcome: result.applied ? parsed.outcome : TRANSCRIBED_OUTCOME,
+        source: appSlug,
+        callId: input.call_id ?? null,
+        leadId,
+        confidence: parsed.confidence,
       },
+      options: { tenantId, actor: "agent", actorAgentId: appSlug },
     });
-    await recomputeCloseness({ tenantId, companyId: lead.companyId, personId });
+    // An applied outcome went through logLeadCallOutcome, which already recomputed.
+    if (!result.applied) await recomputeCloseness({ tenantId, companyId: lead.companyId, personId });
 
     if (lead.companyId) revalidatePath(`/companies/${lead.companyId}`);
     if (personId) revalidatePath(`/persons/${personId}`);
@@ -386,7 +352,7 @@ async function createConfirmTask(
         personId,
         type: "call",
         direction: "outbound",
-        outcome: "transcribed",
+        outcome: TRANSCRIBED_OUTCOME,
         notes,
         campaign: lead.campaign,
         // When the transcript came from the queue it already lives on the
@@ -408,8 +374,7 @@ async function createConfirmTask(
         assignedToId: lead.assignedToId ?? null,
         title: `${AUTO_OUTCOME_LABELS.confirmTaskTitle}: ${who}`,
         description: composeConfirmDescription(parsed, reasonLabel),
-        type: "call",
-        category: "revenue_generating",
+        ...LEAD_CALL_TASK,
         status: "created",
         dueDate: now,
       },

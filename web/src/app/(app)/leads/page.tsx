@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { serializeDates } from "@/lib/serialize";
@@ -8,10 +9,9 @@ import { fullName, formatRelativeTime } from "@/lib/utils";
 import { getLeadExtras } from "@/lib/leads/board";
 import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact, tierAFlag } from "@/lib/leads/first-contact";
-import { LEAD_OUTCOME_LABEL, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/outcomes";
+import { ACTIVE_LEAD_WHERE, LEAD_OUTCOME_LABEL, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/vocab";
 import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 
-const TENANT_ID = 1;
 const PAGE_SIZE = 30;
 // ponytail: per-column cap (newest first) + "N / total" badge — a kanban has no
 // natural page; add per-column "load more" when a column actually exceeds this.
@@ -33,7 +33,7 @@ export default async function LeadsPage({
   // the active board — the "Lezárt" list keeps them for history.
   const CLOSED_WHERE = { tenantId: TENANT_ID, OR: [{ outcome: { not: "open" } }, { convertedDealId: { not: null } }] };
   const [activeCount, convertedCount] = await Promise.all([
-    db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: null, outcome: "open" } }),
+    db.lead.count({ where: { tenantId: TENANT_ID, ...ACTIVE_LEAD_WHERE } }),
     db.lead.count({ where: CLOSED_WHERE }),
   ]);
 
@@ -172,7 +172,7 @@ export default async function LeadsPage({
   // a tenant can end up with zero isInitial statuses (unchecking it at /leads/setup
   // clears the flag without electing a replacement), and orphaned leads must still land.
   const initialKey = statuses.find((s) => s.isInitial)?.key ?? statuses[0]?.key ?? "new";
-  const ACTIVE = { tenantId: TENANT_ID, convertedDealId: null, outcome: "open", ...(tier ? { tier } : {}) };
+  const ACTIVE = { tenantId: TENANT_ID, ...ACTIVE_LEAD_WHERE, ...(tier ? { tier } : {}) };
   const knownKeys = statuses.map((s) => s.key);
   // A lead whose status was deleted at /leads/setup has no column — it lands in
   // the entry column instead of vanishing from the board (which would make the

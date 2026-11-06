@@ -1,3 +1,4 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
 
@@ -7,7 +8,7 @@ export async function GET(request: Request) {
 
   const tags = await db.tag.findMany({
     where: {
-      tenantId: 1,
+      tenantId: TENANT_ID,
       ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
     },
     select: { id: true, name: true, color: true },

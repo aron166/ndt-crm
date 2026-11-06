@@ -1,8 +1,7 @@
+import { TENANT_ID } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { SettingsClient } from "./SettingsClient";
 import { listAppApiKeys } from "@/app/actions/app-keys";
-
-const TENANT_ID = 1;
 
 export default async function SettingsPage() {
   const [tenant, credentials, appKeys] = await Promise.all([

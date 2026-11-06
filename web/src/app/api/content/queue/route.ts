@@ -1,33 +1,21 @@
 import { NextResponse } from "next/server";
 import { reportError } from "@/lib/report-error";
-import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { jsonApi, requireAppKey } from "@/lib/api/http";
 import { getQueue } from "@/lib/content/service";
 import { CONTENT_CATEGORIES, CONTENT_STATUSES, isContentStatus, type ContentStatus } from "@/lib/content/types";
 
 // GET /api/content/queue — items the content-revise skill should pick up.
 // App-key auth, same shape as the rest of the content API.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
-function json(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+const api = jsonApi("GET, OPTIONS");
+const json = api.json;
+export const OPTIONS = api.OPTIONS;
 
 const DEFAULT_STATUSES: ContentStatus[] = ["changes_requested", "rewrite_requested"];
 
 export async function GET(request: Request) {
-  const key = await validateAppKey(request);
-  if (!key) return json({ error: "Unauthorized" }, 401);
-  if (!rateLimit(key.keyId)) return json({ error: "Rate limit exceeded (30 req/min)" }, 429);
+  const key = await requireAppKey(request, json);
+  if (key instanceof NextResponse) return key;
 
   const raw = new URL(request.url).searchParams.get("status");
   let statuses: ContentStatus[] = DEFAULT_STATUSES;

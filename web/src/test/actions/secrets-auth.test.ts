@@ -18,7 +18,7 @@ vi.mock("@/lib/db", () => ({ db }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/crypto", () => ({ encrypt }));
-vi.mock("@/lib/integrations/resend", () => ({ DEFAULT_TENANT_ID: 1, sendEmail, sendTestEmail }));
+vi.mock("@/lib/integrations/resend", () => ({ sendEmail, sendTestEmail }));
 vi.mock("@/lib/leads/service", () => ({ moveLead, setLeadOutcome: vi.fn() }));
 vi.mock("@/lib/actor", () => {
   const getActor = vi.fn();
@@ -34,7 +34,7 @@ import { saveIntegrationCredential, disconnectIntegration } from "@/app/actions/
 import { listAppApiKeys, createAppApiKey, revokeAppApiKey } from "@/app/actions/app-keys";
 import { sendResendTest, sendCrmEmail } from "@/app/actions/email";
 import { getCostRates, upsertCostRate } from "@/app/actions/cost-rates";
-import { updateLeadStatus } from "@/app/actions/leads";
+import { moveLead as moveLeadAction } from "@/app/actions/leads";
 
 const denied = { error: "NOT_A_CRM_USER" };
 
@@ -55,7 +55,7 @@ describe("secrets/email/rate-card actions auth gate", () => {
     expect(await sendCrmEmail({ to: "a@b.c", subject: "s", text: "t" })).toEqual(denied);
     await expect(getCostRates()).rejects.toThrow("NOT_A_CRM_USER");
     expect(await upsertCostRate("x", "u", "1")).toEqual(denied);
-    expect(await updateLeadStatus(1, "won")).toEqual(denied);
+    expect(await moveLeadAction(1, "won")).toEqual(denied);
 
     for (const model of Object.values(db)) for (const fn of Object.values(model)) expect(fn).not.toHaveBeenCalled();
     for (const fn of [encrypt, sendEmail, sendTestEmail, moveLead]) expect(fn).not.toHaveBeenCalled();
