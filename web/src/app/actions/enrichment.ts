@@ -6,9 +6,8 @@ import { db } from "@/lib/db";
 import { requireCrmUser } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import Groq from "groq-sdk";
+import { GROQ_MODEL, groqFromEnv, stripJsonFence } from "@/lib/groq";
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
 const FETCH_TIMEOUT_MS = 8000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -125,10 +124,10 @@ async function pingWebsite(url: string): Promise<"alive" | "dead" | "unknown"> {
 // Only called after structured sources have run. Receives ALL collected facts.
 // Fills in ONLY what structured sources couldn't answer.
 
-function getGroq(): Groq {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error("GROQ_API_KEY not set");
-  return new Groq({ apiKey });
+function getGroq() {
+  const groq = groqFromEnv();
+  if (!groq) throw new Error("GROQ_API_KEY not set");
+  return groq;
 }
 
 interface AiCompanyResult {
@@ -178,7 +177,7 @@ Please fill these missing fields: ${fieldsNeeded}`;
   });
 
   const raw = completion.choices[0]?.message?.content ?? "";
-  const jsonStr = raw.replace(/^```json?\n?/i, "").replace(/\n?```$/i, "").trim();
+  const jsonStr = stripJsonFence(raw);
   return JSON.parse(jsonStr) as AiCompanyResult;
 }
 
@@ -360,7 +359,7 @@ Do you have any verifiable public information about this person? If not, return 
         max_tokens: 150,
       });
       const raw = completion.choices[0]?.message?.content ?? "";
-      const jsonStr = raw.replace(/^```json?\n?/i, "").replace(/\n?```$/i, "").trim();
+      const jsonStr = stripJsonFence(raw);
       const parsed = JSON.parse(jsonStr) as { notes?: string | null; confidence?: number };
 
       if (parsed.notes && (parsed.confidence ?? 0) > 0.6 && !changes["notes"]) {
