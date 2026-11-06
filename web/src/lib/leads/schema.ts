@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { answersRecordSchema } from "./qualification";
 import { TIERS } from "./tier";
-import { REPLY_TYPES } from "@/lib/outreach/campaign";
+import { REPLY_TYPES } from "@/lib/outreach/steps";
 import { emptyToUndef } from "@/lib/zod-helpers";
 
 // Public lead-intake payload (POST /api/leads).

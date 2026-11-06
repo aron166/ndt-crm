@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_STEP, SEQUENCE_OFFSET_DAYS, type DraftStatus } from "./steps";
+import { MAX_STEP, SEQUENCE_OFFSET_DAYS, type DraftStatus, REPLY_TYPES } from "./steps";
 
 /**
  * Campaign tracking (Kai/Áron P0, 2026-09-17) — PURE module, no DB.
@@ -32,18 +32,6 @@ export function dueAtForStep(firstSentAt: Date, nextStep: number): Date | null {
 export function canMarkReplied(status: DraftStatus): boolean {
   return status === "sent";
 }
-
-/** SEND_PLAN §3 reply_type, as stable English keys. Labels are UI. */
-export const REPLY_TYPES = [
-  "interested", // érdeklődő
-  "question", // kérdés
-  "forwarded", // továbbküldte
-  "not_now", // most nem
-  "no", // nem
-  "unsubscribed", // leiratkozott
-  "auto_reply", // automatikus válasz (szabadság, „nem én vagyok az illetékes”)
-] as const;
-export type ReplyType = (typeof REPLY_TYPES)[number];
 
 export const markSentSchema = z.object({
   draftId: z.number().int().positive(),

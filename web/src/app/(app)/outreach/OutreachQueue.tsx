@@ -23,7 +23,8 @@ import type { OutreachSettings } from "@/lib/outreach/settings";
 import { setCampaignTarget, markDraftReplied } from "@/app/actions/outreach-campaigns";
 import { canEdit, canApprove, withFooter } from "@/lib/outreach/drafts";
 import { DRAFT_STATUSES, MAX_STEP, canSend, type DraftStatus } from "@/lib/outreach/steps";
-import { canMarkReplied, REPLY_TYPES, type ReplyType } from "@/lib/outreach/campaign";
+import { canMarkReplied } from "@/lib/outreach/campaign";
+import { REPLY_TYPES, type ReplyType } from "@/lib/outreach/steps";
 import { REPLY_TYPE_LABEL } from "@/lib/outreach/labels";
 import { MarkSentControl } from "./DueToday";
 

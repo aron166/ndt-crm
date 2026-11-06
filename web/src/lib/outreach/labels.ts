@@ -1,4 +1,4 @@
-import type { ReplyType } from "./campaign";
+import type { ReplyType } from "./steps";
 
 // ⚠️ HU PROPOSALS — not signed off by Áron (translating-english-to-hungarian pass only).
 export const REPLY_TYPE_LABEL: Record<ReplyType | "unknown", string> = {

@@ -38,3 +38,15 @@ export function canSend(status: DraftStatus): boolean {
 
 /** The statuses sendDraft (and "sent by hand") may claim. Derived from canSend(). */
 export const CLAIMABLE_STATUSES: DraftStatus[] = DRAFT_STATUSES.filter((s) => canSend(s));
+
+/** SEND_PLAN §3 reply_type, as stable English keys. Labels are UI. */
+export const REPLY_TYPES = [
+  "interested", // érdeklődő
+  "question", // kérdés
+  "forwarded", // továbbküldte
+  "not_now", // most nem
+  "no", // nem
+  "unsubscribed", // leiratkozott
+  "auto_reply", // automatikus válasz (szabadság, „nem én vagyok az illetékes”)
+] as const;
+export type ReplyType = (typeof REPLY_TYPES)[number];

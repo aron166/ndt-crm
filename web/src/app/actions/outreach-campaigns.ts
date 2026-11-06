@@ -12,12 +12,12 @@ import { audit } from "@/lib/audit";
 import { requireCrmUserId } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
 import { threadKeyFor } from "@/lib/outreach/drafts";
-import { MAX_STEP, WAVE_MAX, UNSENT_STATUSES, CLAIMABLE_STATUSES, type DraftStatus } from "@/lib/outreach/steps";
+import { MAX_STEP, WAVE_MAX, UNSENT_STATUSES, CLAIMABLE_STATUSES, type DraftStatus, type ReplyType } from "@/lib/outreach/steps";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import { runAutomations } from "@/lib/automations/engine";
 import {
   canMarkReplied, markRepliedSchema, markSentSchema,
-  buildFunnel, type CampaignFunnel, type ReplyType,
+  buildFunnel, type CampaignFunnel,
 } from "@/lib/outreach/campaign";
 import { ingestLead, leadCreatedEvent } from "@/lib/leads/ingest";
 import { leadIntakeSchema } from "@/lib/leads/schema";
