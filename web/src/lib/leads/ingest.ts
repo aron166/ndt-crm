@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { LeadIntake } from "./schema";
 import { normalizeIntakeAnswers, withAnswers, effectiveAnswers } from "./qualification";
 import { computeTier, type LeadTier } from "./tier";
+import { w2FieldsFromAnswers } from "./lifecycle";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
 //
@@ -296,6 +297,8 @@ export async function ingestLead(
           }
         : {}),
       ...(tier ? { tier } : {}),
+      // W2 columns from the form answers (intent, buyer_type); unknown slugs stay null.
+      ...w2FieldsFromAnswers(answers),
       ...(Object.keys(customFields).length > 0
         ? { customFields: customFields as Prisma.InputJsonValue }
         : {}),

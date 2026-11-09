@@ -191,6 +191,26 @@ describe("ingestLead", () => {
     expect(data.tier).toBe("A");
   });
 
+  it("copies the W7 intent and buyer_type answers into the W2 columns (Kai 2026-11-09)", async () => {
+    const input = parse({
+      company_name: "teszt ltd", contact_phone: "+36301234567", question_set: "w7",
+      qualification: { gate: "task", intent: "service_concrete", buyer_type: "company", call_window: "8_10", location: "Budapest" },
+    });
+    const { tx } = makeTx({});
+    await ingestLead(input, ctx, tx);
+    const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(data).toMatchObject({ intent: "service_concrete", buyerType: "company" });
+    expect(data.qualification).toMatchObject({ call_window: "8_10", location: "Budapest" });
+  });
+
+  it("an unknown intent slug leaves the W2 column unset", async () => {
+    const input = parse({ company_name: "x", contact_phone: "+36301234567", qualification: { intent: "valami_uj" } });
+    const { tx } = makeTx({});
+    await ingestLead(input, ctx, tx);
+    const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(data.intent).toBeUndefined();
+  });
+
   it("a derived tier wins over the caller's pre-tier when answers are present", async () => {
     const input = parse({
       company_name: "Acme",

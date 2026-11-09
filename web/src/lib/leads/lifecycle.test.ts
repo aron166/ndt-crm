@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  ALL_STAGES, DEFAULT_TRANSITIONS, atBudapest, slaDeadline, addWorkdays, cadenceTask, recallDefaultDate, RECALL_REASONS,
+  w2FieldsFromAnswers, ALL_STAGES, DEFAULT_TRANSITIONS, atBudapest, slaDeadline, addWorkdays, cadenceTask, recallDefaultDate, RECALL_REASONS,
   planTransition, findTransition, buildDigest, entryTasks, type LifecycleLead, type DigestLead,
 } from "./lifecycle";
 
@@ -173,5 +173,17 @@ describe("entryTasks ordered", () => {
     const t = entryTasks("ordered", "offer_accepted", new Date("2026-11-09T10:00:00Z"));
     expect(t[0].title).toContain("Időpont-egyeztető hívás");
     expect(t[0].type).toBe("call");
+  });
+});
+
+describe("w2FieldsFromAnswers", () => {
+  it("maps the landing slugs and never guesses", () => {
+    expect(w2FieldsFromAnswers({ intent: "service_concrete", buyer_type: "company" })).toEqual({ intent: "service_concrete", buyerType: "company" });
+    expect(w2FieldsFromAnswers({ intent: "service" })).toEqual({ intent: "service_vague" });
+    expect(w2FieldsFromAnswers({ intent: "device" })).toEqual({ intent: "unknown" });
+    expect(w2FieldsFromAnswers({ intent: "info" })).toEqual({ intent: "unknown" });
+    expect(w2FieldsFromAnswers({ intent: "rental" })).toEqual({ intent: "rental" });
+    expect(w2FieldsFromAnswers({ situation: "private" })).toEqual({ buyerType: "private" });
+    expect(w2FieldsFromAnswers({ intent: "valami", buyer_type: "ceg" })).toEqual({});
   });
 });

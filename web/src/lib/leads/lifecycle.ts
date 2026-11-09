@@ -75,6 +75,26 @@ export const isRecallReason = (s: unknown): s is RecallReason => (RECALL_REASONS
 
 export const BUYER_TYPES = ["company", "private"] as const;
 export const INTENTS = ["service_concrete", "service_vague", "rental", "purchase", "unknown"] as const;
+/**
+ * The W2 lead columns from the form answers (W7 landing, 2026-11-09). Landing
+ * slugs map onto the CHECK-constrained values; anything unknown stays unset
+ * rather than guessed. `device` (rent or buy, undecided) and `info` are
+ * `unknown` until the first call. buyer_type falls back to the older
+ * `situation` answer (company / private).
+ */
+const INTENT_FROM_FORM: Record<string, (typeof INTENTS)[number]> = {
+  service_concrete: "service_concrete", service_vague: "service_vague", service: "service_vague",
+  rental: "rental", purchase: "purchase", device: "unknown", info: "unknown", unknown: "unknown",
+};
+export function w2FieldsFromAnswers(answers: Record<string, string>): { intent?: (typeof INTENTS)[number]; buyerType?: (typeof BUYER_TYPES)[number] } {
+  const out: { intent?: (typeof INTENTS)[number]; buyerType?: (typeof BUYER_TYPES)[number] } = {};
+  const intent = INTENT_FROM_FORM[(answers.intent ?? "").trim().toLowerCase()];
+  if (intent) out.intent = intent;
+  const bt = (answers.buyer_type ?? answers.situation ?? "").trim().toLowerCase();
+  if (bt === "company" || bt === "private") out.buyerType = bt;
+  return out;
+}
+
 export const OFFER_TYPES = ["service", "rental", "purchase"] as const;
 /** PROPOSAL labels. */
 export const OFFER_TYPE_LABEL: Record<(typeof OFFER_TYPES)[number], string> = {

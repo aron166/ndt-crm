@@ -38,6 +38,22 @@ export function formAlertText(lead: {
   };
 }
 
+type AlertResult = { userId: number; ok: true; resendId: string } | { userId: number; ok: false; error: string };
+
+/** One app_events row per alert attempt ("form_alert_sent"); a failed trace never breaks the intake. */
+async function recordAlert(tenantId: number, leadId: number, results: AlertResult[]): Promise<void> {
+  try {
+    await db.appEvent.create({
+      data: {
+        tenantId, sourceApp: "ndt-crm", eventType: "form_alert_sent",
+        payload: { leadId, sent: results.filter((r) => r.ok).length, recipients: results.length, results },
+      },
+    });
+  } catch (err) {
+    reportError("leads.formAlert.trace", err, { leadId });
+  }
+}
+
 export async function sendFormAlert(tenantId: number, leadId: number): Promise<{ sent: number }> {
   try {
     if (!(await getResendConfig(tenantId))) return { sent: 0 };
@@ -55,7 +71,7 @@ export async function sendFormAlert(tenantId: number, leadId: number): Promise<{
     if (!lead) return { sent: 0 };
     const hostIds = Object.values(demoHostsFromSettings(tenant?.settings)).filter((x): x is number => typeof x === "number");
     const users = hostIds.length
-      ? await db.user.findMany({ where: { tenantId, id: { in: hostIds } }, select: { email: true } })
+      ? await db.user.findMany({ where: { tenantId, id: { in: hostIds } }, select: { id: true, email: true } })
       : [];
     const cf = (lead.customFields ?? {}) as Record<string, unknown>;
     const q = (lead.qualification ?? {}) as Record<string, unknown>;
@@ -76,6 +92,12 @@ export async function sendFormAlert(tenantId: number, leadId: number): Promise<{
     for (const r of results) {
       if (r.ok) sent++; else reportError("leads.formAlert.send", new Error(r.error), { leadId });
     }
+    // Delivery trace (Kai 2026-11-09): verifiable from the DB. Recipients by user id,
+    // never the address; the Resend message id on success, the error otherwise.
+    await recordAlert(tenantId, leadId, users.map((u, i) => {
+      const r = results[i];
+      return r.ok ? { userId: u.id, ok: true, resendId: r.id } : { userId: u.id, ok: false, error: r.error };
+    }));
     return { sent };
   } catch (err) {
     reportError("leads.formAlert", err, { leadId });
