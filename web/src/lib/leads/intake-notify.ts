@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 import { createHash } from "node:crypto";
 import { sendEmail } from "@/lib/integrations/resend";
+import { slaDeadline } from "./lifecycle";
 
 // Web-form intake notifications (Áron 2026-11-09, after the Fable review):
 //  1. an instant Telegram ping to sales (env TELEGRAM_BOT_TOKEN + TELEGRAM_LEADS_CHAT_ID;
@@ -57,6 +58,10 @@ export interface IntakeFacts {
   buyerType: string | null;
   callWindow: string | null;
   town: string | null;
+  /** Raw form answers (W7 slugs), for the personalised lines. */
+  answers?: Record<string, string>;
+  /** When the lead came in, for the "when do we call" sentence. */
+  receivedAt?: Date;
 }
 
 /** Pure: the Telegram text. Telegram links a +36... number itself (tap to call). */
@@ -91,17 +96,82 @@ export function nextStepLine(intent: string | null): string {
   }
 }
 
-/** Pure: the auto-reply (PROPOSAL, Áron signs it before auto_reply_enabled goes on). */
-export function autoReplyText(f: Pick<IntakeFacts, "name" | "intent">, caller = AUTO_REPLY_CALLER): { subject: string; text: string } {
+// ── Personalised lines (Áron 2026-11-09: "details or interesting things based on
+// their answers if we can, if not plain is fine"). Only claims we can back
+// (workspace docs/birdsview/gtm-system-2026-11-08/CLAIMS-CHECK-2026-11-09.md, 5a:
+// millimetre accuracy for rebar position and cover) and our own pricing analysis
+// (peter-wiki Pricing_Model, raw34: own machine pays off around 10 000 m2 a year).
+// Any answer we do not recognise gives no line; the caller falls back to plain.
+
+const ELEMENT: Record<string, string> = { wall: "falról", slab: "födémről vagy aljzatról", bridge: "hídról vagy műtárgyról" };
+const SIZE: Record<string, string> = {
+  under_50: "50 m² alatti", "50_300": "kb. 50-300 m²-es", "300_1000": "kb. 300-1000 m²-es", over_1000: "1000 m² feletti",
+};
+const TIMING: Record<string, string> = { this_week: "még ezen a héten lenne aktuális", two_weeks: "két héten belül lenne aktuális", no_date: "még nincs konkrét időpont" };
+const GOAL_FACT: Record<string, string> = {
+  before_drilling: "Fúrás, vágás vagy bontás előtt a betonvas helyét milliméteres pontossággal jelöljük ki.",
+  condition: "Állapotfelmérésnél bontás nélkül mérjük fel a betonvas helyét és a betontakarást, milliméteres pontossággal.",
+};
+const INTEREST_FACT: Record<string, string> = {
+  before_drilling: "Röviden: mielőtt hozzányúlnak a betonhoz, bontás nélkül, milliméteres pontossággal megmutatjuk, hol fut a betonvas.",
+  condition: "Röviden: állapotfelmérésnél bontás nélkül látjuk, hol van a betonvas és mekkora rajta a betontakarás.",
+  what_for: "Röviden: a betonradar bontás nélkül mutatja meg, hol van a betonvas és milyen mélyen, milliméteres pontossággal.",
+};
+
+/** Pure: 0-2 lines built only from the lead's own answers; [] when nothing reliable. */
+export function personalLines(intent: string | null, a: Record<string, string> = {}): string[] {
+  if (intent === "service_concrete") {
+    const element = ELEMENT[a.concrete];
+    if (!element) return [];
+    const size = SIZE[a.size];
+    const when = TIMING[a.timing];
+    const first = `Láttuk, hogy egy ${size ? `${size} ` : ""}${element} van szó${when ? `, és ${when}` : ""}. A hívásban ehhez igazítjuk a mérési tervet.`;
+    return GOAL_FACT[a.goal] ? [first, GOAL_FACT[a.goal]] : [first];
+  }
+  if (intent === "rental" || intent === "purchase" || intent === "device") {
+    const mode = a.device_mode === "rent" ? "a bérlés érdekli"
+      : a.device_mode === "buy" ? "a vásárlás érdekli"
+      : a.device_mode === "undecided" ? "még nem döntötte el, bérelne vagy venne" : null;
+    const area = a.annual_area === "under_1000" || a.annual_area === "1000_10000"
+      ? "Évi 10 000 m² alatt a saját gép (kezelővel, kiszállással együtt) általában drágább, mint a mérési szolgáltatásunk; ezt a hívásban a saját számaival összevetjük."
+      : a.annual_area === "over_10000"
+        ? "Évi 10 000 m² felett már a saját gép lehet a jobb megoldás; a hívásban összevetjük a bérlést és a vásárlást."
+        : null;
+    return [...(mode ? [`Láttuk, hogy ${mode}.`] : []), ...(area ? [area] : [])];
+  }
+  if (intent === "service_vague" || intent === "info") {
+    return INTEREST_FACT[a.interest] ? [INTEREST_FACT[a.interest]] : [];
+  }
+  return [];
+}
+
+/**
+ * When we call, matched to the SLA clock (lifecycle.slaDeadline): within an hour in
+ * working hours, otherwise 9:30 that morning (before 8:00) or the next working day.
+ */
+export function callWhenPhrase(receivedAt: Date | undefined): string {
+  if (!receivedAt) return "hamarosan";
+  const due = slaDeadline(receivedAt);
+  if (due.getTime() - receivedAt.getTime() <= 3_600_000) return "egy órán belül";
+  const day = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest" }).format(d);
+  return day(due) === day(receivedAt) ? "ma 9:30-ig" : "a következő munkanapon 9:30-ig";
+}
+
+/** Pure: the auto-reply (PROPOSAL; Áron approved switching it on, 2026-11-09). */
+export function autoReplyText(
+  f: Pick<IntakeFacts, "name" | "intent" | "answers" | "receivedAt">,
+  caller = AUTO_REPLY_CALLER,
+): { subject: string; text: string } {
   const name = safeName(f.name);
+  const personal = personalLines(f.intent, f.answers);
   return {
     subject: "Megkaptuk az érdeklődését (BetonRadar)",
     text: [
       name ? `Tisztelt ${name}!` : "Tisztelt Érdeklődő!",
       "",
       "Köszönjük, megkaptuk!",
-      `${caller} kollégánk hamarosan felhívja: munkaidőben egy órán belül, egyébként a következő munkanap 9:30-ig.`,
-      nextStepLine(f.intent),
+      `${caller} kollégánk ${callWhenPhrase(f.receivedAt)} felhívja.`,
+      ...(personal.length ? personal : [nextStepLine(f.intent)]),
       "",
       "Üdvözlettel,",
       "BetonRadar",
@@ -124,7 +194,7 @@ async function loadFacts(tenantId: number, leadId: number) {
   const lead = await db.lead.findFirst({
     where: { id: leadId, tenantId },
     select: {
-      id: true, intent: true, buyerType: true, qualification: true, customFields: true, companyId: true,
+      id: true, intent: true, buyerType: true, qualification: true, customFields: true, companyId: true, createdAt: true,
       contact: { select: { email: true, phone: true, personId: true } },
     },
   });
@@ -140,6 +210,8 @@ async function loadFacts(tenantId: number, leadId: number) {
     buyerType: lead.buyerType ?? str(q.buyer_type),
     callWindow: str(q.call_window) ?? str(cf.call_window),
     town: str(q.location) ?? str(q.city) ?? str(cf.location),
+    answers: Object.fromEntries(Object.entries(q).filter((e): e is [string, string] => typeof e[1] === "string")),
+    receivedAt: lead.createdAt,
   };
   return { lead, facts };
 }

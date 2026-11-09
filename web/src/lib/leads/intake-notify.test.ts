@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/integrations/resend";
-import { autoReplyText, safeName, callWindowLabel, nextStepLine, pingText, sendAutoReply, sendLeadPing, type IntakeFacts } from "./intake-notify";
+import { atBudapest } from "./lifecycle";
+import { autoReplyText, safeName, personalLines, callWhenPhrase, callWindowLabel, nextStepLine, pingText, sendAutoReply, sendLeadPing, type IntakeFacts } from "./intake-notify";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
@@ -55,8 +56,7 @@ describe("autoReplyText", () => {
   it("greets by name, promises the call, signs, no em dash", () => {
     const { subject, text } = autoReplyText(facts);
     expect(text).toContain("Tisztelt Kiss Anna!");
-    expect(text).toContain("Nagy Péter kollégánk hamarosan felhívja");
-    expect(text).toContain("9:30-ig");
+    expect(text).toContain("Nagy Péter kollégánk hamarosan felhívja.");
     expect(text).toContain("BetonRadar");
     expect(text).toContain("Uphill Trade Kft.");
     expect(subject + text).not.toContain("\u2014");
@@ -189,5 +189,33 @@ describe("safeName (Vanda #1)", () => {
     expect(safeName("www.valami.hu")).toBeNull();
     expect(safeName("x".repeat(61))).toBeNull();
     expect(autoReplyText({ name: "http://evil", intent: null }).text.startsWith("Tisztelt Érdeklődő!")).toBe(true);
+  });
+});
+
+describe("personalised auto-reply (Áron 2026-11-09)", () => {
+  it("service: element, area band and timing from the answers, plus the goal fact", () => {
+    const l = personalLines("service_concrete", { concrete: "slab", size: "50_300", timing: "two_weeks", goal: "before_drilling" });
+    expect(l[0]).toBe("Láttuk, hogy egy kb. 50-300 m²-es födémről vagy aljzatról van szó, és két héten belül lenne aktuális. A hívásban ehhez igazítjuk a mérési tervet.");
+    expect(l[1]).toContain("milliméteres pontossággal");
+  });
+  it("service without a recognised element gives no line (plain fallback)", () => {
+    expect(personalLines("service_concrete", { size: "50_300" })).toEqual([]);
+    expect(autoReplyText({ name: null, intent: "service_concrete", answers: {} }).text).toContain("A hívásban egyeztetjük, mit kell megvizsgálni");
+  });
+  it("device: rent or buy and the 10 000 m2 break-even, never a made-up number", () => {
+    const l = personalLines("rental", { device_mode: "rent", annual_area: "under_1000" });
+    expect(l).toEqual(["Láttuk, hogy a bérlés érdekli.", expect.stringContaining("Évi 10 000 m² alatt")]);
+    expect(personalLines("purchase", { annual_area: "unknown" })).toEqual([]);
+  });
+  it("info path: one supported fact for the topic", () => {
+    expect(personalLines("service_vague", { interest: "what_for" })[0]).toContain("bontás nélkül");
+    expect(personalLines("service_vague", { interest: "other" })).toEqual([]);
+  });
+  it("the call promise follows the SLA clock: weekday hours, after 16:00, weekend, early morning", () => {
+    expect(callWhenPhrase(atBudapest(2026, 11, 10, 10, 15))).toBe("egy órán belül");
+    expect(callWhenPhrase(atBudapest(2026, 11, 10, 16, 30))).toBe("a következő munkanapon 9:30-ig");
+    expect(callWhenPhrase(atBudapest(2026, 11, 14, 11, 0))).toBe("a következő munkanapon 9:30-ig");
+    expect(callWhenPhrase(atBudapest(2026, 11, 16, 7, 20))).toBe("ma 9:30-ig");
+    expect(callWhenPhrase(undefined)).toBe("hamarosan");
   });
 });
