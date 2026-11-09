@@ -1,0 +1,147 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/FormField";
+import { createLeadOfferAction, sendLeadOfferAction, acceptLeadOfferAction } from "@/app/actions/offers";
+import { OFFER_TEMPLATES, OFFER_TEMPLATE_LABEL, type OfferTemplate } from "@/lib/offers/offer";
+import { formatDateTime } from "@/lib/utils";
+
+export interface LeadOffer {
+  id: number;
+  quoteNumber: string;
+  template: string | null;
+  status: string;
+  createdAt: string | Date;
+  sentAt: string | Date | null;
+  acceptedAt: string | Date | null;
+}
+
+const inputStyle: React.CSSProperties = {
+  width: "100%", padding: "6px 10px", fontSize: 14,
+  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
+  borderRadius: 6, color: "var(--fg)", outline: "none",
+};
+
+export function LeadOffersPanel({ leadId, offers }: { leadId: number; offers: LeadOffer[] }) {
+  const router = useRouter();
+  const [template, setTemplate] = useState<OfferTemplate>("demo");
+  const [areaM2, setAreaM2] = useState("");
+  const [bigPackage, setBigPackage] = useState<"standard" | "unlimited">("standard");
+  const [months, setMonths] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function create(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null); setNote(null);
+    startTransition(async () => {
+      const res = await createLeadOfferAction(leadId, {
+        template,
+        areaM2: template === "big_service" && areaM2 ? Number(areaM2) : undefined,
+        bigPackage: template === "big_service" ? bigPackage : undefined,
+        months: template === "rental" && months ? Number(months) : undefined,
+      });
+      if ("error" in res) { setError(res.error); return; }
+      // PROPOSAL copy
+      if (res.hasPlaceholders) setNote("Az ajánlatban egyeztetés alatti adat van: kiküldés előtt pótold a beállításokban.");
+      router.refresh();
+    });
+  }
+
+  function send(quoteId: number) {
+    // PROPOSAL copy
+    if (!confirm("Elküldöd az ajánlatot a leadnek e-mailben?")) return;
+    setError(null); setNote(null);
+    startTransition(async () => {
+      const res = await sendLeadOfferAction(quoteId);
+      if ("error" in res) { setError(res.error); return; }
+      setNote(`Elküldve: ${res.to}`); // PROPOSAL copy
+      router.refresh();
+    });
+  }
+
+  function accept(quoteId: number) {
+    // PROPOSAL copy
+    if (!confirm("A lead elfogadta az ajánlatot (Elfogadom)? A lead a Megrendelve fázisba kerül.")) return;
+    setError(null); setNote(null);
+    startTransition(async () => {
+      const res = await acceptLeadOfferAction(quoteId);
+      if ("error" in res) { setError(res.error); return; }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="card" style={{ padding: 16, marginTop: 16 }}>
+      {/* PROPOSAL copy */}
+      <h2 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px" }}>Ajánlatok</h2>
+
+      <form onSubmit={create} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", marginBottom: 12 }}>
+        {/* PROPOSAL copy */}
+        <FormField label="Sablon">
+          <select style={inputStyle} value={template} onChange={(e) => setTemplate(e.target.value as OfferTemplate)}>
+            {OFFER_TEMPLATES.map((t) => <option key={t} value={t}>{OFFER_TEMPLATE_LABEL[t]}</option>)}
+          </select>
+        </FormField>
+        {template === "big_service" && (
+          <>
+            {/* PROPOSAL copy */}
+            <FormField label="Terület (m2)">
+              <input type="number" min={0} step="any" style={inputStyle} value={areaM2} onChange={(e) => setAreaM2(e.target.value)} />
+            </FormField>
+            {/* PROPOSAL copy */}
+            <FormField label="Csomag">
+              <select style={inputStyle} value={bigPackage} onChange={(e) => setBigPackage(e.target.value as "standard" | "unlimited")}>
+                <option value="standard">Standard</option>
+                <option value="unlimited">Unlimited</option>
+              </select>
+            </FormField>
+          </>
+        )}
+        {template === "rental" && (
+          // PROPOSAL copy
+          <FormField label="Hónapok">
+            <input type="number" min={1} step={1} style={inputStyle} value={months} onChange={(e) => setMonths(e.target.value)} />
+          </FormField>
+        )}
+        {/* PROPOSAL copy */}
+        <Button type="submit" disabled={pending} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+          Ajánlat készítése
+        </Button>
+      </form>
+
+      {note && <p className="text-sm" style={{ color: "var(--amber)", marginBottom: 8 }}>{note}</p>}
+      {error && <p className="text-sm" style={{ color: "var(--coral)", marginBottom: 8 }}>{error}</p>}
+
+      {offers.length === 0 ? (
+        // PROPOSAL copy
+        <p className="text-sm" style={{ color: "var(--fg-mute)" }}>Még nincs ajánlat.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {offers.map((o) => {
+            const open = o.status === "draft" || o.status === "sent";
+            return (
+              <div key={o.id} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", fontSize: 13 }}>
+                <strong>{o.quoteNumber}</strong>
+                <span>{OFFER_TEMPLATE_LABEL[o.template as OfferTemplate] ?? o.template}</span>
+                <span style={{ color: "var(--fg-mute)" }}>{o.status}</span>
+                <span style={{ color: "var(--fg-mute)" }}>{formatDateTime(o.createdAt)}</span>
+                <a href={`/leads/${leadId}/offers/${o.id}/pdf`} target="_blank" rel="noreferrer" className="row-link">PDF</a>
+                {open && (
+                  <>
+                    {/* PROPOSAL copy */}
+                    <Button type="button" variant="outline" disabled={pending} onClick={() => send(o.id)}>Küldés e-mailben</Button>
+                    <Button type="button" variant="outline" disabled={pending} onClick={() => accept(o.id)}>Ajánlat elfogadva</Button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -9,7 +9,7 @@ import { logLeadCall } from "@/app/actions/leads";
 import { correctCallOutcome } from "@/app/actions/calls";
 import { proposeBookingSlots } from "@/app/actions/bookings";
 import type { BookingConflictInfo } from "@/lib/leads/service";
-import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, CALL_TYPES, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { FormField } from "@/components/ui/FormField";
 import type { ScriptVariant } from "@/lib/leads/scripts";
@@ -65,6 +65,7 @@ export function CallOutcomeModal({
   const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
   const [technologyWord, setTechnologyWord] = useState("");
+  const [callType, setCallType] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [slotsPending, startSlotsTransition] = useTransition();
@@ -81,7 +82,7 @@ export function CallOutcomeModal({
   function reset() {
     setOutcome("no_answer"); setNote(""); setCallbackAt(""); setDemoWith("aron"); setLostReason(""); setError(null);
     setBookingAt(""); setBookingKind(""); setSlotProposals([]); setSlotError(null); setSavedConflicts(null);
-    setScriptKey(defaultScriptKey); setTechnologyWord("");
+    setScriptKey(defaultScriptKey); setTechnologyWord(""); setCallType("");
   }
   // The call is already saved while the conflict notice shows — closing then
   // must still refresh the parent, same as "Rendben".
@@ -101,6 +102,7 @@ export function CallOutcomeModal({
         lostReason: isLostCallOutcome(outcome) ? lostReason : null,
         scriptVariant: scriptKey || undefined,
         technologyWord: technologyWord.trim() || undefined,
+        callType: callType || null,
       };
       const res = correctsInteractionId
         ? await correctCallOutcome(correctsInteractionId, leadId, payload)
@@ -179,6 +181,14 @@ export function CallOutcomeModal({
           <FormField label="Eredmény" required>
             <select style={inputStyle} value={outcome} onChange={(e) => setOutcome(e.target.value)} autoFocus>
               {CALL_OUTCOMES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+            </select>
+          </FormField>
+
+          {/* PROPOSAL copy */}
+          <FormField label="Hívás típusa">
+            <select aria-label="Hívás típusa" style={inputStyle} value={callType} onChange={(e) => setCallType(e.target.value)}>
+              <option value="">nincs megadva</option>
+              {CALL_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
             </select>
           </FormField>
 
