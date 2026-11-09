@@ -337,9 +337,11 @@ export async function setLeadOutcome(
       const matched = matchLostReason(typed);
       code = matched ?? "other";
       note = matched ? null : typed;
-    } else if (isLostReason(before.lostReason)) {
-      code = before.lostReason;
-      note = before.lostNote ?? null;
+    } else if (before.outcome === "lost" && before.lostReason) {
+      // Only an already-lost lead reuses its reason; a legacy free-text reason is other + note.
+      const stored = matchLostReason(before.lostReason);
+      code = stored ?? "other";
+      note = stored ? (before.lostNote ?? null) : before.lostReason.trim();
     }
     if (!code) return { error: "Válaszd ki, miért veszett el a lead" };
     if (code === "other" && (note ?? "").length < LOST_REASON_MIN) {
@@ -519,6 +521,11 @@ export async function logLeadCallOutcome(
     return { error: "A lead már lezárt: előbb nyisd újra" };
   }
   const logOnly = lead.outcome !== "open";
+  if (logOnly && (input.outcome === "callback_requested" || input.outcome === "meeting_booked")) {
+    // A callback or a booking needs a working lead: refuse, so a human reopens it
+    // (the auto-apply paths turn this error into a confirm task, nothing is lost).
+    return { error: "A lead lezárt: visszahíváshoz vagy foglaláshoz előbb nyisd újra", issues: {} };
+  }
   // The row this one supersedes must be THIS lead's, in THIS tenant. Both
   // current callers check it too, but the guard belongs here: the FK only
   // proves the id exists somewhere, so without this a caller could point a
@@ -558,7 +565,8 @@ export async function logLeadCallOutcome(
 
   const table = await getLeadTransitions(ctx.tenantId);
   const callPlan = planCallOutcome(input, lead, table, now);
-  if (logOnly) Object.assign(callPlan, { transition: null, callbackAt: null, bookingAt: null, bookingKind: null });
+  // Lost lead: the call is recorded, the stage, tasks and next action stay as they are.
+  if (logOnly) callPlan.transition = null;
   const personId = lead.contact?.personId ?? null;
   const who = leadWho(lead, leadId);
   // meeting_booked: whoever holds the meeting owns the lead (was demo_aron / demo_peter).
@@ -703,7 +711,7 @@ export async function logLeadCallOutcome(
     success: true,
     interactionId: interaction.id,
     status: plan.status ?? lead.status,
-    outcome: plan.lost ? "lost" : "open",
+    outcome: plan.lost || logOnly ? "lost" : "open",
     taskId: task?.id ?? null,
     bookingTaskId: bookingTask?.id ?? null,
     bookingConflicts,

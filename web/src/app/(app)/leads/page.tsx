@@ -9,7 +9,7 @@ import { getLeadExtras } from "@/lib/leads/board";
 import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact, tierAFlag } from "@/lib/leads/first-contact";
 import { LEAD_OUTCOME_LABEL, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/outcomes";
-import { MAIN_STAGES } from "@/lib/leads/lifecycle";
+import { MAIN_STAGES, lostReasonLabel } from "@/lib/leads/lifecycle";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 
@@ -129,7 +129,7 @@ export default async function LeadsPage({
                     ) : (
                       <span className="font-mono-ndt truncate" style={{ color: "var(--coral)", fontSize: 12, width: 150 }}>
                         {LEAD_OUTCOME_LABEL[l.outcome as LeadOutcome] ?? l.outcome}
-                        {l.lostReason ? ` · ${callOutcomeLabel(l.lostReason)}` : ""}
+                        {l.lostReason ? ` · ${lostReasonLabel(l.lostReason)}` : ""}
                       </span>
                     )}
                   </div>

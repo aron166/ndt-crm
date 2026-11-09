@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Building2, User, Mail, Phone, Globe, CheckCircle2, Pencil, Trash2, PhoneCall, CalendarClock } from "lucide-react";
 import { LeadMoveDialog } from "@/components/LeadMoveDialog";
+import { lostReasonLabel } from "@/lib/leads/lifecycle";
 import { setLeadOutcomeAction, deleteLead, assignLeadAction } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
@@ -243,7 +244,8 @@ export function LeadDetailClient({
               color: "var(--fg)", outline: "none",
             }}
           >
-            {statuses.map((s) => (
+            {/* A lost lead can only be reopened (lost -> new); offering the rest only produced refusals. */}
+            {statuses.filter((s) => status !== "lost" || s.key === "lost" || s.key === "new").map((s) => (
               <option key={s.key} value={s.key}>{s.label}</option>
             ))}
           </select>
@@ -372,7 +374,7 @@ export function LeadDetailClient({
                 <span style={{ color: "var(--fg-mute)" }}>Kimenetel</span>
                 <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>
                   {LEAD_OUTCOME_LABEL[outcome as LeadOutcome] ?? outcome}
-                  {outcome === "lost" && lead.lostReason ? ` · ${callOutcomeLabel(lead.lostReason)}` : ""}
+                  {outcome === "lost" && lead.lostReason ? ` · ${lostReasonLabel(lead.lostReason)}` : ""}
                 </span>
               </div>
               <div className="flex justify-between items-center" style={{ fontSize: 12 }}>
