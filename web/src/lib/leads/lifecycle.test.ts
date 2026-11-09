@@ -174,3 +174,21 @@ describe("DEFAULT_TRANSITIONS", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
+
+describe("call_logged: reached, second call agreed", () => {
+  const now = new Date("2026-11-09T12:00:00Z");
+  const base = { status: "new", attempts: 0, assignedToId: 3, offerType: null, nextAction: null, nextDue: null, statusEnteredAt: now };
+  const next = { nextAction: "Második hívás", nextDue: new Date("2026-11-10T09:00:00Z") };
+  it("new -> contacting with attempts 1, contacting stays with attempts + 1", () => {
+    const t1 = findTransition(DEFAULT_TRANSITIONS, "new", "call_logged")!;
+    const r1 = planTransition(base, t1, next, now);
+    expect("error" in r1 ? r1 : r1.data).toMatchObject({ status: "contacting", attempts: 1, nextAction: "Második hívás" });
+    const t2 = findTransition(DEFAULT_TRANSITIONS, "contacting", "call_logged")!;
+    const r2 = planTransition({ ...base, status: "contacting", attempts: 3 }, t2, next, now);
+    expect("error" in r2 ? r2 : r2.data).toMatchObject({ status: "contacting", attempts: 4 });
+  });
+  it("still needs a next action (no entry task)", () => {
+    const t1 = findTransition(DEFAULT_TRANSITIONS, "new", "call_logged")!;
+    expect(planTransition(base, t1, {}, now)).toHaveProperty("error");
+  });
+});

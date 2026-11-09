@@ -71,6 +71,9 @@ export const DEFAULT_TRANSITIONS: LeadTransition[] = [
   ...CALL_ROWS("new"),
   { from: "new", event: "sla_missed", to: "new", action: "escalation task to Áron" },
   ...CALL_ROWS("contacting"),
+  // Reached, a second call agreed (Kai, 2026-11-09): stays in contacting, attempts + 1.
+  { from: "new", event: "call_logged", to: "contacting", action: "second call task" },
+  { from: "contacting", event: "call_logged", to: "contacting", action: "second call task" },
   { from: "contacting", event: "attempts_exhausted", to: "recall", action: "closing email task, recall unreachable 60 d" },
   { from: "discovery_booked", event: "meeting_no_show", to: "discovery_booked", action: "call + email, rebook (max 2)" },
   { from: "discovery_booked", event: "meeting_no_show_twice", to: "recall", action: "closing email task, recall no_show" },
@@ -435,6 +438,7 @@ export function planTransition(
   };
   if (!self) data.statusEnteredAt = now;
   if (input.attempts != null) data.attempts = input.attempts;
+  else if (t.event === "call_logged") data.attempts = Math.min(MAX_ATTEMPTS, (t.from === "contacting" ? lead.attempts : 0) + 1);
   else if (!self && t.to === "contacting") data.attempts = 0;
   if (data.attempts != null && (data.attempts < 0 || data.attempts > MAX_ATTEMPTS)) return { error: "Érvénytelen próbálkozásszám" };
 
