@@ -187,6 +187,20 @@ FROM w2_map m WHERE l.id = m.id;
 
 UPDATE "leads" SET "status_entered_at" = "created_at" WHERE "status_entered_at" IS NULL;
 
+-- 3b. Every open lead leaves with a next action (spec rule 2): take it from the
+--     lead's earliest open call task; recall leads get that date as recall_date;
+--     the rest get a "fill in the next step" action due now, so the 08:00 digest
+--     lists them instead of the sweep missing them.
+UPDATE "leads" l SET "next_action" = t.title, "next_due" = t.due_date
+FROM (SELECT DISTINCT ON ("lead_id") "lead_id", "title", "due_date" FROM "tasks"
+      WHERE "tenant_id" = 1 AND "type" = 'call' AND "status" IN ('created', 'in_progress') AND "due_date" IS NOT NULL
+      ORDER BY "lead_id", "due_date") t
+WHERE l.id = t.lead_id AND l.tenant_id = 1 AND l.outcome = 'open' AND l.status NOT IN ('won', 'lost');
+UPDATE "leads" SET "recall_reason" = 'timing', "recall_date" = COALESCE("next_due", CURRENT_TIMESTAMP)
+WHERE "tenant_id" = 1 AND "status" = 'recall' AND "recall_date" IS NULL;
+UPDATE "leads" SET "next_action" = 'Következő lépés pótlása', "next_due" = CURRENT_TIMESTAMP
+WHERE "tenant_id" = 1 AND "outcome" = 'open' AND "status" NOT IN ('won', 'lost') AND "next_due" IS NULL;
+
 -- 4. Tenant 1 board columns: the new keys (labels are PROPOSAL until Áron approves).
 DELETE FROM "lead_statuses" WHERE "tenant_id" = 1
     AND "key" IN ('call_1', 'call_2', 'call_3', 'call_3_plus', 'demo_aron', 'demo_peter');

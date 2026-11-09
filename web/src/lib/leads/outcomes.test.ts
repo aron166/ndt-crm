@@ -123,7 +123,13 @@ describe("planCallOutcome", () => {
   });
   it("an outcome whose event has no row from the stage only logs the call", () => {
     expect(p("no_answer", lead("ordered")).transition).toBeNull();
-    expect(p("wrong_number", lead("recall")).transition).toBeNull();
+  });
+
+  it("a lost outcome past the call stages closes through lead_lost (Vanda #2)", () => {
+    const plan = p("wrong_number", lead("recall"));
+    expect(plan.transition).toMatchObject({ from: "recall", event: "lead_lost", to: "lost" });
+    expect(plan.input.lostReason).toBe("invalid_contact");
+    expect(p("not_interested", lead("offer_sent"), { lostReason: "no budget now" }).transition?.event).toBe("lead_lost");
   });
 });
 

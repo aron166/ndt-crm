@@ -79,9 +79,14 @@ export async function completeOpenLeadCallTasks(
   leadId: number,
   tenantId: number,
   now: Date,
+  opts: { keepLifecycle?: boolean } = {},
 ): Promise<number> {
   const { count } = await tx.task.updateMany({
-    where: { tenantId, leadId, type: "call", status: { in: ["created", "in_progress"] } },
+    where: {
+      tenantId, leadId, type: "call", status: { in: ["created", "in_progress"] },
+      // A stage move retires lifecycle follow-ups as CANCELLED (writeLeadTransition), not done.
+      ...(opts.keepLifecycle ? { NOT: { setMembership: { has: LIFECYCLE_TASK_TAG } } } : {}),
+    },
     data: { status: "done", completedAt: now },
   });
   return count;
@@ -89,6 +94,9 @@ export async function completeOpenLeadCallTasks(
 
 /** Tag on every task the lifecycle creates, so a later stage move can retire them. */
 export const LIFECYCLE_TASK_TAG = "w2_lifecycle";
+const LEAD_CHANGED = "LEAD_CHANGED";
+const LEAD_CHANGED_MSG = "A lead időközben változott, frissítsd az oldalt";
+const isLeadChanged = (e: unknown) => e instanceof Error && e.message === LEAD_CHANGED;
 
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 
@@ -113,7 +121,10 @@ export async function writeLeadTransition(
       data: { status: "cancelled" },
     });
   }
-  await tx.lead.updateMany({ where: { id: leadId, tenantId }, data: plan.data });
+  // Guard on the stage we planned from: a double submit or a concurrent move
+  // finds 0 rows and rolls the whole move back instead of logging it twice.
+  const { count } = await tx.lead.updateMany({ where: { id: leadId, tenantId, status: args.fromStatus }, data: plan.data });
+  if (count === 0) throw new Error(LEAD_CHANGED);
   await tx.leadStatusHistory.create({
     data: {
       tenantId, leadId, fromStatus: args.fromStatus, toStatus: plan.data.status, event: args.transition.event,
@@ -189,16 +200,19 @@ export async function changeLeadStatus(
   if ("error" in plan) return plan;
 
   const escalationUserId = plan.tasks.some((t) => t.escalate) ? await resolveDemoHost(ctx.tenantId, "aron") : null;
-  await db.$transaction(async (tx) => {
+  try { await db.$transaction(async (tx) => {
     // Moving the card is acting on the lead: its open callback task is done.
     // EXCEPT into `recall`, which IS "call this back later".
-    if (newStatus !== RECALL_STATUS) await completeOpenLeadCallTasks(tx, leadId, ctx.tenantId, now);
+    if (newStatus !== RECALL_STATUS) await completeOpenLeadCallTasks(tx, leadId, ctx.tenantId, now, { keepLifecycle: true });
     await writeLeadTransition(tx, {
       leadId, tenantId: ctx.tenantId, fromStatus: before.status, transition, plan,
       companyId: before.companyId, personId: before.contact?.personId ?? null, who: leadWho(before, leadId),
       actorUserId: ctx.userId, actorAgentId: ctx.actorAgentId, escalationUserId, now,
     });
-  });
+  }); } catch (e) {
+    if (isLeadChanged(e)) return { error: LEAD_CHANGED_MSG };
+    throw e;
+  }
   audit("lead", leadId, "update",
     { status: before.status, statusLabel: leadStatusLabel(before.status, statuses), nextAction: before.nextAction },
     { status: newStatus, statusLabel: leadStatusLabel(newStatus, statuses), event: transition.event, nextAction: plan.data.nextAction },
@@ -552,7 +566,8 @@ export async function logLeadCallOutcome(
   };
   const escalationUserId = transitionPlan?.tasks.some((t) => t.escalate) ? await resolveDemoHost(ctx.tenantId, "aron") : null;
 
-  const { interaction, task, bookingTask } = await db.$transaction(async (tx) => {
+  let txResult;
+  try { txResult = await db.$transaction(async (tx) => {
     const interaction = await tx.interaction.create({
       data: {
         tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId, userId: ctx.userId,
@@ -611,7 +626,11 @@ export async function logLeadCallOutcome(
       await tx.company.updateMany({ where: { id: lead.companyId, tenantId: ctx.tenantId }, data: { lastInteractionDate: input.occurredAt ?? now } });
     }
     return { interaction, task, bookingTask };
-  });
+  }); } catch (e) {
+    if (isLeadChanged(e)) return { error: LEAD_CHANGED_MSG, issues: {} };
+    throw e;
+  }
+  const { interaction, task, bookingTask } = txResult;
   await recomputeCloseness({ tenantId: ctx.tenantId, companyId: lead.companyId, personId });
 
   // Conflict check on the WRITE (finding 5): a hand-typed date is the case that

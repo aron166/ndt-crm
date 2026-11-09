@@ -4,7 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { getLeadStagePrompt, moveLead } from "@/app/actions/leads";
+import { getLeadStagePrompt } from "@/app/actions/leads";
+import { LeadMoveDialog } from "@/components/LeadMoveDialog";
 
 // Péter's rule (BRIEFING addendum 2026-09-07 P0 #4): "ticking a task must NOT
 // silently advance the stage — it's ambiguous → prompt for the phase". So
@@ -19,8 +20,9 @@ export function LeadStagePromptModal({ taskId, onClose }: { taskId: number; onCl
   const router = useRouter();
   const [prompt, setPrompt] = useState<Prompt | undefined>(undefined);
   const [picked, setPicked] = useState<string | null>(null);
+  const [moveTo, setMoveTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending] = useTransition();
 
   useEffect(() => {
     let alive = true;
@@ -38,15 +40,23 @@ export function LeadStagePromptModal({ taskId, onClose }: { taskId: number; onCl
 
   const unchanged = picked === prompt.currentStatus;
 
+  // W2: a move needs its details (next action, reason, offer type), so the pick
+  // hands over to the shared move dialog instead of moving bare.
   function handleSave() {
     if (!prompt || !picked || unchanged) { onClose(); return; }
-    setError(null);
-    startTransition(async () => {
-      const res = await moveLead(prompt.leadId, picked!);
-      if ("error" in res) { setError(res.error); return; }
-      onClose();
-      router.refresh();
-    });
+    setMoveTo(picked);
+  }
+
+  if (moveTo) {
+    return (
+      <LeadMoveDialog
+        leadId={prompt.leadId}
+        target={moveTo}
+        targetLabel={prompt.statuses.find((s) => s.key === moveTo)?.label ?? moveTo}
+        onClose={() => setMoveTo(null)}
+        onMoved={() => { onClose(); router.refresh(); }}
+      />
+    );
   }
 
   const pickedDescription = prompt.statuses.find((s) => s.key === picked)?.description ?? null;

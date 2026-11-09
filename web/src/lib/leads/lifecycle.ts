@@ -279,8 +279,13 @@ export function entryTasks(to: string, event: string, now: Date, ctx: { recallDa
       ];
     case "won":
       return [{ title: "Átadás: munka dátuma / bérlés rögzítése / gép kiszállítása", type: "internal", dueDate: addWorkdays(now, 1) }];
-    case "recall":
-      return ctx.recallDate ? [{ title: "Visszahívás", type: "call", dueDate: ctx.recallDate }] : [];
+    case "recall": {
+      // Spec 4: these moves into recall come with a closing email ("reply to reopen"), as a task.
+      const closing: PlannedTask[] = ["meeting_no_show_twice", "offer_expired", "demo_expired"].includes(event)
+        ? [{ title: "Záró email: válaszoljon, ha újranyitná", type: "email", dueDate: now }]
+        : [];
+      return ctx.recallDate ? [...closing, { title: "Visszahívás", type: "call", dueDate: ctx.recallDate }] : closing;
+    }
     default:
       // discovery_booked / demo_booked: the dated meeting IS the next action (caller supplies it).
       return [];

@@ -110,7 +110,7 @@ describe("card → task: moving the card completes the open callback task", () =
   });
 });
 
-describe("changeLeadStatus — the transition table and the open-lead rule", () => {
+describe("changeLeadStatus: the transition table and the open-lead rule", () => {
   it("refuses a move that is not in the table (new -> won) and writes nothing", async () => {
     mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, status: "new" });
     const res = await changeLeadStatus(10, "won", ctx);

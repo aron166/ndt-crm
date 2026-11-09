@@ -86,19 +86,24 @@ export async function runLifecycleSweep(tenantId: number, now: Date = new Date()
   const aronId = await resolveDemoHost(tenantId, "aron");
 
   // 1. SLA missed on new leads.
-  const late = await db.lead.findMany({
-    where: { tenantId, status: "new", outcome: "open", convertedDealId: null, nextDue: { lt: now } },
+  // A new lead with no timer (intake hook failed, or pre-W2) counts from its SLA deadline.
+  const late = (await db.lead.findMany({
+    where: { tenantId, status: "new", outcome: "open", convertedDealId: null, OR: [{ nextDue: { lt: now } }, { nextDue: null }] },
     select: SWEEP_SELECT,
-  });
+  })).filter((l) => l.nextDue != null || slaDeadline(l.createdAt).getTime() < now.getTime());
   for (const lead of late) {
     try {
       const t = findTransition(table, "new", "sla_missed");
       if (!t) break;
-      const already = await db.leadStatusHistory.findFirst({ where: { tenantId, leadId: lead.id, event: "sla_missed" }, select: { id: true } });
+      // Once per stay in `new` (a reopened lead escalates again).
+      const already = await db.leadStatusHistory.findFirst({
+        where: { tenantId, leadId: lead.id, event: "sla_missed", ...(lead.statusEnteredAt ? { at: { gte: lead.statusEnteredAt } } : {}) },
+        select: { id: true },
+      });
       if (already) continue;
       const plan = planTransition(lead, t, {
         tasks: [{ title: "SLA lejárt, hívd most", type: "call", dueDate: now, escalate: true }],
-        nextAction: lead.nextAction, nextDue: lead.nextDue,
+        nextAction: lead.nextAction ?? "Első hívás (SLA)", nextDue: lead.nextDue ?? now,
       }, now);
       if ("error" in plan) { out.errors++; continue; }
       await db.$transaction((tx) => writeLeadTransition(tx, {
@@ -150,7 +155,7 @@ export async function getDailyDigest(tenantId: number, now: Date = new Date()): 
   const rows = await db.lead.findMany({
     where: { tenantId, outcome: "open", convertedDealId: null, status: { notIn: [...CLOSED_STAGES] } },
     select: { ...SWEEP_SELECT, assignedTo: { select: { name: true } } },
-    orderBy: { nextDue: "asc" },
+    orderBy: { nextDue: { sort: "asc", nulls: "first" } },
     take: 500,
   });
   const leads: DigestLead[] = rows.map((r) => ({

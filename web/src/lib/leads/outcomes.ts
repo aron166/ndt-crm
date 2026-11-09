@@ -240,6 +240,9 @@ export function planCallOutcome(
       break;
   }
   plan.transition = event ? findTransition(table, from, event) : null;
+  // A lost outcome past the call stages (qualified, offer_sent, demo_*, recall)
+  // still closes the lead: the manual-close row exists from every open stage.
+  if (!plan.transition && ti.lostReason) plan.transition = findTransition(table, from, "lead_lost");
   if (input.outcome === "callback_requested" && !plan.transition) plan.callbackAt = input.callbackAt ?? null;
   return plan;
 }

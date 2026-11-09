@@ -232,7 +232,11 @@ export async function runLeadAction(
     const cfg = actionConfig as ChangeLeadStatusActionConfig;
     if (!cfg?.toStatus) return false;
     const { changeLeadStatus } = await import("@/lib/leads/service");
-    const r = await changeLeadStatus(ev.leadId, cfg.toStatus, systemCtx(ev.tenantId), { fireAutomations: false });
+    // W2: a rule cannot type a next action, so a dateless target gets a review step.
+    // Stages that need a reason (lost, qualified) still refuse, which surfaces in the firing error.
+    const r = await changeLeadStatus(ev.leadId, cfg.toStatus, systemCtx(ev.tenantId), {
+      fireAutomations: false, nextAction: "Automatikus lépés: ellenőrizd", nextDue: new Date(Date.now() + 86_400_000),
+    });
     if ("error" in r) throw new Error(r.error);
     return true;
   }
