@@ -21,22 +21,65 @@ export const isOpenStage = (s: string | null) => s != null && !CLOSED_STAGES.inc
 
 export const MAX_ATTEMPTS = 8;
 
+// Péter's words first (Áron, 2026-11-09), then the older W2 codes. Keys stay
+// English slugs (stored in leads.lost_reason); labels are what Péter sees.
 export const LOST_REASONS = [
-  "invalid_contact", "not_our_service", "no_need", "did_in_house", "chose_competitor",
-  "price", "project_cancelled", "bought_machine_elsewhere", "unreachable", "other",
+  "unqualified", "not_our_service", "offer_declined", "unreachable", "price", "chose_competitor",
+  "project_cancelled", "other",
+  "no_need", "invalid_contact", "did_in_house", "bought_machine_elsewhere",
 ] as const;
 export type LostReason = (typeof LOST_REASONS)[number];
 export const isLostReason = (s: unknown): s is LostReason => (LOST_REASONS as readonly unknown[]).includes(s);
-/** These codes need a note (spec 7: competitor name, or what "other" was). */
-export const LOST_REASONS_NEEDING_NOTE: readonly LostReason[] = ["other", "chose_competitor"];
+export const LOST_REASON_LABEL: Record<LostReason, string> = {
+  unqualified: "Minősíthetetlen (nem releváns megkeresés)",
+  not_our_service: "Nem ez kell neki",
+  offer_declined: "Nem fogadta el az ajánlatot",
+  unreachable: "Nem elérhető",
+  price: "Árban nem egyeztünk",
+  chose_competitor: "Mást választott",
+  project_cancelled: "Projekt elmaradt",
+  other: "Egyéb (megjegyzés kötelező)",
+  // PROPOSAL labels (not from Péter's list):
+  no_need: "Nincs rá szüksége",
+  invalid_contact: "Hibás elérhetőség / spam",
+  did_in_house: "Saját maga megoldotta",
+  bought_machine_elsewhere: "Máshol vett gépet",
+};
+export const lostReasonLabel = (key: string | null | undefined): string =>
+  key ? (isLostReason(key) ? LOST_REASON_LABEL[key] : key) : "-";
+/** A typed reason: the key, or one of the labels (any case, with or without the parenthesis), else null. */
+export function matchLostReason(text: string | null | undefined): LostReason | null {
+  const t = (text ?? "").trim().toLowerCase();
+  if (!t) return null;
+  if (isLostReason(t)) return t;
+  for (const k of LOST_REASONS) {
+    const label = LOST_REASON_LABEL[k].toLowerCase();
+    if (t === label || t === label.replace(/\s*\(.*\)\s*$/, "")) return k;
+  }
+  return null;
+}
+/** Only "Egyéb" needs a note (Péter's list). */
+export const LOST_REASONS_NEEDING_NOTE: readonly LostReason[] = ["other"];
 
 export const RECALL_REASONS = ["timing", "budget_cycle", "no_decision", "unreachable", "no_show"] as const;
 export type RecallReason = (typeof RECALL_REASONS)[number];
+/** PROPOSAL labels. */
+export const RECALL_REASON_LABEL: Record<RecallReason, string> = {
+  timing: "Most nem aktuális (saját időpont)",
+  budget_cycle: "Költségkeret: jövő év",
+  no_decision: "Nem döntött",
+  unreachable: "Nem elérhető",
+  no_show: "Nem jelent meg",
+};
 export const isRecallReason = (s: unknown): s is RecallReason => (RECALL_REASONS as readonly unknown[]).includes(s);
 
 export const BUYER_TYPES = ["company", "private"] as const;
 export const INTENTS = ["service_concrete", "service_vague", "rental", "purchase", "unknown"] as const;
 export const OFFER_TYPES = ["service", "rental", "purchase"] as const;
+/** PROPOSAL labels. */
+export const OFFER_TYPE_LABEL: Record<(typeof OFFER_TYPES)[number], string> = {
+  service: "Szolgáltatás (vizsgálat)", rental: "Eszközbérlés", purchase: "Eszközvásárlás",
+};
 export type OfferType = (typeof OFFER_TYPES)[number];
 
 export const DEMO_CREDIT_DAYS = 30;
@@ -229,6 +272,8 @@ export const RECALL_REASON_BY_EVENT: Record<string, RecallReason> = {
 };
 // Which lost reason a move into lost carries when the caller gives none.
 export const LOST_REASON_BY_EVENT: Record<string, LostReason> = {
+  offer_declined: "offer_declined",
+  demo_declined: "offer_declined",
   call_wrong_number: "invalid_contact",
   recall_unreachable_twice: "unreachable",
 };
@@ -401,7 +446,7 @@ export interface TransitionPlan {
     offerType?: string | null;
     outcome?: "open" | "lost";
     closedAt?: Date | null;
-    lostReason?: string;
+    lostReason?: string | null;
     lostNote?: string | null;
     recallReason?: string;
     recallDate?: Date;
@@ -445,7 +490,8 @@ export function planTransition(
     if (LOST_REASONS_NEEDING_NOTE.includes(code) && !note) return { error: "Ehhez az okhoz megjegyzés kötelező" };
     Object.assign(data, { outcome: "lost", closedAt: now, lostReason: code, lostNote: note?.slice(0, LOST_NOTE_MAX) ?? null });
   } else if (t.from === "lost") {
-    Object.assign(data, { outcome: "open", closedAt: null });
+    // Reopen: the old closing reason no longer applies (it stays in history / audit).
+    Object.assign(data, { outcome: "open", closedAt: null, lostReason: null, lostNote: null });
   }
 
   let recallDate: Date | null = null;
@@ -502,5 +548,5 @@ export const CALL_OUTCOME_EVENT: Record<string, string> = {
 export const CALL_OUTCOME_LOST_REASON: Record<string, LostReason> = {
   wrong_number: "invalid_contact",
   not_interested: "no_need",
-  disqualified: "not_our_service",
+  disqualified: "unqualified",
 };

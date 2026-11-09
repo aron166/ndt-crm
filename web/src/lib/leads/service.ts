@@ -10,7 +10,7 @@ import {
   RECALL_STATUS, bookingIssue, type LeadOutcome,
 } from "./outcomes";
 import {
-  isLostReason, planTransition, transitionsBetween, findTransition,
+  isLostReason, matchLostReason, planTransition, transitionsBetween, findTransition, type LostReason,
   type LeadTransition, type TransitionInput, type TransitionPlan,
 } from "./lifecycle";
 import {
@@ -42,7 +42,7 @@ type Result<T = object> = ({ success: true } & T) | { error: string };
 
 const LEAD_EVENT_SELECT = {
   status: true, outcome: true, companyId: true, source: true, serviceInterest: true,
-  estimatedValue: true, convertedDealId: true, assignedToId: true, lostReason: true,
+  estimatedValue: true, convertedDealId: true, assignedToId: true, lostReason: true, lostNote: true,
   channel: true, campaign: true,
   attempts: true, offerType: true, nextAction: true, nextDue: true, statusEnteredAt: true,
   company: { select: { name: true } },
@@ -324,25 +324,33 @@ export async function setLeadOutcome(
   const before = await loadLead(leadId, ctx.tenantId);
   if (!before) return { error: "Lead nem található" };
 
-  // A reason is MANDATORY on lost (Péter, 2026-09-07) — no "manual" placeholder.
-  // An already-lost lead keeps its stored reason if the caller sends none.
-  let reason: string | undefined;
+  // A reason is MANDATORY on lost (Péter, 2026-09-07). The typed text is a
+  // reason key or a Hungarian label (LOST_REASON_LABEL); any other text is the
+  // note under "other". With no text, an already-lost lead keeps its stored
+  // code AND note: passing the bare stored "other" without its note made every
+  // second close fail ("Ehhez az okhoz megjegyzés kötelező", Áron 2026-11-09).
+  let code: LostReason | null = null;
+  let note: string | null = null;
   if (outcome === "lost") {
-    reason = lostReason?.trim() || before.lostReason?.trim() || undefined;
-    if (!reason || reason.length < LOST_REASON_MIN) {
-      return { error: "A vesztett kimenetelhez indok kötelező (min. 3 karakter)" };
+    const typed = lostReason?.trim().slice(0, LOST_REASON_MAX) || null;
+    if (typed) {
+      const matched = matchLostReason(typed);
+      code = matched ?? "other";
+      note = matched ? null : typed;
+    } else if (isLostReason(before.lostReason)) {
+      code = before.lostReason;
+      note = before.lostNote ?? null;
     }
-    reason = reason.slice(0, LOST_REASON_MAX);
+    if (!code) return { error: "Válaszd ki, miért veszett el a lead" };
+    if (code === "other" && (note ?? "").length < LOST_REASON_MIN) {
+      return { error: "Egyéb okhoz írd le röviden, mi történt (min. 3 karakter)" };
+    }
   }
 
   // W2: lost is a stage. Closing / reopening goes through the transition table
-  // (lead_lost / lead_reopened rows), so it is logged with a reason code. Free
-  // text that is not a code is kept as the note under "other".
+  // (lead_lost / lead_reopened rows), so it is logged with a reason code.
   if (outcome === "lost" && before.status !== "lost") {
-    const code = isLostReason(reason) ? reason : "other";
-    const r = await changeLeadStatus(leadId, "lost", ctx, {
-      event: "lead_lost", lostReason: code, lostNote: code === reason ? null : reason,
-    });
+    const r = await changeLeadStatus(leadId, "lost", ctx, { event: "lead_lost", lostReason: code, lostNote: note });
     return "error" in r ? r : { success: true };
   }
   if (outcome === "open" && before.status === "lost") {
@@ -361,12 +369,11 @@ export async function setLeadOutcome(
     return { error: "Deallé alakított lead nem nyitható újra" };
   }
 
-  // Already-lost lead: only its reason changes (same code/note split as above).
-  const lostCode = reason && isLostReason(reason) ? reason : "other";
+  // Already-lost lead: only its reason changes.
   const data: Prisma.LeadUpdateManyMutationInput = {
     outcome,
     closedAt: outcome === "open" ? null : new Date(),
-    ...(outcome === "lost" ? { lostReason: lostCode, lostNote: lostCode === reason ? null : reason } : {}),
+    ...(outcome === "lost" ? { lostReason: code, lostNote: note } : {}),
   };
   if (before.outcome !== outcome || outcome === "lost") {
     await db.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data });
@@ -505,9 +512,13 @@ export async function logLeadCallOutcome(
 
   const lead = await loadLead(leadId, ctx.tenantId);
   if (!lead) return { error: "Lead nem található" };
-  if (lead.outcome !== "open" || lead.convertedDealId) {
+  // A converted (won) lead is tracked on its deal. A LOST lead may still log a
+  // call (Áron 2026-11-09: "hívás eredménye lezártnál nem nyílik meg"): the call
+  // is recorded, the stage does not move (reopen first to work it again).
+  if (lead.convertedDealId || lead.outcome === "won") {
     return { error: "A lead már lezárt: előbb nyisd újra" };
   }
+  const logOnly = lead.outcome !== "open";
   // The row this one supersedes must be THIS lead's, in THIS tenant. Both
   // current callers check it too, but the guard belongs here: the FK only
   // proves the id exists somewhere, so without this a caller could point a
@@ -547,6 +558,7 @@ export async function logLeadCallOutcome(
 
   const table = await getLeadTransitions(ctx.tenantId);
   const callPlan = planCallOutcome(input, lead, table, now);
+  if (logOnly) Object.assign(callPlan, { transition: null, callbackAt: null, bookingAt: null, bookingKind: null });
   const personId = lead.contact?.personId ?? null;
   const who = leadWho(lead, leadId);
   // meeting_booked: whoever holds the meeting owns the lead (was demo_aron / demo_peter).
