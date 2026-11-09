@@ -7,6 +7,7 @@ import { leadIntakeSchema } from "@/lib/leads/schema";
 import { ingestLead } from "@/lib/leads/ingest";
 import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
 import { sendFormAlert } from "@/lib/leads/form-alert";
+import { sendAutoReply, sendLeadPing } from "@/lib/leads/intake-notify";
 import { sendIntroMaterial, type IntroResult } from "@/lib/leads/intro";
 import { runAutomations } from "@/lib/automations/engine";
 import { serializeDates } from "@/lib/serialize";
@@ -110,7 +111,14 @@ export async function POST(request: Request) {
     // W2 SLA timer: owner, first-call next action + task. Post-commit, fail-safe.
     await startLeadLifecycle(key.tenantId, result.leadId);
     // Web form: internal alert to sales (Péter + Áron). Never to the lead; no-op without Resend.
-    if (parsed.data.channel === "landing") await sendFormAlert(key.tenantId, result.leadId);
+    if (parsed.data.channel === "landing") {
+      // Sales ping (Telegram) and the lead's auto-reply (off until Áron signs it); both no-op when unconfigured.
+      await Promise.all([
+        sendFormAlert(key.tenantId, result.leadId),
+        sendLeadPing(key.tenantId, result.leadId),
+        sendAutoReply(key.tenantId, result.leadId),
+      ]);
+    }
 
     // Fire task-automation rules for the new lead (e.g. the seeded follow-up
     // task). Runs post-commit and is itself fail-safe, so it never blocks or

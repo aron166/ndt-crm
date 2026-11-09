@@ -89,10 +89,10 @@ describe("planTransition", () => {
     if ("error" in r) throw new Error(r.error);
     expect(r.data).toMatchObject({ outcome: "lost", nextAction: null, nextDue: null });
   });
-  it("entering demo_done sets the credit clock (now + 30 d) and plans 5 tasks", () => {
+  it("entering demo_done sets the credit clock (now + 14 d, Áron 2026-11-09) and plans 5 tasks", () => {
     const r = planTransition(lead("demo_booked"), row("demo_booked", "demo_delivered"), {}, now);
     if ("error" in r) throw new Error(r.error);
-    expect(r.data.demoCreditUntil?.getTime()).toBe(now.getTime() + 30 * DAY);
+    expect(r.data.demoCreditUntil?.getTime()).toBe(now.getTime() + 14 * DAY);
     expect(r.data.demoDoneAt).toEqual(now);
     expect(r.tasks).toHaveLength(5);
   });

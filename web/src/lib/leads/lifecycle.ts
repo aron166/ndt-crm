@@ -102,7 +102,12 @@ export const OFFER_TYPE_LABEL: Record<(typeof OFFER_TYPES)[number], string> = {
 };
 export type OfferType = (typeof OFFER_TYPES)[number];
 
-export const DEMO_CREDIT_DAYS = 30;
+/**
+ * Demo credit (Áron 2026-11-09, replaces the W2 spec's 30 days): the demo fee is
+ * credited when, within 14 days of demo_done, the lead orders at least 100 m2 of
+ * service, any rental or any purchase. Same rule as the offer PDF text.
+ */
+export const DEMO_CREDIT_DAYS = 14;
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -333,9 +338,9 @@ export function entryTasks(to: string, event: string, now: Date, ctx: { recallDa
       return [
         { title: "Demó riport kiküldése + döntési hívás", type: "call", dueDate: addWorkdays(now, 2) },
         { title: "Demó utánkövetés (3. nap)", type: "call", dueDate: new Date(now.getTime() + 3 * DAY) },
-        { title: "Demó utánkövetés (7. nap): jóváírás határideje", type: "call", dueDate: new Date(now.getTime() + 7 * DAY) },
+        { title: "Demó utánkövetés (7. nap): a jóváírás a 14. napig él (min. 100 m², bérlés vagy vásárlás)", type: "call", dueDate: new Date(now.getTime() + 7 * DAY) },
         { title: "Demó utánkövetés (14. nap)", type: "call", dueDate: new Date(now.getTime() + 14 * DAY) },
-        { title: "Demó jóváírás ma lejár", type: "internal", dueDate: new Date(now.getTime() + DEMO_CREDIT_DAYS * DAY) },
+        { title: "Demó jóváírás ma lejár (14. nap): min. 100 m² szolgáltatás, bérlés vagy vásárlás esetén jár", type: "internal", dueDate: new Date(now.getTime() + DEMO_CREDIT_DAYS * DAY) },
       ];
     case "ordered":
       return [
