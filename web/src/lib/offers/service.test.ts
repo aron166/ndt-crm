@@ -50,7 +50,7 @@ describe("createLeadOffer", () => {
     expect(change.mock.calls[1][1]).toBe("offer_sent");
     expect(change.mock.calls[1][3]).toMatchObject({ event: "offer_sent" });
     expect(d.quote.create).toHaveBeenCalledTimes(1);
-    const data = d.quote.create.mock.calls[0][0].data as Record<string, any>;
+    const data = d.quote.create.mock.calls[0][0].data as unknown as { template: string; meta: { template: string }; items: { create: unknown[] } };
     expect(data.template).toBe("demo");
     expect(data.meta.template).toBe("demo");
     expect(data.items.create).toHaveLength(1);
