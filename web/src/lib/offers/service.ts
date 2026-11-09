@@ -7,7 +7,7 @@ import { nextQuoteNumber } from "@/lib/quotes/number";
 import { sendEmail } from "@/lib/integrations/resend";
 import { changeLeadStatus, type LeadCtx } from "@/lib/leads/service";
 import {
-  buildOffer, offerConfigFromSettings, offerTotals, OFFER_TYPE_BY_TEMPLATE, OFFER_TEMPLATE_LABEL, ACCEPTANCE_TEXT,
+  buildOffer, offerConfigFromSettings, offerTotals, issuerMissing, OFFER_TYPE_BY_TEMPLATE, OFFER_TEMPLATE_LABEL, ACCEPTANCE_TEXT,
   type OfferInput, type OfferMeta, type OfferPdfDoc, type OfferLine,
 } from "./offer";
 import { renderOfferPdf } from "./pdf";
@@ -56,8 +56,10 @@ export async function createLeadOffer(leadId: number, input: OfferInput, ctx: Le
   const now = new Date();
   const year = now.getFullYear();
 
-  let quoteId: number;
-  try {
+  let quoteId = 0;
+  // Quote number = max + 1 under @@unique([tenantId, quoteNumber]): retry on a
+  // collision (double click, two users), the same 5 attempts as actions/quotes.ts.
+  for (let attempt = 0; ; attempt++) try {
     quoteId = await db.$transaction(async (tx) => {
       const existing = await tx.quote.findMany({ where: { tenantId, quoteNumber: { startsWith: `AJ-${year}-` } }, select: { quoteNumber: true } });
       const q = await tx.quote.create({
@@ -79,10 +81,15 @@ export async function createLeadOffer(leadId: number, input: OfferInput, ctx: Le
       });
       return q.id;
     });
+    break;
   } catch (err) {
+    if ((err as { code?: string })?.code === "P2002" && attempt < 4) continue;
     reportError("offers.create", err, { leadId });
     return { error: "Az ajánlat létrehozása nem sikerült" };
   }
+  // Audit at creation, before the moves, so every path that keeps the quote is recorded.
+  audit("quote", quoteId, "create", null, { leadId, template: input.template, hasPlaceholders: built.hasPlaceholders },
+    { tenantId, actor: ctx.actor, actorAgentId: ctx.actorAgentId });
 
   // Lifecycle: qualify (offer_type from the template) when needed, then offer_sent.
   const offerType = OFFER_TYPE_BY_TEMPLATE[input.template];
@@ -94,19 +101,25 @@ export async function createLeadOffer(leadId: number, input: OfferInput, ctx: Le
     if ("error" in r) {
       if (to === "qualified" || steps.length === 1) {
         // Nothing moved yet: the draft offer goes too.
-        await db.quote.deleteMany({ where: { id: quoteId, tenantId, status: "draft" } });
+        try {
+          await db.quote.deleteMany({ where: { id: quoteId, tenantId, status: "draft" } });
+        } catch (err) {
+          reportError("offers.create.rollback", err, { leadId, quoteId });
+        }
         return { error: r.error };
       }
       // Qualified but not moved on: the offer stays, the lead is in qualified. Say so.
       return { error: `Az ajánlat elkészült, de a lead a Minősítve fázisban maradt: ${r.error}` };
     }
   }
-  audit("quote", quoteId, "create", null, { leadId, template: input.template, hasPlaceholders: built.hasPlaceholders },
-    { tenantId, actor: ctx.actor, actorAgentId: ctx.actorAgentId });
   return { success: true, quoteId, hasPlaceholders: built.hasPlaceholders };
 }
 
-/** The frozen document for the PDF; null when not this tenant's offer. */
+/**
+ * The document for the PDF; null when not this tenant's offer. Issuer, terms and
+ * prices are frozen on the quote (meta + lines); the customer block is read live
+ * from the person / company, so a corrected name shows on a re-render.
+ */
 export async function loadOfferPdfDoc(quoteId: number, tenantId: number): Promise<OfferPdfDoc | null> {
   const q = await db.quote.findFirst({
     where: { id: quoteId, tenantId, template: { not: null } },
@@ -140,7 +153,7 @@ export async function loadOfferPdfDoc(quoteId: number, tenantId: number): Promis
 
 /** True when the document still carries a placeholder (price or issuer legal facts). */
 export function offerDocHasPlaceholders(doc: OfferPdfDoc): boolean {
-  return !doc.totals.complete || !doc.meta.issuer.legalName || !doc.meta.issuer.address || !doc.meta.issuer.taxNumber;
+  return !doc.totals.complete || issuerMissing(doc.meta.issuer).length > 0;
 }
 
 /**
@@ -152,19 +165,35 @@ export async function sendLeadOffer(quoteId: number, ctx: LeadCtx): Promise<Resu
   const q = await db.quote.findFirst({
     where: { id: quoteId, tenantId, template: { not: null }, leadId: { not: null } },
     select: {
-      id: true, status: true, leadId: true, companyId: true, personId: true,
-      lead: { select: { customFields: true, contact: { select: { email: true, person: { select: { email: true } } } } } },
+      id: true, status: true, leadId: true, companyId: true, personId: true, validUntil: true,
+      lead: { select: { outcome: true, customFields: true, contact: { select: { email: true, person: { select: { email: true } } } } } },
     },
   });
   if (!q || !q.lead) return { error: "Ajánlat nem található" };
   if (q.status !== "draft" && q.status !== "sent") return { error: "Ez az ajánlat már nem küldhető" };
+  if (q.lead.outcome !== "open") return { error: "Lezárt leadnek nem küldünk ajánlatot" };
+  if (q.validUntil && q.validUntil.getTime() < Date.now()) return { error: "Az ajánlat lejárt: készíts újat" };
   const to = leadEmail(q.lead);
   if (!to) return { error: "A leadnek nincs e-mail címe" };
   const doc = await loadOfferPdfDoc(quoteId, tenantId);
   if (!doc) return { error: "Ajánlat nem található" };
   if (offerDocHasPlaceholders(doc)) return { error: "Az ajánlatban még van egyeztetés alatti adat (ár vagy cégadat): így nem küldhető ki" };
 
-  const pdf = await renderOfferPdf(doc);
+  let pdf: Uint8Array;
+  try {
+    pdf = await renderOfferPdf(doc);
+  } catch (err) {
+    reportError("offers.send.render", err, { quoteId });
+    return { error: "Az ajánlat PDF előállítása nem sikerült, próbáld újra" };
+  }
+
+  // Claim the quote before sending: two concurrent clicks cannot both send.
+  const claim = await db.quote.updateMany({
+    where: { id: quoteId, tenantId, status: q.status },
+    data: { status: "sending" },
+  });
+  if (claim.count === 0) return { error: "Az ajánlat küldése már folyamatban van" };
+
   const brand = doc.meta.issuer.brand ?? doc.meta.issuer.legalName ?? "";
   const sent = await sendEmail({
     tenantId, to,
@@ -181,9 +210,16 @@ export async function sendLeadOffer(quoteId: number, ctx: LeadCtx): Promise<Resu
     ].join("\n"),
     companyId: q.companyId, personId: q.personId,
     attachments: [{ filename: `${doc.quoteNumber}.pdf`, content: Buffer.from(pdf).toString("base64") }],
+  }).catch((err: unknown) => {
+    reportError("offers.send", err, { quoteId });
+    return { ok: false as const, error: "Nem sikerült elküldeni az ajánlatot" };
   });
-  if (!sent.ok) return { error: sent.error };
-  await db.quote.updateMany({ where: { id: quoteId, tenantId }, data: { status: "sent", sentAt: new Date() } });
+  if (!sent.ok) {
+    // Release the claim so the button works again.
+    await db.quote.updateMany({ where: { id: quoteId, tenantId, status: "sending" }, data: { status: q.status } });
+    return { error: sent.error };
+  }
+  await db.quote.updateMany({ where: { id: quoteId, tenantId, status: "sending" }, data: { status: "sent", sentAt: new Date() } });
   audit("quote", quoteId, "update", { status: q.status }, { status: "sent", to }, { tenantId, actor: ctx.actor, actorAgentId: ctx.actorAgentId });
   return { success: true, to };
 }
@@ -201,10 +237,14 @@ export async function acceptLeadOffer(quoteId: number, ctx: LeadCtx): Promise<Re
   });
   if (!q || !q.leadId || !q.lead) return { error: "Ajánlat nem található" };
   if (q.status === "accepted") return { success: true };
-  if (q.status !== "sent" && q.status !== "draft") return { error: "Ez az ajánlat már nem fogadható el" };
-  const event = q.lead.status === "demo_done" ? "order_placed" : "offer_accepted";
-  const r = await changeLeadStatus(q.leadId, "ordered", ctx, { event });
-  if ("error" in r) return r;
+  // Only a sent offer can be accepted (the acceptance is the reply to it).
+  if (q.status !== "sent") return { error: "Csak kiküldött ajánlat fogadható el" };
+  // A retry after a failed quote update finds the lead already ordered: just finish the quote.
+  if (q.lead.status !== "ordered") {
+    const event = q.lead.status === "demo_done" ? "order_placed" : "offer_accepted";
+    const r = await changeLeadStatus(q.leadId, "ordered", ctx, { event });
+    if ("error" in r) return r;
+  }
   await db.quote.updateMany({ where: { id: quoteId, tenantId }, data: { status: "accepted", acceptedAt: new Date() } });
   audit("quote", quoteId, "update", { status: q.status }, { status: "accepted" }, { tenantId, actor: ctx.actor, actorAgentId: ctx.actorAgentId });
   return { success: true };

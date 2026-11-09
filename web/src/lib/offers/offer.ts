@@ -205,9 +205,14 @@ export function buildOffer(input: OfferInput, cfg: OfferConfig): BuiltOffer | { 
       terms = ["Az árak nettó árak, az ÁFA külön kerül felszámításra."];
       break;
   }
-  const hasPlaceholders = lines.some((l) => l.unitRate == null)
-    || cfg.issuer.legalName == null || cfg.issuer.address == null || cfg.issuer.taxNumber == null;
+  const hasPlaceholders = lines.some((l) => l.unitRate == null) || issuerMissing(cfg.issuer).length > 0;
   return { title, vatRate: cfg.vatRate, lines, meta: { ...base, intro, terms }, hasPlaceholders };
+}
+
+/** Issuer facts the PDF prints as mandatory; any missing one blocks sending (one check, used by build and send). */
+export function issuerMissing(issuer: OfferConfig["issuer"]): string[] {
+  const req: (keyof OfferConfig["issuer"])[] = ["legalName", "brand", "address", "taxNumber", "companyRegNo"];
+  return req.filter((k) => !issuer[k]);
 }
 
 /** Totals over known amounts; `complete` false when any line is a placeholder. */

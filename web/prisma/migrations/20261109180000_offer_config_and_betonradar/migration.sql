@@ -2,11 +2,11 @@
 -- 1. Offer config: the issuer's legal facts confirmed by Áron (workspace docs/birdsview/
 --    gtm-system-2026-11-08/COMPANY.md, 2026-11-09) and the demo terms. Code holds no
 --    legal defaults; only this config does. Skipped when the tenant already has `offers`.
--- 2. Brand rename BetonScan -> BetonRadar in UNSENT email drafts (status draft only;
+-- 2. Brand rename BetonScan -> BetonRadar in UNSENT email drafts (draft and approved;
 --    sent mail is history and is never rewritten).
 -- Rollback: UPDATE "tenants" SET "settings" = "settings" - 'offers' WHERE "id" = 1;
 --           UPDATE "email_drafts" SET "subject" = replace("subject", 'BetonRadar', 'BetonScan'),
---             "body" = replace("body", 'BetonRadar', 'BetonScan') WHERE "tenant_id" = 1 AND "status" = 'draft';
+--             "body" = replace("body", 'BetonRadar', 'BetonScan') WHERE "tenant_id" = 1 AND "status" IN ('draft', 'approved');
 UPDATE "tenants"
 SET "settings" = COALESCE("settings", '{}'::jsonb) || jsonb_build_object('offers', jsonb_build_object(
     'issuer', jsonb_build_object(
@@ -33,5 +33,5 @@ UPDATE "email_drafts"
 SET "subject" = replace("subject", 'BetonScan', 'BetonRadar'),
     "body" = replace("body", 'BetonScan', 'BetonRadar'),
     "updated_at" = CURRENT_TIMESTAMP
-WHERE "tenant_id" = 1 AND "status" = 'draft'
+WHERE "tenant_id" = 1 AND "status" IN ('draft', 'approved')
   AND ("subject" LIKE '%BetonScan%' OR "body" LIKE '%BetonScan%');

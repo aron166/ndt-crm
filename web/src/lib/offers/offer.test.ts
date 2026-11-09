@@ -5,7 +5,7 @@ import {
 
 const filled: OfferConfig = {
   ...DEFAULT_OFFER_CONFIG,
-  issuer: { ...DEFAULT_OFFER_CONFIG.issuer, legalName: "Teszt Kft.", address: "1111 Budapest, Fő u. 1.", taxNumber: "12345678-1-42" },
+  issuer: { ...DEFAULT_OFFER_CONFIG.issuer, legalName: "Teszt Kft.", brand: "BetonRadar", address: "1111 Budapest, Fő u. 1.", taxNumber: "12345678-1-42", companyRegNo: "01-09-000000" },
 };
 const ok = (r: ReturnType<typeof buildOffer>): BuiltOffer => {
   if ("error" in r) throw new Error(r.error);
