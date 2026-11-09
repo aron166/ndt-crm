@@ -62,7 +62,8 @@ export function SignOffForm({ leadId }: { leadId: number }) {
     setHasSig(false);
   }
 
-  const netOk = !change || newNet === "" || Number.isFinite(Number(newNet));
+  // A scope change needs its text AND a real new price: an empty price must not go out as 0 Ft.
+  const netOk = !change || (changeText.trim().length >= 3 && newNet.trim() !== "" && Number.isFinite(Number(newNet)) && Number(newNet) >= 0);
   const canSubmit = signerName.trim() !== "" && doneScope.trim() !== "" && hasSig && netOk && !pending;
 
   function submit(e: React.FormEvent) {

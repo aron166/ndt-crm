@@ -134,7 +134,7 @@ function Doc({ number, data }: { number: string; data: DocumentData }) {
           <>
             <CustomerBlock cu={data.customer} label="Megrendelő" />
             <View style={styles.block}>
-              <Text>Megrendelő: {data.orderNumber ?? "-"}</Text>
+              <Text>Megrendelés száma: {data.orderNumber ?? "-"}</Text>
             </View>
             <View style={styles.block}>
               <Text style={styles.strong}>Elvégzett munka:</Text>
