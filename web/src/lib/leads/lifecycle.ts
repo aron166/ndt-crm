@@ -75,6 +75,27 @@ export const isRecallReason = (s: unknown): s is RecallReason => (RECALL_REASONS
 
 export const BUYER_TYPES = ["company", "private"] as const;
 export const INTENTS = ["service_concrete", "service_vague", "rental", "purchase", "unknown"] as const;
+/**
+ * The W2 lead columns from the form answers (W7 landing, 2026-11-09). Landing
+ * slugs map onto the CHECK-constrained values; anything unknown stays unset
+ * rather than guessed. `device` (rent or buy, undecided) and `info` are
+ * `unknown` until the first call. buyer_type falls back to the older
+ * `situation` answer (company / private).
+ */
+// Keep in step with the CASE in migration 20261109200000_backfill_lead_intent_buyer_type.
+const INTENT_FROM_FORM: Record<string, (typeof INTENTS)[number]> = {
+  service_concrete: "service_concrete", service_vague: "service_vague", service: "service_vague",
+  rental: "rental", purchase: "purchase", device: "unknown", info: "unknown", unknown: "unknown",
+};
+export function w2FieldsFromAnswers(answers: Record<string, string>): { intent?: (typeof INTENTS)[number]; buyerType?: (typeof BUYER_TYPES)[number] } {
+  const out: { intent?: (typeof INTENTS)[number]; buyerType?: (typeof BUYER_TYPES)[number] } = {};
+  const intent = INTENT_FROM_FORM[(answers.intent ?? "").trim().toLowerCase()];
+  if (intent) out.intent = intent;
+  const bt = (answers.buyer_type ?? answers.situation ?? "").trim().toLowerCase();
+  if (bt === "company" || bt === "private") out.buyerType = bt;
+  return out;
+}
+
 export const OFFER_TYPES = ["service", "rental", "purchase"] as const;
 /** PROPOSAL labels. */
 export const OFFER_TYPE_LABEL: Record<(typeof OFFER_TYPES)[number], string> = {
@@ -82,7 +103,12 @@ export const OFFER_TYPE_LABEL: Record<(typeof OFFER_TYPES)[number], string> = {
 };
 export type OfferType = (typeof OFFER_TYPES)[number];
 
-export const DEMO_CREDIT_DAYS = 30;
+/**
+ * Demo credit (Áron 2026-11-09, replaces the W2 spec's 30 days): the demo fee is
+ * credited when, within 14 days of demo_done, the lead orders at least 100 m2 of
+ * service, any rental or any purchase. Same rule as the offer PDF text.
+ */
+export const DEMO_CREDIT_DAYS = 14;
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -129,7 +155,7 @@ export const DEFAULT_TRANSITIONS: LeadTransition[] = [
   { from: "demo_booked", event: "demo_delivered", to: "demo_done", action: "report + decision call task, demo credit clock" },
   { from: "demo_booked", event: "demo_cancelled", to: "recall", action: "ask reason" },
   { from: "demo_booked", event: "demo_declined", to: "lost", action: "lost_reason" },
-  { from: "demo_done", event: "order_placed", to: "ordered", action: "credit applied if within 30 days, payment check task" },
+  { from: "demo_done", event: "order_placed", to: "ordered", action: "credit applied if within 14 days (min. 100 m2, rental or purchase), payment check task" },
   { from: "demo_done", event: "demo_followed_up", to: "demo_done", action: "follow-up day 3, 7, 14" },
   { from: "demo_done", event: "demo_expired", to: "recall", action: "closing email task, recall no_decision" },
   { from: "ordered", event: "order_won", to: "won", action: "handover task" },
@@ -313,9 +339,9 @@ export function entryTasks(to: string, event: string, now: Date, ctx: { recallDa
       return [
         { title: "Demó riport kiküldése + döntési hívás", type: "call", dueDate: addWorkdays(now, 2) },
         { title: "Demó utánkövetés (3. nap)", type: "call", dueDate: new Date(now.getTime() + 3 * DAY) },
-        { title: "Demó utánkövetés (7. nap): jóváírás határideje", type: "call", dueDate: new Date(now.getTime() + 7 * DAY) },
+        { title: "Demó utánkövetés (7. nap): a jóváírás a 14. napig él (min. 100 m², bérlés vagy vásárlás)", type: "call", dueDate: new Date(now.getTime() + 7 * DAY) },
         { title: "Demó utánkövetés (14. nap)", type: "call", dueDate: new Date(now.getTime() + 14 * DAY) },
-        { title: "Demó jóváírás ma lejár", type: "internal", dueDate: new Date(now.getTime() + DEMO_CREDIT_DAYS * DAY) },
+        { title: "Demó jóváírás ma lejár (14. nap): min. 100 m² szolgáltatás, bérlés vagy vásárlás esetén jár", type: "internal", dueDate: new Date(now.getTime() + DEMO_CREDIT_DAYS * DAY) },
       ];
     case "ordered":
       return [

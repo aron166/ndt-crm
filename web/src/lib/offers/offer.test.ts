@@ -106,3 +106,19 @@ describe("config only (Kai 2026-11-09)", () => {
     expect("error" in none ? "" : none.meta.terms.join(" ")).not.toContain("jóváírjuk");
   });
 });
+
+describe("demo price wording (Áron 2026-11-09)", () => {
+  const demo = (cfg: OfferConfig) => ok(buildOffer({ template: "demo" }, cfg));
+  it("intro states the intro price with a no-break-space separator and invoicing after the work", () => {
+    expect(demo(DEFAULT_OFFER_CONFIG).meta.intro.join(" ")).toContain(
+      "Bevezető ár a következő két hónapban: 100 000 Ft + ÁFA. Számlázás a munka elvégzése után.",
+    );
+  });
+  it("terms no longer carry the generic invoice-after-work line", () => {
+    expect(demo(DEFAULT_OFFER_CONFIG).meta.terms.join(" ")).not.toContain("a számlát a munka után állítjuk ki");
+  });
+  it("a null demo price shows the placeholder", () => {
+    const cfg: OfferConfig = { ...DEFAULT_OFFER_CONFIG, demo: { ...DEFAULT_OFFER_CONFIG.demo, netHuf: null } };
+    expect(demo(cfg).meta.intro.join(" ")).toContain("[egyeztetés alatt]");
+  });
+});

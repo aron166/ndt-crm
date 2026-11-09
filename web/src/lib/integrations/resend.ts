@@ -53,6 +53,8 @@ export interface SendEmailInput {
   personId?: number | null;
   /** Skip the interaction log (used for connection test sends). */
   skipLog?: boolean;
+  /** Display name on the From line instead of the tenant's (e.g. the lead's owner). Address unchanged. */
+  fromName?: string | null;
   /** Files to attach (Resend: base64 content). */
   attachments?: { filename: string; content: string }[];
 }
@@ -94,11 +96,16 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   // when a caller queried contacts directly. (SUPPRESSION_LIST_SPEC.md #2.)
   if (await isAddressSuppressed(tenantId, to)) return { ok: false, error: SUPPRESSED_ERROR };
 
-  const from = config.fromName ? `${config.fromName} <${config.fromEmail}>` : config.fromEmail;
+  // Strip characters that could break the header; the address always stays the tenant's.
+  // RFC 5322: a quoted display name may hold commas, parentheses and accents.
+  const displayName = (input.fromName ?? config.fromName)?.replace(/["<>\\\r\n]/g, "").trim() || null;
+  const from = displayName ? `"${displayName}" <${config.fromEmail}>` : config.fromEmail;
 
   let id: string;
   try {
     const res = await fetch(RESEND_ENDPOINT, {
+      // A slow Resend must not hold the public intake response (the catch below reports it).
+      signal: AbortSignal.timeout(8000),
       method: "POST",
       headers: {
         Authorization: `Bearer ${config.apiKey}`,

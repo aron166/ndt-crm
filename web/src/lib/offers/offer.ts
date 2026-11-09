@@ -25,6 +25,7 @@ export const OFFER_TYPE_BY_TEMPLATE: Record<OfferTemplate, "service" | "rental" 
 };
 
 export const PLACEHOLDER = "[egyeztetés alatt]";
+const HUF = new Intl.NumberFormat("hu-HU", { maximumFractionDigits: 0 });
 
 /** tenants.settings.offers. Every field optional; null/missing = placeholder. */
 export interface OfferConfig {
@@ -172,9 +173,10 @@ export function buildOffer(input: OfferInput, cfg: OfferConfig): BuiltOffer | { 
       lines = [line(`Bevezető vizsgálat: legfeljebb ${cfg.demo.hours} óra, legfeljebb ${cfg.demo.areaM2} m², a helyszínen`, 1, "alkalom", cfg.demo.netHuf)];
       intro = [
         `Bevezető vizsgálatunkkal ${cfg.demo.hours} óra alatt legfeljebb ${cfg.demo.areaM2} m² felületet vizsgálunk meg a helyszínen.`,
-        `A bevezető ár ${cfg.demo.introPeriodText} érvényes.`,
+        // Áron 2026-11-09: one price, invoiced after the work (no prepay ladder).
+        `Bevezető ár ${cfg.demo.introPeriodText}: ${cfg.demo.netHuf != null ? `${HUF.format(cfg.demo.netHuf)} Ft` : PLACEHOLDER} + ÁFA. Számlázás a munka elvégzése után.`,
       ];
-      terms = cfg.demo.creditRuleText ? [...common, cfg.demo.creditRuleText] : common;
+      terms = [common[0], ...(cfg.demo.creditRuleText ? [cfg.demo.creditRuleText] : [])];
       break;
     case "big_service": {
       const area = input.areaM2 ?? null;
