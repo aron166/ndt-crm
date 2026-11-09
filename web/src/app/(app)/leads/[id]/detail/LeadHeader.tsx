@@ -57,7 +57,8 @@ export function LeadHeader(p: {
   const ownerName = p.users.find((u) => String(u.id) === p.assignedTo)?.name ?? null;
   // A form slug ("service_concrete") is already shown as a label in the key facts; only free text belongs here.
   const rawSubject = lead.serviceInterest || lead.subject;
-  const subject = rawSubject && !/^[a-z0-9_]+$/.test(rawSubject) ? rawSubject : null;
+  // Slug = lowercase words joined by underscores (service_concrete); a one-word subject like "beton" stays (Vanda C3).
+  const subject = rawSubject && !/^[a-z0-9]+(_[a-z0-9]+)+$/.test(rawSubject) ? rawSubject : null;
   const outcomeColor = p.outcome === "won" ? "var(--mint)" : p.outcome === "lost" ? "var(--coral)" : null;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" style={{ marginBottom: 24 }}>
@@ -162,7 +163,7 @@ export function LeadHeader(p: {
               onChange={(e) => p.onOutcome(e.target.value as LeadOutcome)}
               disabled={p.outcomePending}
               className="font-mono-ndt min-h-[44px]"
-              title="Kimenetel"
+             
               style={{
                 ...selectBase, fontWeight: 600,
                 background: p.outcome === "won" ? "var(--mint-soft)" : p.outcome === "lost" ? "var(--coral-soft)" : "var(--bg-panel)",

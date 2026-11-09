@@ -189,7 +189,8 @@ export function LeadDetailClient({
 
       <LeadTabs active={tab} callCount={interactions.length} />
 
-      {tab === "overview" && (
+      {/* All tabs stay mounted (hidden when inactive) so an unsaved qualification draft survives a tab switch (Vanda C1). */}
+      <div hidden={tab !== "overview"}>
         <OverviewTab openTasks={openTasks} message={lead.message}>
           <LeadQualificationPanel
             leadId={lead.id}
@@ -201,8 +202,8 @@ export function LeadDetailClient({
             sets={questionSets}
           />
         </OverviewTab>
-      )}
-      {tab === "calls" && (
+      </div>
+      <div hidden={tab !== "calls"}>
         <CallsTab
           leadId={lead.id}
           interactions={interactions}
@@ -210,9 +211,9 @@ export function LeadDetailClient({
           closed={closed}
           onCorrect={(id) => { setCorrecting(id); setLogging(true); }}
         />
-      )}
-      {tab === "offers" && offersPanel}
-      {tab === "history" && (
+      </div>
+      <div hidden={tab !== "offers"}>{offersPanel}</div>
+      <div hidden={tab !== "history"}>
         <HistoryTab
           sourceApp={lead.sourceApp}
           source={lead.source}
@@ -222,7 +223,7 @@ export function LeadDetailClient({
           customFields={lead.customFields}
           auditEntries={auditEntries}
         />
-      )}
+      </div>
 
       <CallOutcomeModal
         open={logging}

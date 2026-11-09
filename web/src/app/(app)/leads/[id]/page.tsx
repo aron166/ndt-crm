@@ -101,7 +101,6 @@ export default async function LeadDetailPage({
     lead.buyerType ? { label: "Ügyfél", value: lead.buyerType === "company" ? "cég" : lead.buyerType === "private" ? "magánszemély" : lead.buyerType } : null,
     callWindow ? { label: "Hívható", value: callWindowLabel(callWindow) } : null,
     town ? { label: "Település", value: town } : null,
-    lead.tier ? { label: "Szint", value: lead.tier } : null,
   ].filter((f): f is { label: string; value: string } => f !== null);
 
   return (

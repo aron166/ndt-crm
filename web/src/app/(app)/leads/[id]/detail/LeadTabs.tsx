@@ -18,7 +18,8 @@ export function LeadTabs({ active, callCount }: { active: TabKey; callCount: num
     { key: "history", label: "Előzmények" },
   ];
   return (
-    <div role="tablist" className="flex overflow-x-auto" style={{ borderBottom: "1px solid var(--line-soft)", marginBottom: 16, gap: 4 }}>
+    // URL-driven navigation, not an ARIA tab widget: a nav with aria-current (Vanda C4). PROPOSAL copy.
+    <nav aria-label="Lead részletek" className="flex overflow-x-auto" style={{ borderBottom: "1px solid var(--line-soft)", marginBottom: 16, gap: 4, paddingTop: 2 }}>
       {tabs.map((t) => {
         const on = t.key === active;
         return (
@@ -26,8 +27,7 @@ export function LeadTabs({ active, callCount }: { active: TabKey; callCount: num
             key={t.key}
             href={`?tab=${t.key}`}
             scroll={false}
-            role="tab"
-            aria-selected={on}
+            aria-current={on ? "page" : undefined}
             className="inline-flex items-center min-h-[44px] whitespace-nowrap"
             style={{
               padding: "0 14px", fontSize: 14, fontWeight: on ? 600 : 500,
@@ -39,6 +39,6 @@ export function LeadTabs({ active, callCount }: { active: TabKey; callCount: num
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }
