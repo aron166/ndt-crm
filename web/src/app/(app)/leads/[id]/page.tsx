@@ -8,6 +8,7 @@ import { getLeadStatuses, getQuestionModel, getScriptVariants } from "@/lib/lead
 import { answersFrom, answerSourcesFrom } from "@/lib/leads/qualification";
 import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact } from "@/lib/leads/first-contact";
+import { INTENT_LABEL, callWindowLabel } from "@/lib/leads/intake-notify";
 import { LeadOffersPanel } from "./LeadOffersPanel";
 import { LeadDetailClient } from "./LeadDetailClient";
 
@@ -89,6 +90,19 @@ export default async function LeadDetailPage({
     (await firstContactByLead(TENANT_ID, [{ id: leadId, companyId: lead.companyId, personId, createdAt: lead.createdAt }])).get(leadId) ?? null,
   );
 
+  const qa = answersFrom(lead.qualification);
+  const cf = (lead.customFields ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const callWindow = str(qa.call_window) ?? str(cf.call_window);
+  const town = str(qa.location);
+  // PROPOSAL copy: the key-fact captions. Only facts that are present are listed.
+  const keyFacts = [
+    lead.intent ? { label: "Szándék", value: INTENT_LABEL[lead.intent] ?? lead.intent } : null,
+    lead.buyerType ? { label: "Ügyfél", value: lead.buyerType === "company" ? "cég" : lead.buyerType === "private" ? "magánszemély" : lead.buyerType } : null,
+    callWindow ? { label: "Hívható", value: callWindowLabel(callWindow) } : null,
+    town ? { label: "Település", value: town } : null,
+  ].filter((f): f is { label: string; value: string } => f !== null);
+
   return (
     <div className="mount">
       <div style={{ marginBottom: 16 }}>
@@ -103,6 +117,7 @@ export default async function LeadDetailPage({
       </div>
 
       <LeadDetailClient
+        keyFacts={keyFacts}
         firstContactMin={firstContactMin}
         lead={serializeDates({
           ...lead,

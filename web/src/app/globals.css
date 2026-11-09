@@ -797,3 +797,13 @@
 } /* end @layer components */
 
 @media (max-width: 767px) { :root { --statusbar-h: 0px; } }
+
+/* ndt-crm "moved": the next-step strip text slides in once on a stage change. */
+@keyframes strip-moved {
+  from { transform: translateX(16px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.strip-moved { animation: strip-moved 200ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .strip-moved { animation: none; }
+}
