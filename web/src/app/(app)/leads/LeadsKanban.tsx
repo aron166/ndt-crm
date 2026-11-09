@@ -7,6 +7,8 @@ import { Building2, Phone, Clock, CalendarClock, Trash2, PhoneCall } from "lucid
 import { moveLead, deleteLead, setLeadOutcomeAction } from "@/app/actions/leads";
 import { DeleteCardDialog, type DeleteCascade } from "@/components/DeleteCardDialog";
 import { CallOutcomeModal } from "./CallOutcomeModal";
+import { LeadMoveDialog } from "@/components/LeadMoveDialog";
+import { MAX_ATTEMPTS } from "@/lib/leads/lifecycle";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import {
@@ -36,6 +38,10 @@ interface Lead {
   lastContactAt: string | null;
   callbackDueAt: string | null;
   customFields: Record<string, unknown> | null;
+  attempts: number;
+  nextAction: string | null;
+  nextDue: string | null;
+  recallDate: string | null;
   company: { id: number; name: string } | null;
   contact: {
     id: number;
@@ -52,7 +58,11 @@ interface LeadsKanbanProps {
   columnTotals: Record<string, number>;
   columnLimit: number;
   scriptVariants: ScriptVariant[];
+  /** Recall/lost list view (single column) or null for the main board. */
+  sideView?: "recall" | "lost" | null;
 }
+
+const shortDate = (v: string) => new Date(v).toLocaleDateString("hu-HU", { month: "2-digit", day: "2-digit" });
 
 function personNameOf(lead: Lead): string | null {
   const p = lead.contact?.person;
@@ -200,6 +210,27 @@ function LeadCard({
         </a>
       )}
 
+      {lead.attempts > 0 && (
+        <span
+          className="font-mono-ndt"
+          aria-label={`Próbálkozások: ${lead.attempts} / ${MAX_ATTEMPTS}`}
+          style={{ display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 6, marginRight: 6, background: "var(--bg-hover)", color: "var(--fg-mute)" }}
+        >
+          {lead.attempts}/{MAX_ATTEMPTS}
+        </span>
+      )}
+      {(lead.nextAction || lead.nextDue) && (
+        <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-soft)", marginBottom: 6 }}>
+          {lead.nextAction}{lead.nextAction && lead.nextDue ? " · " : ""}{lead.nextDue ? shortDate(lead.nextDue) : ""}
+        </div>
+      )}
+      {lead.recallDate && (
+        <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--amber)", marginBottom: 6 }}>
+          {/* PROPOSAL copy */}
+          Visszahívás: {shortDate(lead.recallDate)}
+        </div>
+      )}
+
       {cbTone !== null || lead.callbackDueAt ? (
         <div
           className="flex items-center gap-1 font-mono-ndt"
@@ -265,28 +296,17 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
   const [hoverCol, setHoverCol] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Lead | null>(null);
   const [callingId, setCallingId] = useState<number | null>(null);
+  const [moving, setMoving] = useState<{ id: number; target: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function handleDrop(statusKey: string) {
     if (!draggingId) return;
     const lead = leads.find((l) => l.id === draggingId);
-    if (!lead || lead.status === statusKey) { setDraggingId(null); setHoverCol(null); return; }
-
     const id = draggingId;
-    const prevStatus = lead.status;
-    setLeads((prev) => prev.map((l) => l.id === id ? { ...l, status: statusKey } : l));
     setDraggingId(null); setHoverCol(null);
-    startTransition(async () => {
-      const res = await moveLead(id, statusKey);
-      if (res && "error" in res) {
-        // Failed move rolls back NOW and says why — never a silent optimistic card.
-        setLeads((prev) => prev.map((l) => l.id === id ? { ...l, status: prevStatus } : l));
-        setError(res.error);
-        return;
-      }
-      router.refresh();
-    });
+    if (!lead || lead.status === statusKey) return;
+    setMoving({ id, target: statusKey });
   }
 
   function handleDelete(id: number) {
@@ -328,6 +348,15 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
 
   return (
     <>
+    {moving && (
+      <LeadMoveDialog
+        leadId={moving.id}
+        target={moving.target}
+        targetLabel={statuses.find((s) => s.key === moving.target)?.label ?? moving.target}
+        onClose={() => setMoving(null)}
+        onMoved={() => { setMoving(null); router.refresh(); }}
+      />
+    )}
     <DeleteCardDialog
       open={pendingDelete !== null}
       kind="lead"

@@ -9,6 +9,8 @@ import { getLeadExtras } from "@/lib/leads/board";
 import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact, tierAFlag } from "@/lib/leads/first-contact";
 import { LEAD_OUTCOME_LABEL, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/outcomes";
+import { MAIN_STAGES } from "@/lib/leads/lifecycle";
+import type { LeadStatusDef } from "@/lib/leads/statuses";
 import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 
 const TENANT_ID = 1;
@@ -24,6 +26,7 @@ export default async function LeadsPage({
 }) {
   const { view, page: rawPage, tier: rawTier } = await searchParams;
   const showConverted = view === "closed" || view === "converted";
+  const sideView = view === "recall" || view === "lost" ? view : null;
   const parsedPage = Number.parseInt(rawPage ?? "1", 10);
   const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
   // Tier filter applies only to the active (kanban) view — closed list ignores it.
@@ -171,14 +174,29 @@ export default async function LeadsPage({
   // Fall back to the first configured column, never to a key with no column:
   // a tenant can end up with zero isInitial statuses (unchecking it at /leads/setup
   // clears the flag without electing a replacement), and orphaned leads must still land.
-  const initialKey = statuses.find((s) => s.isInitial)?.key ?? statuses[0]?.key ?? "new";
-  const ACTIVE = { tenantId: TENANT_ID, convertedDealId: null, outcome: "open", ...(tier ? { tier } : {}) };
-  const knownKeys = statuses.map((s) => s.key);
+  const allStatuses = statuses;
+  const mainStatuses = allStatuses.filter((s) => (MAIN_STAGES as readonly string[]).includes(s.key));
+  const sideDef: LeadStatusDef | null = sideView
+    ? allStatuses.find((s) => s.key === sideView) ?? {
+        key: sideView, label: sideView === "recall" ? "Visszahívás" : "Elveszett", color: "#8b8b9a", position: 99,
+        isInitial: false, isTerminal: sideView === "lost", isCommitment: false, description: null,
+      } // PROPOSAL copy
+    : null;
+  const boardStatuses = sideDef ? [sideDef] : mainStatuses;
+  const initialKey = mainStatuses.find((s) => s.isInitial)?.key ?? mainStatuses[0]?.key ?? "new";
+  const ACTIVE = {
+    tenantId: TENANT_ID, convertedDealId: null,
+    outcome: sideView === "lost" ? "lost" : "open",
+    ...(tier ? { tier } : {}),
+  };
+  const knownKeys = allStatuses.map((s) => s.key);
   // A lead whose status was deleted at /leads/setup has no column — it lands in
   // the entry column instead of vanishing from the board (which would make the
   // "Aktív · N" count disagree with the sum of the columns).
   const colWhere = (key: string) =>
-    key === initialKey
+    sideView === "lost" ? ACTIVE
+    : sideView ? { ...ACTIVE, status: key }
+    : key === initialKey
       ? { ...ACTIVE, OR: [{ status: key }, { status: null }, { status: { notIn: knownKeys } }] }
       : { ...ACTIVE, status: key };
 
@@ -187,7 +205,7 @@ export default async function LeadsPage({
   // capped column, and pays a serial round trip when it does. Fine at ~2ms (fra1);
   // if several columns ever sit at the cap, pair it back into the findMany's Promise.all.
   const perColumn = await Promise.all(
-    statuses.map(async (st) => {
+    boardStatuses.map(async (st) => {
       const rows = await db.lead.findMany({
         where: colWhere(st.key),
         include: {
@@ -222,7 +240,7 @@ export default async function LeadsPage({
     tierFlag: tierAFlag(l.tier, l.createdAt, firstContacts.get(l.id) ?? null, now),
     // Same normalization as colWhere, so the client renders the card in the
     // column the server counted it in.
-    status: l.status && knownKeys.includes(l.status) ? l.status : initialKey,
+    status: sideView ?? (l.status && knownKeys.includes(l.status) ? l.status : initialKey),
     estimatedValue: l.estimatedValue != null ? Number(l.estimatedValue) : null,
     customFields: (l.customFields ?? null) as Record<string, unknown> | null,
     lastContactAt: extras.get(l.id)?.lastContactAt ?? null,
@@ -246,10 +264,28 @@ export default async function LeadsPage({
     </Link>
   );
 
+  // Seed from the current params, touch only our key (same as the tier pills).
+  const hrefWith = (key: "tier" | "view", value: string | null) => {
+    const q = new URLSearchParams();
+    if (tier) q.set("tier", tier);
+    if (sideView) q.set("view", sideView);
+    if (value) q.set(key, value); else q.delete(key);
+    const str = q.toString();
+    return str ? `/leads?${str}` : "/leads";
+  };
+
+  const SideFilter = (
+    <div className="flex flex-wrap items-center gap-2">
+      {/* PROPOSAL copy */}
+      {tierPill(hrefWith("view", sideView === "recall" ? null : "recall"), sideView === "recall", "Visszahívás")}
+      {tierPill(hrefWith("view", sideView === "lost" ? null : "lost"), sideView === "lost", "Elveszett")}
+    </div>
+  );
+
   const TierFilter = (
     <div className="flex flex-wrap items-center gap-2">
-      {tierPill("/leads", tier === null, "Mind")}
-      {TIERS.map((t) => tierPill(`/leads?tier=${t}`, tier === t, `${t} · ${TIER_LABEL[t]}`, TIER_COLOR[t]))}
+      {tierPill(hrefWith("tier", null), tier === null, "Mind")}
+      {TIERS.map((t) => tierPill(hrefWith("tier", t), tier === t, `${t} · ${TIER_LABEL[t]}`, TIER_COLOR[t]))}
     </div>
   );
 
@@ -271,6 +307,7 @@ export default async function LeadsPage({
         </div>
         <div className="page-actions" style={{ gap: 8 }}>
           {TierFilter}
+          {SideFilter}
           {Toggle}
           <Link href="/leads/setup" className="btn sm" style={{ gap: 6 }}>
             <Settings2 style={{ width: 13, height: 13 }} />
@@ -280,7 +317,8 @@ export default async function LeadsPage({
       </div>
 
       <LeadsKanban
-        statuses={statuses}
+        statuses={boardStatuses}
+        sideView={sideView}
         leads={serializeDates(leadsForClient) as Parameters<typeof LeadsKanban>[0]["leads"]}
         columnTotals={columnTotals}
         columnLimit={COLUMN_LIMIT}
