@@ -321,6 +321,22 @@ export async function setLeadOutcome(
     reason = reason.slice(0, LOST_REASON_MAX);
   }
 
+  // W2: lost is a stage. Closing / reopening goes through the transition table
+  // (lead_lost / lead_reopened rows), so it is logged with a reason code. Free
+  // text that is not a code is kept as the note under "other".
+  if (outcome === "lost" && before.status !== "lost") {
+    const code = isLostReason(reason) ? reason : "other";
+    const r = await changeLeadStatus(leadId, "lost", ctx, {
+      event: "lead_lost", lostReason: code, lostNote: code === reason ? null : reason,
+    });
+    return "error" in r ? r : { success: true };
+  }
+  if (outcome === "open" && before.status === "lost") {
+    if (before.convertedDealId) return { error: "Deallé alakított lead nem nyitható újra" };
+    const r = await changeLeadStatus(leadId, "new", ctx, { event: "lead_reopened" });
+    return "error" in r ? r : { success: true };
+  }
+
   let dealId: number | undefined;
   if (outcome === "won") {
     const conv = await convertLeadToDeal(leadId, ctx);
@@ -331,10 +347,12 @@ export async function setLeadOutcome(
     return { error: "Deallé alakított lead nem nyitható újra" };
   }
 
+  // Already-lost lead: only its reason changes (same code/note split as above).
+  const lostCode = reason && isLostReason(reason) ? reason : "other";
   const data: Prisma.LeadUpdateManyMutationInput = {
     outcome,
     closedAt: outcome === "open" ? null : new Date(),
-    ...(outcome === "lost" ? { lostReason: reason } : {}),
+    ...(outcome === "lost" ? { lostReason: lostCode, lostNote: lostCode === reason ? null : reason } : {}),
   };
   if (before.outcome !== outcome || outcome === "lost") {
     await db.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data });

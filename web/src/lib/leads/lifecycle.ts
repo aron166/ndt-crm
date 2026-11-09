@@ -54,6 +54,7 @@ export interface LeadTransition {
   action: string | null;
 }
 
+const OPEN_STAGES_FOR_CLOSE = ["new", "contacting", "discovery_booked", "qualified", "offer_sent", "demo_booked", "demo_done", "ordered", "recall"];
 const OPEN_FOR_INBOUND = ["new", "discovery_booked", "qualified", "offer_sent", "demo_booked", "demo_done", "ordered", "recall"];
 // The first call from `new` has the same outcomes as a call while contacting.
 const CALL_ROWS = (from: string): LeadTransition[] => [
@@ -95,6 +96,10 @@ export const DEFAULT_TRANSITIONS: LeadTransition[] = [
   ...OPEN_FOR_INBOUND.map((from) => ({ from, event: "inbound_received", to: "contacting", action: "call task, nurture paused" })),
   { from: "contacting", event: "inbound_received", to: "contacting", action: "call task, nurture paused" },
   { from: "lost", event: "inbound_received", to: "new", action: "history shown" },
+  // The pre-W2 outcome control (Nyitott / Vesztett) stays: it closes or reopens
+  // through the table, so every close is still a logged, reasoned move.
+  ...OPEN_STAGES_FOR_CLOSE.map((from) => ({ from, event: "lead_lost", to: "lost", action: "lost_reason (manual close)" })),
+  { from: "lost", event: "lead_reopened", to: "new", action: "call task" },
 ];
 
 export function findTransition(table: readonly LeadTransition[], from: string, event: string): LeadTransition | null {
@@ -251,6 +256,10 @@ export function entryTasks(to: string, event: string, now: Date, ctx: { recallDa
       }
       if (event === "inbound_received") return [{ title: "Bejövő válasz: hívd vissza", type: "call", dueDate: new Date(now.getTime() + HOUR) }];
       return [];
+    case "new":
+      return event === "lead_reopened" || event === "inbound_received"
+        ? [{ title: "Újranyitott lead: hívás", type: "call", dueDate: new Date(now.getTime() + HOUR) }]
+        : [];
     case "qualified":
       return [{ title: "Ajánlat összeállítása és kiküldése", type: "internal", dueDate: addWorkdays(now, 1) }];
     case "offer_sent":

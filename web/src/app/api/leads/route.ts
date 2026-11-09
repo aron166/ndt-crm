@@ -5,6 +5,7 @@ import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { leadIntakeSchema } from "@/lib/leads/schema";
 import { ingestLead } from "@/lib/leads/ingest";
+import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
 import { sendIntroMaterial, type IntroResult } from "@/lib/leads/intro";
 import { runAutomations } from "@/lib/automations/engine";
 import { serializeDates } from "@/lib/serialize";
@@ -104,6 +105,9 @@ export async function POST(request: Request) {
           personId: result.personId,
         })
       : null;
+
+    // W2 SLA timer: owner, first-call next action + task. Post-commit, fail-safe.
+    await startLeadLifecycle(key.tenantId, result.leadId);
 
     // Fire task-automation rules for the new lead (e.g. the seeded follow-up
     // task). Runs post-commit and is itself fail-safe, so it never blocks or

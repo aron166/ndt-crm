@@ -1,4 +1,6 @@
 import { runIdleAutomations } from "@/lib/automations/idle";
+import { runLifecycleSweep } from "@/lib/leads/lifecycle-sweep";
+import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 
 // Scheduled evaluator for time-based automations (deal_idle_in_stage).
@@ -14,7 +16,11 @@ export async function GET(request: Request) {
 
   try {
     const result = await runIdleAutomations();
-    return Response.json({ ok: true, ...result });
+    // W2 lead lifecycle: SLA escalation + recall wake-up (tasks and stage moves only, no sends).
+    const tenants = await db.tenant.findMany({ select: { id: true } });
+    const lifecycle = [];
+    for (const t of tenants) lifecycle.push({ tenantId: t.id, ...(await runLifecycleSweep(t.id)) });
+    return Response.json({ ok: true, ...result, lifecycle });
   } catch (err) {
     reportError("cron.automations", err);
     return Response.json({ ok: false, error: "Internal error" }, { status: 500 });

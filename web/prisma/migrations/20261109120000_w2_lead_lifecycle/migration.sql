@@ -121,7 +121,17 @@ INSERT INTO "lead_status_transitions" ("tenant_id", "from_status", "event", "to_
     (1, 'ordered', 'inbound_received', 'contacting', 'call task, nurture paused'),
     (1, 'recall', 'inbound_received', 'contacting', 'call task, nurture paused'),
     (1, 'contacting', 'inbound_received', 'contacting', 'call task, nurture paused'),
-    (1, 'lost', 'inbound_received', 'new', 'history shown');
+    (1, 'lost', 'inbound_received', 'new', 'history shown'),
+    (1, 'new', 'lead_lost', 'lost', 'lost_reason (manual close)'),
+    (1, 'contacting', 'lead_lost', 'lost', 'lost_reason (manual close)'),
+    (1, 'discovery_booked', 'lead_lost', 'lost', 'lost_reason (manual close)'),
+    (1, 'qualified', 'lead_lost', 'lost', 'lost_reason (manual close)'),
+    (1, 'offer_sent', 'lead_lost', 'lost', 'lost_reason (manual close)'),
+    (1, 'demo_booked', 'lead_lost', 'lost', 'lost_reason (manual close)'),
+    (1, 'demo_done', 'lead_lost', 'lost', 'lost_reason (manual close)'),
+    (1, 'ordered', 'lead_lost', 'lost', 'lost_reason (manual close)'),
+    (1, 'recall', 'lead_lost', 'lost', 'lost_reason (manual close)'),
+    (1, 'lost', 'lead_reopened', 'new', 'call task');
 
 -- 3. Map tenant 1 leads onto the new keys. Owners come from tenants.settings.demoHosts
 --    (the same map resolveDemoHost reads): peter = Péter, aron = Áron.
