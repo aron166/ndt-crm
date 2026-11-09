@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { userLeadCtx } from "@/lib/actor";
 import { OFFER_TEMPLATES } from "@/lib/offers/offer";
 import { acceptLeadOffer, createLeadOffer, sendLeadOffer } from "@/lib/offers/service";
+import { createOrderDocument } from "@/lib/documents/service";
+import { reportError } from "@/lib/report-error";
 
 // Lead offers (raw60): create (moves to offer_sent, sends nothing), the MANUAL
 // send button, and the manual "Ajánlat elfogadva". Every export is gated.
@@ -54,7 +56,20 @@ export async function acceptLeadOfferAction(quoteId: number) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
   const r = await acceptLeadOffer(quoteId, ctx);
+  // Acceptance makes an order (raw60 D13): the Megrendelő is stored on the lead.
+  // A failure here never undoes the acceptance; the button can be pressed again (idempotent).
+  let orderError: string | null = null;
+  if ("success" in r) {
+    try {
+      const doc = await createOrderDocument(quoteId, ctx);
+      if ("error" in doc) orderError = doc.error;
+    } catch (err) {
+      // The acceptance is committed; an exception here must not look like a failed acceptance (Vanda #B2).
+      reportError("offers.accept.orderDocument", err, { quoteId });
+      orderError = "váratlan hiba, nyomd meg újra az elfogadást";
+    }
+  }
   const leadId = await leadOfQuote(quoteId);
   if (leadId) revalidateLead(leadId);
-  return r;
+  return orderError ? { success: true as const, warning: `Elfogadva, de a megrendelő nem készült el: ${orderError}` } : r;
 }

@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/FormField";
 import { createLeadOfferAction, sendLeadOfferAction, acceptLeadOfferAction } from "@/app/actions/offers";
 import { OFFER_TEMPLATES, OFFER_TEMPLATE_LABEL, type OfferTemplate } from "@/lib/offers/offer";
+import { DOCUMENT_TITLE, type DocumentKind } from "@/lib/documents/document";
 import { formatDateTime } from "@/lib/utils";
 
 export interface LeadOffer {
@@ -18,13 +20,20 @@ export interface LeadOffer {
   acceptedAt: string | Date | null;
 }
 
+export interface LeadDocumentRow {
+  id: number;
+  kind: string;
+  number: string;
+  createdAt: string | Date;
+}
+
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "6px 10px", fontSize: 14,
   background: "var(--bg-0)", border: "1px solid var(--line-soft)",
   borderRadius: 6, color: "var(--fg)", outline: "none",
 };
 
-export function LeadOffersPanel({ leadId, offers }: { leadId: number; offers: LeadOffer[] }) {
+export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId: number; offers: LeadOffer[]; documents: LeadDocumentRow[]; status: string | null }) {
   const router = useRouter();
   const [template, setTemplate] = useState<OfferTemplate>("demo");
   const [areaM2, setAreaM2] = useState("");
@@ -70,6 +79,7 @@ export function LeadOffersPanel({ leadId, offers }: { leadId: number; offers: Le
     startTransition(async () => {
       const res = await acceptLeadOfferAction(quoteId);
       if ("error" in res) { setError(res.error); return; }
+      if ("warning" in res && res.warning) setNote(res.warning);
       router.refresh();
     });
   }
@@ -77,7 +87,7 @@ export function LeadOffersPanel({ leadId, offers }: { leadId: number; offers: Le
   return (
     <div className="card" style={{ padding: 16, marginTop: 16 }}>
       {/* PROPOSAL copy */}
-      <h2 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px" }}>Ajánlatok</h2>
+      <h2 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px" }}>Ajánlatok és dokumentumok</h2>
 
       <form onSubmit={create} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", marginBottom: 12 }}>
         {/* PROPOSAL copy */}
@@ -141,6 +151,26 @@ export function LeadOffersPanel({ leadId, offers }: { leadId: number; offers: Le
             );
           })}
         </div>
+      )}
+
+      {documents.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+          {documents.map((d) => (
+            <div key={d.id} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", fontSize: 13 }}>
+              <span>{DOCUMENT_TITLE[d.kind as DocumentKind] ?? d.kind}</span>
+              <strong>{d.number}</strong>
+              <span style={{ color: "var(--fg-mute)" }}>{formatDateTime(d.createdAt)}</span>
+              <a href={`/leads/${leadId}/documents/${d.id}/pdf`} target="_blank" rel="noreferrer" className="row-link">PDF</a>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {status === "ordered" && (
+        // PROPOSAL copy
+        <Link href={`/leads/${leadId}/signoff`} className="inline-flex items-center rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4" style={{ minHeight: 44, marginTop: 12 }}>
+          Helyszíni átvétel (aláírás)
+        </Link>
       )}
     </div>
   );

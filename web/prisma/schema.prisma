@@ -45,6 +45,7 @@ model Tenant {
   leadStatuses           LeadStatus[]
   leadStatusTransitions  LeadStatusTransition[]
   leadStatusHistory      LeadStatusHistory[]
+  leadDocuments          LeadDocument[]
   automationRules        AutomationRule[]
   automationFirings      AutomationFiring[]
   automationEmailSends   AutomationEmailSend[]
@@ -296,6 +297,7 @@ model User {
   contentNotes           ContentNote[]
   assistantConversations AssistantConversation[]
   leadStatusChanges      LeadStatusHistory[]     @relation("LeadStatusHistoryActor")
+  leadDocumentsCreated   LeadDocument[]          @relation("LeadDocumentCreator")
 
   @@map("users")
 }
@@ -379,6 +381,7 @@ model Lead {
   firings       AutomationFiring[]
   quotes        Quote[]
   statusHistory LeadStatusHistory[]
+  documents     LeadDocument[]
 
   @@unique([tenantId, threadKey])
   @@index([tenantId, nextDue])
@@ -698,12 +701,13 @@ model Quote {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  tenant  Tenant          @relation(fields: [tenantId], references: [id])
-  company Company         @relation(fields: [companyId], references: [id])
-  person  Person?         @relation(fields: [personId], references: [id])
-  lead    Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  deal    Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  items   QuoteLineItem[]
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  company   Company         @relation(fields: [companyId], references: [id])
+  person    Person?         @relation(fields: [personId], references: [id])
+  lead      Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  deal      Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  items     QuoteLineItem[]
+  documents LeadDocument[]
 
   @@unique([tenantId, quoteNumber])
   @@index([tenantId, status])
@@ -1575,4 +1579,28 @@ model ContentNote {
 
   @@index([tenantId, itemId])
   @@map("content_notes")
+}
+
+// Documents generated for a lead (lib/documents): the Megrendelő on acceptance and
+// the on-site teljesítésigazolás. `data` is frozen at creation; the PDF renders it.
+model LeadDocument {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  leadId      Int      @map("lead_id")
+  quoteId     Int?     @map("quote_id")
+  kind        String // order | completion (CHECK in the migration)
+  number      String // MR-YYYY-NNNN | TI-YYYY-NNNN
+  data        Json
+  createdById Int?     @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  lead      Lead   @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  quote     Quote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  createdBy User?  @relation("LeadDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, number])
+  @@unique([quoteId, kind])
+  @@index([tenantId, leadId])
+  @@map("lead_documents")
 }

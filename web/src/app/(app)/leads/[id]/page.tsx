@@ -41,7 +41,7 @@ export default async function LeadDetailPage({
 
   const personId = lead.contact?.person?.id ?? null;
 
-  const [interactions, auditEntries, statuses, users, openTasks, questionModel, scriptVariants, callTypeGroups, offers] = await Promise.all([
+  const [interactions, auditEntries, statuses, users, openTasks, questionModel, scriptVariants, callTypeGroups, offers, documents] = await Promise.all([
     // Per-lead touches first-class (leadId), plus the person/company timeline
     // so older/company-level history still shows. Newest first, bounded.
     db.interaction.findMany({
@@ -82,6 +82,11 @@ export default async function LeadDetailPage({
       where: { tenantId: TENANT_ID, leadId, template: { not: null } },
       select: { id: true, quoteNumber: true, template: true, status: true, createdAt: true, sentAt: true, acceptedAt: true },
       orderBy: { createdAt: "desc" },
+    }),
+    db.leadDocument.findMany({
+      where: { tenantId: TENANT_ID, leadId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, kind: true, number: true, createdAt: true },
     }),
   ]);
 
@@ -135,7 +140,7 @@ export default async function LeadDetailPage({
         answerSources={answerSourcesFrom(lead.answerSources)}
         scriptVariants={scriptVariants}
         callTypeCounts={callTypeGroups.map((g) => ({ callType: g.callType, count: g._count._all }))}
-        offersPanel={<LeadOffersPanel leadId={leadId} offers={serializeDates(offers)} />}
+        offersPanel={<LeadOffersPanel leadId={leadId} offers={serializeDates(offers)} documents={serializeDates(documents)} status={lead.status} />}
       />
     </div>
   );
