@@ -261,23 +261,3 @@ export function daysSince(date: Date | string | null | undefined, now: Date = ne
   if (!date) return null;
   return Math.max(0, Math.floor((now.getTime() - new Date(date).getTime()) / 86_400_000));
 }
-
-/**
- * Ask for the mandatory lost reason from the two manual outcome dropdowns (lead
- * card + lead detail). Returns null when the user cancels or types nothing usable
- * — the caller aborts, so a lead is never closed as lost without a why.
- *
- * ponytail: `window.prompt`, matching the `confirm()`/`alert()` already used on
- * both surfaces. The high-frequency path (setter logging a call) gets a real
- * required field in CallOutcomeModal; upgrade this to a dialog if the manual
- * dropdown turns out to be used often.
- */
-export function promptLostReason(): string | null {
-  const raw = window.prompt("Miért veszett el a lead? (kötelező)");
-  const reason = raw?.trim() ?? "";
-  if (reason.length < LOST_REASON_MIN) {
-    if (raw !== null) window.alert("Az elvesztés oka kötelező (min. 3 karakter).");
-    return null;
-  }
-  return reason.slice(0, LOST_REASON_MAX);
-}

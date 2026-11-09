@@ -4,7 +4,9 @@ import { useState, useTransition } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { moveLead, type MoveLeadDetails } from "@/app/actions/leads";
-import { LOST_REASONS, RECALL_REASONS, OFFER_TYPES } from "@/lib/leads/lifecycle";
+import {
+  LOST_REASONS, LOST_REASON_LABEL, RECALL_REASONS, RECALL_REASON_LABEL, OFFER_TYPES, OFFER_TYPE_LABEL,
+} from "@/lib/leads/lifecycle";
 
 const FIELD = {
   width: "100%", fontSize: 14, padding: "6px 10px", borderRadius: 6,
@@ -51,10 +53,10 @@ export function LeadMoveDialog({
   const label = (text: string, id: string) => (
     <label htmlFor={id} className="block text-sm" style={{ color: "var(--fg-mute)", marginBottom: 2 }}>{text}</label>
   );
-  const select = (id: string, value: string, set: (v: string) => void, options: readonly string[]) => (
+  const select = (id: string, value: string, set: (v: string) => void, options: readonly string[], labels: Record<string, string>, empty = "-") => (
     <select id={id} value={value} onChange={(e) => set(e.target.value)} style={FIELD}>
-      <option value="">-</option>
-      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      <option value="">{empty}</option>
+      {options.map((o) => <option key={o} value={o}>{labels[o] ?? o}</option>)}
     </select>
   );
 
@@ -80,7 +82,7 @@ export function LeadMoveDialog({
             <div>
               {/* PROPOSAL copy */}
               {label("Ajánlat típusa", "move-offer-type")}
-              {select("move-offer-type", offerType, setOfferType, OFFER_TYPES)}
+              {select("move-offer-type", offerType, setOfferType, OFFER_TYPES, OFFER_TYPE_LABEL)}
             </div>
           )}
           {target === "lost" && (
@@ -88,11 +90,11 @@ export function LeadMoveDialog({
               <div>
                 {/* PROPOSAL copy */}
                 {label("Elvesztés oka", "move-lost-reason")}
-                {select("move-lost-reason", lostReason, setLostReason, LOST_REASONS)}
+                {select("move-lost-reason", lostReason, setLostReason, LOST_REASONS, LOST_REASON_LABEL, "Válassz okot" /* PROPOSAL copy */)}
               </div>
               <div>
                 {/* PROPOSAL copy */}
-                {label("Megjegyzés", "move-lost-note")}
+                {label(lostReason === "other" ? "Megjegyzés (kötelező)" : "Megjegyzés", "move-lost-note")}
                 <textarea id="move-lost-note" rows={3} value={lostNote} onChange={(e) => setLostNote(e.target.value)} style={FIELD} />
               </div>
             </>
@@ -102,7 +104,7 @@ export function LeadMoveDialog({
               <div>
                 {/* PROPOSAL copy */}
                 {label("Visszahívás oka", "move-recall-reason")}
-                {select("move-recall-reason", recallReason, setRecallReason, RECALL_REASONS)}
+                {select("move-recall-reason", recallReason, setRecallReason, RECALL_REASONS, RECALL_REASON_LABEL)}
               </div>
               <div>
                 {/* PROPOSAL copy */}

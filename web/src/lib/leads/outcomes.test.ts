@@ -115,7 +115,7 @@ describe("planCallOutcome", () => {
     expect(a.transition?.to).toBe("lost");
     expect(a.input.lostReason).toBe("no_need");
     expect(a.input.lostNote).toBe("Van saját szkennerük");
-    expect(p("disqualified", lead("new"), { lostReason: "Nincs betonszerkezetük" }).input.lostReason).toBe("not_our_service");
+    expect(p("disqualified", lead("new"), { lostReason: "Nincs betonszerkezetük" }).input.lostReason).toBe("unqualified");
     expect(p("wrong_number", lead("new")).input.lostReason).toBe("invalid_contact");
   });
   it("an explicit lostCode overrides the default", () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { LOST_REASONS, LOST_REASON_LABEL, isLostReason } from "@/lib/leads/lifecycle";
 import { useRef, useState, useTransition } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -96,7 +97,12 @@ export function LeadEditModal({ open, onClose, onSaved, initial }: LeadEditModal
           </FormField>
 
           <FormField label="Elvesztés oka">
-            <Input name="lostReason" defaultValue={initial.lostReason ?? ""} placeholder="Ha elveszett, miért" />
+            {/* The reason is a code (Péter's list); a legacy free-text value stays selectable as is. */}
+            <select name="lostReason" defaultValue={initial.lostReason ?? ""} className="font-mono-ndt" style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line-soft)", background: "var(--bg-1)", color: "var(--fg)" }}>
+              <option value="">-</option>
+              {initial.lostReason && !isLostReason(initial.lostReason) && <option value={initial.lostReason}>{initial.lostReason}</option>}
+              {LOST_REASONS.map((k) => <option key={k} value={k}>{LOST_REASON_LABEL[k]}</option>)}
+            </select>
           </FormField>
 
           <FormField label="Kampány">
