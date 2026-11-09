@@ -34,6 +34,7 @@ vi.mock("@/lib/db", () => ({
     user: { findFirst: vi.fn() },
     interaction: { create: vi.fn() },
     company: { updateMany: vi.fn() },
+    pipeline: { findFirst: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -42,6 +43,7 @@ type M = ReturnType<typeof vi.fn>;
 const mockDb = db as unknown as {
   lead: { findFirst: M; updateMany: M };
   task: { updateMany: M; create: M };
+  pipeline: { findFirst: M };
   $transaction: M;
 };
 const ctx: LeadCtx = { tenantId: 1, userId: 2, actor: "user" };
@@ -61,6 +63,7 @@ let txTaskUpdateMany: ReturnType<typeof vi.fn>;
 let txTaskCreate: ReturnType<typeof vi.fn>;
 let txLeadUpdateMany: ReturnType<typeof vi.fn>;
 let txHistoryCreate: ReturnType<typeof vi.fn>;
+let txDealCreate: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -71,6 +74,8 @@ beforeEach(() => {
   txTaskCreate = vi.fn().mockResolvedValue({ id: 99 });
   txLeadUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
   txHistoryCreate = vi.fn().mockResolvedValue({ id: 1 });
+  txDealCreate = vi.fn().mockResolvedValue({ id: 500 });
+  mockDb.pipeline.findFirst.mockResolvedValue({ id: 3, stages: [{ id: 4 }] });
   mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
       interaction: { create: vi.fn().mockResolvedValue({ id: 55 }) },
@@ -78,6 +83,7 @@ beforeEach(() => {
       lead: { updateMany: txLeadUpdateMany },
       leadStatusHistory: { create: txHistoryCreate },
       company: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      deal: { create: txDealCreate, aggregate: vi.fn().mockResolvedValue({ _max: { position: null } }) },
     }),
   );
 });
@@ -146,6 +152,47 @@ describe("changeLeadStatus: the transition table and the open-lead rule", () => 
     expect(txLeadUpdateMany.mock.calls[0][0].data).toMatchObject({
       status: "lost", outcome: "lost", lostReason: "other", lostNote: "kiderült: bérbeadó", nextAction: null,
     });
+  });
+});
+
+describe("changeLeadStatus: won converts the lead to a Deal", () => {
+  const ORDERED = { ...LEAD, status: "ordered", offerType: "service", nextAction: "Fizetés", nextDue: new Date("2026-09-20T10:00:00Z") };
+
+  it("ordered -> won creates one deal, claims the lead, then writes the move as won", async () => {
+    mockDb.lead.findFirst.mockResolvedValue(ORDERED);
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ success: true, changed: true });
+    expect(txDealCreate).toHaveBeenCalledTimes(1);
+    expect(txDealCreate.mock.calls[0][0].data.customFields).toEqual({ fromLeadId: 10, offerType: "service" });
+    const claim = txLeadUpdateMany.mock.calls[0][0];
+    expect(claim.where).toMatchObject({ id: 10, convertedDealId: null });
+    expect(claim.data).toMatchObject({ convertedDealId: 500 });
+    const move = txLeadUpdateMany.mock.calls.find((c) => c[0].data.status === "won")![0];
+    expect(move.data).toMatchObject({ status: "won", outcome: "won" });
+    expect(txLeadUpdateMany.mock.invocationCallOrder[0]).toBeGreaterThan(txDealCreate.mock.invocationCallOrder[0]);
+  });
+
+  it("is idempotent: an already converted lead creates no second deal and still moves", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...ORDERED, convertedDealId: 77 });
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ success: true, changed: true });
+    expect(txDealCreate).not.toHaveBeenCalled();
+    expect(txLeadUpdateMany.mock.calls.some((c) => c[0].data.status === "won")).toBe(true);
+  });
+
+  it("refuses without a company and writes no status and no history", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...ORDERED, companyId: null, company: null });
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ error: "A leadhez nincs cég társítva" });
+    expect(txDealCreate).not.toHaveBeenCalled();
+    expect(txHistoryCreate).not.toHaveBeenCalled();
+    expect(txLeadUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("a non-won move never touches deal.create", async () => {
+    const res = await changeLeadStatus(10, "qualified", ctx, { offerType: "service" });
+    expect(res).toEqual({ success: true, changed: true });
+    expect(txDealCreate).not.toHaveBeenCalled();
   });
 });
 

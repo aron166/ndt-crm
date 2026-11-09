@@ -106,6 +106,13 @@ describe("planTransition", () => {
     if ("error" in r) throw new Error(r.error);
     expect(r.data).toMatchObject({ status: "new", outcome: "open", closedAt: null });
   });
+  it("ordered -> won (order_won) closes the lead as won and plans the handover task", () => {
+    const r = planTransition(lead("ordered", { nextAction: "x", nextDue: now }), row("ordered", "order_won"), {}, now);
+    if ("error" in r) throw new Error(r.error);
+    expect(r.data).toMatchObject({ status: "won", outcome: "won", closedAt: now, nextAction: null, nextDue: null });
+    expect(r.tasks).toHaveLength(1);
+    expect(r.tasks[0].title).toContain("Átadás");
+  });
   it("a from mismatch errors", () => {
     expect(err(planTransition(lead("new"), row("contacting", "call_no_answer"), {}, now))).toContain("Nem engedélyezett");
   });
