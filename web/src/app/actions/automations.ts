@@ -69,6 +69,8 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
     if (!statuses.some((st) => st.key === toStatus)) {
       return { error: "Ismeretlen célstátusz" };
     }
+    // Won creates a real Deal (W2): a human decides that, never an unattended rule.
+    if (toStatus === "won") return { error: "Megnyert státuszba automatizmus nem léptethet" };
     actionConfig.toStatus = toStatus;
   } else if (actionType === "assign_lead") {
     if (!Number.isInteger(Number(actionConfig.assignedToId)) || Number(actionConfig.assignedToId) <= 0) {

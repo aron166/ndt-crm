@@ -180,6 +180,16 @@ describe("changeLeadStatus: won converts the lead to a Deal", () => {
     expect(txLeadUpdateMany.mock.calls.some((c) => c[0].data.status === "won")).toBe(true);
   });
 
+  it("deal and move share ONE transaction: a stale move rolls the deal back (Vanda follow-up #1)", async () => {
+    mockDb.lead.findFirst.mockResolvedValue(ORDERED);
+    // claim succeeds, the guarded move finds the lead changed (0 rows)
+    txLeadUpdateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ error: "A lead időközben változott, frissítsd az oldalt" });
+    expect(mockDb.$transaction).toHaveBeenCalledTimes(1);
+    expect(txHistoryCreate).not.toHaveBeenCalled();
+  });
+
   it("refuses without a company and writes no status and no history", async () => {
     mockDb.lead.findFirst.mockResolvedValue({ ...ORDERED, companyId: null, company: null });
     const res = await changeLeadStatus(10, "won", ctx);
