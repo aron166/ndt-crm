@@ -592,6 +592,7 @@ export async function logLeadCallOutcome(
       data: {
         tenantId: ctx.tenantId, leadId, companyId: lead.companyId, personId, userId: ctx.userId,
         type: "call", direction: "outbound", outcome: input.outcome, notes: input.note,
+        callType: input.callType ?? null,
         occurredAt: input.occurredAt ?? now,
         scriptVariant: input.scriptVariant ?? null,
         technologyWord: input.technologyWord ?? null,

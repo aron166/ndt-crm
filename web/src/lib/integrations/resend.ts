@@ -53,6 +53,8 @@ export interface SendEmailInput {
   personId?: number | null;
   /** Skip the interaction log (used for connection test sends). */
   skipLog?: boolean;
+  /** Files to attach (Resend: base64 content). */
+  attachments?: { filename: string; content: string }[];
 }
 
 /** Send a test email to the configured From address to verify the credentials. */
@@ -108,6 +110,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         subject,
         text: input.text,
         ...(input.replyTo ? { reply_to: input.replyTo } : {}),
+        ...(input.attachments?.length ? { attachments: input.attachments } : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));
