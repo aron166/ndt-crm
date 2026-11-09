@@ -98,7 +98,7 @@ describe("planTransition", () => {
   });
   it("entering qualified without offerType errors; with the lead's own offerType passes", () => {
     const t = row("contacting", "call_qualified");
-    expect(err(planTransition(lead("contacting"), t, {}, now))).toContain("ajánlat típusa");
+    expect(err(planTransition(lead("contacting"), t, {}, now))).toContain("ajánlat típusát");
     expect(err(planTransition(lead("contacting", { offerType: "rental" }), t, {}, now))).toBeNull();
   });
   it("leaving lost sets outcome open", () => {
