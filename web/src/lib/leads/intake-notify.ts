@@ -103,13 +103,14 @@ export function nextStepLine(intent: string | null): string {
 // (peter-wiki Pricing_Model, raw34: own machine pays off around 10 000 m2 a year).
 // Any answer we do not recognise gives no line; the caller falls back to plain.
 
+const NB = "\u00a0"; // no-break space: figures and units never wrap apart
 const ELEMENT: Record<string, string> = { wall: "falról", slab: "födémről vagy aljzatról", bridge: "hídról vagy műtárgyról" };
 const SIZE: Record<string, string> = {
-  under_50: "50 m² alatti", "50_300": "kb. 50-300 m²-es", "300_1000": "kb. 300-1000 m²-es", over_1000: "1000 m² feletti",
+  under_50: `50${NB}m² alatti`, "50_300": `kb. 50-300${NB}m²-es`, "300_1000": `kb. 300-1000${NB}m²-es`, over_1000: `1000${NB}m² feletti`,
 };
 const TIMING: Record<string, string> = { this_week: "még ezen a héten lenne aktuális", two_weeks: "két héten belül lenne aktuális", no_date: "még nincs konkrét időpont" };
 const GOAL_FACT: Record<string, string> = {
-  before_drilling: "Fúrás, vágás vagy bontás előtt a betonvas helyét milliméteres pontossággal jelöljük ki.",
+  before_drilling: "Fúrás, vágás vagy bontás előtt bontás nélkül, milliméteres pontossággal feltérképezzük a betonvas helyét.",
   condition: "Állapotfelmérésnél bontás nélkül mérjük fel a betonvas helyét és a betontakarást, milliméteres pontossággal.",
 };
 const INTEREST_FACT: Record<string, string> = {
@@ -117,30 +118,45 @@ const INTEREST_FACT: Record<string, string> = {
   condition: "Röviden: állapotfelmérésnél bontás nélkül látjuk, hol van a betonvas és mekkora rajta a betontakarás.",
   what_for: "Röviden: a betonradar bontás nélkül mutatja meg, hol van a betonvas és milyen mélyen, milliméteres pontossággal.",
 };
+const DEVICE_MODE: Record<string, string> = {
+  rent: "a bérlés érdekli", buy: "a vásárlás érdekli", undecided: "még nem döntötte el, bérelne vagy venne",
+};
+const ANNUAL_AREA: Record<string, string> = {
+  under_1000: `évi 1000${NB}m² alatti`, "1000_10000": `évi 1000-10${NB}000${NB}m²-es`, over_10000: `évi 10${NB}000${NB}m² feletti`,
+};
+
+/**
+ * Lookup by the lead's own answer, OWN keys only: the answers are an open string
+ * map, so "constructor" or "__proto__" must give nothing, never an inherited value.
+ */
+function pick(map: Record<string, string>, key: string | undefined): string | undefined {
+  return key !== undefined && Object.hasOwn(map, key) ? map[key] : undefined;
+}
 
 /** Pure: 0-2 lines built only from the lead's own answers; [] when nothing reliable. */
 export function personalLines(intent: string | null, a: Record<string, string> = {}): string[] {
   if (intent === "service_concrete") {
-    const element = ELEMENT[a.concrete];
-    if (!element) return [];
-    const size = SIZE[a.size];
-    const when = TIMING[a.timing];
-    const first = `Láttuk, hogy egy ${size ? `${size} ` : ""}${element} van szó${when ? `, és ${when}` : ""}. A hívásban ehhez igazítjuk a mérési tervet.`;
-    return GOAL_FACT[a.goal] ? [first, GOAL_FACT[a.goal]] : [first];
+    const element = pick(ELEMENT, a.concrete);
+    const goal = pick(GOAL_FACT, a.goal);
+    if (!element) return goal ? [goal] : [];
+    const size = pick(SIZE, a.size);
+    const when = pick(TIMING, a.timing);
+    const first = `Az űrlapja alapján egy ${size ? `${size} ` : ""}${element} van szó${when ? `, és ${when}` : ""}. A hívásban ehhez igazítjuk a mérési tervet.`;
+    return goal ? [first, goal] : [first];
   }
   if (intent === "rental" || intent === "purchase" || intent === "device") {
-    const mode = a.device_mode === "rent" ? "a bérlés érdekli"
-      : a.device_mode === "buy" ? "a vásárlás érdekli"
-      : a.device_mode === "undecided" ? "még nem döntötte el, bérelne vagy venne" : null;
-    const area = a.annual_area === "under_1000" || a.annual_area === "1000_10000"
-      ? "Évi 10 000 m² alatt a saját gép (kezelővel, kiszállással együtt) általában drágább, mint a mérési szolgáltatásunk; ezt a hívásban a saját számaival összevetjük."
-      : a.annual_area === "over_10000"
-        ? "Évi 10 000 m² felett már a saját gép lehet a jobb megoldás; a hívásban összevetjük a bérlést és a vásárlást."
-        : null;
-    return [...(mode ? [`Láttuk, hogy ${mode}.`] : []), ...(area ? [area] : [])];
+    // No pricing claim here (Vanda #160-A2/A3): the break-even depends on the
+    // operator and on renting vs buying, so we only promise to compare, with their figure.
+    const mode = pick(DEVICE_MODE, a.device_mode);
+    const area = pick(ANNUAL_AREA, a.annual_area);
+    return [
+      ...(mode ? [`Az űrlapja alapján ${mode}.`] : []),
+      ...(area ? [`A hívásban az ${area} mennyiség alapján összevetjük, hogy a bérlés, a vásárlás vagy a mérési szolgáltatásunk éri meg jobban.`] : []),
+    ];
   }
   if (intent === "service_vague" || intent === "info") {
-    return INTEREST_FACT[a.interest] ? [INTEREST_FACT[a.interest]] : [];
+    const fact = pick(INTEREST_FACT, a.interest);
+    return fact ? [fact] : [];
   }
   return [];
 }
