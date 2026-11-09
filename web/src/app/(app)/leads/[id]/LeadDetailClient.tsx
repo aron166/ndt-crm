@@ -14,7 +14,7 @@ import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/le
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
-import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
+import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, type LeadOutcome } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
@@ -131,7 +131,8 @@ export function LeadDetailClient({
   const [assignedTo, setAssignedTo] = useState(String(lead.assignedToId ?? ""));
   // Resync when a successful assign (or any other refresh) brings new props in.
   useEffect(() => { setAssignedTo(String(lead.assignedToId ?? "")); }, [lead.assignedToId]);
-  const closed = outcome !== "open" || converted !== null;
+  // A lost lead stays workable: call log allowed, status select can reopen it.
+  const closed = outcome === "won" || converted !== null;
 
   function handleDelete() {
     const label = lead.serviceInterest || lead.subject || `Lead #${lead.id}`;
@@ -158,18 +159,13 @@ export function LeadDetailClient({
   }
 
   function handleOutcome(next: LeadOutcome) {
-    // A lost lead must say WHY (Péter, 2026-09-07); an already-lost lead keeps
-    // the stored reason, so only ask when there is none yet.
-    let reason: string | null = null;
-    if (next === "lost" && !lead.lostReason) {
-      reason = promptLostReason();
-      if (reason === null) return;
-    }
+    // Lost opens the move dialog so the user picks a Hungarian reason; cancel leaves the select as is.
+    if (next === "lost") { setMoveTarget("lost"); return; }
     const prev = outcome;
     setOutcome(next);
     setActionError(null);
     startOutcome(async () => {
-      const res = await setLeadOutcomeAction(lead.id, next, reason);
+      const res = await setLeadOutcomeAction(lead.id, next);
       if ("error" in res) { setOutcome(prev); setActionError(res.error); router.refresh(); return; }
       if (res.dealId) setConverted(res.dealId);
       router.refresh();
@@ -258,7 +254,7 @@ export function LeadDetailClient({
               target={moveTarget}
               targetLabel={statuses.find((s) => s.key === moveTarget)?.label ?? moveTarget}
               onClose={() => setMoveTarget(null)}
-              onMoved={() => { setStatus(moveTarget); setMoveTarget(null); router.refresh(); }}
+              onMoved={() => { setStatus(moveTarget); if (moveTarget === "lost") setOutcome("lost"); setMoveTarget(null); router.refresh(); }}
             />
           )}
 

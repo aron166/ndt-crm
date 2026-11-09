@@ -12,7 +12,7 @@ import { MAX_ATTEMPTS } from "@/lib/leads/lifecycle";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import {
-  LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, promptLostReason, type LeadOutcome,
+  LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, type LeadOutcome,
 } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
@@ -324,18 +324,13 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
 
   function handleOutcome(id: number, outcome: LeadOutcome) {
     if (outcome === "open") return;
-    // A lost lead must say WHY (Péter, 2026-09-07). The server rejects it either
-    // way; this asks before we optimistically pull the card off the board.
-    let reason: string | null = null;
-    if (outcome === "lost") {
-      reason = promptLostReason();
-      if (reason === null) return;
-    }
+    // Lost opens the move dialog (Hungarian reason picker) instead of a prompt.
+    if (outcome === "lost") { setMoving({ id, target: "lost" }); return; }
     // Won/lost leave the active board — optimistic remove; a failure puts it back.
     const snapshot = leads;
     setLeads((prev) => prev.filter((l) => l.id !== id));
     startTransition(async () => {
-      const res = await setLeadOutcomeAction(id, outcome, reason);
+      const res = await setLeadOutcomeAction(id, outcome);
       if (res && "error" in res) { setLeads(snapshot); setError(res.error); return; }
       router.refresh();
     });
