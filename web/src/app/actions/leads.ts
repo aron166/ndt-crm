@@ -1,6 +1,7 @@
 "use server";
 
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
@@ -9,6 +10,7 @@ import {
   changeLeadStatus, setLeadOutcome, assignLead, logLeadCallOutcome, setLeadQualification,
 } from "@/lib/leads/service";
 import type { LeadOutcome } from "@/lib/leads/outcomes";
+import { LOST_REASONS, LOST_NOTE_MAX, OFFER_TYPES, RECALL_REASONS } from "@/lib/leads/lifecycle";
 import { userLeadCtx } from "@/lib/actor";
 import { setTenantSettings } from "@/lib/tenant-settings";
 import { parseQuestionList, parseQuestionSets } from "@/lib/leads/qualification";
@@ -50,23 +52,38 @@ export async function deleteLead(
   return { success: true };
 }
 
-export async function moveLead(leadId: number, newStatus: string) {
+/** Stage-move details from the board / lead page (W2). Plain JSON: dates are ISO strings. */
+const moveDetailsSchema = z.object({
+  event: z.string().trim().min(1).max(64).optional(),
+  nextAction: z.string().trim().min(1).max(500).optional(),
+  nextDue: z.coerce.date().optional(),
+  offerType: z.enum(OFFER_TYPES).optional(),
+  lostReason: z.enum(LOST_REASONS).optional(),
+  lostNote: z.string().trim().max(LOST_NOTE_MAX).optional(),
+  recallReason: z.enum(RECALL_REASONS).optional(),
+  recallDate: z.coerce.date().optional(),
+}).strict();
+export type MoveLeadDetails = z.input<typeof moveDetailsSchema>;
+
+export async function moveLead(leadId: number, newStatus: string, details: MoveLeadDetails = {}) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
-  const res = await changeLeadStatus(leadId, newStatus, ctx);
+  const parsed = moveDetailsSchema.safeParse(details);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Érvénytelen adat" };
+  const res = await changeLeadStatus(leadId, newStatus, ctx, parsed.data);
   if ("error" in res) return res;
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
-  // Moving the card completes the lead's open callback task (changeLeadStatus →
-  // completeOpenLeadCallTasks), so the task surfaces are stale too.
+  // Moving the card completes the lead's open callback task and creates the
+  // stage's tasks, so the task surfaces are stale too.
   revalidatePath("/tasks");
   return { success: true };
 }
 
-export async function updateLeadStatus(leadId: number, newStatus: string) {
+export async function updateLeadStatus(leadId: number, newStatus: string, details: MoveLeadDetails = {}) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
-  return moveLead(leadId, newStatus);
+  return moveLead(leadId, newStatus, details);
 }
 
 /** Lead → deal hand-off (the `won` door). Logic lives in lib/leads/service.ts. */
