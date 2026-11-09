@@ -1,0 +1,59 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { db } from "@/lib/db";
+import { getResendConfig, sendEmail } from "@/lib/integrations/resend";
+import { formAlertText, sendFormAlert } from "./form-alert";
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
+vi.mock("@/lib/integrations/resend", () => ({ getResendConfig: vi.fn(), sendEmail: vi.fn() }));
+vi.mock("@/lib/db", () => ({
+  db: {
+    tenant: { findUnique: vi.fn() },
+    lead: { findFirst: vi.fn() },
+    user: { findMany: vi.fn() },
+  },
+}));
+
+const d = vi.mocked(db, true);
+
+describe("formAlertText", () => {
+  it("has name, phone, answers, call window and the lead link", () => {
+    const { subject, text } = formAlertText({
+      id: 12, company: "ZMT", contactName: "Kiss Anna", email: "a@b.hu", phone: "+36301234567",
+      intent: "demo", callWindow: "délután", message: null, answers: { size: "500 m2", empty: "" }, tier: null,
+    }, "https://x.test");
+    expect(subject).toContain("Kiss Anna");
+    expect(text).toContain("Kiss Anna");
+    expect(text).toContain("+36301234567");
+    expect(text).toContain("- size: 500 m2");
+    expect(text).not.toContain("- empty");
+    expect(text).toContain("délután");
+    expect(text).toContain("https://x.test/leads/12");
+  });
+});
+
+describe("sendFormAlert", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    d.tenant.findUnique.mockResolvedValue({ settings: { demoHosts: { aron: 1, peter: 2 } } } as never);
+    d.lead.findFirst.mockResolvedValue({
+      id: 12, intent: null, message: null, qualification: { call_window: "reggel" }, customFields: { contact_email: "lead@x.hu" },
+      tier: null, company: { name: "ZMT" }, contact: { email: null, phone: "1", person: null },
+    } as never);
+    d.user.findMany.mockResolvedValue([{ email: "aron@crm.hu" }, { email: "peter@crm.hu" }] as never);
+    vi.mocked(sendEmail).mockResolvedValue({ ok: true } as never);
+  });
+
+  it("is a no-op without Resend config", async () => {
+    vi.mocked(getResendConfig).mockResolvedValue(null);
+    expect(await sendFormAlert(1, 12)).toEqual({ sent: 0 });
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("sends only to the demoHosts users, never to the lead", async () => {
+    vi.mocked(getResendConfig).mockResolvedValue({} as never);
+    expect(await sendFormAlert(1, 12)).toEqual({ sent: 2 });
+    expect(vi.mocked(sendEmail).mock.calls.map((c) => c[0].to)).toEqual(["aron@crm.hu", "peter@crm.hu"]);
+    expect(d.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 1, id: { in: [1, 2] } } }));
+  });
+});
