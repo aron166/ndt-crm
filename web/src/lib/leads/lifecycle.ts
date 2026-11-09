@@ -159,6 +159,8 @@ export const DEFAULT_TRANSITIONS: LeadTransition[] = [
   { from: "demo_done", event: "demo_followed_up", to: "demo_done", action: "follow-up day 3, 7, 14" },
   { from: "demo_done", event: "demo_expired", to: "recall", action: "closing email task, recall no_decision" },
   { from: "ordered", event: "order_won", to: "won", action: "handover task" },
+  // Work done and signed on site (teljesítésigazolás), not paid yet: still ordered, invoice task.
+  { from: "ordered", event: "work_completed", to: "ordered", action: "teljesítésigazolás signed on site, invoice task (manual)" },
   { from: "ordered", event: "payment_reminded", to: "ordered", action: "payment reminder call; day 15 escalate to Áron" },
   { from: "recall", event: "recall_date_reached", to: "contacting", action: "review note, one personal touch" },
   { from: "recall", event: "recall_unreachable_twice", to: "lost", action: "none" },
