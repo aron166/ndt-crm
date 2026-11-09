@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { reportError } from "@/lib/report-error";
 import { db } from "@/lib/db";
 import { getResendConfig, sendEmail } from "@/lib/integrations/resend";
 import { formAlertText, sendFormAlert } from "./form-alert";
@@ -30,6 +31,14 @@ describe("formAlertText", () => {
     expect(text).toContain("délután");
     expect(text).toContain("https://x.test/leads/12");
   });
+
+  it("prints non-string answers as JSON", () => {
+    const { text } = formAlertText({
+      id: 1, company: null, contactName: null, email: null, phone: null,
+      intent: null, callWindow: null, message: null, answers: { opts: { a: 1 } }, tier: null,
+    }, "https://x.test");
+    expect(text).toContain('- opts: {"a":1}');
+  });
 });
 
 describe("sendFormAlert", () => {
@@ -55,5 +64,12 @@ describe("sendFormAlert", () => {
     expect(await sendFormAlert(1, 12)).toEqual({ sent: 2 });
     expect(vi.mocked(sendEmail).mock.calls.map((c) => c[0].to)).toEqual(["aron@crm.hu", "peter@crm.hu"]);
     expect(d.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 1, id: { in: [1, 2] } } }));
+  });
+
+  it("reports when no recipients resolve", async () => {
+    vi.mocked(getResendConfig).mockResolvedValue({} as never);
+    d.tenant.findUnique.mockResolvedValue({ settings: {} } as never);
+    expect(await sendFormAlert(1, 12)).toEqual({ sent: 0 });
+    expect(reportError).toHaveBeenCalledWith("leads.formAlert.noRecipients", expect.any(Error), { leadId: 12 });
   });
 });

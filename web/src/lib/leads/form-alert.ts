@@ -16,7 +16,7 @@ export function formAlertText(lead: {
   intent: string | null; callWindow: string | null; message: string | null; answers: Record<string, unknown>; tier: string | null;
 }, base = BASE): { subject: string; text: string } {
   const answers = Object.entries(lead.answers).filter(([, v]) => v != null && v !== "")
-    .map(([k, v]) => `- ${k}: ${String(v)}`);
+    .map(([k, v]) => `- ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`);
   return {
     subject: `Új űrlapos lead: ${lead.contactName ?? lead.company ?? `#${lead.id}`}${lead.tier ? ` (${lead.tier})` : ""}`,
     text: [
@@ -70,9 +70,10 @@ export async function sendFormAlert(tenantId: number, leadId: number): Promise<{
       callWindow: s(q.call_window) ?? s(cf.call_window),
       message: lead.message, answers: q, tier: lead.tier,
     });
+    if (!users.length) reportError("leads.formAlert.noRecipients", new Error("no demoHosts users"), { leadId });
+    const results = await Promise.all(users.map((u) => sendEmail({ tenantId, to: u.email, subject, text, skipLog: true })));
     let sent = 0;
-    for (const u of users) {
-      const r = await sendEmail({ tenantId, to: u.email, subject, text, skipLog: true });
+    for (const r of results) {
       if (r.ok) sent++; else reportError("leads.formAlert.send", new Error(r.error), { leadId });
     }
     return { sent };

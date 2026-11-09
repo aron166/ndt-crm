@@ -46,7 +46,7 @@ export function LeadOffersPanel({ leadId, offers }: { leadId: number; offers: Le
       });
       if ("error" in res) { setError(res.error); return; }
       // PROPOSAL copy
-      if (res.hasPlaceholders) setNote("Az ajánlatban egyeztetés alatti adat van: kiküldés előtt pótold a beállításokban.");
+      if (res.hasPlaceholders) setNote("Az ajánlatban egyeztetés alatti adat van (ár vagy cégadat): így nem küldhető ki. Az adatokat Nate tölti fel a konfigurációba.");
       router.refresh();
     });
   }

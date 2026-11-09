@@ -2,7 +2,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import type { LeadCtx } from "./service";
-import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
+import { CALL_TYPE_KEYS, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
 import { answersRecordSchema } from "./qualification";
 import { LOST_REASONS, LOST_NOTE_MAX, OFFER_TYPES, RECALL_REASONS } from "./lifecycle";
 
@@ -100,7 +100,7 @@ export const leadInteractionWireSchema = z.object({
   lost_reason: z.preprocess(emptyToUndef, z.string().optional()),
   assigned_to_id: optInt,
   script_variant: z.preprocess(emptyToUndef, z.string().optional()),
-  call_type: z.preprocess(emptyToUndef, z.string().optional()),
+  call_type: z.preprocess(emptyToUndef, z.enum(CALL_TYPE_KEYS).optional()),
 });
 export function toCallOutcomeInput(w: z.infer<typeof leadInteractionWireSchema>) {
   return {

@@ -65,13 +65,14 @@ export async function correctCallOutcome(interactionId: number, leadId: number, 
   outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
   bookingAt?: string | null; bookingKind?: string | null;
   lostReason?: string | null; scriptVariant?: string | null; technologyWord?: string | null;
+  callType?: string | null;
 }) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
 
   const original = await db.interaction.findFirst({
     where: { id: interactionId, tenantId: TENANT_ID },
-    select: { leadId: true, technologyWord: true, scriptVariant: true },
+    select: { leadId: true, technologyWord: true, scriptVariant: true, callType: true },
   });
   if (!original) return { error: "Interakció nem található" };
   if (!original.leadId) return { error: "Az interakcióhoz nincs lead társítva" };
@@ -85,6 +86,7 @@ export async function correctCallOutcome(interactionId: number, leadId: number, 
   // `input` always wins over the carried-forward one.
   const technologyWord = input.technologyWord ?? original.technologyWord ?? undefined;
   const scriptVariant = input.scriptVariant ?? original.scriptVariant ?? undefined;
+  const callType = input.callType ?? original.callType ?? undefined;
 
   const res = await logLeadCallOutcome(
     leadId,
@@ -99,6 +101,7 @@ export async function correctCallOutcome(interactionId: number, leadId: number, 
       ...(input.lostReason ? { lostReason: input.lostReason } : {}),
       ...(scriptVariant ? { scriptVariant } : {}),
       ...(technologyWord ? { technologyWord } : {}),
+      ...(callType ? { callType } : {}),
     },
     ctx,
   );

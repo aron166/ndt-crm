@@ -74,7 +74,7 @@ export default async function LeadDetailPage({
     getScriptVariants(TENANT_ID),
     db.interaction.groupBy({
       by: ["callType"],
-      where: { tenantId: TENANT_ID, leadId, type: "call" },
+      where: { tenantId: TENANT_ID, leadId, type: "call", supersededBy: { none: {} } },
       _count: { _all: true },
     }),
     db.quote.findMany({
