@@ -504,7 +504,7 @@ export function planTransition(
 
   if (t.to === "qualified" && !self) {
     const offerType = input.offerType ?? lead.offerType;
-    if (!offerType) return { error: "Minősítéshez az ajánlat típusa kötelező (service / rental / purchase)" };
+    if (!offerType) return { error: "Minősítéshez válaszd ki az ajánlat típusát (szolgáltatás, bérlés vagy vásárlás)" };
     data.offerType = offerType;
   } else if (input.offerType) {
     data.offerType = input.offerType;
