@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
+import { createHash } from "node:crypto";
 import { sendEmail } from "@/lib/integrations/resend";
 
 // Web-form intake notifications (Áron 2026-11-09, after the Fable review):
@@ -14,6 +15,19 @@ import { sendEmail } from "@/lib/integrations/resend";
 
 const BASE = process.env.APP_BASE_URL ?? "https://ndt-crm.vercel.app";
 export const AUTO_REPLY_REPLY_TO = "peter@betonradar.hu";
+/** Who the auto-reply promises will call; also the From display name, so the two never disagree. */
+export const AUTO_REPLY_CALLER = "Nagy Péter";
+
+/**
+ * The lead's typed name, safe to put in a mail we send to a lead-supplied
+ * address: whitespace collapsed, capped, and dropped when it looks like a link
+ * or an address (a form is not a way to mail third parties our text plus theirs).
+ */
+export function safeName(name: string | null): string | null {
+  const n = (name ?? "").replace(/\s+/g, " ").trim();
+  if (!n || n.length > 60 || /https?:|www\.|@|\/|\\/i.test(n)) return null;
+  return n;
+}
 
 export const INTENT_LABEL: Record<string, string> = {
   service_concrete: "Szolgáltatás, konkrét feladat",
@@ -71,24 +85,25 @@ export function nextStepLine(intent: string | null): string {
     case "purchase":
       return "A hívásban felmérjük, milyen eszközre van szüksége, és egy helyszíni bemutató méréssel kezdünk.";
     case "info":
-      return "Hamarosan küldünk egy rövid összefoglalót arról, mire jó a mérés és hogyan dolgozunk.";
+      return "A hívásban röviden összefoglaljuk, mire jó a mérés és hogyan dolgozunk.";
     default:
       return "A hívásban megbeszéljük a részleteket és a következő lépést.";
   }
 }
 
 /** Pure: the auto-reply (PROPOSAL, Áron signs it before auto_reply_enabled goes on). */
-export function autoReplyText(f: Pick<IntakeFacts, "name" | "intent">): { subject: string; text: string } {
+export function autoReplyText(f: Pick<IntakeFacts, "name" | "intent">, caller = AUTO_REPLY_CALLER): { subject: string; text: string } {
+  const name = safeName(f.name);
   return {
     subject: "Megkaptuk az érdeklődését (BetonRadar)",
     text: [
-      f.name ? `Tisztelt ${f.name}!` : "Tisztelt Érdeklődő!",
+      name ? `Tisztelt ${name}!` : "Tisztelt Érdeklődő!",
       "",
       "Köszönjük, megkaptuk!",
-      "Nagy Péter kollégánk hamarosan hívja: munkaidőben egy munkaórán belül, egyébként a következő munkanap 9:30-ig.",
+      `${caller} kollégánk hamarosan felhívja: munkaidőben egy órán belül, egyébként a következő munkanap 9:30-ig.`,
       nextStepLine(f.intent),
       "",
-      "Üdvözlettel:",
+      "Üdvözlettel,",
       "BetonRadar",
       "Uphill Trade Kft.",
     ].join("\n"),
@@ -111,7 +126,6 @@ async function loadFacts(tenantId: number, leadId: number) {
     select: {
       id: true, intent: true, buyerType: true, qualification: true, customFields: true, companyId: true,
       contact: { select: { email: true, phone: true, personId: true } },
-      assignedTo: { select: { name: true } },
     },
   });
   if (!lead) return null;
@@ -172,14 +186,29 @@ export async function sendAutoReply(tenantId: number, leadId: number): Promise<{
       await trace(tenantId, "auto_reply_sent", { leadId, ok: false, error: "no email on the lead" });
       return { ok: false };
     }
-    const { subject, text } = autoReplyText(loaded.facts);
+    // One auto-reply per address per 24 h: a re-submitted form (or a flood with
+    // someone else's address) gets no second mail. Matched on a hash, never the address.
+    const toHash = createHash("sha256").update(loaded.facts.email.trim().toLowerCase()).digest("hex").slice(0, 32);
+    const recent = await db.appEvent.findFirst({
+      where: {
+        tenantId, eventType: "auto_reply_sent", createdAt: { gte: new Date(Date.now() - 86_400_000) },
+        payload: { path: ["toHash"], equals: toHash },
+      },
+      select: { id: true },
+    });
+    if (recent) {
+      await trace(tenantId, "auto_reply_sent", { leadId, ok: false, toHash, error: "already sent to this address in 24 h" });
+      return { ok: false };
+    }
+    const caller = str(settings.auto_reply_caller) ?? AUTO_REPLY_CALLER;
+    const { subject, text } = autoReplyText(loaded.facts, caller);
     const r = await sendEmail({
       tenantId, to: loaded.facts.email, subject, text,
       replyTo: str(settings.auto_reply_to) ?? AUTO_REPLY_REPLY_TO,
-      fromName: loaded.lead.assignedTo?.name ?? null,
+      fromName: caller,
       companyId: loaded.lead.companyId, personId: loaded.lead.contact?.personId ?? null,
     });
-    await trace(tenantId, "auto_reply_sent", r.ok ? { leadId, ok: true, resendId: r.id } : { leadId, ok: false, error: r.error });
+    await trace(tenantId, "auto_reply_sent", r.ok ? { leadId, ok: true, toHash, resendId: r.id } : { leadId, ok: false, toHash, error: r.error });
     return { ok: r.ok };
   } catch (err) {
     reportError("leads.autoReply", err, { leadId });

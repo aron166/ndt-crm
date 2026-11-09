@@ -97,12 +97,15 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   if (await isAddressSuppressed(tenantId, to)) return { ok: false, error: SUPPRESSED_ERROR };
 
   // Strip characters that could break the header; the address always stays the tenant's.
-  const displayName = (input.fromName ?? config.fromName)?.replace(/["<>\r\n]/g, "").trim() || null;
-  const from = displayName ? `${displayName} <${config.fromEmail}>` : config.fromEmail;
+  // RFC 5322: a quoted display name may hold commas, parentheses and accents.
+  const displayName = (input.fromName ?? config.fromName)?.replace(/["<>\\\r\n]/g, "").trim() || null;
+  const from = displayName ? `"${displayName}" <${config.fromEmail}>` : config.fromEmail;
 
   let id: string;
   try {
     const res = await fetch(RESEND_ENDPOINT, {
+      // A slow Resend must not hold the public intake response (the catch below reports it).
+      signal: AbortSignal.timeout(8000),
       method: "POST",
       headers: {
         Authorization: `Bearer ${config.apiKey}`,

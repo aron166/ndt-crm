@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/integrations/resend";
-import { autoReplyText, callWindowLabel, nextStepLine, pingText, sendAutoReply, sendLeadPing, type IntakeFacts } from "./intake-notify";
+import { autoReplyText, safeName, callWindowLabel, nextStepLine, pingText, sendAutoReply, sendLeadPing, type IntakeFacts } from "./intake-notify";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
@@ -10,7 +10,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     tenant: { findUnique: vi.fn() },
     lead: { findFirst: vi.fn() },
-    appEvent: { create: vi.fn() },
+    appEvent: { create: vi.fn(), findFirst: vi.fn() },
   },
 }));
 
@@ -55,7 +55,7 @@ describe("autoReplyText", () => {
   it("greets by name, promises the call, signs, no em dash", () => {
     const { subject, text } = autoReplyText(facts);
     expect(text).toContain("Tisztelt Kiss Anna!");
-    expect(text).toContain("Nagy Péter kollégánk hamarosan hívja");
+    expect(text).toContain("Nagy Péter kollégánk hamarosan felhívja");
     expect(text).toContain("9:30-ig");
     expect(text).toContain("BetonRadar");
     expect(text).toContain("Uphill Trade Kft.");
@@ -130,6 +130,7 @@ describe("sendAutoReply", () => {
     vi.clearAllMocks();
     d.lead.findFirst.mockResolvedValue(leadRow() as never);
     d.appEvent.create.mockResolvedValue({} as never);
+    d.appEvent.findFirst.mockResolvedValue(null as never);
     vi.mocked(sendEmail).mockResolvedValue({ ok: true, id: "re_1" } as never);
   });
 
@@ -149,7 +150,25 @@ describe("sendAutoReply", () => {
     }));
     const arg = d.appEvent.create.mock.calls[0][0] as { data: { eventType: string; payload: unknown } };
     expect(arg.data.eventType).toBe("auto_reply_sent");
-    expect(arg.data.payload).toEqual({ leadId: 22, ok: true, resendId: "re_1" });
+    expect(arg.data.payload).toMatchObject({ leadId: 22, ok: true, resendId: "re_1" });
+    expect(JSON.stringify(arg.data.payload)).not.toContain("@");
+  });
+
+  it("only a literal true enables it (Vanda)", async () => {
+    for (const v of ["true", 1, null]) {
+      d.tenant.findUnique.mockResolvedValue({ settings: { auto_reply_enabled: v } } as never);
+      expect(await sendAutoReply(1, 22)).toEqual({ ok: false });
+    }
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("a second submission from the same address within 24 h gets no second mail (Vanda #4)", async () => {
+    d.tenant.findUnique.mockResolvedValue({ settings: { auto_reply_enabled: true } } as never);
+    d.appEvent.findFirst.mockResolvedValue({ id: 1 } as never);
+    expect(await sendAutoReply(1, 22)).toEqual({ ok: false });
+    expect(sendEmail).not.toHaveBeenCalled();
+    const arg = d.appEvent.create.mock.calls[0][0] as unknown as { data: { payload: { error: string } } };
+    expect(arg.data.payload.error).toBe("already sent to this address in 24 h");
   });
 
   it("traces a missing email and sends nothing", async () => {
@@ -159,5 +178,16 @@ describe("sendAutoReply", () => {
     expect(sendEmail).not.toHaveBeenCalled();
     const arg = d.appEvent.create.mock.calls[0][0] as { data: { payload: unknown } };
     expect(arg.data.payload).toEqual({ leadId: 22, ok: false, error: "no email on the lead" });
+  });
+});
+
+describe("safeName (Vanda #1)", () => {
+  it("keeps a normal name, drops links, addresses, long or multi-line text", () => {
+    expect(safeName("  Járó   Csaba ")).toBe("Járó Csaba");
+    expect(safeName("Kovács\n\nKattintson: http://x.hu")).toBeNull();
+    expect(safeName("a@b.hu")).toBeNull();
+    expect(safeName("www.valami.hu")).toBeNull();
+    expect(safeName("x".repeat(61))).toBeNull();
+    expect(autoReplyText({ name: "http://evil", intent: null }).text.startsWith("Tisztelt Érdeklődő!")).toBe(true);
   });
 });

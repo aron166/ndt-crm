@@ -82,6 +82,7 @@ export const INTENTS = ["service_concrete", "service_vague", "rental", "purchase
  * `unknown` until the first call. buyer_type falls back to the older
  * `situation` answer (company / private).
  */
+// Keep in step with the CASE in migration 20261109200000_backfill_lead_intent_buyer_type.
 const INTENT_FROM_FORM: Record<string, (typeof INTENTS)[number]> = {
   service_concrete: "service_concrete", service_vague: "service_vague", service: "service_vague",
   rental: "rental", purchase: "purchase", device: "unknown", info: "unknown", unknown: "unknown",
@@ -154,7 +155,7 @@ export const DEFAULT_TRANSITIONS: LeadTransition[] = [
   { from: "demo_booked", event: "demo_delivered", to: "demo_done", action: "report + decision call task, demo credit clock" },
   { from: "demo_booked", event: "demo_cancelled", to: "recall", action: "ask reason" },
   { from: "demo_booked", event: "demo_declined", to: "lost", action: "lost_reason" },
-  { from: "demo_done", event: "order_placed", to: "ordered", action: "credit applied if within 30 days, payment check task" },
+  { from: "demo_done", event: "order_placed", to: "ordered", action: "credit applied if within 14 days (min. 100 m2, rental or purchase), payment check task" },
   { from: "demo_done", event: "demo_followed_up", to: "demo_done", action: "follow-up day 3, 7, 14" },
   { from: "demo_done", event: "demo_expired", to: "recall", action: "closing email task, recall no_decision" },
   { from: "ordered", event: "order_won", to: "won", action: "handover task" },
