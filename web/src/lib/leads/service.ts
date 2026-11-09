@@ -199,6 +199,14 @@ export async function changeLeadStatus(
   }, now);
   if ("error" in plan) return plan;
 
+  // Won = the deal door (Áron, 2026-11-10): convert BEFORE the move, so a lead
+  // never sits in `won` without its Deal. convertLeadToDeal is idempotent (it
+  // returns the existing deal), so a retry after a failed move is safe.
+  if (newStatus === "won" && !plan.self) {
+    const conv = await convertLeadToDeal(leadId, ctx);
+    if ("error" in conv) return conv;
+  }
+
   const escalationUserId = plan.tasks.some((t) => t.escalate) ? await resolveDemoHost(ctx.tenantId, "aron") : null;
   try { await db.$transaction(async (tx) => {
     // Moving the card is acting on the lead: its open callback task is done.
@@ -288,6 +296,8 @@ export async function convertLeadToDeal(leadId: number, ctx: LeadCtx): Promise<R
           assignedToId: lead.assignedToId,
           pipelineId: pipeline.id, stageId: firstStage.id,
           value: lead.estimatedValue ?? null, currency: "HUF",
+          // W2: what was sold travels with the deal (no Deal column for it).
+          customFields: { fromLeadId: leadId, ...(lead.offerType ? { offerType: lead.offerType } : {}) },
           position: (maxPos._max.position ?? -1) + 1,
           stageEnteredAt: new Date(),
         },

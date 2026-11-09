@@ -196,6 +196,8 @@ export default async function LeadsPage({
   const colWhere = (key: string) =>
     sideView === "lost" ? ACTIVE
     : sideView ? { ...ACTIVE, status: key }
+    // Won leads are closed (outcome won, converted to a Deal) but keep their column.
+    : key === "won" ? { tenantId: TENANT_ID, status: "won", ...(tier ? { tier } : {}) }
     : key === initialKey
       ? { ...ACTIVE, OR: [{ status: key }, { status: null }, { status: { notIn: knownKeys } }] }
       : { ...ACTIVE, status: key };

@@ -399,7 +399,7 @@ export interface TransitionPlan {
     nextAction: string | null;
     nextDue: Date | null;
     offerType?: string | null;
-    outcome?: "open" | "lost";
+    outcome?: "open" | "lost" | "won";
     closedAt?: Date | null;
     lostReason?: string;
     lostNote?: string | null;
@@ -446,6 +446,9 @@ export function planTransition(
     Object.assign(data, { outcome: "lost", closedAt: now, lostReason: code, lostNote: note?.slice(0, LOST_NOTE_MAX) ?? null });
   } else if (t.from === "lost") {
     Object.assign(data, { outcome: "open", closedAt: null });
+  } else if (t.to === "won" && !self) {
+    // The caller converts the lead to a Deal first (service.changeLeadStatus); outcome follows the stage.
+    Object.assign(data, { outcome: "won", closedAt: now });
   }
 
   let recallDate: Date | null = null;
