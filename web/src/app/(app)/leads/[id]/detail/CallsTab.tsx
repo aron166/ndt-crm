@@ -19,7 +19,7 @@ export interface Interaction {
 
 // ⚠️ HU string below is a PROPOSAL, unreviewed by Áron (same convention as
 // AUTO_OUTCOME_LABELS in lib/calls/auto-outcome.ts). `outcome: "transcribed"`
-// marks a queued dictation, not a real call outcome — it has no entry in
+// marks a queued dictation, not a real call outcome: it has no entry in
 // CALL_OUTCOMES, so the raw English key must never reach the chip.
 const TRANSCRIBED_OUTCOME_LABEL = "Átirat rögzítve";
 function outcomeChipLabel(outcome: string): string {
@@ -52,9 +52,9 @@ export function CallsTab({
         <div className="space-y-3">
           {interactions.map((r) => {
             // A correction (supersedesInteractionId set) is never itself flagged
-            // as auto-derived — it IS the human correction. And the badge/button
+            // as auto-derived: it IS the human correction. And the badge/button
             // only ever apply to an interaction that actually belongs to the lead
-            // being viewed — the timeline query also pulls in sibling leads of the
+            // being viewed: the timeline query also pulls in sibling leads of the
             // same company/person, and correcting THOSE would silently act on a
             // different lead than the one shown in the modal.
             const ownLead = r.leadId === leadId;
