@@ -27,7 +27,7 @@ CREATE INDEX "lead_documents_tenant_id_lead_id_idx" ON "lead_documents"("tenant_
 ALTER TABLE "lead_documents" ADD CONSTRAINT "lead_documents_tenant_id_fkey"
     FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "lead_documents" ADD CONSTRAINT "lead_documents_lead_id_fkey"
-    FOREIGN KEY ("lead_id") REFERENCES "leads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    FOREIGN KEY ("lead_id") REFERENCES "leads"("id") ON DELETE RESTRICT ON UPDATE CASCADE; -- signed records outlive a lead delete attempt
 ALTER TABLE "lead_documents" ADD CONSTRAINT "lead_documents_quote_id_fkey"
     FOREIGN KEY ("quote_id") REFERENCES "quotes"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "lead_documents" ADD CONSTRAINT "lead_documents_created_by_id_fkey"

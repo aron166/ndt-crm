@@ -24,17 +24,34 @@ export function SignOffForm({ leadId }: { leadId: number }) {
   const [pending, startTransition] = useTransition();
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
+  const last = useRef({ x: 0, y: 0 });
 
-  // Size the backing store to the CSS size times devicePixelRatio.
+  const ink = useRef(0); // stroke length drawn, in CSS px: a tap is not a signature
+  const [resized, setResized] = useState(false);
+
+  // Size the backing store to the CSS size times devicePixelRatio, and again on every
+  // resize or rotation (Vanda #B4). A resized canvas cannot keep its strokes aligned,
+  // so it is cleared and the signer is asked to sign again.
   useEffect(() => {
     const c = canvas.current;
     if (!c) return;
-    const dpr = window.devicePixelRatio || 1;
-    c.width = c.clientWidth * dpr;
-    c.height = c.clientHeight * dpr;
-    const ctx = c.getContext("2d")!;
-    ctx.scale(dpr, dpr);
-    ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#000";
+    let first = true;
+    const size = () => {
+      const dpr = window.devicePixelRatio || 1;
+      c.width = c.clientWidth * dpr;
+      c.height = c.clientHeight * dpr;
+      const ctx = c.getContext("2d")!;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#000";
+      if (!first && ink.current > 0) setResized(true);
+      first = false;
+      ink.current = 0;
+      setHasSig(false);
+    };
+    size();
+    const ro = new ResizeObserver(() => size());
+    ro.observe(c);
+    return () => ro.disconnect();
   }, [done]);
 
   function pos(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -46,19 +63,24 @@ export function SignOffForm({ leadId }: { leadId: number }) {
     drawing.current = true;
     const ctx = e.currentTarget.getContext("2d")!;
     const { x, y } = pos(e);
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 0.01, y); ctx.stroke();
-    setHasSig(true);
+    ctx.beginPath(); ctx.moveTo(x, y);
+    last.current = { x, y };
+    setResized(false);
   }
   function move(e: React.PointerEvent<HTMLCanvasElement>) {
     if (!drawing.current) return;
     const ctx = e.currentTarget.getContext("2d")!;
     const { x, y } = pos(e);
     ctx.lineTo(x, y); ctx.stroke();
+    ink.current += Math.hypot(x - last.current.x, y - last.current.y);
+    last.current = { x, y };
+    if (ink.current > 40) setHasSig(true);
   }
   function up() { drawing.current = false; }
   function clear() {
     const c = canvas.current!;
     c.getContext("2d")!.clearRect(0, 0, c.clientWidth, c.clientHeight);
+    ink.current = 0;
     setHasSig(false);
   }
 
@@ -127,6 +149,8 @@ export function SignOffForm({ leadId }: { leadId: number }) {
       <div>
         {/* PROPOSAL copy */}
         <p id="so-sig-help" style={label}>Kérjük, írja alá a keretben</p>
+        {/* PROPOSAL copy */}
+        {resized && <p role="status" style={{ fontSize: 16, color: "var(--amber)", marginBottom: 6 }}>A képernyő elfordult: kérjük, írja alá újra.</p>}
         <canvas
           ref={canvas}
           aria-label="Aláírás" // PROPOSAL copy

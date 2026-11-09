@@ -14,7 +14,8 @@ vi.mock("@/lib/db", () => ({
     lead: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
     quote: { findFirst: vi.fn() },
-    task: { create: vi.fn() },
+    task: { create: vi.fn(), findFirst: vi.fn() },
+    leadStatusHistory: { findFirst: vi.fn() },
     leadDocument: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), delete: vi.fn(), deleteMany: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -30,7 +31,7 @@ const offer = {
   customer: { company: null, contactName: null, email: null, phone: null },
   lines: [], meta: { issuer: { name: "K" } },
 };
-const input = { signerName: "Kiss Anna", signature: "data:image/png;base64,AAAA", doneScope: "Kész a munka" };
+const input = { signerName: "Kiss Anna", signature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", doneScope: "Kész a munka" };
 const orderedLead = { status: "ordered", companyId: 3, customFields: {}, company: { name: "ZMT" }, contact: { email: null, phone: null, personId: 5, person: null } };
 
 beforeEach(() => {
@@ -86,7 +87,9 @@ describe("signOffLead", () => {
   });
   it("creates one completion document, logs work_completed, creates the invoice task", async () => {
     d.lead.findFirst.mockResolvedValue(orderedLead as never);
-    d.leadDocument.findFirst.mockResolvedValue({ number: "MR-2026-0003", data: {} } as never);
+    d.leadDocument.findFirst
+      .mockResolvedValueOnce({ number: "MR-2026-0003", data: {}, createdAt: new Date("2026-11-01") } as never)
+      .mockResolvedValueOnce(null as never);
     d.leadDocument.create.mockResolvedValue({ id: 200, number: "TI-2026-0001" } as never);
     const r = await signOffLead(7, input, ctx);
     expect(r).toEqual({ success: true, documentId: 200, number: "TI-2026-0001" });
@@ -101,6 +104,7 @@ describe("signOffLead", () => {
   });
   it("keeps the document when the status move fails and names its number", async () => {
     d.lead.findFirst.mockResolvedValue(orderedLead as never);
+    d.leadDocument.findFirst.mockResolvedValue(null as never);
     d.leadDocument.create.mockResolvedValue({ id: 200, number: "TI-2026-0001" } as never);
     change.mockResolvedValue({ error: "nem lehet" } as never);
     const r = await signOffLead(7, input, ctx);
@@ -108,6 +112,31 @@ describe("signOffLead", () => {
     expect((r as { error: string }).error).toContain("TI-2026-0001");
     expect(d.leadDocument.delete).not.toHaveBeenCalled();
     expect(d.leadDocument.deleteMany).not.toHaveBeenCalled();
+    expect(d.task.create).not.toHaveBeenCalled();
+  });
+  it("a retry finds the signed document: no second document, the missing move and task are completed once (Vanda #B1)", async () => {
+    d.lead.findFirst.mockResolvedValue(orderedLead as never);
+    d.leadDocument.findFirst
+      .mockResolvedValueOnce({ number: "MR-2026-0003", data: {}, createdAt: new Date("2026-11-01") } as never)
+      .mockResolvedValueOnce({ id: 200, number: "TI-2026-0001", data: { scopeChange: null }, createdAt: new Date("2026-11-02") } as never);
+    d.leadStatusHistory.findFirst.mockResolvedValue(null as never);
+    d.task.findFirst.mockResolvedValue(null as never);
+    change.mockResolvedValue({ success: true, changed: true } as never);
+    expect(await signOffLead(7, input, ctx)).toEqual({ success: true, documentId: 200, number: "TI-2026-0001" });
+    expect(d.leadDocument.create).not.toHaveBeenCalled();
+    expect(change).toHaveBeenCalledTimes(1);
+    expect(d.task.create).toHaveBeenCalledTimes(1);
+  });
+  it("a second retry after a full sign-off changes nothing", async () => {
+    d.lead.findFirst.mockResolvedValue(orderedLead as never);
+    d.leadDocument.findFirst
+      .mockResolvedValueOnce({ number: "MR-2026-0003", data: {}, createdAt: new Date("2026-11-01") } as never)
+      .mockResolvedValueOnce({ id: 200, number: "TI-2026-0001", data: { scopeChange: null }, createdAt: new Date("2026-11-02") } as never);
+    d.leadStatusHistory.findFirst.mockResolvedValue({ id: 5 } as never);
+    d.task.findFirst.mockResolvedValue({ id: 9 } as never);
+    expect(await signOffLead(7, input, ctx)).toEqual({ success: true, documentId: 200, number: "TI-2026-0001" });
+    expect(d.leadDocument.create).not.toHaveBeenCalled();
+    expect(change).not.toHaveBeenCalled();
     expect(d.task.create).not.toHaveBeenCalled();
   });
 });

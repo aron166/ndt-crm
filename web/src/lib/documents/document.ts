@@ -87,6 +87,20 @@ export function buildOrderData(offer: OfferPdfDoc, acceptedAt: Date): OrderData 
 export const SIGNATURE_MAX_BYTES = 300_000;
 export const SIGNOFF_TEXT_MAX = 2000;
 
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+/**
+ * The data URL really is a PNG of a sane size (Vanda #B3): a base64 that only
+ * looks right would make every render of the signed PDF fail. atob works in the
+ * browser and in Node 16+, so this stays pure and shared.
+ */
+export function isRealPng(dataUrl: string): boolean {
+  const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  if (b64.length < 80) return false; // the smallest real PNG (1x1) is about 92 base64 characters
+  let head: string;
+  try { head = atob(b64.slice(0, 12)); } catch { return false; }
+  return PNG_MAGIC.every((byte, i) => head.charCodeAt(i) === byte);
+}
+
 /** Pure validation of the sign-off input; returns the first problem in Hungarian, or null. */
 export function signOffIssue(input: {
   signerName: string; signature: string; doneScope: string;
@@ -95,6 +109,7 @@ export function signOffIssue(input: {
   if (input.signerName.trim().length < 2) return "Add meg az aláíró nevét";
   if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(input.signature)) return "Hiányzik az aláírás";
   if (input.signature.length > SIGNATURE_MAX_BYTES) return "Az aláírás túl nagy, töröld és írd alá újra";
+  if (!isRealPng(input.signature)) return "Az aláírás nem olvasható, töröld és írd alá újra";
   if (input.doneScope.trim().length < 3) return "Írd le röviden az elvégzett munkát";
   if (input.doneScope.length > SIGNOFF_TEXT_MAX) return "Az elvégzett munka leírása túl hosszú";
   if (input.scopeChange) {

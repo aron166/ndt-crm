@@ -45,7 +45,7 @@ describe("buildOrderData", () => {
 });
 
 describe("signOffIssue", () => {
-  const ok = { signerName: "Kiss Anna", signature: "data:image/png;base64,AAAA", doneScope: "Kábelezés kész" };
+  const ok = { signerName: "Kiss Anna", signature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", doneScope: "Kábelezés kész" };
   it("returns null for valid input", () => {
     expect(signOffIssue(ok)).toBeNull();
     expect(signOffIssue({ ...ok, scopeChange: { text: "Extra fal", newNetHuf: 5000 } })).toBeNull();
@@ -68,5 +68,14 @@ describe("signOffIssue", () => {
   it("rejects a scope change without text or with a negative price", () => {
     expect(signOffIssue({ ...ok, scopeChange: { text: " ", newNetHuf: 100 } })).toBe("Írd le a módosítást");
     expect(signOffIssue({ ...ok, scopeChange: { text: "Extra", newNetHuf: -1 } })).toBe("Add meg az új nettó árat");
+  });
+});
+
+describe("isRealPng (Vanda #B3)", () => {
+  it("accepts a real PNG and rejects base64 that only looks like one", async () => {
+    const { isRealPng } = await import("./document");
+    expect(isRealPng("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=")).toBe(true);
+    expect(isRealPng("data:image/png;base64,AAAA")).toBe(false);
+    expect(isRealPng("data:image/png;base64," + "A".repeat(200))).toBe(false);
   });
 });

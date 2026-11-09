@@ -108,9 +108,22 @@ export async function signOffLead(leadId: number, input: SignOffInput, ctx: Lead
   if (lead.status !== "ordered") return { error: "Teljesítésigazolás csak megrendelt munkához készül" };
 
   const [order, tenant] = await Promise.all([
-    db.leadDocument.findFirst({ where: { tenantId, leadId, kind: "order" }, orderBy: { createdAt: "desc" }, select: { number: true, data: true } }),
+    db.leadDocument.findFirst({ where: { tenantId, leadId, kind: "order" }, orderBy: { createdAt: "desc" }, select: { number: true, data: true, createdAt: true } }),
     db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }),
   ]);
+  // Idempotent (Vanda #B1): a retry, a timeout or a double tap finds the sign-off of
+  // this order already signed and only completes what is missing (move, task); it
+  // never makes a second signed document.
+  const prior = await db.leadDocument.findFirst({
+    where: { tenantId, leadId, kind: "completion", ...(order ? { createdAt: { gte: order.createdAt } } : {}) },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, number: true, data: true, createdAt: true },
+  });
+  if (prior) {
+    const scopeChanged = (prior.data as { scopeChange?: unknown } | null)?.scopeChange != null;
+    const finished = await finishSignOff(leadId, prior.number, scopeChanged, prior.createdAt, lead.companyId, lead.contact?.personId ?? null, ctx);
+    return "error" in finished ? finished : { success: true, documentId: prior.id, number: prior.number };
+  }
   const cf = (lead.customFields ?? {}) as Record<string, unknown>;
   const p = lead.contact?.person;
   const now = new Date();
@@ -133,27 +146,49 @@ export async function signOffLead(leadId: number, input: SignOffInput, ctx: Lead
   const doc = await insertDocument({ tenantId, leadId, quoteId: null, kind: "completion", data, createdById: ctx.userId });
   audit("lead", leadId, "update", null, { document: doc.number, kind: "completion", scopeChanged: data.scopeChange != null }, { tenantId, actor: ctx.actor, actorAgentId: ctx.actorAgentId });
 
-  const due = addWorkdays(now, 1);
-  const moved = await changeLeadStatus(leadId, "ordered", ctx, {
-    event: "work_completed", nextAction: "Számla kiállítása a teljesítésigazolás alapján", nextDue: due,
+  const finished = await finishSignOff(leadId, doc.number, data.scopeChange != null, now, lead.companyId, lead.contact?.personId ?? null, ctx);
+  return "error" in finished ? finished : { success: true, documentId: doc.id, number: doc.number };
+}
+
+/**
+ * The parts of a sign-off after the signed document exists: the W2 work_completed
+ * move (once per document) and the invoice task (once per document). Safe to call again.
+ */
+async function finishSignOff(
+  leadId: number, number: string, scopeChanged: boolean, signedAt: Date,
+  companyId: number | null, personId: number | null, ctx: LeadCtx,
+): Promise<Result> {
+  const { tenantId } = ctx;
+  const due = addWorkdays(new Date(), 1);
+  const alreadyMoved = await db.leadStatusHistory.findFirst({
+    where: { tenantId, leadId, event: "work_completed", at: { gte: signedAt } }, select: { id: true },
   });
-  if ("error" in moved) {
-    reportError("documents.signOff.move", new Error(moved.error), { leadId, document: doc.number });
-    return { error: `A teljesítésigazolás elkészült (${doc.number}), de a lead állapota nem frissült: ${moved.error}` };
-  }
-  try {
-    await db.task.create({
-      data: {
-        tenantId, leadId, companyId: lead.companyId, personId: lead.contact?.personId ?? null,
-        assignedToId: ctx.userId, title: `Számla kiállítása (${doc.number}${data.scopeChange ? ", módosított ár" : ""})`,
-        type: "internal", category: "revenue_generating", status: "created", dueDate: due,
-        setMembership: [LIFECYCLE_TASK_TAG],
-      },
+  if (!alreadyMoved) {
+    const moved = await changeLeadStatus(leadId, "ordered", ctx, {
+      event: "work_completed", nextAction: "Számla kiállítása a teljesítésigazolás alapján", nextDue: due,
     });
+    if ("error" in moved) {
+      reportError("documents.signOff.move", new Error(moved.error), { leadId, document: number });
+      return { error: `A teljesítésigazolás elkészült (${number}), de a lead állapota nem frissült: ${moved.error}` };
+    }
+  }
+  const title = `Számla kiállítása (${number}${scopeChanged ? ", módosított ár" : ""})`;
+  try {
+    const exists = await db.task.findFirst({ where: { tenantId, leadId, title }, select: { id: true } });
+    if (!exists) {
+      await db.task.create({
+        data: {
+          tenantId, leadId, companyId, personId,
+          assignedToId: ctx.userId, title,
+          type: "internal", category: "revenue_generating", status: "created", dueDate: due,
+          setMembership: [LIFECYCLE_TASK_TAG],
+        },
+      });
+    }
   } catch (err) {
     reportError("documents.signOff.task", err, { leadId });
   }
-  return { success: true, documentId: doc.id, number: doc.number };
+  return { success: true };
 }
 
 /** The frozen data of one document of this tenant's lead, for the PDF route. */

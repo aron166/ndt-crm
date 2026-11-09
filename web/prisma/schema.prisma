@@ -1595,7 +1595,7 @@ model LeadDocument {
   createdAt   DateTime @default(now()) @map("created_at")
 
   tenant    Tenant @relation(fields: [tenantId], references: [id])
-  lead      Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead      Lead   @relation(fields: [leadId], references: [id], onDelete: Restrict)
   quote     Quote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
   createdBy User?  @relation("LeadDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
