@@ -167,3 +167,11 @@ describe("DEFAULT_TRANSITIONS", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
+
+describe("entryTasks ordered", () => {
+  it("plans the booking call task first", () => {
+    const t = entryTasks("ordered", "offer_accepted", new Date("2026-11-09T10:00:00Z"));
+    expect(t[0].title).toContain("Időpont-egyeztető hívás");
+    expect(t[0].type).toBe("call");
+  });
+});

@@ -8,6 +8,7 @@ import { getLeadStatuses, getQuestionModel, getScriptVariants } from "@/lib/lead
 import { answersFrom, answerSourcesFrom } from "@/lib/leads/qualification";
 import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact } from "@/lib/leads/first-contact";
+import { LeadOffersPanel } from "./LeadOffersPanel";
 import { LeadDetailClient } from "./LeadDetailClient";
 
 const TENANT_ID = 1;
@@ -39,7 +40,7 @@ export default async function LeadDetailPage({
 
   const personId = lead.contact?.person?.id ?? null;
 
-  const [interactions, auditEntries, statuses, users, openTasks, questionModel, scriptVariants] = await Promise.all([
+  const [interactions, auditEntries, statuses, users, openTasks, questionModel, scriptVariants, callTypeGroups, offers] = await Promise.all([
     // Per-lead touches first-class (leadId), plus the person/company timeline
     // so older/company-level history still shows. Newest first, bounded.
     db.interaction.findMany({
@@ -71,6 +72,16 @@ export default async function LeadDetailPage({
     }),
     getQuestionModel(TENANT_ID),
     getScriptVariants(TENANT_ID),
+    db.interaction.groupBy({
+      by: ["callType"],
+      where: { tenantId: TENANT_ID, leadId, type: "call", supersededBy: { none: {} } },
+      _count: { _all: true },
+    }),
+    db.quote.findMany({
+      where: { tenantId: TENANT_ID, leadId, template: { not: null } },
+      select: { id: true, quoteNumber: true, template: true, status: true, createdAt: true, sentAt: true, acceptedAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   const firstContactMin = minutesToFirstContact(
@@ -108,6 +119,8 @@ export default async function LeadDetailPage({
         qualification={answersFrom(lead.qualification)}
         answerSources={answerSourcesFrom(lead.answerSources)}
         scriptVariants={scriptVariants}
+        callTypeCounts={callTypeGroups.map((g) => ({ callType: g.callType, count: g._count._all }))}
+        offersPanel={<LeadOffersPanel leadId={leadId} offers={serializeDates(offers)} />}
       />
     </div>
   );

@@ -15,7 +15,7 @@ import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/le
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
 import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
-import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, type LeadOutcome } from "@/lib/leads/outcomes";
+import { callTypeLabel, LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, type LeadOutcome } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
 import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
@@ -102,6 +102,8 @@ export function LeadDetailClient({
   answerSources,
   questionSets,
   scriptVariants,
+  callTypeCounts,
+  offersPanel,
 }: {
   lead: Lead;
   firstContactMin: number | null;
@@ -115,6 +117,8 @@ export function LeadDetailClient({
   answerSources: AnswerSources;
   questionSets: QuestionSet[];
   scriptVariants: ScriptVariant[];
+  callTypeCounts: { callType: string | null; count: number }[];
+  offersPanel: React.ReactNode;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(lead.status ?? "new");
@@ -215,6 +219,12 @@ export function LeadDetailClient({
             {" · "}
             {firstContactMin != null ? `Első kontakt: ${formatMinutes(firstContactMin)} a beérkezés után` : "Még nincs kontakt"}
           </p>
+          {callTypeCounts.length > 0 && (
+            <p className="page-sub" style={{ marginTop: 4 }}>
+              {/* PROPOSAL copy */}
+              {callTypeCounts.map((c) => `${c.callType ? callTypeLabel(c.callType) : "típus nélkül"}: ${c.count}`).join(" · ")}
+            </p>
+          )}
         </div>
         <div className="page-actions" style={{ gap: 8 }}>
           <button onClick={() => setEditing(true)} className="btn" style={{ gap: 6 }}>
@@ -527,6 +537,8 @@ export function LeadDetailClient({
           )}
         </div>
       </div>
+
+      {offersPanel}
 
       <CallOutcomeModal
         open={logging}

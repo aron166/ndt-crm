@@ -4,7 +4,7 @@ import { TIERS } from "./tier";
 import { REPLY_TYPES } from "@/lib/outreach/campaign";
 
 // Public lead-intake payload (POST /api/leads).
-// Landing pages (BetonScan/BirdsView) and automations (n8n) post this shape.
+// Landing pages (BetonRadar/BirdsView) and automations (n8n) post this shape.
 // snake_case on the wire — that's what external HTML forms / webhooks emit.
 
 const emptyToUndef = (v: unknown) =>

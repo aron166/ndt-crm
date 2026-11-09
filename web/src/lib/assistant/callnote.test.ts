@@ -97,3 +97,13 @@ describe("hash and mapping", () => {
     expect(input.technologyWord).toBe("georadar");
   });
 });
+
+describe("call_type", () => {
+  const input = (patch: Record<string, unknown>) =>
+    toCallOutcomeInput(callNoteSchema.parse({ ...sample, ...patch }), { transcript: "t", callId: "c" });
+  it("support maps to callType", () => expect(input({ call_type: "support" }).callType).toBe("support"));
+  it("null call_type leaves callType out", () => {
+    expect(input({ call_type: null })).not.toHaveProperty("callType");
+  });
+  it("invalid call_type fails the schema", () => expect(bad({ call_type: "chitchat" })).toBe(false));
+});

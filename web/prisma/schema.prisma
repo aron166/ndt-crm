@@ -680,6 +680,10 @@ model Quote {
   leadId      Int?      @map("lead_id") // origin lead, if quoted from intake
   dealId      Int?      @map("deal_id") // linked deal (acceptance never auto-advances it)
   quoteNumber String    @map("quote_number") // per-tenant human id, e.g. AJ-2026-0001
+  // Offer generated from a lead (lib/offers): demo | big_service | rental | purchase.
+  // null = a hand-built quote. `meta` freezes the document facts (issuer, terms) at creation.
+  template    String?
+  meta        Json?
   title       String
   status      String    @default("draft") // draft | sent | accepted | rejected | expired
   currency    String    @default("HUF")
@@ -780,6 +784,8 @@ model Interaction {
   supersedesInteractionId Int?     @map("supersedes_interaction_id")
   callId                  String?  @map("call_id")
   occurredAt              DateTime @default(now()) @map("occurred_at")
+  // Call label (raw60 D20), NOT a sequence: qualification | support | booking | offer_followup.
+  callType                String?  @map("call_type")
   createdAt               DateTime @default(now()) @map("created_at")
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])

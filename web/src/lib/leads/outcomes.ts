@@ -28,6 +28,22 @@ export const CALL_OUTCOMES = [
   { key: "meeting_booked",     label: "Foglalt meeting" },
 ] as const;
 export type CallOutcomeKey = (typeof CALL_OUTCOMES)[number]["key"];
+
+/**
+ * Call LABELS (raw60 D20, Péter): what kind of call it was, deliberately NOT a
+ * numbered sequence. Counts per lead are a signal. Labels are PROPOSAL copy.
+ */
+export const CALL_TYPES = [
+  { key: "qualification",  label: "Minősítő hívás" },
+  { key: "support",        label: "Kérdés / árkifogás / tisztázás" },
+  { key: "booking",        label: "Időpont-egyeztetés (elfogadás után)" },
+  { key: "offer_followup", label: "Gépajánlat utánkövetése" },
+] as const;
+export type CallTypeKey = (typeof CALL_TYPES)[number]["key"];
+export const CALL_TYPE_KEYS = CALL_TYPES.map((t) => t.key) as [CallTypeKey, ...CallTypeKey[]];
+export function callTypeLabel(key: string | null): string {
+  return CALL_TYPES.find((t) => t.key === key)?.label ?? key ?? "-";
+}
 /**
  * The call outcomes that CLOSE the lead as lost. Péter's rule (BRIEFING addendum
  * 2026-09-07): "mandatory note on every outcome, INCLUDING a reason for
@@ -78,6 +94,8 @@ export const callOutcomeSchema = z
     bookingKind: z.enum(BOOKING_KINDS).optional(),
     /** Required when the outcome is lost/disqualified — a short free text WHY. */
     lostReason: z.string().trim().max(LOST_REASON_MAX).optional(),
+    /** Call label (CALL_TYPES); optional, never a sequence. */
+    callType: z.enum(CALL_TYPE_KEYS).optional(),
     /** W2 lost reason CODE; defaults per outcome (CALL_OUTCOME_LOST_REASON). lostReason is the note. */
     lostCode: z.enum(LOST_REASONS).optional(),
     /** Optional: who the callback task is assigned to (defaults to the actor). */

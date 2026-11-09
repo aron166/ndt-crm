@@ -319,6 +319,8 @@ export function entryTasks(to: string, event: string, now: Date, ctx: { recallDa
       ];
     case "ordered":
       return [
+        // raw60 D15: round one replaces self-booking with a second call (welcome + date).
+        { title: "Időpont-egyeztető hívás: üdvözlés és a helyszíni időpont rögzítése", type: "call", dueDate: addWorkdays(now, 1) },
         { title: "Előleg / számla kiküldve, fizetés ellenőrzése", type: "internal", dueDate: new Date(now.getTime() + 8 * DAY) },
         { title: "Fizetés nem érkezett: eszkaláció", type: "internal", dueDate: new Date(now.getTime() + 15 * DAY), escalate: true },
       ];
