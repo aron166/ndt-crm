@@ -55,7 +55,9 @@ export function LeadHeader(p: {
   const { lead } = p;
   const stageLabel = p.statuses.find((s) => s.key === p.status)?.label ?? p.status;
   const ownerName = p.users.find((u) => String(u.id) === p.assignedTo)?.name ?? null;
-  const subject = lead.serviceInterest || lead.subject;
+  // A form slug ("service_concrete") is already shown as a label in the key facts; only free text belongs here.
+  const rawSubject = lead.serviceInterest || lead.subject;
+  const subject = rawSubject && !/^[a-z0-9_]+$/.test(rawSubject) ? rawSubject : null;
   const outcomeColor = p.outcome === "won" ? "var(--mint)" : p.outcome === "lost" ? "var(--coral)" : null;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" style={{ marginBottom: 24 }}>
