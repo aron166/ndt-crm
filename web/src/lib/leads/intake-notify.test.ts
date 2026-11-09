@@ -59,7 +59,7 @@ describe("autoReplyText", () => {
     expect(text).toContain("9:30-ig");
     expect(text).toContain("BetonRadar");
     expect(text).toContain("Uphill Trade Kft.");
-    expect(subject + text).not.toContain("—");
+    expect(subject + text).not.toContain("\u2014");
   });
   it("falls back to a generic greeting", () => {
     expect(autoReplyText({ name: null, intent: null }).text).toContain("Tisztelt Érdeklődő!");
