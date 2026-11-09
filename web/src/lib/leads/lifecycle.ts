@@ -346,3 +346,147 @@ export function buildDigest(leads: DigestLead[], now: Date): Digest {
   ].join("\n") || "Nincs teendő.";
   return { dueToday, overdue, pastMaxAge, noNextAction, text };
 }
+
+// ── One transition, planned (pure; the DB write is service.applyLeadTransition) ──
+
+export interface LifecycleLead {
+  status: string | null;
+  attempts: number;
+  assignedToId: number | null;
+  offerType: string | null;
+  nextAction: string | null;
+  nextDue: Date | null;
+  statusEnteredAt: Date | null;
+}
+
+/** What the caller supplies with a move. Everything optional; the plan fills defaults. */
+export interface TransitionInput {
+  ownerId?: number | null;
+  nextAction?: string | null;
+  nextDue?: Date | null;
+  offerType?: OfferType | null;
+  lostReason?: LostReason | null;
+  lostNote?: string | null;
+  recallReason?: RecallReason | null;
+  recallDate?: Date | null;
+  /** Set by the call planner (cadence); else entering contacting resets to 0. */
+  attempts?: number;
+  /** Tasks the event itself creates (cadence), before the stage-entry tasks. */
+  tasks?: PlannedTask[];
+}
+
+export interface TransitionPlan {
+  self: boolean;
+  data: {
+    status: string;
+    statusEnteredAt?: Date;
+    attempts?: number;
+    assignedToId: number | null;
+    nextAction: string | null;
+    nextDue: Date | null;
+    offerType?: string | null;
+    outcome?: "open" | "lost";
+    closedAt?: Date | null;
+    lostReason?: string;
+    lostNote?: string | null;
+    recallReason?: string;
+    recallDate?: Date;
+    demoDoneAt?: Date;
+    demoCreditUntil?: Date;
+  };
+  tasks: PlannedTask[];
+}
+
+export const LOST_NOTE_MAX = 500;
+
+/**
+ * Rules 2-4 of the spec, pure: the transition must come from the table (caller
+ * looked it up), lost needs a code (+ note for other / competitor), recall gets
+ * a reason + date, qualified needs offer_type, and an OPEN lead must leave the
+ * move with an owner, a next action and a due date.
+ */
+export function planTransition(
+  lead: LifecycleLead,
+  t: LeadTransition,
+  input: TransitionInput,
+  now: Date,
+): TransitionPlan | { error: string } {
+  if ((lead.status ?? "new") !== t.from) return { error: `Nem engedélyezett lépés: ${lead.status} → ${t.to}` };
+  const self = t.from === t.to;
+  const data: TransitionPlan["data"] = {
+    status: t.to,
+    assignedToId: input.ownerId ?? lead.assignedToId,
+    nextAction: null,
+    nextDue: null,
+  };
+  if (!self) data.statusEnteredAt = now;
+  if (input.attempts != null) data.attempts = input.attempts;
+  else if (!self && t.to === "contacting") data.attempts = 0;
+  if (data.attempts != null && (data.attempts < 0 || data.attempts > MAX_ATTEMPTS)) return { error: "Érvénytelen próbálkozásszám" };
+
+  if (t.to === "lost") {
+    const code = input.lostReason ?? LOST_REASON_BY_EVENT[t.event] ?? null;
+    if (!code || !isLostReason(code)) return { error: "Az elvesztés oka kötelező" };
+    const note = input.lostNote?.trim() || null;
+    if (LOST_REASONS_NEEDING_NOTE.includes(code) && !note) return { error: "Ehhez az okhoz megjegyzés kötelező" };
+    Object.assign(data, { outcome: "lost", closedAt: now, lostReason: code, lostNote: note?.slice(0, LOST_NOTE_MAX) ?? null });
+  } else if (t.from === "lost") {
+    Object.assign(data, { outcome: "open", closedAt: null });
+  }
+
+  let recallDate: Date | null = null;
+  if (t.to === "recall") {
+    const reason = input.recallReason ?? RECALL_REASON_BY_EVENT[t.event] ?? "timing";
+    recallDate = input.recallDate ?? recallDefaultDate(reason, now);
+    data.recallReason = reason;
+    data.recallDate = recallDate;
+  }
+
+  if (t.to === "qualified" && !self) {
+    const offerType = input.offerType ?? lead.offerType;
+    if (!offerType) return { error: "Minősítéshez az ajánlat típusa kötelező (service / rental / purchase)" };
+    data.offerType = offerType;
+  } else if (input.offerType) {
+    data.offerType = input.offerType;
+  }
+
+  if (t.to === "demo_done" && !self) {
+    data.demoDoneAt = now;
+    data.demoCreditUntil = new Date(now.getTime() + DEMO_CREDIT_DAYS * DAY);
+  }
+
+  const tasks = [...(input.tasks ?? []), ...(self ? [] : entryTasks(t.to, t.event, now, { recallDate }))];
+  const first = [...tasks].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0];
+  data.nextAction = input.nextAction?.trim() || first?.title || (self ? lead.nextAction : null);
+  data.nextDue = input.nextDue ?? first?.dueDate ?? (self ? lead.nextDue : null);
+
+  if (isOpenStage(t.to)) {
+    const missing = [
+      data.assignedToId == null && "felelős",
+      !data.nextAction && "következő lépés",
+      !data.nextDue && "határidő",
+    ].filter(Boolean);
+    if (missing.length) return { error: `Nyitott lead nem maradhat ${missing.join(", ")} nélkül` };
+  } else {
+    // Closed: nothing is owed any more.
+    data.nextAction = null;
+    data.nextDue = null;
+  }
+  return { self, data, tasks };
+}
+
+// ── Call outcome → lifecycle event (planCallOutcome reads the table) ──
+
+export const CALL_OUTCOME_EVENT: Record<string, string> = {
+  no_answer: "call_no_answer",
+  wrong_number: "call_wrong_number",
+  not_interested: "call_no_fit",
+  disqualified: "call_no_fit",
+  callback_requested: "call_not_now",
+  meeting_booked: "call_meeting_booked",
+};
+export const CALL_OUTCOME_LOST_REASON: Record<string, LostReason> = {
+  wrong_number: "invalid_contact",
+  not_interested: "no_need",
+  disqualified: "not_our_service",
+};

@@ -4,6 +4,7 @@ import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import type { LeadCtx } from "./service";
 import { LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX } from "./outcomes";
 import { answersRecordSchema } from "./qualification";
+import { LOST_REASONS, LOST_NOTE_MAX, OFFER_TYPES, RECALL_REASONS } from "./lifecycle";
 
 // Shared bits of the lead write API (/api/leads/:id*). Same per-app-key auth
 // as POST /api/leads: the key carries the tenant; the service-role key is NOT
@@ -48,6 +49,15 @@ export const leadListQuerySchema = z.object({
 export const leadPatchSchema = z
   .object({
     status: z.string().trim().min(1).max(64).optional(),
+    // W2 stage-move details, read only together with `status` (lib/leads/lifecycle.ts).
+    event: z.string().trim().min(1).max(64).optional(),
+    next_action: z.string().trim().min(1).max(500).optional(),
+    next_due: z.coerce.date().optional(),
+    offer_type: z.enum(OFFER_TYPES).optional(),
+    lost_code: z.enum(LOST_REASONS).optional(),
+    lost_note: z.string().trim().max(LOST_NOTE_MAX).optional(),
+    recall_reason: z.enum(RECALL_REASONS).optional(),
+    recall_date: z.coerce.date().optional(),
     outcome: z.enum(LEAD_OUTCOMES).optional(),
     lost_reason: z.string().trim().min(LOST_REASON_MIN).max(LOST_REASON_MAX).optional(),
     assigned_to_id: z.number().int().positive().nullable().optional(),
@@ -61,6 +71,9 @@ export const leadPatchSchema = z
     qualification: answersRecordSchema.optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: "Empty patch" })
+  .refine((d) => d.status !== undefined || [d.event, d.next_action, d.next_due, d.offer_type, d.lost_code, d.lost_note, d.recall_reason, d.recall_date].every((v) => v === undefined), {
+    message: "stage-move fields require status", path: ["status"],
+  })
   // lost_reason is only read by setLeadOutcome; alone it would 200 with an unchanged lead.
   .refine((d) => d.lost_reason === undefined || d.outcome === "lost", {
     message: "lost_reason requires outcome=lost", path: ["lost_reason"],
@@ -107,6 +120,8 @@ export const LEAD_API_SELECT = {
   assignedToId: true, source: true, sourceApp: true, channel: true, campaign: true,
   subject: true, serviceInterest: true, message: true, estimatedValue: true,
   customFields: true, qualification: true, tier: true, convertedDealId: true, receivedDate: true, createdAt: true,
+  buyerType: true, intent: true, offerType: true, attempts: true, nextAction: true, nextDue: true,
+  statusEnteredAt: true, recallReason: true, recallDate: true, lostNote: true, demoDoneAt: true, demoCreditUntil: true,
   company: { select: { id: true, name: true, city: true, vatNumber: true } },
   contact: {
     select: {

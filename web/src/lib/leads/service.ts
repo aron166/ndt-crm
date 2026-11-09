@@ -3,12 +3,16 @@ import { db } from "@/lib/db";
 import { audit, type AuditOptions } from "@/lib/audit";
 import { runAutomations } from "@/lib/automations/engine";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
-import { getLeadStatuses, getQualificationQuestions, getScriptVariants } from "./queries";
+import { getLeadStatuses, getLeadTransitions, getQualificationQuestions, getScriptVariants } from "./queries";
 import { leadStatusLabel } from "./statuses";
 import {
   callOutcomeSchema, planCallOutcome, LEAD_OUTCOMES, LOST_REASON_MIN, LOST_REASON_MAX,
   RECALL_STATUS, bookingIssue, type LeadOutcome,
 } from "./outcomes";
+import {
+  isLostReason, planTransition, transitionsBetween, findTransition,
+  type LeadTransition, type TransitionInput, type TransitionPlan,
+} from "./lifecycle";
 import {
   parseAnswers, answersFrom, answerSourcesFrom, withAnswers, effectiveAnswers, legacyAnswers,
 } from "./qualification";
@@ -40,6 +44,7 @@ const LEAD_EVENT_SELECT = {
   status: true, outcome: true, companyId: true, source: true, serviceInterest: true,
   estimatedValue: true, convertedDealId: true, assignedToId: true, lostReason: true,
   channel: true, campaign: true,
+  attempts: true, offerType: true, nextAction: true, nextDue: true, statusEnteredAt: true,
   company: { select: { name: true } },
   contact: { select: { personId: true, person: { select: { firstName: true, lastName: true } } } },
 } satisfies Prisma.LeadSelect;
@@ -82,37 +87,124 @@ export async function completeOpenLeadCallTasks(
   return count;
 }
 
-/** Move a lead to another column. Fires lead_status_changed automations. */
+/** Tag on every task the lifecycle creates, so a later stage move can retire them. */
+export const LIFECYCLE_TASK_TAG = "w2_lifecycle";
+
+type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+/**
+ * Write ONE planned lifecycle move (W2): the lead columns, the append-only
+ * lead_status_history row, and the tasks the move creates. Open lifecycle tasks
+ * of the previous stage are cancelled on a real stage change. Creates TASKS
+ * only: nothing here sends anything to the lead.
+ */
+export async function writeLeadTransition(
+  tx: Tx,
+  args: {
+    leadId: number; tenantId: number; fromStatus: string | null; transition: LeadTransition; plan: TransitionPlan;
+    companyId: number | null; personId: number | null; who: string;
+    actorUserId: number | null; actorAgentId?: string | null; escalationUserId?: number | null; now: Date;
+  },
+): Promise<number[]> {
+  const { leadId, tenantId, plan, now } = args;
+  if (!plan.self) {
+    await tx.task.updateMany({
+      where: { tenantId, leadId, status: { in: ["created", "in_progress"] }, setMembership: { has: LIFECYCLE_TASK_TAG } },
+      data: { status: "cancelled" },
+    });
+  }
+  await tx.lead.updateMany({ where: { id: leadId, tenantId }, data: plan.data });
+  await tx.leadStatusHistory.create({
+    data: {
+      tenantId, leadId, fromStatus: args.fromStatus, toStatus: plan.data.status, event: args.transition.event,
+      actorUserId: args.actorUserId, actorAgentId: args.actorAgentId ?? null, at: now,
+    },
+  });
+  const ids: number[] = [];
+  for (const t of plan.tasks) {
+    const task = await tx.task.create({
+      data: {
+        tenantId, leadId, companyId: args.companyId, personId: args.personId,
+        assignedToId: t.escalate ? (args.escalationUserId ?? plan.data.assignedToId) : plan.data.assignedToId,
+        title: `${t.title}: ${args.who}`, type: t.type, category: "revenue_generating",
+        status: "created", dueDate: t.dueDate, setMembership: [LIFECYCLE_TASK_TAG],
+      },
+      select: { id: true },
+    });
+    ids.push(task.id);
+  }
+  return ids;
+}
+
+function leadWho(lead: LeadRow, leadId: number): string {
+  const p = lead.contact?.person;
+  return p ? `${p.lastName} ${p.firstName}`.trim() : lead.company?.name ?? `Lead #${leadId}`;
+}
+
+/** Input a stage move may carry (board prompt, API, automations). */
+export interface ChangeLeadStatusOpts extends Omit<TransitionInput, "tasks" | "attempts"> {
+  fireAutomations?: boolean;
+  /** Which table event this is; omitted = the first row from the current stage to the target. */
+  event?: string;
+}
+
+/**
+ * Move a lead to another column (W2). Only moves in the tenant's transition
+ * table are allowed, and an open lead never leaves without owner + next action +
+ * next due. Logs lead_status_history, stamps status_entered_at, creates the
+ * stage's tasks. Fires lead_status_changed automations.
+ */
 export async function changeLeadStatus(
   leadId: number,
   newStatus: string,
   ctx: LeadCtx,
-  opts: { fireAutomations?: boolean } = {},
+  opts: ChangeLeadStatusOpts = {},
 ): Promise<Result<{ changed: boolean }>> {
   const statuses = await getLeadStatuses(ctx.tenantId);
   if (!statuses.some((s) => s.key === newStatus)) return { error: "Ismeretlen státusz" };
 
   const before = await loadLead(leadId, ctx.tenantId);
   if (!before) return { error: "Lead nem található" };
-  if (before.status === newStatus) return { success: true, changed: false };
+  if (before.status === newStatus && !opts.event) return { success: true, changed: false };
 
-  await db.lead.updateMany({ where: { id: leadId, tenantId: ctx.tenantId }, data: { status: newStatus } });
-  // Moving the card is acting on the lead → its open callback task is done.
-  // EXCEPT into `recall`, which IS "call this back later": closing the reminder
-  // there would silently delete the only thing telling anyone to call.
-  const now = new Date();
-  const closedTasks = newStatus === RECALL_STATUS
-    ? 0
-    : await completeOpenLeadCallTasks(db, leadId, ctx.tenantId, now);
-  if (closedTasks > 0) {
-    audit("lead", leadId, "update", { openCallTasks: closedTasks }, { openCallTasks: 0 }, auditOpts(ctx));
+  const from = before.status ?? "new";
+  const table = await getLeadTransitions(ctx.tenantId);
+  const transition = opts.event
+    ? findTransition(table, from, opts.event)
+    : transitionsBetween(table, from, newStatus)[0] ?? null;
+  if (!transition || transition.to !== newStatus) {
+    return { error: `Nem engedélyezett lépés: ${leadStatusLabel(before.status, statuses)} → ${leadStatusLabel(newStatus, statuses)}` };
   }
+  if (opts.ownerId != null) {
+    const user = await db.user.findFirst({ where: { id: opts.ownerId, tenantId: ctx.tenantId }, select: { id: true } });
+    if (!user) return { error: "Felhasználó nem található" };
+  }
+  if (opts.lostReason != null && !isLostReason(opts.lostReason)) return { error: "Ismeretlen elvesztési ok" };
+
+  const now = new Date();
+  const plan = planTransition(before, transition, {
+    ownerId: opts.ownerId, nextAction: opts.nextAction, nextDue: opts.nextDue, offerType: opts.offerType,
+    lostReason: opts.lostReason, lostNote: opts.lostNote, recallReason: opts.recallReason, recallDate: opts.recallDate,
+  }, now);
+  if ("error" in plan) return plan;
+
+  const escalationUserId = plan.tasks.some((t) => t.escalate) ? await resolveDemoHost(ctx.tenantId, "aron") : null;
+  await db.$transaction(async (tx) => {
+    // Moving the card is acting on the lead: its open callback task is done.
+    // EXCEPT into `recall`, which IS "call this back later".
+    if (newStatus !== RECALL_STATUS) await completeOpenLeadCallTasks(tx, leadId, ctx.tenantId, now);
+    await writeLeadTransition(tx, {
+      leadId, tenantId: ctx.tenantId, fromStatus: before.status, transition, plan,
+      companyId: before.companyId, personId: before.contact?.personId ?? null, who: leadWho(before, leadId),
+      actorUserId: ctx.userId, actorAgentId: ctx.actorAgentId, escalationUserId, now,
+    });
+  });
   audit("lead", leadId, "update",
-    { status: before.status, statusLabel: leadStatusLabel(before.status, statuses) },
-    { status: newStatus, statusLabel: leadStatusLabel(newStatus, statuses) },
+    { status: before.status, statusLabel: leadStatusLabel(before.status, statuses), nextAction: before.nextAction },
+    { status: newStatus, statusLabel: leadStatusLabel(newStatus, statuses), event: transition.event, nextAction: plan.data.nextAction },
     auditOpts(ctx));
 
-  if (opts.fireAutomations !== false) {
+  if (opts.fireAutomations !== false && !plan.self) {
     await runAutomations({
       type: "lead_status_changed",
       tenantId: ctx.tenantId,
@@ -421,11 +513,26 @@ export async function logLeadCallOutcome(
     }
   }
 
-  const statuses = await getLeadStatuses(ctx.tenantId);
-  const plan = planCallOutcome(input, lead.status, statuses.map((s) => s.key));
+  const table = await getLeadTransitions(ctx.tenantId);
+  const callPlan = planCallOutcome(input, lead, table, now);
   const personId = lead.contact?.personId ?? null;
-  const p = lead.contact?.person;
-  const who = p ? `${p.lastName} ${p.firstName}`.trim() : lead.company?.name ?? `Lead #${leadId}`;
+  const who = leadWho(lead, leadId);
+  // meeting_booked: whoever holds the meeting owns the lead (was demo_aron / demo_peter).
+  if (input.outcome === "meeting_booked" && input.demoWith) {
+    callPlan.input.ownerId = bookingHostId ?? await resolveDemoHost(ctx.tenantId, input.demoWith);
+  }
+  let transitionPlan: TransitionPlan | null = null;
+  if (callPlan.transition) {
+    const planned = planTransition(lead, callPlan.transition, callPlan.input, now);
+    if ("error" in planned) return { error: planned.error, issues: {} };
+    transitionPlan = planned;
+  }
+  const plan = {
+    status: transitionPlan && !transitionPlan.self ? transitionPlan.data.status : null,
+    lost: transitionPlan?.data.outcome === "lost" ? { lostReason: transitionPlan.data.lostReason ?? "other" } : null,
+    callbackAt: callPlan.callbackAt, bookingAt: callPlan.bookingAt, bookingKind: callPlan.bookingKind,
+  };
+  const escalationUserId = transitionPlan?.tasks.some((t) => t.escalate) ? await resolveDemoHost(ctx.tenantId, "aron") : null;
 
   const { interaction, task, bookingTask } = await db.$transaction(async (tx) => {
     const interaction = await tx.interaction.create({
@@ -470,13 +577,18 @@ export async function logLeadCallOutcome(
           select: { id: true },
         })
       : null;
-    await tx.lead.updateMany({
-      where: { id: leadId, tenantId: ctx.tenantId },
-      data: {
-        ...(plan.status ? { status: plan.status } : {}),
-        ...(plan.lost ? { outcome: "lost", closedAt: now, lostReason: plan.lost.lostReason } : {}),
-      },
-    });
+    if (callPlan.transition && transitionPlan) {
+      await writeLeadTransition(tx, {
+        leadId, tenantId: ctx.tenantId, fromStatus: lead.status, transition: callPlan.transition, plan: transitionPlan,
+        companyId: lead.companyId, personId, who, actorUserId: ctx.userId, actorAgentId: ctx.actorAgentId,
+        escalationUserId, now,
+      });
+    } else if (plan.callbackAt) {
+      await tx.lead.updateMany({
+        where: { id: leadId, tenantId: ctx.tenantId },
+        data: { nextAction: "Visszahívás", nextDue: plan.callbackAt },
+      });
+    }
     if (lead.companyId) {
       await tx.company.updateMany({ where: { id: lead.companyId, tenantId: ctx.tenantId }, data: { lastInteractionDate: input.occurredAt ?? now } });
     }
