@@ -18,6 +18,7 @@ import {
   buildFunnel, type CampaignFunnel, type ReplyType,
 } from "@/lib/outreach/campaign";
 import { ingestLead } from "@/lib/leads/ingest";
+import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
 import { leadIntakeSchema } from "@/lib/leads/schema";
 import { campaignBySlug, resolveAudience } from "@/lib/outreach/registry";
 import { countAudience } from "@/lib/marketing/audience-query";
@@ -231,7 +232,8 @@ export async function markDraftReplied(
     );
     if (!res.deduped) {
       audit("email_draft", draftId, "update", { status: row.status }, { status: "replied", replyType, leadId: res.leadId }, auditOpts);
-      // Same post-commit step as POST /api/leads: the follow-up task rules.
+      // Same post-commit steps as POST /api/leads: the W2 SLA timer, then the follow-up task rules.
+      await startLeadLifecycle(TENANT_ID, res.leadId);
       await runAutomations({
         type: "lead_created",
         tenantId: TENANT_ID,

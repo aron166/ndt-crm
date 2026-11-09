@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { SCRIPT_KEY_MAX } from "./scripts";
 import { BOOKING_KINDS } from "@/lib/booking/priority";
+import {
+  CALL_OUTCOME_EVENT, CALL_OUTCOME_LOST_REASON, LOST_REASONS, MAX_ATTEMPTS, addWorkdays, cadenceTask, findTransition,
+  type LeadTransition, type LifecycleLead, type TransitionInput,
+} from "./lifecycle";
 
 // Lead call-outcome logging — PURE module (no DB), shared by the UI modal, the
 // server action and the public API. The note-required / callback rules live in
@@ -55,15 +59,6 @@ export function callOutcomeLabel(key: string | null): string {
   return CALL_OUTCOMES.find((o) => o.key === key)?.label ?? key ?? "-";
 }
 
-export const DEMO_STATUS: Record<"aron" | "peter", string> = {
-  aron: "demo_aron",
-  peter: "demo_peter",
-};
-
-/** `no_answer` walks the lead along this chain (one step per attempt). */
-export const CALL_STAGE_CHAIN = ["new", "call_1", "call_2", "call_3", "call_3_plus"] as const;
-/** Áron may turn the auto-advance off later — one switch, here. */
-export const AUTO_ADVANCE_ON_NO_ANSWER = true;
 /** Stage a lead lands in when it asks for a callback. */
 export const RECALL_STATUS = "recall";
 
@@ -83,6 +78,8 @@ export const callOutcomeSchema = z
     bookingKind: z.enum(BOOKING_KINDS).optional(),
     /** Required when the outcome is lost/disqualified — a short free text WHY. */
     lostReason: z.string().trim().max(LOST_REASON_MAX).optional(),
+    /** W2 lost reason CODE; defaults per outcome (CALL_OUTCOME_LOST_REASON). lostReason is the note. */
+    lostCode: z.enum(LOST_REASONS).optional(),
     /** Optional: who the callback task is assigned to (defaults to the actor). */
     assignedToId: z.number().int().positive().optional(),
     /**
@@ -176,11 +173,11 @@ export function bookingIssue(
 }
 
 export interface CallOutcomePlan {
-  /** New lead status, or null = unchanged. */
-  status: string | null;
-  /** Set when the outcome closes the lead as lost. */
-  lost: { lostReason: string } | null;
-  /** A callback task to create (callback_requested only). */
+  /** The lead_status_transitions row this call applies; null = no stage change (log only). */
+  transition: LeadTransition | null;
+  /** What the move carries (attempts, cadence tasks, recall, lost code, next action). */
+  input: TransitionInput;
+  /** A plain callback task, only when callback_requested has no transition from this stage. */
   callbackAt: Date | null;
   /** A booking task to create (meeting_booked only). */
   bookingAt: Date | null;
@@ -188,45 +185,65 @@ export interface CallOutcomePlan {
 }
 
 /**
- * What a call outcome does to the lead — pure. `knownStatuses` guards the
- * transition: we never move a lead into a column the tenant deleted.
+ * What a call outcome does to the lead, pure. The move comes from the tenant's
+ * transition table (W2 spec section 4), never a hard-coded chain: an outcome
+ * with no row from the current stage only logs the call.
  */
 export function planCallOutcome(
   input: CallOutcomeInput,
-  currentStatus: string | null,
-  knownStatuses: readonly string[],
+  lead: LifecycleLead,
+  table: readonly LeadTransition[],
+  now: Date = new Date(),
 ): CallOutcomePlan {
-  const known = (s: string) => knownStatuses.includes(s);
-  const plan: CallOutcomePlan = { status: null, lost: null, callbackAt: null, bookingAt: null, bookingKind: null };
+  const from = lead.status ?? "new";
+  let event = CALL_OUTCOME_EVENT[input.outcome];
+  const ti: TransitionInput = {};
+  const plan: CallOutcomePlan = { transition: null, input: ti, callbackAt: null, bookingAt: null, bookingKind: null };
 
   switch (input.outcome) {
     case "no_answer": {
-      if (!AUTO_ADVANCE_ON_NO_ANSWER) break;
-      const i = CALL_STAGE_CHAIN.indexOf((currentStatus ?? "new") as (typeof CALL_STAGE_CHAIN)[number]);
-      const next = i >= 0 && i < CALL_STAGE_CHAIN.length - 1 ? CALL_STAGE_CHAIN[i + 1] : null;
-      if (next && known(next)) plan.status = next;
+      const n = (from === "contacting" ? lead.attempts : 0) + 1;
+      if (n >= MAX_ATTEMPTS) {
+        event = "attempts_exhausted";
+        ti.attempts = MAX_ATTEMPTS;
+        break;
+      }
+      ti.attempts = n;
+      const day0 = from === "contacting" && lead.statusEnteredAt ? lead.statusEnteredAt : now;
+      const next = cadenceTask(n + 1, day0, now);
+      ti.tasks = [];
+      // Spec 5: email right after the first missed call. A TASK, nothing is sent.
+      if (n === 1) ti.tasks.push({ title: "Email a nem fogadott hívás után", type: "email", dueDate: now });
+      if (next) {
+        ti.tasks.push(next);
+        ti.nextAction = next.title;
+        ti.nextDue = next.dueDate;
+      }
       break;
     }
     case "callback_requested":
-      plan.callbackAt = input.callbackAt ?? null;
-      if (known(RECALL_STATUS)) plan.status = RECALL_STATUS;
+      ti.recallReason = "timing";
+      ti.recallDate = input.callbackAt ?? null;
+      if (input.assignedToId != null) ti.ownerId = input.assignedToId;
       break;
-    case "meeting_booked": {
-      const target = DEMO_STATUS[input.demoWith ?? "aron"];
-      if (known(target)) plan.status = target;
+    case "meeting_booked":
       plan.bookingAt = input.bookingAt ?? null;
       plan.bookingKind = input.bookingKind ?? null;
+      ti.nextAction = input.bookingAt ? (from === "offer_sent" ? "Demó" : "Egyeztetés") : "Időpont egyeztetése";
+      ti.nextDue = input.bookingAt ?? addWorkdays(now, 3);
       break;
-    }
     case "not_interested":
     case "disqualified":
-      // The schema guarantees lostReason here; the `??` is a type narrowing, not a default.
-      plan.lost = { lostReason: input.lostReason ?? input.outcome };
-      break;
     case "wrong_number":
+      ti.lostReason = input.lostCode ?? CALL_OUTCOME_LOST_REASON[input.outcome];
+      ti.lostNote = input.lostReason ?? null;
       break;
   }
-  if (plan.status === currentStatus) plan.status = null;
+  plan.transition = event ? findTransition(table, from, event) : null;
+  // A lost outcome past the call stages (qualified, offer_sent, demo_*, recall)
+  // still closes the lead: the manual-close row exists from every open stage.
+  if (!plan.transition && ti.lostReason) plan.transition = findTransition(table, from, "lead_lost");
+  if (input.outcome === "callback_requested" && !plan.transition) plan.callbackAt = input.callbackAt ?? null;
   return plan;
 }
 

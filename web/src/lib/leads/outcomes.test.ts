@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { callOutcomeSchema, planCallOutcome, callbackTone, daysSince, bookingIssue } from "./outcomes";
-import { DEFAULT_LEAD_STATUSES } from "./statuses";
+import { DEFAULT_TRANSITIONS, type LifecycleLead } from "./lifecycle";
 
-const KEYS = DEFAULT_LEAD_STATUSES.map((s) => s.key);
 const parse = (v: unknown) => callOutcomeSchema.safeParse(v);
 
 describe("callOutcomeSchema — the shared rules", () => {
@@ -62,43 +61,75 @@ describe("bookingIssue — who must book a date", () => {
 });
 
 describe("planCallOutcome", () => {
-  const p = (outcome: string, status: string | null, extra: Record<string, unknown> = {}) =>
-    planCallOutcome(callOutcomeSchema.parse({ outcome, note: "n", ...extra }), status, KEYS);
-
-  it("no_answer walks new → call_1 → … → call_3_plus and stops", () => {
-    expect(p("no_answer", "new").status).toBe("call_1");
-    expect(p("no_answer", "call_1").status).toBe("call_2");
-    expect(p("no_answer", "call_3").status).toBe("call_3_plus");
-    expect(p("no_answer", "call_3_plus").status).toBeNull();
-    expect(p("no_answer", "recall").status).toBeNull();
+  const now = new Date("2026-09-07T10:00:00Z");
+  const day0 = new Date("2026-09-01T10:00:00Z");
+  const lead = (status: string | null, extra: Partial<LifecycleLead> = {}): LifecycleLead => ({
+    status, attempts: 0, assignedToId: 1, offerType: null, nextAction: null, nextDue: null, statusEnteredAt: day0, ...extra,
   });
-  it("callback → recall + task date", () => {
-    const plan = p("callback_requested", "call_1", { callbackAt: "2026-09-10T10:00:00Z" });
-    expect(plan.status).toBe("recall");
+  const p = (outcome: string, l: LifecycleLead, extra: Record<string, unknown> = {}) =>
+    planCallOutcome(callOutcomeSchema.parse({ outcome, note: "n", ...extra }), l, DEFAULT_TRANSITIONS, now);
+
+  it("no_answer from new: contacting, attempt 1, email task + attempt-2 cadence task 3.5 h after day 0", () => {
+    const plan = p("no_answer", lead("new"));
+    expect(plan.transition).toMatchObject({ from: "new", to: "contacting" });
+    expect(plan.input.attempts).toBe(1);
+    expect(plan.input.tasks?.map((t) => t.type)).toEqual(["email", "call"]);
+    expect(plan.input.tasks?.[1].dueDate.getTime()).toBe(now.getTime() + 3.5 * 3_600_000);
+    expect(plan.input.nextDue).toEqual(plan.input.tasks?.[1].dueDate);
+  });
+  it("no_answer from contacting at 3 attempts: self transition, attempt 4, next = cadence step 5 at entered + 7 d", () => {
+    const plan = p("no_answer", lead("contacting", { attempts: 3 }));
+    expect(plan.transition).toMatchObject({ from: "contacting", to: "contacting", event: "call_no_answer" });
+    expect(plan.input.attempts).toBe(4);
+    expect(plan.input.nextDue?.getTime()).toBe(day0.getTime() + 7 * 86_400_000);
+    expect(plan.input.tasks).toHaveLength(1);
+  });
+  it("no_answer at attempts 7 fires attempts_exhausted -> recall", () => {
+    const plan = p("no_answer", lead("contacting", { attempts: 7 }));
+    expect(plan.transition).toMatchObject({ event: "attempts_exhausted", to: "recall" });
+    expect(plan.input.attempts).toBe(8);
+  });
+  it("callback_requested from contacting -> recall (timing, date = callbackAt), no plain callback", () => {
+    const plan = p("callback_requested", lead("contacting"), { callbackAt: "2026-09-10T10:00:00Z" });
+    expect(plan.transition?.to).toBe("recall");
+    expect(plan.input.recallReason).toBe("timing");
+    expect(plan.input.recallDate?.toISOString()).toBe("2026-09-10T10:00:00.000Z");
+    expect(plan.callbackAt).toBeNull();
+  });
+  it("callback_requested from a stage with no row keeps a plain callback task", () => {
+    const plan = p("callback_requested", lead("qualified"), { callbackAt: "2026-09-10T10:00:00Z" });
+    expect(plan.transition).toBeNull();
     expect(plan.callbackAt?.toISOString()).toBe("2026-09-10T10:00:00.000Z");
   });
-  it("meeting_booked → demo column of the chosen person, carrying the booking", () => {
-    const bookingExtra = { bookingAt: "2026-09-10T10:00:00Z", bookingKind: "single_machine_demo" };
-    const plan = p("meeting_booked", "call_2", { demoWith: "peter", ...bookingExtra });
-    expect(plan.status).toBe("demo_peter");
-    expect(plan.bookingAt?.toISOString()).toBe("2026-09-10T10:00:00.000Z");
-    expect(plan.bookingKind).toBe("single_machine_demo");
-    expect(p("meeting_booked", "demo_aron", { demoWith: "aron", ...bookingExtra }).status).toBeNull();
+  it("meeting_booked: contacting -> discovery_booked, offer_sent -> demo_booked, due = bookingAt", () => {
+    const extra = { demoWith: "peter", bookingAt: "2026-09-10T10:00:00Z", bookingKind: "single_machine_demo" };
+    const a = p("meeting_booked", lead("contacting"), extra);
+    expect(a.transition?.to).toBe("discovery_booked");
+    expect(a.input.nextDue?.toISOString()).toBe("2026-09-10T10:00:00.000Z");
+    expect(a.bookingAt?.toISOString()).toBe("2026-09-10T10:00:00.000Z");
+    expect(a.bookingKind).toBe("single_machine_demo");
+    expect(p("meeting_booked", lead("offer_sent"), extra).transition?.to).toBe("demo_booked");
   });
-  it("not_interested / disqualified close as lost carrying the typed reason", () => {
-    expect(p("not_interested", "call_1", { lostReason: "Van saját szkennerük" }).lost)
-      .toEqual({ lostReason: "Van saját szkennerük" });
-    expect(p("disqualified", "new", { lostReason: "Nincs betonszerkezetük" }).lost)
-      .toEqual({ lostReason: "Nincs betonszerkezetük" });
-    expect(p("wrong_number", "new")).toEqual({ status: null, lost: null, callbackAt: null, bookingAt: null, bookingKind: null });
+  it("lost outcomes carry the default code and the typed text as note", () => {
+    const a = p("not_interested", lead("contacting"), { lostReason: "Van saját szkennerük" });
+    expect(a.transition?.to).toBe("lost");
+    expect(a.input.lostReason).toBe("no_need");
+    expect(a.input.lostNote).toBe("Van saját szkennerük");
+    expect(p("disqualified", lead("new"), { lostReason: "Nincs betonszerkezetük" }).input.lostReason).toBe("not_our_service");
+    expect(p("wrong_number", lead("new")).input.lostReason).toBe("invalid_contact");
   });
-  it("never moves into a column the tenant removed", () => {
-    const plan = planCallOutcome(
-      callOutcomeSchema.parse({ outcome: "callback_requested", note: "n", callbackAt: "2026-09-10T10:00:00Z" }),
-      "call_1", ["new", "call_1"],
-    );
-    expect(plan.status).toBeNull();
-    expect(plan.callbackAt).not.toBeNull();
+  it("an explicit lostCode overrides the default", () => {
+    expect(p("not_interested", lead("new"), { lostReason: "drága", lostCode: "price" }).input.lostReason).toBe("price");
+  });
+  it("an outcome whose event has no row from the stage only logs the call", () => {
+    expect(p("no_answer", lead("ordered")).transition).toBeNull();
+  });
+
+  it("a lost outcome past the call stages closes through lead_lost (Vanda #2)", () => {
+    const plan = p("wrong_number", lead("recall"));
+    expect(plan.transition).toMatchObject({ from: "recall", event: "lead_lost", to: "lost" });
+    expect(plan.input.lostReason).toBe("invalid_contact");
+    expect(p("not_interested", lead("offer_sent"), { lostReason: "no budget now" }).transition?.event).toBe("lead_lost");
   });
 });
 

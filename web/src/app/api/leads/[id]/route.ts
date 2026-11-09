@@ -75,7 +75,10 @@ export async function PATCH(request: Request, { params }: Params) {
       if ("error" in r) return json({ error: r.error }, 400);
     }
     if (body.status !== undefined) {
-      const r = await changeLeadStatus(id, body.status, ctx);
+      const r = await changeLeadStatus(id, body.status, ctx, {
+        event: body.event, nextAction: body.next_action, nextDue: body.next_due, offerType: body.offer_type,
+        lostReason: body.lost_code, lostNote: body.lost_note, recallReason: body.recall_reason, recallDate: body.recall_date,
+      });
       if ("error" in r) return json({ error: r.error }, 400);
     }
     if (body.outcome !== undefined) {

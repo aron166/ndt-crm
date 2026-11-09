@@ -2,6 +2,7 @@
 // stays import-safe for client components (it has no db dependency).
 import { db } from "@/lib/db";
 import { DEFAULT_LEAD_STATUSES, type LeadStatusDef } from "./statuses";
+import { DEFAULT_TRANSITIONS, type LeadTransition } from "./lifecycle";
 import {
   questionsFromSettings, setsFromSettings,
   type QualificationQuestion, type QuestionSet,
@@ -96,4 +97,18 @@ export async function getScriptVariants(tenantId: number): Promise<ScriptVariant
     const body = liveBodyById.get(v.contentItemId);
     return body !== undefined ? { ...v, body } : { ...v, body: "", liveMissing: true };
   });
+}
+
+/**
+ * The tenant's allowed lead moves (W2 spec section 4). Falls back to the
+ * in-code default when the tenant has no rows, mirroring getLeadStatuses.
+ */
+export async function getLeadTransitions(tenantId: number): Promise<LeadTransition[]> {
+  const rows = await db.leadStatusTransition.findMany({
+    where: { tenantId },
+    select: { fromStatus: true, event: true, toStatus: true, action: true },
+    orderBy: { id: "asc" },
+  });
+  if (rows.length === 0) return DEFAULT_TRANSITIONS;
+  return rows.map((r) => ({ from: r.fromStatus, event: r.event, to: r.toStatus, action: r.action }));
 }

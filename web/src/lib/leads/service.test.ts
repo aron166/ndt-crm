@@ -14,8 +14,9 @@ vi.mock("@/lib/booking/queries", () => ({
   loadBookings: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("./queries", () => ({
+  getLeadTransitions: vi.fn().mockImplementation(async () => (await vi.importActual<typeof import("./lifecycle")>("./lifecycle")).DEFAULT_TRANSITIONS),
   getLeadStatuses: vi.fn().mockResolvedValue(
-    ["new", "call_1", "call_2", "call_3", "call_3_plus", "recall", "demo_aron", "demo_peter"]
+    ["new", "contacting", "discovery_booked", "qualified", "offer_sent", "demo_booked", "demo_done", "ordered", "won", "recall", "lost"]
       .map((key, position) => ({ key, label: key, color: "#000", position, isInitial: position === 0, isTerminal: false, isCommitment: false, description: null })),
   ),
   getQualificationQuestions: vi.fn().mockResolvedValue(
@@ -49,14 +50,17 @@ const mockResolveDemoHost = resolveDemoHost as unknown as M;
 const mockLoadBookings = loadBookings as unknown as M;
 
 const LEAD = {
-  status: "call_1", outcome: "open", companyId: 7, source: null, serviceInterest: null,
-  estimatedValue: null, convertedDealId: null, assignedToId: null, lostReason: null,
+  status: "contacting", outcome: "open", companyId: 7, source: null, serviceInterest: null,
+  estimatedValue: null, convertedDealId: null, assignedToId: 5, attempts: 1, offerType: null,
+  nextAction: "2. hívás", nextDue: new Date("2026-09-08T10:00:00Z"), statusEnteredAt: new Date("2026-09-07T10:00:00Z"), lostReason: null,
   channel: null, company: { name: "Acme Kft." },
   contact: { personId: 3, person: { firstName: "Anna", lastName: "Kiss" } },
 };
 
 let txTaskUpdateMany: ReturnType<typeof vi.fn>;
 let txTaskCreate: ReturnType<typeof vi.fn>;
+let txLeadUpdateMany: ReturnType<typeof vi.fn>;
+let txHistoryCreate: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -65,11 +69,14 @@ beforeEach(() => {
   mockDb.task.updateMany.mockResolvedValue({ count: 1 });
   txTaskUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
   txTaskCreate = vi.fn().mockResolvedValue({ id: 99 });
+  txLeadUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+  txHistoryCreate = vi.fn().mockResolvedValue({ id: 1 });
   mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
       interaction: { create: vi.fn().mockResolvedValue({ id: 55 }) },
       task: { updateMany: txTaskUpdateMany, create: txTaskCreate },
-      lead: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      lead: { updateMany: txLeadUpdateMany },
+      leadStatusHistory: { create: txHistoryCreate },
       company: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     }),
   );
@@ -77,30 +84,68 @@ beforeEach(() => {
 
 describe("card → task: moving the card completes the open callback task", () => {
   it("completes open call tasks on a normal stage move", async () => {
-    const res = await changeLeadStatus(10, "call_2", ctx);
+    const res = await changeLeadStatus(10, "qualified", ctx, { offerType: "service" });
     expect(res).toEqual({ success: true, changed: true });
-    expect(mockDb.task.updateMany).toHaveBeenCalledTimes(1);
-    expect(mockDb.task.updateMany.mock.calls[0][0]).toMatchObject({
+    expect(txTaskUpdateMany.mock.calls[0][0]).toMatchObject({
       where: { tenantId: 1, leadId: 10, type: "call", status: { in: ["created", "in_progress"] } },
       data: { status: "done" },
     });
   });
 
   it("does NOT complete them when moving INTO recall — that IS the reminder", async () => {
-    await changeLeadStatus(10, "recall", ctx);
-    expect(mockDb.task.updateMany).not.toHaveBeenCalled();
+    const res = await changeLeadStatus(10, "recall", ctx);
+    expect(res).toEqual({ success: true, changed: true });
+    expect(txTaskUpdateMany.mock.calls.some((c) => c[0].where.type === "call")).toBe(false);
   });
 
   it("a no-op move touches no task", async () => {
-    const res = await changeLeadStatus(10, "call_1", ctx);
+    const res = await changeLeadStatus(10, "contacting", ctx);
     expect(res).toEqual({ success: true, changed: false });
-    expect(mockDb.task.updateMany).not.toHaveBeenCalled();
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
   });
 
   it("an unknown status is rejected before anything is written", async () => {
     expect(await changeLeadStatus(10, "nope", ctx)).toEqual({ error: "Ismeretlen státusz" });
-    expect(mockDb.lead.updateMany).not.toHaveBeenCalled();
-    expect(mockDb.task.updateMany).not.toHaveBeenCalled();
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("changeLeadStatus: the transition table and the open-lead rule", () => {
+  it("refuses a move that is not in the table (new -> won) and writes nothing", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, status: "new" });
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toMatchObject({ error: expect.stringContaining("Nem engedélyezett lépés") });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+    expect(txHistoryCreate).not.toHaveBeenCalled();
+  });
+
+  it("contacting -> discovery_booked needs a next action and due date (no entry task)", async () => {
+    const res = await changeLeadStatus(10, "discovery_booked", ctx);
+    expect(res).toMatchObject({ error: expect.stringContaining("következő lépés") });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+    const ok = await changeLeadStatus(10, "discovery_booked", ctx, { nextAction: "Egyeztetés", nextDue: new Date("2026-09-20T10:00:00Z") });
+    expect(ok).toEqual({ success: true, changed: true });
+    expect(txLeadUpdateMany.mock.calls[0][0].data).toMatchObject({ status: "discovery_booked", nextAction: "Egyeztetés" });
+  });
+
+  it("writes one history row with from / to / event and the actor", async () => {
+    await changeLeadStatus(10, "qualified", ctx, { offerType: "rental" });
+    expect(txHistoryCreate).toHaveBeenCalledTimes(1);
+    expect(txHistoryCreate.mock.calls[0][0].data).toMatchObject({
+      tenantId: 1, leadId: 10, fromStatus: "contacting", toStatus: "qualified", event: "call_qualified", actorUserId: 2,
+    });
+    expect(txTaskCreate.mock.calls[0][0].data).toMatchObject({ setMembership: ["w2_lifecycle"] });
+  });
+
+  it("moving to lost needs a code; other needs a note too; other + note closes the lead as lost", async () => {
+    expect(await changeLeadStatus(10, "lost", ctx)).toMatchObject({ error: expect.any(String) });
+    expect(await changeLeadStatus(10, "lost", ctx, { lostReason: "other" })).toMatchObject({ error: expect.any(String) });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+    const ok = await changeLeadStatus(10, "lost", ctx, { lostReason: "other", lostNote: "kiderült: bérbeadó" });
+    expect(ok).toEqual({ success: true, changed: true });
+    expect(txLeadUpdateMany.mock.calls[0][0].data).toMatchObject({
+      status: "lost", outcome: "lost", lostReason: "other", lostNote: "kiderült: bérbeadó", nextAction: null,
+    });
   });
 });
 
@@ -109,19 +154,21 @@ describe("task → card: logging a call cannot leave two open callback tasks", (
     const res = await logLeadCallOutcome(10, {
       outcome: "callback_requested", note: "kedden", callbackAt: "2026-09-10T10:00:00Z",
     }, ctx);
-    expect(res).toMatchObject({ success: true, status: "recall", taskId: 99 });
-    expect(txTaskUpdateMany).toHaveBeenCalledTimes(1);
+    // A callback with a table row (contacting -> recall) plans a recall task via the lifecycle writer, not a plain callback.
+    expect(res).toMatchObject({ success: true, status: "recall", taskId: null });
+    expect(txTaskUpdateMany.mock.calls[0][0].where.type).toBe("call");
     expect(txTaskCreate).toHaveBeenCalledTimes(1);
     const closeOrder = txTaskUpdateMany.mock.invocationCallOrder[0];
     const createOrder = txTaskCreate.mock.invocationCallOrder[0];
     expect(closeOrder).toBeLessThan(createOrder);
   });
 
-  it("an outcome with no callback closes the open task and creates none", async () => {
+  it("an outcome with no plain callback closes the open task and only creates lifecycle cadence tasks", async () => {
     const res = await logLeadCallOutcome(10, { outcome: "no_answer", note: "nem vette fel" }, ctx);
-    expect(res).toMatchObject({ success: true, status: "call_2" });
-    expect(txTaskUpdateMany).toHaveBeenCalledTimes(1);
-    expect(txTaskCreate).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ success: true, status: "contacting", taskId: null });
+    expect(txTaskUpdateMany.mock.calls[0][0].where.type).toBe("call");
+    expect(txTaskCreate).toHaveBeenCalledTimes(1);
+    expect(txTaskCreate.mock.calls[0][0].data).toMatchObject({ setMembership: ["w2_lifecycle"] });
   });
 
   it("an unknown scriptVariant is rejected and no interaction row is created", async () => {
@@ -263,12 +310,12 @@ describe("logLeadCallOutcome — bookings", () => {
     expect(txTaskCreate).not.toHaveBeenCalled();
   });
 
-  it("agent ctx, meeting_booked with demoWith only (old API payload): succeeds, no booking task, host never resolved", async () => {
+  it("agent ctx, meeting_booked with demoWith only (old API payload): succeeds, no booking task, host resolved once for the owner", async () => {
     const res = await logLeadCallOutcome(10, {
       outcome: "meeting_booked", note: "demo egyeztetve", demoWith: "aron",
     }, agentCtx);
     expect(res).toMatchObject({ success: true, bookingTaskId: null, bookingConflicts: [] });
-    expect(mockResolveDemoHost).not.toHaveBeenCalled();
+    expect(mockResolveDemoHost).toHaveBeenCalledTimes(1);
     expect(txTaskCreate).not.toHaveBeenCalled();
   });
 

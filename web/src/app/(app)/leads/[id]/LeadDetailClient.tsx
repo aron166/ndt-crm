@@ -4,7 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Building2, User, Mail, Phone, Globe, CheckCircle2, Pencil, Trash2, PhoneCall, CalendarClock } from "lucide-react";
-import { setLeadOutcomeAction, updateLeadStatus, deleteLead, assignLeadAction } from "@/app/actions/leads";
+import { LeadMoveDialog } from "@/components/LeadMoveDialog";
+import { setLeadOutcomeAction, deleteLead, assignLeadAction } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
@@ -116,6 +117,7 @@ export function LeadDetailClient({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(lead.status ?? "new");
+  const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<string>(lead.outcome);
   const [outcomePending, startOutcome] = useTransition();
   const [statusPending, startStatus] = useTransition();
@@ -152,14 +154,7 @@ export function LeadDetailClient({
     .filter(([, v]) => v !== undefined && v !== null && v !== "");
 
   function handleStatusChange(next: string) {
-    const prev = status;
-    setStatus(next);
-    setActionError(null);
-    startStatus(async () => {
-      const res = await updateLeadStatus(lead.id, next);
-      if (res && "error" in res) { setStatus(prev); setActionError(res.error); return; }
-      router.refresh();
-    });
+    if (next !== status) setMoveTarget(next);
   }
 
   function handleOutcome(next: LeadOutcome) {
@@ -256,6 +251,16 @@ export function LeadDetailClient({
               <option key={s.key} value={s.key}>{s.label}</option>
             ))}
           </select>
+
+          {moveTarget && (
+            <LeadMoveDialog
+              leadId={lead.id}
+              target={moveTarget}
+              targetLabel={statuses.find((s) => s.key === moveTarget)?.label ?? moveTarget}
+              onClose={() => setMoveTarget(null)}
+              onMoved={() => { setStatus(moveTarget); setMoveTarget(null); router.refresh(); }}
+            />
+          )}
 
           {/* Outcome — orthogonal to the stage. `won` is the door to the deal pipeline. */}
           <select

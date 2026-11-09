@@ -43,6 +43,8 @@ model Tenant {
   enrichmentProposals    EnrichmentProposal[]
   appApiKeys             AppApiKey[]
   leadStatuses           LeadStatus[]
+  leadStatusTransitions  LeadStatusTransition[]
+  leadStatusHistory      LeadStatusHistory[]
   automationRules        AutomationRule[]
   automationFirings      AutomationFiring[]
   automationEmailSends   AutomationEmailSend[]
@@ -278,21 +280,22 @@ model User {
   // not a migration. Absent/null = the dark default.
   settings     Json?
 
-  tenant             Tenant           @relation(fields: [tenantId], references: [id])
-  assignedTasks      Task[]           @relation("TaskAssignee")
-  loggedInteractions Interaction[]
-  assignedLeads      Lead[]           @relation("LeadAssignee")
-  assignedDeals      Deal[]           @relation("DealAssignee")
-  emailDrafts        EmailDraft[]     @relation("DraftCreator")
-  sentEmailDrafts    EmailDraft[]     @relation("DraftSender")
-  senderCampaigns    Campaign[]       @relation("CampaignSender")
-  contentVersions    ContentVersion[]
-  contentReviews     ContentReview[]
-  resolvedChecks     ContentCheck[]
-  patchTestMarks     PatchTestMark[]
-  assistantCalls     AssistantCall[]
-  contentNotes       ContentNote[]
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  assignedTasks          Task[]                  @relation("TaskAssignee")
+  loggedInteractions     Interaction[]
+  assignedLeads          Lead[]                  @relation("LeadAssignee")
+  assignedDeals          Deal[]                  @relation("DealAssignee")
+  emailDrafts            EmailDraft[]            @relation("DraftCreator")
+  sentEmailDrafts        EmailDraft[]            @relation("DraftSender")
+  senderCampaigns        Campaign[]              @relation("CampaignSender")
+  contentVersions        ContentVersion[]
+  contentReviews         ContentReview[]
+  resolvedChecks         ContentCheck[]
+  patchTestMarks         PatchTestMark[]
+  assistantCalls         AssistantCall[]
+  contentNotes           ContentNote[]
   assistantConversations AssistantConversation[]
+  leadStatusChanges      LeadStatusHistory[]     @relation("LeadStatusHistoryActor")
 
   @@map("users")
 }
@@ -350,19 +353,35 @@ model Lead {
   // schedulable and will see the same thread again on its next run, and a
   // second lead for one answered email is worse than no lead at all.
   threadKey       String?   @map("thread_key")
+  // W2 lifecycle (lib/leads/lifecycle.ts). Owner = assignedToId. Enum-like
+  // columns are CHECK-constrained in the migration.
+  buyerType       String?   @map("buyer_type") // company | private
+  intent          String? // service_concrete | service_vague | rental | purchase | unknown
+  offerType       String?   @map("offer_type") // service | rental | purchase, set at qualified
+  attempts        Int       @default(0) // contact attempts in the current cycle, 0..8
+  nextAction      String?   @map("next_action")
+  nextDue         DateTime? @map("next_due")
+  statusEnteredAt DateTime? @map("status_entered_at")
+  recallReason    String?   @map("recall_reason")
+  recallDate      DateTime? @map("recall_date")
+  lostNote        String?   @map("lost_note")
+  demoDoneAt      DateTime? @map("demo_done_at")
+  demoCreditUntil DateTime? @map("demo_credit_until")
   createdAt       DateTime  @default(now()) @map("created_at")
 
-  tenant        Tenant             @relation(fields: [tenantId], references: [id])
-  company       Company?           @relation(fields: [companyId], references: [id])
-  contact       Contact?           @relation(fields: [contactId], references: [id])
-  assignedTo    User?              @relation("LeadAssignee", fields: [assignedToId], references: [id])
-  convertedDeal Deal?              @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  company       Company?            @relation(fields: [companyId], references: [id])
+  contact       Contact?            @relation(fields: [contactId], references: [id])
+  assignedTo    User?               @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  convertedDeal Deal?               @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
   interactions  Interaction[]
-  tasks         Task[]             @relation("TaskLead")
+  tasks         Task[]              @relation("TaskLead")
   firings       AutomationFiring[]
   quotes        Quote[]
+  statusHistory LeadStatusHistory[]
 
   @@unique([tenantId, threadKey])
+  @@index([tenantId, nextDue])
   @@index([tenantId, convertedDealId])
   @@index([tenantId, outcome, status])
   @@map("leads")
@@ -391,6 +410,43 @@ model LeadStatus {
 
   @@unique([tenantId, key])
   @@map("lead_statuses")
+}
+
+// Allowed lead stage moves (W2 spec section 4). A move not in this table is
+// refused by changeLeadStatus. Seeded from DEFAULT_TRANSITIONS.
+model LeadStatusTransition {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int      @map("tenant_id")
+  fromStatus String   @map("from_status")
+  event      String
+  toStatus   String   @map("to_status")
+  action     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, fromStatus, event])
+  @@map("lead_status_transitions")
+}
+
+// Append-only: every stage change (and self-transition, e.g. attempts + 1).
+model LeadStatusHistory {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  leadId       Int      @map("lead_id")
+  fromStatus   String?  @map("from_status")
+  toStatus     String   @map("to_status")
+  event        String
+  actorUserId  Int?     @map("actor_user_id")
+  actorAgentId String?  @map("actor_agent_id")
+  at           DateTime @default(now())
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  lead      Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  actorUser User?  @relation("LeadStatusHistoryActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, leadId, at])
+  @@map("lead_status_history")
 }
 
 // ─────────────────────────────────────────────
