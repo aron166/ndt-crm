@@ -128,6 +128,7 @@ export async function logLeadCall(leadId: number, input: {
   outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
   bookingAt?: string | null; bookingKind?: string | null;
   lostReason?: string | null; scriptVariant?: string | null; technologyWord?: string | null;
+  callType?: string | null;
 }) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
@@ -143,6 +144,7 @@ export async function logLeadCall(leadId: number, input: {
       ...(input.lostReason ? { lostReason: input.lostReason } : {}),
       ...(input.scriptVariant ? { scriptVariant: input.scriptVariant } : {}),
       ...(input.technologyWord ? { technologyWord: input.technologyWord } : {}),
+      ...(input.callType ? { callType: input.callType } : {}),
     },
     ctx,
   );
