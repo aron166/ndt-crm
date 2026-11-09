@@ -29,8 +29,9 @@ export const PLACEHOLDER = "[egyeztetés alatt]";
 /** tenants.settings.offers. Every field optional; null/missing = placeholder. */
 export interface OfferConfig {
   issuer: {
-    legalName: string | null;   // Uphill Trade Ltd.
-    brand: string | null;       // betonradar.hu
+    legalName: string | null;   // Uphill Trade Kft. (tenants.settings.offers.issuer)
+    brand: string | null;       // BetonRadar
+    website: string | null;     // betonradar.hu
     address: string | null;
     taxNumber: string | null;
     companyRegNo: string | null;
@@ -40,7 +41,7 @@ export interface OfferConfig {
   };
   vatRate: number;
   validityDays: number;
-  demo: { netHuf: number | null; areaM2: number; hours: number; introPeriodText: string };
+  demo: { netHuf: number | null; areaM2: number; hours: number; introPeriodText: string; creditRuleText: string | null };
   bigService: {
     standardPerM2Huf: number | null;  // Standard package (6 h/day cap)
     unlimitedPerM2Huf: number | null; // Unlimited package (12 h/day cap)
@@ -50,15 +51,23 @@ export interface OfferConfig {
   purchase: { netHuf: number | null };
 }
 
-/** Defaults: only facts Áron/Péter stated (raw60 D9, D19). Everything else is a placeholder. */
+/** The demo-credit rule (Kai / Áron 2026-11-09). PROPOSAL copy. */
+export const DEMO_CREDIT_RULE_TEXT =
+  "A bemutató mérés díját (100 000 Ft + ÁFA) jóváírjuk, ha a bemutatót követő 2 héten belül legalább 100 m² mérést (ennek megfelelő, legalább 300 000 Ft + ÁFA értékű szolgáltatást), gépbérlést vagy gépvásárlást rendel.";
+
+/**
+ * Defaults when a tenant has no `offers` settings. The issuer's legal facts are
+ * NEVER defaulted in code: they live in tenants.settings.offers (seeded for
+ * tenant 1 from COMPANY.md), so a missing value shows as a placeholder.
+ */
 export const DEFAULT_OFFER_CONFIG: OfferConfig = {
   issuer: {
-    legalName: "Uphill Trade Ltd.", brand: "betonradar.hu",
+    legalName: null, brand: null, website: null,
     address: null, taxNumber: null, companyRegNo: null, email: null, phone: null, bankAccount: null,
   },
   vatRate: 27,
   validityDays: 30,
-  demo: { netHuf: 100_000, areaM2: 5, hours: 1, introPeriodText: "a következő két hónapban" },
+  demo: { netHuf: 100_000, areaM2: 5, hours: 1, introPeriodText: "a következő két hónapban", creditRuleText: DEMO_CREDIT_RULE_TEXT },
   // shortcut: Pricing_Model says Unlimited 3000 Ft/m2 but marks the numbers as partly placeholder; left null until Péter confirms.
   bigService: { standardPerM2Huf: null, unlimitedPerM2Huf: null, calloutHuf: null },
   rental: { monthlyNetHuf: null },
@@ -79,6 +88,7 @@ export function offerConfigFromSettings(settings: unknown): OfferConfig {
     issuer: {
       legalName: str(iss.legalName) ?? d.issuer.legalName,
       brand: str(iss.brand) ?? d.issuer.brand,
+      website: str(iss.website) ?? d.issuer.website,
       address: str(iss.address), taxNumber: str(iss.taxNumber), companyRegNo: str(iss.companyRegNo),
       email: str(iss.email), phone: str(iss.phone), bankAccount: str(iss.bankAccount),
     },
@@ -89,6 +99,7 @@ export function offerConfigFromSettings(settings: unknown): OfferConfig {
       areaM2: pick(num(demo.areaM2), d.demo.areaM2),
       hours: pick(num(demo.hours), d.demo.hours),
       introPeriodText: str(demo.introPeriodText) ?? d.demo.introPeriodText,
+      creditRuleText: "creditRuleText" in demo ? str(demo.creditRuleText) : d.demo.creditRuleText,
     },
     bigService: {
       standardPerM2Huf: num(big.standardPerM2Huf),
@@ -163,7 +174,7 @@ export function buildOffer(input: OfferInput, cfg: OfferConfig): BuiltOffer | { 
         `Bevezető vizsgálatunkkal ${cfg.demo.hours} óra alatt legfeljebb ${cfg.demo.areaM2} m² felületet vizsgálunk meg a helyszínen.`,
         `A bevezető ár ${cfg.demo.introPeriodText} érvényes.`,
       ];
-      terms = common;
+      terms = cfg.demo.creditRuleText ? [...common, cfg.demo.creditRuleText] : common;
       break;
     case "big_service": {
       const area = input.areaM2 ?? null;
@@ -195,7 +206,7 @@ export function buildOffer(input: OfferInput, cfg: OfferConfig): BuiltOffer | { 
       break;
   }
   const hasPlaceholders = lines.some((l) => l.unitRate == null)
-    || cfg.issuer.address == null || cfg.issuer.taxNumber == null;
+    || cfg.issuer.legalName == null || cfg.issuer.address == null || cfg.issuer.taxNumber == null;
   return { title, vatRate: cfg.vatRate, lines, meta: { ...base, intro, terms }, hasPlaceholders };
 }
 

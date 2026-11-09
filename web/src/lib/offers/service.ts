@@ -140,7 +140,7 @@ export async function loadOfferPdfDoc(quoteId: number, tenantId: number): Promis
 
 /** True when the document still carries a placeholder (price or issuer legal facts). */
 export function offerDocHasPlaceholders(doc: OfferPdfDoc): boolean {
-  return !doc.totals.complete || !doc.meta.issuer.address || !doc.meta.issuer.taxNumber;
+  return !doc.totals.complete || !doc.meta.issuer.legalName || !doc.meta.issuer.address || !doc.meta.issuer.taxNumber;
 }
 
 /**

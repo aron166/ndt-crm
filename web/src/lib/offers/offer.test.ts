@@ -5,7 +5,7 @@ import {
 
 const filled: OfferConfig = {
   ...DEFAULT_OFFER_CONFIG,
-  issuer: { ...DEFAULT_OFFER_CONFIG.issuer, address: "1111 Budapest, Fő u. 1.", taxNumber: "12345678-1-42" },
+  issuer: { ...DEFAULT_OFFER_CONFIG.issuer, legalName: "Teszt Kft.", address: "1111 Budapest, Fő u. 1.", taxNumber: "12345678-1-42" },
 };
 const ok = (r: ReturnType<typeof buildOffer>): BuiltOffer => {
   if ("error" in r) throw new Error(r.error);
@@ -90,5 +90,19 @@ describe("offerConfigFromSettings", () => {
 describe("OFFER_TYPE_BY_TEMPLATE", () => {
   it("maps templates to W2 offer types", () => {
     expect(OFFER_TYPE_BY_TEMPLATE).toEqual({ demo: "service", big_service: "service", rental: "rental", purchase: "purchase" });
+  });
+});
+
+describe("config only (Kai 2026-11-09)", () => {
+  it("code holds no legal issuer defaults; they come from tenants.settings.offers", () => {
+    expect(DEFAULT_OFFER_CONFIG.issuer.legalName).toBeNull();
+    const cfg = offerConfigFromSettings({ offers: { issuer: { legalName: "Uphill Trade Kft.", brand: "BetonRadar", website: "betonradar.hu", address: "2030 Érd, Bajuszfű utca 29.", taxNumber: "25741814-2-13" } } });
+    expect(cfg.issuer).toMatchObject({ legalName: "Uphill Trade Kft.", brand: "BetonRadar", website: "betonradar.hu" });
+  });
+  it("the demo offer carries the demo-credit rule; an explicit null drops it", () => {
+    const d = buildOffer({ template: "demo" }, DEFAULT_OFFER_CONFIG);
+    expect("error" in d ? "" : d.meta.terms.join(" ")).toContain("2 héten belül legalább 100 m²");
+    const none = buildOffer({ template: "demo" }, offerConfigFromSettings({ offers: { demo: { creditRuleText: null } } }));
+    expect("error" in none ? "" : none.meta.terms.join(" ")).not.toContain("jóváírjuk");
   });
 });

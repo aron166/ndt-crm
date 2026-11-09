@@ -285,7 +285,7 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
               <input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="BetonScan landing oldal"
+                placeholder="BetonRadar landing oldal"
                 style={{ width: "100%", padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)", outline: "none" }}
               />
             </div>

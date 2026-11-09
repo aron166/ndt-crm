@@ -55,15 +55,19 @@ function OfferDocument({ doc }: { doc: OfferPdfDoc }) {
     <Document title={`${doc.quoteNumber}: ${doc.title}`}>
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
-          <Text style={styles.brand}>{ph(issuer.brand)}</Text>
+          <View>
+            <Text style={styles.brand}>{ph(issuer.brand)}</Text>
+            {issuer.website ? <Text style={styles.muted}>{issuer.website}</Text> : null}
+          </View>
           <View style={styles.issuer}>
+            {/* Legal facts are mandatory (placeholder when missing); contact lines only when configured. */}
             <Text style={styles.issuerName}>{ph(issuer.legalName)}</Text>
             <Text>{ph(issuer.address)}</Text>
             <Text>Adószám: {ph(issuer.taxNumber)}</Text>
             <Text>Cégjegyzékszám: {ph(issuer.companyRegNo)}</Text>
-            <Text>{ph(issuer.email)}</Text>
-            <Text>{ph(issuer.phone)}</Text>
-            <Text>Bankszámla: {ph(issuer.bankAccount)}</Text>
+            {issuer.email ? <Text>{issuer.email}</Text> : null}
+            {issuer.phone ? <Text>{issuer.phone}</Text> : null}
+            {issuer.bankAccount ? <Text>Bankszámla: {issuer.bankAccount}</Text> : null}
           </View>
         </View>
 

@@ -86,7 +86,7 @@ const docQuote = (over: Record<string, unknown> = {}) => ({
   id: 42, quoteNumber: "AJ-2026-0001", title: "T", createdAt: new Date(), validUntil: null, currency: "HUF", vatRate: 27,
   meta: {
     template: "demo", intro: [], terms: [], acceptance: "x", validityDays: 30,
-    issuer: { ...DEFAULT_OFFER_CONFIG.issuer, address: "addr", taxNumber: "123" },
+    issuer: { ...DEFAULT_OFFER_CONFIG.issuer, legalName: "Uphill Trade Kft.", address: "addr", taxNumber: "123" },
   },
   items: [{ description: "d", quantity: 1, unit: "alkalom", unitRate: 100000, amount: 100000 }],
   company: { name: "ZMT" }, person: null, ...over,
