@@ -7,9 +7,10 @@ import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { reopenTask, deleteTask } from "@/app/actions/tasks";
 import { useTaskCompletion } from "@/components/useTaskCompletion";
 import { formatDate } from "@/lib/utils";
-import { CheckCircle2, RotateCcw, Pencil, Trash2, Plus } from "lucide-react";
+import { CheckCircle2, RotateCcw, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { Badge } from "@astryxdesign/core/Badge";
+import k from "@/components/astryx/page.module.css";
 
 interface Task {
   id: number;
@@ -52,6 +53,36 @@ function isToday(dueDate: Date | null) {
     d.getDate() === today.getDate()
   );
 }
+
+type GroupKey = "overdue" | "today" | "tomorrow" | "later" | "none" | "done";
+
+// PROPOSAL copy (Holnap, Később, Nincs határidő, Kész group labels; ma, holnap relative days)
+const GROUPS: { key: GroupKey; label: string }[] = [
+  { key: "overdue", label: "Lejárt" },
+  { key: "today", label: "Ma" },
+  { key: "tomorrow", label: "Holnap" },
+  { key: "later", label: "Később" },
+  { key: "none", label: "Nincs határidő" },
+  { key: "done", label: "Kész" },
+];
+
+function isTomorrow(dueDate: Date) {
+  const d = new Date(dueDate);
+  const t = new Date();
+  t.setDate(t.getDate() + 1);
+  return d.toDateString() === t.toDateString();
+}
+
+function groupOf(t: Task): GroupKey {
+  if (t.status === "done" || t.status === "cancelled") return "done";
+  if (!t.dueDate) return "none";
+  if (isOverdue(t.dueDate, t.status)) return "overdue";
+  if (isToday(t.dueDate)) return "today";
+  if (isTomorrow(t.dueDate)) return "tomorrow";
+  return "later";
+}
+
+const REL: Partial<Record<GroupKey, string>> = { overdue: "lejárt", today: "ma", tomorrow: "holnap" };
 
 export function TasksClient({ tasks }: TasksClientProps) {
   const router = useRouter();
@@ -126,118 +157,83 @@ export function TasksClient({ tasks }: TasksClientProps) {
       />
       {logModal}
 
-      <div className="rounded-xl overflow-hidden" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)" }}>
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: 14 }}>
-          <thead>
-            <tr>
-              {["", "Feladat", "Típus", "Határidő", "Cég / Személy", "Státusz", ""].map((h, i) => (
-                <th key={i} style={{
-                  textAlign: "left", padding: i === 0 ? "10px 12px" : "10px 16px",
-                  fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em",
-                  color: "var(--fg-faint)", borderBottom: "1px solid var(--line-soft)",
-                  background: "var(--bg-thead)",
-                  display: i >= 2 && i <= 4 ? undefined : undefined,
-                }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ padding: "48px 16px", textAlign: "center", color: "var(--fg-faint)" }}>
-                  Nincs feladat ebben a nézetben.
-                </td>
-              </tr>
-            )}
-            {tasks.map((t) => {
-              const overdue = isOverdue(t.dueDate, t.status);
-              const today = isToday(t.dueDate);
+      {tasks.length === 0 && (
+        <div className={k.empty}>
+          <span>Nincs feladat ebben a nézetben.</span>
+        </div>
+      )}
+      {GROUPS.map((g) => {
+        const rows = tasks.filter((t) => groupOf(t) === g.key);
+        if (rows.length === 0) return null;
+        return (
+          <section key={g.key} className={k.group} aria-labelledby={`g-${g.key}`}>
+            <div className={k.groupHead}>
+              <h2 id={`g-${g.key}`} className={k.groupTitle}>{g.label}</h2>
+              <span className={k.muted}>{rows.length}</span>
+            </div>
+            {rows.map((t) => {
+              const done = t.status === "done";
+              const timed = g.key === "today" || g.key === "tomorrow";
               return (
-                <tr
-                  key={t.id}
-                  style={{ borderBottom: "1px solid var(--line-soft)", transition: "background 0.12s", opacity: t.status === "done" ? 0.6 : 1 }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "var(--row-hover)")}
-                  onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <td style={{ padding: "8px 12px", width: 36 }}>
-                    {t.status !== "done" ? (
-                      <button
-                        onClick={() => handleComplete(t)}
-                        style={{ width: 18, height: 18, borderRadius: "50%", border: "1.5px solid var(--line)", background: "transparent", cursor: "pointer", transition: "border-color .15s" }}
-                        onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--mint)")}
-                        onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--line)")}
-                        title="Kész"
-                      />
-                    ) : (
-                      <CheckCircle2 style={{ width: 18, height: 18, color: "var(--mint)" }} />
-                    )}
-                  </td>
-                  <td style={{ padding: "8px 16px" }}>
-                    <Link
-                      href={`/tasks/${t.id}`}
-                      style={{ fontWeight: 500, color: t.status === "done" ? "var(--fg-faint)" : "var(--fg)", textDecoration: t.status === "done" ? "line-through" : "none" }}
-                      onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-                      onMouseOut={(e) => (e.currentTarget.style.color = t.status === "done" ? "var(--fg-faint)" : "var(--fg)")}
-                    >
-                      {t.title}
-                    </Link>
-                    {t._count.subTasks > 0 && (
-                      <span className="font-mono-ndt" style={{ marginLeft: 8, fontSize: 12, color: "var(--fg-faint)" }}>
-                        ↳ {t._count.subTasks}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: "8px 16px" }}>
-                    <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)", textTransform: "capitalize" }}>
-                      {(t.type ?? "").replace("_", " ")}
-                    </span>
-                  </td>
-                  <td style={{ padding: "8px 16px" }}>
-                    <span className="font-mono-ndt" style={{ fontSize: 12, color: overdue ? "var(--coral)" : today ? "var(--amber)" : "var(--fg-faint)", fontWeight: overdue || today ? 600 : 400 }}>
-                      {t.dueDate ? formatDate(t.dueDate) : "-"}{overdue && " Lejárt"}
-                    </span>
-                  </td>
-                  <td style={{ padding: "8px 16px", fontSize: 14, color: "var(--fg-mute)" }}>
-                    {t.company && <Link href={`/companies/${t.company.id}`} style={{ color: "var(--fg-mute)" }} onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")} onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}>{t.company.name}</Link>}
-                    {t.person && <span>{t.company && " · "}<Link href={`/persons/${t.person.id}`} style={{ color: "var(--fg-faint)" }} onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")} onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}>{t.person.lastName} {t.person.firstName}</Link></span>}
-                    {!t.company && !t.person && <span style={{ color: "var(--fg-faint)" }}>-</span>}
-                  </td>
-                  <td style={{ padding: "8px 16px" }}>
-                    <TaskStatusBadge status={t.status} />
-                  </td>
-                  <td style={{ padding: "8px 12px" }}>
-                    <div className="flex items-center gap-0.5 justify-end">
-                      <button onClick={() => { setEditTask(t); setModalOpen(true); }}
-                        style={{ padding: 4, borderRadius: 4, color: "var(--fg-faint)", cursor: "pointer" }}
-                        onMouseOver={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--fg)"; }}
-                        onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-faint)"; }}
-                        title="Szerkesztés">
-                        <Pencil style={{ width: 13, height: 13 }} />
-                      </button>
-                      {t.status === "done" && (
-                        <button onClick={() => handleReopen(t.id)}
-                          style={{ padding: 4, borderRadius: 4, color: "var(--fg-faint)", cursor: "pointer" }}
-                          onMouseOver={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--fg)"; }}
-                          onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-faint)"; }}
-                          title="Újranyitás">
-                          <RotateCcw style={{ width: 13, height: 13 }} />
-                        </button>
-                      )}
-                      <button onClick={() => handleDelete(t.id)}
-                        style={{ padding: 4, borderRadius: 4, color: "var(--fg-faint)", cursor: "pointer" }}
-                        onMouseOver={(e) => { e.currentTarget.style.background = "var(--coral-soft)"; e.currentTarget.style.color = "var(--coral)"; }}
-                        onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-faint)"; }}
-                        title="Törlés">
-                        <Trash2 style={{ width: 13, height: 13 }} />
-                      </button>
+                <div key={t.id} className={k.row} data-u={g.key === "overdue" || g.key === "today" || g.key === "done" ? g.key : undefined}>
+                  <span className={k.bar} />
+                  <div className={k.cell}>
+                    <div className={k.nameLine}>
+                      <Link href={`/tasks/${t.id}`} className={k.name}>{t.title}</Link>
+                      {t.type && <Badge variant="neutral" label={t.type.replace("_", " ")} />}
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                  <div className={k.cell}>
+                    <div className={k.meta}>
+                      {t.company && <Link href={`/companies/${t.company.id}`} className={k.strong}>{t.company.name}</Link>}
+                      {t.person && <Link href={`/persons/${t.person.id}`} className={k.muted}>{t.person.lastName} {t.person.firstName}</Link>}
+                      {!t.company && !t.person && <span className={k.muted}>-</span>}
+                    </div>
+                    <div className={k.meta}>
+                      <TaskStatusBadge status={t.status} />
+                      {t._count.subTasks > 0 && <span className={k.muted}>↳ {t._count.subTasks}</span>}
+                    </div>
+                  </div>
+                  <div className={k.cell}>
+                    {t.dueDate ? (
+                      <>
+                        <span className={k.time}>
+                          {timed
+                            ? new Intl.DateTimeFormat("hu-HU", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t.dueDate))
+                            : formatDate(t.dueDate)}
+                        </span>
+                        {REL[g.key] && <span className={k.muted}>{REL[g.key]}</span>}
+                      </>
+                    ) : <span className={k.muted}>-</span>}
+                  </div>
+                  <div className={k.cellEnd}>
+                    {!done && (
+                      <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={() => handleComplete(t)} title="Kész">
+                        <CheckCircle2 className="size-4" />
+                        Kész
+                      </button>
+                    )}
+                    <button type="button" className={k.btn} style={{ minWidth: 40, padding: 0 }} aria-label="Szerkesztés" title="Szerkesztés"
+                      onClick={() => { setEditTask(t); setModalOpen(true); }}>
+                      <Pencil className="size-4" />
+                    </button>
+                    {done && (
+                      <button type="button" className={k.btn} style={{ minWidth: 40, padding: 0 }} aria-label="Újranyitás" title="Újranyitás"
+                        onClick={() => handleReopen(t.id)}>
+                        <RotateCcw className="size-4" />
+                      </button>
+                    )}
+                    <button type="button" className={k.btn} style={{ minWidth: 40, padding: 0 }} aria-label="Törlés" title="Törlés"
+                      onClick={() => handleDelete(t.id)}>
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
-      </div>
+          </section>
+        );
+      })}
     </>
   );
 }

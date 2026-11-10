@@ -3,14 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, CheckCircle2, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import k from "@/components/astryx/page.module.css";
 import { TaskModal } from "../TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { reopenTask } from "@/app/actions/tasks";
 import { useTaskCompletion } from "@/components/useTaskCompletion";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 
 interface SubTask {
   id: number;
@@ -119,87 +118,51 @@ export function TaskDetailClient({ task }: { task: Task }) {
       />
       {logModal}
 
-      <div className="flex items-center gap-2 mb-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setEditOpen(true)}
-          className="gap-1.5"
-        >
-          <Pencil className="size-3.5" />
+      <div className={k.actions} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button type="button" className={k.btn} onClick={() => setEditOpen(true)}>
+          <Pencil className="size-4" />
           Szerkesztés
-        </Button>
+        </button>
         {task.status !== "done" ? (
-          <Button
-            size="sm"
-            className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
-            onClick={() => handleComplete(task)}
-          >
-            <CheckCircle2 className="size-3.5" />
+          <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={() => handleComplete(task)}>
+            <CheckCircle2 className="size-4" />
             Kész
-          </Button>
+          </button>
         ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleReopen(task.id)}
-          >
+          <button type="button" className={k.btn} onClick={() => handleReopen(task.id)}>
             Újranyitás
-          </Button>
+          </button>
         )}
       </div>
 
-      {task.subTasks.length > 0 || true ? (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <h2 className="text-sm font-medium text-slate-700">
-              Alfeladatok ({task.subTasks.length})
-            </h2>
-            <button
-              onClick={() => setSubTaskOpen(true)}
-              className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700"
-            >
-              <Plus className="size-3.5" />
-              Hozzáadás
-            </button>
-          </div>
-          {task.subTasks.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-slate-400">
-              Nincsenek alfeladatok.
-            </p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {task.subTasks.map((s) => (
-                <li key={s.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
-                  {s.status !== "done" ? (
-                    <button
-                      onClick={() => handleComplete(s)}
-                      className="w-4 h-4 rounded-full border-2 border-slate-300 hover:border-green-500 shrink-0"
-                    />
-                  ) : (
-                    <CheckCircle2 className="size-4 text-green-500 shrink-0" />
-                  )}
-                  <Link
-                    href={`/tasks/${s.id}`}
-                    className={cn(
-                      "flex-1 text-sm hover:text-indigo-600",
-                      s.status === "done" ? "line-through text-slate-400" : "text-slate-800"
-                    )}
-                  >
-                    {s.title}
-                  </Link>
-                  {s.dueDate && (
-                    <span className="text-xs text-slate-400 hidden sm:block">
-                      {formatDate(s.dueDate)}
-                    </span>
-                  )}
-                  <TaskStatusBadge status={s.status} />
-                </li>
-              ))}
-            </ul>
-          )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
+        <div className={k.kv}>
+          <h2 className={k.h2}>Alfeladatok ({task.subTasks.length})</h2>
+          <button type="button" className={k.btn} onClick={() => setSubTaskOpen(true)}>
+            <Plus className="size-4" />
+            Hozzáadás
+          </button>
         </div>
-      ) : null}
+        {task.subTasks.length === 0 ? (
+          <span className={k.muted}>Nincsenek alfeladatok.</span>
+        ) : (
+          task.subTasks.map((s) => (
+            <div key={s.id} className={k.row} style={{ gridTemplateColumns: "6px minmax(0, 1fr) auto auto" }} data-u={s.status === "done" ? "done" : undefined}>
+              <span className={k.bar} />
+              <div className={k.nameLine}>
+                <Link href={`/tasks/${s.id}`} className={k.name}>{s.title}</Link>
+                {s.dueDate && <span className={k.muted}>{formatDate(s.dueDate)}</span>}
+              </div>
+              <TaskStatusBadge status={s.status} />
+              {s.status !== "done" ? (
+                <button type="button" className={k.btn} onClick={() => handleComplete(s)} aria-label="Kész" title="Kész">
+                  <CheckCircle2 className="size-4" />
+                </button>
+              ) : <span />}
+            </div>
+          ))
+        )}
+      </div>
     </>
   );
 }
