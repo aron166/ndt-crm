@@ -57,3 +57,9 @@ easy-to-use UI everywhere, it really is important, Péter is not good with tech.
    words, fewer choices visible at once (secondary actions behind a "..." menu or a "Részletes adatok" disclosure),
    and the same button placement on every page (primary action top right of the header; in dialogs: Mégse left
    of the primary, primary last).
+
+## Language (Áron, 2026-11-10)
+The CRM UI does not have to be all Hungarian: Péter reads English. Do not spend effort translating internal UI text;
+English is fine for new internal labels and helper text. Keep existing Hungarian labels as they are (no churn, no
+renames). Plain, simple words in either language, never two languages inside one control. Customer-facing text
+(emails, PDFs, offers, the sign-off form) stays Hungarian.
