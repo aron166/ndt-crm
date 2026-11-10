@@ -66,7 +66,7 @@ export default async function LeadDetailPage({
     }),
     getEntityHistory("lead", leadId),
     getLeadStatuses(TENANT_ID),
-    db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    db.user.findMany({ where: { tenantId: TENANT_ID, email: { not: { endsWith: "@system" } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     db.task.findMany({
       where: { tenantId: TENANT_ID, leadId, status: { in: ["created", "in_progress"] } },
       select: { id: true, title: true, dueDate: true, type: true, assignedTo: { select: { name: true } } },
