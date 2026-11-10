@@ -1,4 +1,5 @@
 .panel { background: var(--ui-surface); box-shadow: var(--ui-shadow-raised); border-radius: var(--ui-radius-surface); padding: 16px; display: flex; flex-direction: column; gap: 14px; color: var(--ui-text); min-width: 0; }
+.embedded { display: flex; flex-direction: column; gap: 14px; color: var(--ui-text); min-width: 0; }
 .stack { display: flex; flex-direction: column; gap: 10px; }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .muted { color: var(--ui-text-muted); font-size: 13px; }
@@ -17,10 +18,10 @@
 .disc { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; font-size: 14px; }
 
 /* machine-day grid */
-.scroll { overflow-x: auto; max-width: 100%; }
-.grid { display: grid; grid-template-columns: 112px minmax(320px, 1fr); min-width: 432px; }
+.scroll { overflow-x: auto; max-width: 100%; min-width: 0; }
+.grid { display: grid; grid-template-columns: 112px minmax(624px, 1fr); min-width: 736px; }
 .hours { display: grid; grid-template-columns: repeat(13, 1fr); font-size: 12px; color: var(--ui-text-muted); padding-bottom: 4px; }
-.lbl { padding: 8px 0; border-top: 1px solid var(--ui-border); display: flex; flex-direction: column; justify-content: center; font-size: 13px; }
+.lbl { position: sticky; left: 0; z-index: 2; background: var(--ui-surface); padding: 8px 0; border-top: 1px solid var(--ui-border); display: flex; flex-direction: column; justify-content: center; font-size: 13px; }
 .lbl { gap: 2px; padding-inline-end: 8px; line-height: 1.25; }
 .whyOff { color: var(--ui-text); font-size: 12px; }
 .track { position: relative; height: 52px; border-top: 1px solid var(--ui-border); background-image: repeating-linear-gradient(90deg, var(--ui-border) 0 1px, transparent 1px calc(100% / 13)); }

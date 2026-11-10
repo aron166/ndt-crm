@@ -7,6 +7,31 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { TIER_LABEL, isTier } from "@/lib/leads/tier";
 import s from "./lead2.module.css";
 
+const telOf = (phone: string | null) => (phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : null);
+
+// tel: dials on a phone; a desktop browser only switches to calling mode.
+function CallLink({ tel, onCall, className }: { tel: string | null; onCall: () => void; className: string }) {
+  return (
+    <a
+      href={tel ?? undefined}
+      role={tel ? undefined : "button"}
+      tabIndex={tel ? undefined : 0}
+      className={`${s.callBtn} ${className}`}
+      onClick={(e) => {
+        if (!window.matchMedia("(pointer: coarse)").matches) e.preventDefault();
+        onCall();
+      }}
+    >
+      <Phone size={20} />{/* PROPOSAL copy */}Hívás
+    </a>
+  );
+}
+
+/** Phone only: sticky full-width call bar, rendered last in the page so sticky bottom holds. */
+export function CallBar({ phone, onCall }: { phone: string | null; onCall: () => void }) {
+  return <div className={s.callBar}><CallLink tel={telOf(phone)} onCall={onCall} className="" /></div>;
+}
+
 export function Header(p: {
   name: string;
   companyId: number | null;
@@ -30,7 +55,7 @@ export function Header(p: {
 }) {
   const contact = p.contactName && p.personHref ? <Link href={p.personHref}>{p.contactName}</Link> : p.contactName;
   const subParts = [contact, p.role, p.town].filter(Boolean);
-  const tel = p.phone ? `tel:${p.phone.replace(/[^\d+]/g, "")}` : null;
+  const tel = telOf(p.phone);
   return (
     <div className={s.head}>
       <div className={s.who}>
@@ -39,6 +64,21 @@ export function Header(p: {
           {isTier(p.tier) && <span className={s.chip}>{`${p.tier} · ${TIER_LABEL[p.tier]}`}</span>}
           {/* PROPOSAL copy */}
           <span className={s.chip}>{`Felelős: ${p.ownerName ?? "nincs"}`}</span>
+          <span className={s.menu}>
+      <DropdownMenu>
+        <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "icon" })} aria-label="Továbbiak">
+          <MoreHorizontal size={18} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {/* PROPOSAL copy: menu items */}
+          <DropdownMenuItem onClick={p.onEdit}>Szerkesztés</DropdownMenuItem>
+          <DropdownMenuItem onClick={p.onOwner}>Felelős módosítása</DropdownMenuItem>
+          {p.canClose && <DropdownMenuItem onClick={p.onClose}>Lezárás</DropdownMenuItem>}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={p.deleting} onClick={p.onDelete}>{p.deleting ? "Törlés…" : "Törlés"}</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+          </span>
         </div>
         <h1 className={s.name}>{p.companyId ? <Link href={`/companies/${p.companyId}`}>{p.name}</Link> : p.name}</h1>
         {subParts.length > 0 && (
@@ -50,36 +90,7 @@ export function Header(p: {
         </div>
       </div>
       <div className={s.act}>
-        <DropdownMenu>
-          <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "icon" })} aria-label="Továbbiak">
-            <MoreHorizontal size={18} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {/* PROPOSAL copy: menu items */}
-            <DropdownMenuItem onClick={p.onEdit}>Szerkesztés</DropdownMenuItem>
-            <DropdownMenuItem onClick={p.onOwner}>Felelős módosítása</DropdownMenuItem>
-            {p.canClose && <DropdownMenuItem onClick={p.onClose}>Lezárás</DropdownMenuItem>}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem disabled={p.deleting} onClick={p.onDelete}>{p.deleting ? "Törlés…" : "Törlés"}</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {!p.calling && (
-          <div className={s.callWrap}>
-            {/* tel: dials on a phone; a desktop browser only switches to calling mode. */}
-            <a
-              href={tel ?? undefined}
-              role={tel ? undefined : "button"}
-              tabIndex={tel ? undefined : 0}
-              className={s.callBtn}
-              onClick={(e) => {
-                if (!window.matchMedia("(pointer: coarse)").matches) e.preventDefault();
-                p.onCall();
-              }}
-            >
-              <Phone size={20} />{/* PROPOSAL copy */}Hívás
-            </a>
-          </div>
-        )}
+        {!p.calling && <CallLink tel={tel} onCall={p.onCall} className={s.callDesk} />}
       </div>
     </div>
   );

@@ -19,7 +19,7 @@ import { isAutoOutcome } from "@/lib/calls/auto-outcome";
 import { formatRelativeTime, fullName } from "@/lib/utils";
 import { formatMinutes } from "@/lib/leads/first-contact";
 import { OpenTasks, type OpenTask } from "./detail/OverviewTab";
-import { Header } from "./v2/Header";
+import { Header, CallBar } from "./v2/Header";
 import { Situation } from "./v2/Situation";
 import { Suggestions } from "./v2/Suggestions";
 import { Timeline } from "./v2/Timeline";
@@ -402,6 +402,8 @@ export function LeadDetailClient({
           campaign: lead.campaign,
         }}
       />
+
+      {!calling && <CallBar phone={phone} onCall={() => setMode(true)} />}
     </div>
   );
 }

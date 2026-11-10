@@ -9,7 +9,7 @@ import s from "./lead.module.css";
 const PAD_META: Record<string, { code: string; hint: string }> = {
   no_answer: { code: "NV", hint: "kísérlet +1, következő hívás a ritmus szerint" },
   callback_requested: { code: "VH", hint: "dátum kötelező" },
-  meeting_booked: { code: "IF", hint: "időpont a foglalás panelen" },
+  meeting_booked: { code: "IF", hint: "Időpont foglalása" }, // PROPOSAL copy
   not_interested: { code: "NE", hint: "ok kötelező" },
   wrong_number: { code: "HS", hint: "hibás elérhetőség" },
   disqualified: { code: "NR", hint: "ok kötelező" },

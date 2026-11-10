@@ -28,7 +28,7 @@ import css from "./booking.module.css";
 const keyOf = (s: { machineId: number; startsAt: string }) => `${s.machineId}@${s.startsAt}`;
 const MAX_PROBES = 7;
 
-export function BookingPanel({ leadId, leadOpen, initialKind = "single_machine_demo", onBooked }: { leadId: number; leadOpen: boolean; initialKind?: BookingKind; onBooked?: () => void }) {
+export function BookingPanel({ leadId, leadOpen, initialKind = "single_machine_demo", onBooked, embedded = false }: { embedded?: boolean; leadId: number; leadOpen: boolean; initialKind?: BookingKind; onBooked?: () => void }) {
   const router = useRouter();
   const [siteLoaded, setSiteLoaded] = useState(false);
   const [siteError, setSiteError] = useState<string | null>(null);
@@ -169,8 +169,8 @@ export function BookingPanel({ leadId, leadOpen, initialKind = "single_machine_d
 
   if (!leadOpen) {
     return (
-      <section className={css.panel} aria-label="Időpont foglalása">
-        <Heading level={2}>Időpont foglalása</Heading>
+      <section className={embedded ? css.embedded : css.panel} aria-label="Időpont foglalása">
+        {!embedded && <Heading level={2}>Időpont foglalása</Heading>}
         <span className={css.muted}>Lezárt leadre nem lehet foglalni.</span>
       </section>
     );
@@ -178,8 +178,8 @@ export function BookingPanel({ leadId, leadOpen, initialKind = "single_machine_d
 
   if (booked) {
     return (
-      <section className={css.panel} aria-label="Időpont foglalása">
-        <Heading level={2}>Időpont foglalása</Heading>
+      <section className={embedded ? css.embedded : css.panel} aria-label="Időpont foglalása">
+        {!embedded && <Heading level={2}>Időpont foglalása</Heading>}
         <span className={css.ok} role="status">Lefoglalva: {booked}. A feladat létrejött.</span>
       </section>
     );
@@ -189,8 +189,8 @@ export function BookingPanel({ leadId, leadOpen, initialKind = "single_machine_d
   const grid = result && result.slots.length > 0 ? gridRows(result.from, result.slots.map((s) => s.startsAt)) : [];
 
   return (
-    <section className={css.panel} aria-label="Időpont foglalása">
-      <Heading level={2}>Időpont foglalása</Heading>
+    <section className={embedded ? css.embedded : css.panel} aria-label="Időpont foglalása">
+      {!embedded && <Heading level={2}>Időpont foglalása</Heading>}
 
       {!siteLoaded && <div className={css.skeleton} style={{ height: 44 }} aria-busy="true" />}
       {siteError && <span className={css.err} role="alert">{siteError}</span>}

@@ -14,7 +14,9 @@
 .phone { font-weight: 600; font-size: 17px; }
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .chip { font-size: 12px; padding: 2px 10px; border-radius: var(--ui-radius-pill); background: var(--ui-surface-muted); color: var(--ui-text); }
+.menu { margin-left: auto; }
 .act { display: flex; align-items: center; gap: 12px; }
+.callBar { display: none; }
 .callBtn {
   display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; min-width: 220px; padding: 0 28px;
   border: 0; border-radius: var(--ui-radius-control); background: var(--ui-accent); color: var(--ui-on-accent);
@@ -81,10 +83,9 @@
 @media (max-width: 700px) {
   .name { font-size: 28px; }
   .head { flex-direction: column; align-items: stretch; }
-  .page { padding-bottom: 88px; }
-  .callWrap { position: fixed; inset: auto 0 0 0; z-index: 20; padding: 12px 16px; background: var(--ui-surface); box-shadow: 0 -1px 0 var(--ui-border); }
-  .callWrap .callBtn { width: 100%; min-height: 52px; font-size: 17px; }
-  .act { position: static; }
+  .act { display: none; }
+  .callBar { display: block; position: sticky; bottom: 0; z-index: 20; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--ui-surface); box-shadow: 0 -1px 0 var(--ui-border); }
+  .callBar .callBtn { width: 100%; min-height: 52px; font-size: 17px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .callBtn { transition: none; }

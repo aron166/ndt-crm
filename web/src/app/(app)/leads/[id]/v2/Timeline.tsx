@@ -50,11 +50,10 @@ export function Timeline({ items, phone, autoPct, onCorrect }: {
 }) {
   const [all, setAll] = useState(false);
   const shown = all ? items : items.slice(0, SHOWN);
-  const only = items.length <= 1;
-  return (
+    return (
     <section className={s.card} aria-label="Történet">
       <h2 className={s.h2}>{/* PROPOSAL copy */}Történet</h2>
-      {only && (
+      {items.length === 0 && (
         <p className={s.muted}>{/* PROPOSAL copy */}Még nincs esemény.{phone && <> Hívd fel: <a href={`tel:${phone.replace(/[^\d+]/g, "")}`}>{phone}</a></>}</p>
       )}
       <ul className={s.tl}>

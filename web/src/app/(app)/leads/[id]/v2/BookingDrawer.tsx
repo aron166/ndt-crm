@@ -18,7 +18,7 @@ export function BookingDrawer({ open, kind, leadId, leadOpen, onClose, onBooked 
     <Drawer isOpen={open} onOpenChange={(o) => !o && onClose()} label="Időpont foglalása" width={720} experimental={{ isFullWidthOnMobile: true }}>
       <DrawerHeader title={/* PROPOSAL copy */ "Időpont foglalása"} onOpenChange={(o) => !o && onClose()} />
       <div className={s.sheet}>
-        {open && <BookingPanel key={kind} leadId={leadId} leadOpen={leadOpen} initialKind={kind} onBooked={onBooked} />}
+        {open && <BookingPanel embedded key={kind} leadId={leadId} leadOpen={leadOpen} initialKind={kind} onBooked={onBooked} />}
       </div>
     </Drawer>
   );
