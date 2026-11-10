@@ -5,13 +5,13 @@ export type LeadsViewName = "queue" | "board" | "closed";
 
 // PROPOSAL copy
 const VIEWS: { key: LeadsViewName; label: string; href: string }[] = [
-  { key: "queue", label: "Hívólista", href: "/leads" },
-  { key: "board", label: "Tábla", href: "/leads?view=board" },
+  { key: "board", label: "Tábla", href: "/leads" },
+  { key: "queue", label: "Hívólista", href: "/leads?view=queue" },
   { key: "closed", label: "Lezárt", href: "/leads?view=closed" },
 ];
 
 export function LeadsHeader({
-  view, title, help, openCount, queueCount, closedCount, owner, now = new Date(), actions,
+  view, title, help, openCount, queueCount, closedCount, owner, ownerHref, now = new Date(), actions,
 }: {
   view: LeadsViewName;
   title: string;
@@ -22,6 +22,7 @@ export function LeadsHeader({
   owner?: { current: string; users: { id: number; name: string }[] };
   now?: Date;
   actions?: React.ReactNode;
+  ownerHref?: (key: string) => string;
 }) {
   // PROPOSAL copy
   const dateLine = new Intl.DateTimeFormat("hu-HU", {
@@ -61,7 +62,7 @@ export function LeadsHeader({
               {ownerLinks.map((o) => (
                 <Link
                   key={o.key}
-                  href={o.key === "me" ? "/leads" : `/leads?owner=${o.key}`}
+                  href={ownerHref ? ownerHref(o.key) : `/leads?owner=${o.key}`}
                   aria-current={o.key === owner.current ? "true" : undefined}
                   className={`${s.segItem} ${o.key === owner.current ? s.segItemOn : ""}`}
                 >

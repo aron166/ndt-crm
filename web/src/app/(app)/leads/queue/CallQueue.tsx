@@ -27,7 +27,7 @@ export function CallQueue({
               : owner === "all" ? "Nincs nyitott lead."
               : `${ownerName ?? "Ennek a felhasználónak"} nevén nincs nyitott lead.`}
           </span>
-          {owner !== "all" && <Link href="/leads?owner=all" className={s.link}>Mindenki listája</Link>}
+          {owner !== "all" && <Link href="/leads?view=queue&owner=all" className={s.link}>Mindenki listája</Link>}
         </div>
       ) : (
         groups.map((g) => (

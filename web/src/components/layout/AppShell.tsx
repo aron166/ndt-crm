@@ -65,6 +65,8 @@ export function AppShell({
       <AxAppShell
         height="fill"
         variant="section"
+        // Drawer below lg (1024): the 260px nav beside old full-width screens cut them off on laptops with zoom.
+        mobileNav={{ breakpoint: "lg" }}
         sideNav={
           <CrmSideNav
             email={email}

@@ -30,8 +30,8 @@ export default async function LeadsPage({
 }) {
   const { view, page: rawPage, tier: rawTier, owner: rawOwner } = await searchParams;
   const showConverted = view === "closed" || view === "converted";
-  // No view = the call queue; tier=X alone opens the board (only the board filters by tier).
-  const isQueue = !showConverted && !["board", "recall", "lost"].includes(view ?? "") && !isTier(rawTier);
+  // No view = the leads board (Aron 2026-11-10: a lead is not a call); the call queue is one view, ?view=queue.
+  const isQueue = !showConverted && view === "queue";
   const sideView = view === "recall" || view === "lost" ? view : null;
   const parsedPage = Number.parseInt(rawPage ?? "1", 10);
   const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
@@ -40,23 +40,39 @@ export default async function LeadsPage({
 
   // Counts power the toggle. Won (= converted to a deal) and lost leads leave
   // the active board: the "Lezárt" list keeps them for history.
-  const [actor, users, activeCount, convertedCount] = await Promise.all([
+  const [actor, users, convertedCount] = await Promise.all([
     getActor(TENANT_ID),
-    db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    // Recall leads sit off the main columns, so the "Tábla · N" count leaves them out too.
-    db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: null, outcome: "open", OR: [{ status: null }, { status: { notIn: [...SIDE_STAGES] } }] } }),
+    db.user.findMany({ where: { tenantId: TENANT_ID, email: { not: { endsWith: "@system" } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     db.lead.count({ where: CLOSED_WHERE }),
   ]);
 
-  const ownerParam = rawOwner === "all" || users.some((u) => String(u.id) === rawOwner) ? rawOwner! : "me";
-  // "me" without a resolved user must see nothing (-1), never everyone.
+  const explicitOwner = rawOwner === "all" || users.some((u) => String(u.id) === rawOwner);
+  // No owner chosen and the signed-in user owns no open lead: show everyone's queue, not an
+  // empty page (Aron could not find his leads in prod, 2026-11-10). The owner filter shows "Mindenki".
+  const myTotal = !explicitOwner && rawOwner !== "me" && actor.userId != null ? await getQueueTotal(actor.userId) : null;
+  const ownsNone = !explicitOwner && rawOwner !== "me" && (actor.userId == null || myTotal === 0);
+  const ownerParam = explicitOwner ? rawOwner! : ownsNone ? "all" : "me";
+  // An explicit ?owner=me without a resolved user sees nothing (-1), never everyone.
   const assignedToId = ownerParam === "all" ? null : ownerParam === "me" ? (actor.userId ?? -1) : Number(ownerParam);
-  // Non-queue views show the tab count for the default (me) list; the queue branch reuses its own total.
-  const queueTotalOther = isQueue ? 0 : await getQueueTotal(actor.userId ?? -1);
+  // Board main columns and the queue are the same set (open, recall and lost off), so one count serves both tabs
+  // and follows the owner filter. Recall leads sit off the main columns and stay out of it.
+  const openTotal = ownerParam === "me" && myTotal != null ? myTotal : await getQueueTotal(assignedToId);
+  const queueTotalOther = openTotal;
 
   const header = (
     props: Pick<React.ComponentProps<typeof LeadsHeader>, "view" | "title" | "help" | "owner" | "actions"> & { queueCount?: number },
-  ) => <LeadsHeader {...props} queueCount={props.queueCount ?? queueTotalOther} openCount={activeCount} closedCount={convertedCount} />;
+  ) => <LeadsHeader {...props} queueCount={props.queueCount ?? queueTotalOther} openCount={openTotal} ownerHref={ownerHref} closedCount={convertedCount} />;
+  // Owner links keep the view and, on the board, the tier and side filters.
+  const ownerHref = (key: string) => {
+    const q = new URLSearchParams();
+    if (isQueue) q.set("view", "queue");
+    else if (sideView) q.set("view", sideView);
+    if (!isQueue && tier) q.set("tier", tier);
+    q.set("owner", key);
+    return `/leads?${q.toString()}`;
+  };
+  // PROPOSAL copy
+  const ownerHelp = ownsNone ? "Nincs hozzád rendelt nyitott lead, ezért mindenki leadjei látszanak." : undefined;
 
   if (showConverted) {
     return (
@@ -70,7 +86,7 @@ export default async function LeadsPage({
   if (isQueue) {
     const now = new Date();
     const [statuses, rows, counts, queueTotal] = await Promise.all([
-      getLeadStatuses(TENANT_ID), getQueueRows(assignedToId), getFooterCounts(), getQueueTotal(assignedToId),
+      getLeadStatuses(TENANT_ID), getQueueRows(assignedToId), getFooterCounts(), openTotal,
     ]);
     // Heading counts come from the loaded rows (at most 200, most urgent first), so
     // past the cap they undercount; the list footer says so.
@@ -84,7 +100,7 @@ export default async function LeadsPage({
       <div className="mount">
         {header({
           view: "queue", title, queueCount: queueTotal,
-          help: "Felülről lefelé haladj. A Hívás gomb tárcsáz és megnyitja a lead lapját.",
+          help: ownerHelp ?? "Felülről lefelé haladj. A Hívás gomb tárcsáz és megnyitja a lead lapját.",
           owner: { current: ownerParam, users },
         })}
         <div className={qcss.split}>
@@ -120,6 +136,7 @@ export default async function LeadsPage({
     tenantId: TENANT_ID, convertedDealId: null,
     outcome: sideView === "lost" ? "lost" : "open",
     ...(tier ? { tier } : {}),
+    ...(assignedToId != null ? { assignedToId } : {}),
   };
   const knownKeys = allStatuses.map((s) => s.key);
   // A lead whose status was deleted at /leads/setup has no column: it lands in
@@ -142,6 +159,7 @@ export default async function LeadsPage({
         where: colWhere(st.key),
         include: {
           company: { select: { id: true, name: true } },
+          assignedTo: { select: { name: true } },
           contact: {
             select: {
               id: true, phone: true, email: true,
@@ -174,6 +192,7 @@ export default async function LeadsPage({
     // column the server counted it in.
     status: sideView ?? (l.status && knownKeys.includes(l.status) ? l.status : initialKey),
     estimatedValue: l.estimatedValue != null ? Number(l.estimatedValue) : null,
+    owner: l.assignedTo?.name ?? null,
     customFields: (l.customFields ?? null) as Record<string, unknown> | null,
     lastContactAt: extras.get(l.id)?.lastContactAt ?? null,
     callbackDueAt: extras.get(l.id)?.callbackDueAt ?? null,
@@ -200,6 +219,7 @@ export default async function LeadsPage({
     const q = new URLSearchParams();
     if (tier) q.set("tier", tier);
     q.set("view", sideView ?? "board");
+    if (ownerParam !== "me") q.set("owner", ownerParam);
     if (value) q.set(key, value); else q.delete(key);
     if (key === "view" && !value) q.set("view", "board");
     return `/leads?${q.toString()}`;
@@ -224,7 +244,9 @@ export default async function LeadsPage({
     <div className="mount">
       {header({
         view: "board",
-        title: "Szakaszok", // PROPOSAL copy
+        title: "Leadek", // PROPOSAL copy
+        help: ownerHelp,
+        owner: { current: ownerParam, users },
         actions: (
           <div className="flex flex-wrap items-center gap-2">
             {TierFilter}
