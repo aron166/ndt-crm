@@ -70,7 +70,7 @@ export function Header(p: {
           <span className={s.chip}>{`Felelős: ${p.ownerName ?? "nincs"}`}</span>
           <span className={s.menu}>
       <DropdownMenu>
-        <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "icon" })} aria-label="Továbbiak">
+        <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "icon" })} aria-label="Lead actions" /* PROPOSAL copy: own name, the nav already has Továbbiak */>
           <MoreHorizontal size={18} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
