@@ -119,7 +119,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
                       key={v.id}
                       style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", cursor: "pointer", transition: "background .12s", ...(active ? { background: "var(--ui-accent-surface)" } : {}) }}
                       onMouseOver={(e) => (e.currentTarget.style.background = "var(--ui-hover)")}
-                      onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                      onMouseOut={(e) => (e.currentTarget.style.background = active ? "var(--ui-accent-surface)" : "transparent")}
                     >
                       <div style={{ flex: 1 }} onClick={() => applyView(v)}>
                         <span style={{ fontSize: 14, color: active ? "var(--ui-text-link)" : "var(--ui-text-muted)", fontWeight: active ? 500 : 400 }}>
