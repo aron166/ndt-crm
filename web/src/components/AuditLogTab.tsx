@@ -1,12 +1,11 @@
 import { getEntityHistory } from "@/app/actions/audit";
 import { formatDateTime } from "@/lib/utils";
 import type { AuditEntityType } from "@/lib/audit";
-import { cn } from "@/lib/utils";
 
-const ACTION_LABEL: Record<string, { label: string; color: string }> = {
-  create: { label: "Létrehozva", color: "bg-green-50 text-green-700" },
-  update: { label: "Módosítva",  color: "bg-blue-50 text-blue-700"  },
-  delete: { label: "Törölve",    color: "bg-red-50 text-red-500"    },
+const ACTION_LABEL: Record<string, { label: string; tone: string }> = {
+  create: { label: "Létrehozva", tone: "mint" },
+  update: { label: "Módosítva",  tone: "sky"  },
+  delete: { label: "Törölve",    tone: "coral"    },
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -23,14 +22,14 @@ function ChangeRow({ field, before, after }: { field: string; before: unknown; a
   const label = FIELD_LABELS[field] ?? field;
   const fmt = (v: unknown) =>
     v === null || v === undefined
-      ? <span className="italic" style={{ color: "var(--fg-faint)" }}>-</span>
+      ? <span className="italic" style={{ color: "var(--ui-text-muted)" }}>-</span>
       : <span style={{ fontWeight: 500 }}>{String(v)}</span>;
   return (
-    <div className="flex items-start gap-2 text-xs" style={{ color: "var(--fg-soft)" }}>
-      <span className="shrink-0 w-28" style={{ color: "var(--fg-faint)" }}>{label}</span>
-      <span className="line-through" style={{ color: "var(--fg-faint)" }}>{fmt(before)}</span>
-      <span style={{ color: "var(--fg-faint)" }}>→</span>
-      {fmt(after)}
+    <div className="flex items-start gap-2 text-xs" style={{ color: "var(--ui-text-muted)" }}>
+      <span className="shrink-0 w-28" style={{ color: "var(--ui-text-muted)" }}>{label}</span>
+      <span className="line-through" style={{ color: "var(--ui-text-muted)" }}>{fmt(before)}</span>
+      <span style={{ color: "var(--ui-text-muted)" }}>→</span>
+      <span style={{ color: "var(--ui-text)" }}>{fmt(after)}</span>
     </div>
   );
 }
@@ -39,7 +38,7 @@ function ChangeRow({ field, before, after }: { field: string; before: unknown; a
 export function AuditLogEntries({ entries }: { entries: AuditEntry[] }) {
   if (entries.length === 0) {
     return (
-      <p className="text-sm py-6 text-center" style={{ color: "var(--fg-faint)" }}>
+      <p className="text-sm py-6 text-center" style={{ color: "var(--ui-text-muted)" }}>
         Nincs rögzített változás. A jövőbeli módosítások itt jelennek meg.
       </p>
     );
@@ -56,18 +55,18 @@ export function AuditLogEntries({ entries }: { entries: AuditEntry[] }) {
         const changedFields = e.action === "update" ? Object.keys(changes.after ?? {}) : [];
 
         return (
-          <div key={e.id} className="rounded-xl p-4" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)" }}>
+          <div key={e.id} className="p-4" style={{ background: "var(--ui-surface)", border: "1px solid var(--ui-border)", borderRadius: "var(--ui-radius-surface)" }}>
             <div className="flex items-center gap-2 mb-2">
-              <span className={cn("px-2 py-0.5 rounded text-xs font-medium", actionMeta.color)}>
+              <span className={`badge-ds ${actionMeta.tone}`}>
                 {actionMeta.label}
               </span>
-              <span className="text-xs ml-auto" style={{ color: "var(--fg-faint)" }}>
+              <span className="text-xs ml-auto" style={{ color: "var(--ui-text-muted)" }}>
                 {formatDateTime(e.occurredAt)}
               </span>
             </div>
 
             {e.action === "create" && changes.after && (
-              <p className="text-xs" style={{ color: "var(--fg-mute)" }}>
+              <p className="text-xs" style={{ color: "var(--ui-text-muted)" }}>
                 {Object.entries(changes.after)
                   .filter(([, v]) => v !== null && v !== undefined && v !== "")
                   .map(([k, v]) => `${FIELD_LABELS[k] ?? k}: ${v}`)
@@ -85,7 +84,7 @@ export function AuditLogEntries({ entries }: { entries: AuditEntry[] }) {
             )}
 
             {e.action === "delete" && changes.before && (
-              <p className="text-xs line-through" style={{ color: "var(--fg-faint)" }}>
+              <p className="text-xs line-through" style={{ color: "var(--ui-text-muted)" }}>
                 {Object.entries(changes.before)
                   .filter(([, v]) => v !== null && v !== undefined)
                   .map(([k, v]) => `${FIELD_LABELS[k] ?? k}: ${v}`)

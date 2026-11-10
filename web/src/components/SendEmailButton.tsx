@@ -23,13 +23,13 @@ export function SendEmailButton({
   return (
     <>
       {variant === "primary" ? (
-        <Button onClick={() => setOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+        <Button type="button" onClick={() => setOpen(true)}>
           <Mail className="size-4" /> Email
         </Button>
       ) : (
-        <button className="btn inline-flex items-center gap-1.5" onClick={() => setOpen(true)}>
+        <Button type="button" variant="outline" onClick={() => setOpen(true)}>
           <Mail className="size-4" aria-hidden="true" /> Email
-        </button>
+        </Button>
       )}
       <SendEmailModal
         open={open}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { CreatePersonModal } from "@/components/CreatePersonModal";
 
 export function CreatePersonButton() {
@@ -8,7 +9,7 @@ export function CreatePersonButton() {
   return (
     <>
       <CreatePersonModal open={open} onClose={() => setOpen(false)} />
-      <button className="btn primary" onClick={() => setOpen(true)}>+ Új személy</button>
+      <Button type="button" onClick={() => setOpen(true)}>+ Új személy</Button>
     </>
   );
 }

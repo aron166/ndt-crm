@@ -3,7 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createPerson } from "@/app/actions/persons";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/FormField";
 
 interface Props {
@@ -46,33 +49,33 @@ export function CreatePersonModal({ open, onClose }: Props) {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField label="Vezetéknév" required>
-              <input name="lastName" className="input-ds" placeholder="Kovács" required autoFocus />
+              <Input name="lastName" placeholder="Kovács" required autoFocus />
             </FormField>
             <FormField label="Keresztnév" required>
-              <input name="firstName" className="input-ds" placeholder="Béla" required />
+              <Input name="firstName" placeholder="Béla" required />
             </FormField>
             <FormField label="Email">
-              <input name="email" className="input-ds" placeholder="kovacs.bela@ceg.hu" type="email" />
+              <Input name="email" placeholder="kovacs.bela@ceg.hu" type="email" />
             </FormField>
             <FormField label="Telefon">
-              <input name="phone" className="input-ds" placeholder="+36 30 123 4567" type="tel" />
+              <Input name="phone" placeholder="+36 30 123 4567" type="tel" />
             </FormField>
             <FormField label="LinkedIn URL" full>
-              <input name="linkedinUrl" className="input-ds" placeholder="https://linkedin.com/in/..." type="url" />
+              <Input name="linkedinUrl" placeholder="https://linkedin.com/in/..." type="url" />
             </FormField>
             <FormField label="Megjegyzés" full>
-              <textarea name="notes" className="input-ds" rows={2} style={{ resize: "vertical" }} />
+              <Textarea name="notes" rows={2} />
             </FormField>
           </div>
 
-          {error && <div style={{ fontSize: 14, color: "var(--coral)", padding: "6px 10px", background: "var(--coral-soft)", borderRadius: 5 }}>{error}</div>}
+          {error && <div style={{ fontSize: 14, color: "var(--ui-danger-text)", padding: "6px 10px", background: "var(--ui-danger-surface)", borderRadius: "var(--ui-radius-control)" }}>{error}</div>}
 
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
-            <button type="button" className="btn" onClick={onClose} disabled={pending}>Mégse</button>
-            <button type="submit" className="btn primary" disabled={pending}>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={pending}>Mégse</Button>
+            <Button type="submit" disabled={pending}>
               {pending ? "Mentés..." : "Személy létrehozása"}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
