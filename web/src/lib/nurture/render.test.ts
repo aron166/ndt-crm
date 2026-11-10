@@ -37,6 +37,13 @@ describe("renderBody", () => {
     expect(html).toContain(">oldal</a>");
     expect(text).toContain("oldal: https://crm.test/click?u=");
   });
+  it("tracks betonradar.hu links but leaves external links as written", () => {
+    const { html, text } = renderBody("[a](https://www.betonradar.hu/x) [b](https://example.com/y)", ctx);
+    expect(html).toContain('href="https://crm.test/click?u=');
+    expect(html).toContain('href="https://example.com/y"');
+    expect(text).toContain("b: https://example.com/y");
+    expect(text).not.toContain("u=https%3A%2F%2Fexample.com");
+  });
   it("escapes HTML in the body", () => {
     const { html } = renderBody("<script>alert(1)</script>", ctx);
     expect(html).not.toContain("<script>");

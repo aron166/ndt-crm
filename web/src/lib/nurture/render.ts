@@ -30,14 +30,19 @@ export function withUtm(url: string, templateKey: string, position: number): str
 
 const LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
 
+const isOwnSite = (url: string) => { try { return /(^|\.)betonradar\.hu$/i.test(new URL(url).hostname); } catch { return false; } };
+/** Our own links: UTM + click tracking. External links stay as written (the redirect only serves our site, Vanda W9-4). */
+function linkFor(url: string, ctx: RenderContext): string {
+  return isOwnSite(url) ? ctx.trackUrl(withUtm(url, ctx.templateKey, ctx.position)) : url;
+}
+
 /** Inline markdown (bold, links) for one line, as HTML. */
 function inlineHtml(line: string, ctx: RenderContext): string {
   let out = "";
   let last = 0;
   for (const m of line.matchAll(LINK)) {
     out += esc(line.slice(last, m.index)).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    const dest = withUtm(m[2], ctx.templateKey, ctx.position);
-    out += `<a href="${esc(ctx.trackUrl(dest))}">${esc(m[1])}</a>`;
+    out += `<a href="${esc(linkFor(m[2], ctx))}">${esc(m[1])}</a>`;
     last = (m.index ?? 0) + m[0].length;
   }
   return out + esc(line.slice(last)).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -45,7 +50,7 @@ function inlineHtml(line: string, ctx: RenderContext): string {
 
 function inlineText(line: string, ctx: RenderContext): string {
   return line
-    .replace(LINK, (_m, text: string, url: string) => `${text}: ${ctx.trackUrl(withUtm(url, ctx.templateKey, ctx.position))}`)
+    .replace(LINK, (_m, text: string, url: string) => `${text}: ${linkFor(url, ctx)}`)
     .replace(/\*\*([^*]+)\*\*/g, "$1");
 }
 

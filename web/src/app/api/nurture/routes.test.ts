@@ -62,6 +62,12 @@ describe("unsubscribe route", () => {
     expect(d.suppression.create).not.toHaveBeenCalled();
   });
 
+  it("POST still succeeds when suppression.create races (P2002)", async () => {
+    d.suppression.create.mockRejectedValue({ code: "P2002" } as never);
+    const res = await unsub.POST(req("POST"));
+    expect(res.status).toBe(200);
+  });
+
   it("an invalid token is 400 and writes nothing", async () => {
     expect((await unsub.GET(req("GET", "d=x&s=y"))).status).toBe(400);
     expect((await unsub.POST(req("POST", "d=x&s=y"))).status).toBe(400);
@@ -76,18 +82,11 @@ describe("click route", () => {
     return new Request(`https://crm.test/api/nurture/click?d=${dd}&s=${s}`);
   };
 
-  it("redirects to the destination, records the click, creates a call task", async () => {
+  it("redirects to the destination and records the click, never creating a task", async () => {
     const res = await click.GET(url("https://www.betonradar.hu/x?utm_source=nurture"));
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("https://www.betonradar.hu/x?utm_source=nurture");
     expect(d.appEvent.create.mock.calls[0][0].data).toMatchObject({ eventType: "nurture_click" });
-    expect(d.task.create).toHaveBeenCalledTimes(1);
-  });
-
-  it("creates at most one call task per day", async () => {
-    d.task.findFirst.mockResolvedValue({ id: 8 } as never);
-    await click.GET(url("https://www.betonradar.hu/x"));
-    expect(d.appEvent.create).toHaveBeenCalledTimes(1);
     expect(d.task.create).not.toHaveBeenCalled();
   });
 

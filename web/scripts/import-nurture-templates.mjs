@@ -1,7 +1,7 @@
 // Loads nurture email drafts into nurture_templates as unapproved proposals. Approved rows are never touched.
 // Usage (from web/): node scripts/import-nurture-templates.mjs --dir <drafts dir> --tenant 1 [--dry-run] [--prod]
 // Reads DATABASE_URL from the environment only. --dry-run parses and prints the plan without connecting.
-// Refuses a host containing "supabase" unless --prod is given (prod imports only with Kai's go).
+// Allowlist (Vanda W9-9): only a local database without --prod; prod imports only with Kai's go.
 import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
@@ -18,8 +18,8 @@ if (!url) { console.error("DATABASE_URL is not set"); process.exit(2); }
 let host;
 try { host = new URL(url).host; } catch { console.error("DATABASE_URL is not a valid URL"); process.exit(2); }
 console.log(`target host: ${host}${dryRun ? " (dry run)" : ""}`);
-if (host.toLowerCase().includes("supabase") && !args.includes("--prod")) {
-  console.error("refusing: supabase host without --prod"); process.exit(1);
+if (!/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host) && !args.includes("--prod")) {
+  console.error("refusing: non-local host without --prod"); process.exit(1);
 }
 
 const files = fs.readdirSync(dir).filter((f) => /-email\.md$/.test(f)).sort();

@@ -57,12 +57,13 @@ async function activitiesFor(tenantId: number, leadId: number, since: Date): Pro
     }),
     db.task.findMany({ where: { tenantId, leadId, startsAt: { not: null }, createdAt: { gte: since } }, select: { createdAt: true } }),
     // Stage changes by people or the lifecycle; the creation row is not a change.
-    db.leadStatusHistory.findMany({ where: { tenantId, leadId, at: { gte: since }, event: { not: "lead_created" } }, select: { at: true } }),
+    db.leadStatusHistory.findMany({ where: { tenantId, leadId, at: { gte: since }, event: { not: "lead_created" } }, select: { at: true, fromStatus: true, toStatus: true } }),
   ]);
   return [
     ...interactions.map((i) => ({ at: i.occurredAt, kind: (i.type === "call" ? "call" : "reply") as Activity["kind"] })),
     ...bookings.map((b) => ({ at: b.createdAt, kind: "booking" as const })),
-    ...moves.map((m) => ({ at: m.at, kind: "stage_change" as const })),
+    // Only real moves: self-transitions (sla_missed, a no-answer attempt) are not a conversation (Vanda W9-5).
+    ...moves.filter((m) => m.fromStatus !== m.toStatus).map((m) => ({ at: m.at, kind: "stage_change" as const })),
   ];
 }
 
@@ -126,6 +127,7 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
       lead: {
         select: {
           id: true, qualification: true, customFields: true, companyId: true,
+          intent: true, status: true, outcome: true, convertedDealId: true,
           contact: { select: { email: true, personId: true } }, assignedTo: { select: { name: true } },
         },
       },
@@ -140,6 +142,18 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
       if (!seq) continue;
       const lead = en.lead;
       const cf = lead.customFields as Record<string, unknown> | null;
+      // Re-check eligibility here too, so a lead outside the enrolment scan window
+      // that became won / ordered / ineligible is still stopped (Vanda W9-6).
+      const nowSegment = segmentFor({
+        intent: lead.intent, status: lead.status, outcome: lead.outcome, convertedDealId: lead.convertedDealId,
+        qualification: lead.qualification as Record<string, unknown> | null, customFields: cf,
+      });
+      if (nowSegment !== seq.segment) {
+        await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { status: "stopped", stoppedReason: nowSegment ? "segment_changed" : "not_eligible" } });
+        await event(tenantId, "nurture_stopped", { leadId: lead.id, enrollmentId: en.id, reason: nowSegment ? "segment_changed" : "not_eligible" });
+        out.stopped++;
+        continue;
+      }
       const email = leadEmail(cf, lead.contact?.email);
       if (!email || (await isAddressSuppressed(tenantId, email))) {
         await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { status: "stopped", stoppedReason: "unsubscribed" } });
@@ -189,7 +203,12 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
       const template = templateByKey.get(step.templateKey) ?? null;
       const block = !enabled ? "nurture_disabled" : templateBlock(template, assets);
       if (block || !template) {
-        if (passTo !== en.nextPosition) await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { nextPosition: passTo } });
+        // With sending on, a step whose template or asset does not exist is passed (W9: "skipped,
+        // never sent with a placeholder"), so one missing piece does not stall the sequence
+        // (Vanda W9-3). An unapproved template, or sending off, waits.
+        const pass = enabled && (block === "template_missing" || (block ?? "").startsWith("asset_missing"));
+        const to = pass ? step.position + 1 : passTo;
+        if (to !== en.nextPosition) await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { nextPosition: to } });
         await skipOnce(tenantId, { leadId: lead.id, enrollmentId: en.id, templateKey: step.templateKey, position: step.position, reason: block ?? "template_missing" });
         out.skipped++;
         continue;
@@ -201,6 +220,13 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
         return `${BASE}/api/nurture/click?d=${c.d}&s=${c.s}`;
       };
       const { text, html } = renderBody(template.bodyMd, { templateKey: step.templateKey, position: step.position, trackUrl, unsubscribeUrl, issuer });
+      // Claim the step first (Vanda W9-2): a concurrent run, or a crash after the send,
+      // can never send the same step twice. Released again if the send fails.
+      const claim = await db.nurtureEnrollment.updateMany({
+        where: { id: en.id, tenantId, status: "active", nextPosition: en.nextPosition },
+        data: { nextPosition: step.position + 1, lastSentAt: now },
+      });
+      if (claim.count !== 1) continue;
       const r = await sendEmail({
         tenantId, to: email, subject: template.subject, text, html,
         fromName: lead.assignedTo?.name ?? null,
@@ -208,11 +234,14 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
         companyId: lead.companyId, personId: lead.contact?.personId ?? null,
       });
       if (!r.ok) {
+        await db.nurtureEnrollment.updateMany({
+          where: { id: en.id, tenantId, nextPosition: step.position + 1 },
+          data: { nextPosition: en.nextPosition, lastSentAt: en.lastSentAt },
+        });
         await event(tenantId, "nurture_skipped", { leadId: lead.id, enrollmentId: en.id, templateKey: step.templateKey, position: step.position, reason: "send_failed", error: r.error });
         out.skipped++;
         continue;
       }
-      await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { nextPosition: step.position + 1, lastSentAt: now } });
       await event(tenantId, "nurture_sent", { leadId: lead.id, enrollmentId: en.id, templateKey: step.templateKey, position: step.position, resendId: r.id });
       out.sent++;
     } catch (err) {

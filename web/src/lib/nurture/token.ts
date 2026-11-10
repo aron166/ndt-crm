@@ -11,8 +11,11 @@ function key(purpose: string): Buffer {
   return createHmac("sha256", Buffer.from(base, "hex")).update(`nurture:${purpose}`).digest();
 }
 
-export function signPayload(purpose: "unsub" | "click", payload: Record<string, unknown>): { d: string; s: string } {
-  const d = Buffer.from(JSON.stringify(payload)).toString("base64url");
+/** Links live a year (Vanda W9-8): long enough for an old mail, not forever. */
+export const TOKEN_TTL_MS = 365 * 86_400_000;
+
+export function signPayload(purpose: "unsub" | "click", payload: Record<string, unknown>, now: number = Date.now()): { d: string; s: string } {
+  const d = Buffer.from(JSON.stringify({ ...payload, x: now + TOKEN_TTL_MS })).toString("base64url");
   const s = createHmac("sha256", key(purpose)).update(d).digest("base64url");
   return { d, s };
 }
@@ -23,5 +26,8 @@ export function verifyPayload<T>(purpose: "unsub" | "click", d: string | null, s
   let got: Buffer;
   try { got = Buffer.from(s, "base64url"); } catch { return null; }
   if (got.length !== want.length || !timingSafeEqual(got, want)) return null;
-  try { return JSON.parse(Buffer.from(d, "base64url").toString("utf8")) as T; } catch { return null; }
+  let data: (T & { x?: unknown }) | null;
+  try { data = JSON.parse(Buffer.from(d, "base64url").toString("utf8")) as T & { x?: unknown }; } catch { return null; }
+  if (!data || typeof data.x !== "number" || data.x < Date.now()) return null;
+  return data;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { signPayload, verifyPayload } from "./token";
+import { signPayload, verifyPayload, TOKEN_TTL_MS } from "./token";
 
 vi.mock("server-only", () => ({}));
 
@@ -10,7 +10,7 @@ describe("nurture token", () => {
   it("round-trips", () => {
     vi.stubEnv("ENCRYPTION_KEY", KEY);
     const { d, s } = signPayload("unsub", { t: 1, e: "a@b.hu" });
-    expect(verifyPayload("unsub", d, s)).toEqual({ t: 1, e: "a@b.hu" });
+    expect(verifyPayload("unsub", d, s)).toMatchObject({ t: 1, e: "a@b.hu" });
   });
   it("rejects tampered d or s", () => {
     vi.stubEnv("ENCRYPTION_KEY", KEY);
@@ -25,7 +25,12 @@ describe("nurture token", () => {
     vi.stubEnv("ENCRYPTION_KEY", KEY);
     const { d, s } = signPayload("click", { t: 1 });
     expect(verifyPayload("unsub", d, s)).toBeNull();
-    expect(verifyPayload("click", d, s)).toEqual({ t: 1 });
+    expect(verifyPayload("click", d, s)).toMatchObject({ t: 1 });
+  });
+  it("does not verify an expired token", () => {
+    vi.stubEnv("ENCRYPTION_KEY", KEY);
+    const { d, s } = signPayload("unsub", { t: 1 }, Date.now() - 2 * TOKEN_TTL_MS);
+    expect(verifyPayload("unsub", d, s)).toBeNull();
   });
   it("throws on sign without ENCRYPTION_KEY", () => {
     vi.stubEnv("ENCRYPTION_KEY", "");

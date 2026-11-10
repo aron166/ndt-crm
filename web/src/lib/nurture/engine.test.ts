@@ -41,7 +41,7 @@ const leadRow = (enrollments: unknown[]) => ({
 const live = () => ({
   id: 5, sequenceId: 10, status: "active", nextPosition: 1, enrolledAt: new Date(now.getTime() - 2 * 86_400_000),
   pausedAt: null, resumedAt: null, lastSentAt: null,
-  lead: { id: 1, qualification: null, customFields: { contact_email: "Lead@X.hu" }, companyId: 3, contact: { email: null, personId: 4 }, assignedTo: { name: "Aron" } },
+  lead: { id: 1, intent: "service_concrete", status: "new", outcome: "open", convertedDealId: null, qualification: null, customFields: { contact_email: "Lead@X.hu" }, companyId: 3, contact: { email: null, personId: 4 }, assignedTo: { name: "Aron" } },
 });
 const eventTypes = () => d.appEvent.create.mock.calls.map((c) => (c[0].data as { eventType: string }).eventType);
 
@@ -95,9 +95,10 @@ describe("runNurture", () => {
     expect(arg.html).toContain("<p>");
     expect(arg.headers?.["List-Unsubscribe"]).toMatch(/^<.*\/api\/nurture\/unsubscribe\?d=.+&s=.+>$/);
     expect(arg.headers?.["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
-    expect(d.nurtureEnrollment.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { nextPosition: 2, lastSentAt: now } }),
-    );
+    expect(d.nurtureEnrollment.updateMany).toHaveBeenCalledWith({
+      where: { id: 5, tenantId: 1, status: "active", nextPosition: 1 },
+      data: { nextPosition: 2, lastSentAt: now },
+    });
     const sent = d.appEvent.create.mock.calls.map((c) => c[0].data as { eventType: string; payload: { resendId?: string } })
       .find((e) => e.eventType === "nurture_sent");
     expect(sent?.payload.resendId).toBe("re_123");
@@ -133,6 +134,82 @@ describe("runNurture", () => {
     expect(d.nurtureEnrollment.create).toHaveBeenCalledWith({ data: { tenantId: 1, leadId: 1, sequenceId: 10, enrolledAt: now } });
     expect(r).toMatchObject({ stopped: 1, enrolled: 1 });
     expect(eventTypes()).toEqual(expect.arrayContaining(["nurture_stopped", "nurture_enrolled"]));
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("does not send when the claim count is 0", async () => {
+    setup({ nurture_enabled: true });
+    d.nurtureEnrollment.updateMany.mockResolvedValue({ count: 0 } as never);
+    const r = await runNurture(1, now);
+    expect(send).not.toHaveBeenCalled();
+    expect(r.sent).toBe(0);
+  });
+
+  it("releases the claim and logs send_failed when the send fails", async () => {
+    setup({ nurture_enabled: true });
+    send.mockResolvedValue({ ok: false, error: "boom" } as never);
+    const r = await runNurture(1, now);
+    expect(r.skipped).toBe(1);
+    expect(d.nurtureEnrollment.updateMany).toHaveBeenCalledWith({
+      where: { id: 5, tenantId: 1, nextPosition: 2 },
+      data: { nextPosition: 1, lastSentAt: null },
+    });
+    const ev = d.appEvent.create.mock.calls.map((c) => c[0].data as { eventType: string; payload: { reason?: string } });
+    expect(ev.find((e) => e.eventType === "nurture_skipped")?.payload.reason).toBe("send_failed");
+  });
+
+  it("stops a live enrollment whose lead became won, without sending", async () => {
+    setup({ nurture_enabled: true });
+    const en = live();
+    en.lead.status = "won";
+    d.nurtureEnrollment.findMany.mockResolvedValue([en] as never);
+    const r = await runNurture(1, now);
+    expect(send).not.toHaveBeenCalled();
+    expect(r.stopped).toBe(1);
+    expect(d.nurtureEnrollment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "stopped", stoppedReason: "not_eligible" } }),
+    );
+  });
+
+  it("passes a missing template when sending is on, but waits on an unapproved one", async () => {
+    setup({ nurture_enabled: true }, []);
+    await runNurture(1, now);
+    expect(send).not.toHaveBeenCalled();
+    expect(d.nurtureEnrollment.updateMany).toHaveBeenCalledWith({ where: { id: 5, tenantId: 1 }, data: { nextPosition: 2 } });
+
+    vi.clearAllMocks();
+    d.nurtureEnrollment.updateMany.mockResolvedValue({ count: 1 } as never);
+    d.appEvent.create.mockResolvedValue({} as never);
+    d.interaction.findMany.mockResolvedValue([] as never);
+    d.task.findMany.mockResolvedValue([] as never);
+    d.leadStatusHistory.findMany.mockResolvedValue([] as never);
+    d.appEvent.findFirst.mockResolvedValue(null as never);
+    suppressed.mockResolvedValue(false);
+    setup({ nurture_enabled: true }, [template({ status: "proposal", approvedByAron: false })]);
+    await runNurture(1, now);
+    expect(d.nurtureEnrollment.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: { nextPosition: 2 } }));
+  });
+
+  it("a self-transition in the status history does not pause, a real move does", async () => {
+    setup({ nurture_enabled: true });
+    const at = new Date(now.getTime() - 3_600_000);
+    d.leadStatusHistory.findMany.mockResolvedValue([{ at, fromStatus: "new", toStatus: "new" }] as never);
+    const r1 = await runNurture(1, now);
+    expect(r1.paused).toBe(0);
+    expect(r1.sent).toBe(1);
+
+    vi.clearAllMocks();
+    d.nurtureEnrollment.updateMany.mockResolvedValue({ count: 1 } as never);
+    d.appEvent.create.mockResolvedValue({} as never);
+    d.interaction.findMany.mockResolvedValue([] as never);
+    d.task.findMany.mockResolvedValue([] as never);
+    d.appEvent.findFirst.mockResolvedValue(null as never);
+    suppressed.mockResolvedValue(false);
+    send.mockResolvedValue({ ok: true, id: "re_1" } as never);
+    setup({ nurture_enabled: true });
+    d.leadStatusHistory.findMany.mockResolvedValue([{ at, fromStatus: "new", toStatus: "contacted" }] as never);
+    const r2 = await runNurture(1, now);
+    expect(r2.paused).toBe(1);
     expect(send).not.toHaveBeenCalled();
   });
 });
