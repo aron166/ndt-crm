@@ -45,7 +45,8 @@
 .cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; margin-top: 28px; align-items: start; }
 @media (min-width: 1024px) {
   .cols { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
-  .side { position: sticky; top: 16px; }
+  /* Capped to the viewport: a sticky panel taller than the screen hid its book button until the page end. */
+  .side { position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
 }
 /* The machine-day grid needs width: from 1280px the booking column gets half. */
 @media (min-width: 1280px) {
