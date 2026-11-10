@@ -1,0 +1,8 @@
+/* Person list, Astryx tokens only. Table, header and pager come from the page kit. */
+.row { height: 52px; }
+.avatar { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 12px; font-weight: 700; color: var(--color-on-accent); }
+.name { font-size: 15px; font-weight: 600; color: var(--color-text-primary); text-decoration: none; overflow-wrap: anywhere; }
+.name:hover { text-decoration: underline; }
+.secLink { font-size: 14px; color: var(--color-text-secondary); text-decoration: none; overflow-wrap: anywhere; }
+.secLink:hover { color: var(--color-text-primary); text-decoration: underline; }
+.name:focus-visible, .secLink:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }

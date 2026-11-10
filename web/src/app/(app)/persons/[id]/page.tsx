@@ -7,11 +7,12 @@ import { getTagsForEntity } from "@/app/actions/tags";
 import { getEntityHistory } from "@/app/actions/audit";
 import { serializeDates } from "@/lib/serialize";
 import { serializeTaskCost } from "@/lib/tasks/costing";
+import k from "@/components/astryx/page.module.css";
 
 const TENANT_ID = 1;
 
 const AVATAR_PALETTE = [
-  "var(--indigo)", "var(--mint)", "var(--amber)",
+  "var(--color-accent)", "var(--mint)", "var(--amber)",
   "var(--sky)", "var(--violet)", "var(--coral)",
 ];
 
@@ -81,17 +82,11 @@ export default async function PersonDetailPage({
   const initials = [person.firstName?.[0], person.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "?";
 
   return (
-    <div className="mount">
-      <div style={{ marginBottom: 16 }}>
-        <Link
-          href="/persons"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
-          className="row-link"
-        >
-          <ArrowLeft style={{ width: 14, height: 14 }} />
-          Vissza a személyekhez
-        </Link>
-      </div>
+    <div>
+      <Link href="/persons" className={k.back}>
+        <ArrowLeft className="size-4" />
+        Vissza a személyekhez
+      </Link>
 
       <PersonDetailClient
         person={serializeDates(person)}
