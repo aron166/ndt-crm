@@ -4,13 +4,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, AlertTriangle } from "lucide-react";
 import { upsertCostRate, type CostRateEntry } from "@/app/actions/cost-rates";
+import k from "@/components/astryx/page.module.css";
+import q from "../quotes/quotes.module.css";
 import { costCodeLabel, costCodeUnitHint } from "@/lib/tasks/costing";
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 10px", fontSize: 14,
-  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-  borderRadius: 6, color: "var(--fg)", outline: "none",
-};
 
 export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[] }) {
   const router = useRouter();
@@ -52,36 +48,38 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
   }
 
   return (
-    <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12 }} className="p-5">
-      <table className="w-full text-sm">
-        <thead>
-          <tr>
-            {["Költségkód", "Egység", "Egységár (Ft)"].map((h) => (
-              <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)" }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.code} style={{ borderTop: "1px solid var(--line-soft)" }}>
-              <td style={{ padding: "8px 10px", color: "var(--fg-soft)" }}>{costCodeLabel(r.code)}</td>
-              <td style={{ padding: "8px 10px", width: 140 }}>
-                <input style={inputStyle} value={r.unit} onChange={(e) => set(r.code, "unit", e.target.value)} placeholder={costCodeUnitHint(r.code)} />
-              </td>
-              <td style={{ padding: "8px 10px", width: 160 }}>
-                <input type="number" inputMode="decimal" step="any" min={0} style={inputStyle} value={r.unitRate} onChange={(e) => set(r.code, "unitRate", e.target.value)} placeholder="-" />
-              </td>
+    <div className={q.box}>
+      <div className={k.tableWrap}>
+        <table className={k.table} style={{ minWidth: 0 }}>
+          <thead>
+            <tr>
+              {["Költségkód", "Egység", "Egységár (Ft)"].map((h) => (
+                <th key={h}>{h}</th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.code}>
+                <td>{costCodeLabel(r.code)}</td>
+                <td style={{ width: 140 }}>
+                  <input className={q.input} value={r.unit} onChange={(e) => set(r.code, "unit", e.target.value)} placeholder={costCodeUnitHint(r.code)} />
+                </td>
+                <td style={{ width: 160 }}>
+                  <input className={`${q.input} ${q.numCell}`} type="number" inputMode="decimal" step="any" min={0} value={r.unitRate} onChange={(e) => set(r.code, "unitRate", e.target.value)} placeholder="-" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="flex items-center gap-3 mt-4">
-        <button className="btn primary" disabled={pending} onClick={handleSave}>
+        <button className={`${k.btn} ${k.btnPrimary}`} disabled={pending} onClick={handleSave}>
           {pending ? "Mentés…" : "Mentés"}
         </button>
         {msg && (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--color-text-success)" : "var(--color-text-error)" }}>
             {msg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {msg.text}
           </span>
         )}

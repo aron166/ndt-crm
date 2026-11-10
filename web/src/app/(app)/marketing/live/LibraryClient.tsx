@@ -7,12 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { UI, CATEGORY_LABEL } from "@/lib/content/labels";
 import { CONTENT_CATEGORIES, type ContentCategory } from "@/lib/content/types";
 import type { LibraryRow } from "@/lib/content/queries";
-
-const selectStyle: React.CSSProperties = {
-  padding: "6px 10px", fontSize: 14, minHeight: 44, maxWidth: "100%",
-  background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
-  borderRadius: 6, color: "var(--fg)", outline: "none",
-};
+import k from "@/components/astryx/page.module.css";
+import s from "../marketing.module.css";
 
 function plainTextPreview(body: string): string {
   const plain = body
@@ -37,8 +33,7 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="btn sm"
-      style={{ minHeight: 44 }}
+      className={k.btn}
     >
       {copied ? UI.copied : UI.copyText}
     </button>
@@ -47,50 +42,45 @@ function CopyButton({ text }: { text: string }) {
 
 function Card({ row }: { row: LibraryRow }) {
   return (
-    <div className="panel">
-      <div className="panel-pad">
-        <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 6 }}>
-          {row.campaign && <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>{row.campaign.name}</span>}
-          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{UI.version(row.versionNumber)}</span>
+    <div className={k.row} data-u="done" style={{ alignItems: "start" }}>
+      <span className={k.bar} />
+      <div className={k.cell}>
+        <Link href={`/marketing/${row.id}`} className={`${k.name} ${s.rowLink}`}>{row.title}</Link>
+        <div className={k.meta}>
+          {row.campaign && <span className={k.muted}>{row.campaign.name}</span>}
+          <span className={`${k.muted} ${k.num}`}>{UI.version(row.versionNumber)}</span>
         </div>
-        <Link href={`/marketing/${row.id}`} style={{ textDecoration: "none" }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg)", marginBottom: 3 }}>{row.title}</div>
-        </Link>
-        {row.purpose && <p style={{ fontSize: 13, color: "var(--fg-mute)", marginBottom: 10 }}>{row.purpose}</p>}
-        <p
-          style={{
-            fontSize: 16, lineHeight: 1.6, color: "var(--fg-soft)", marginBottom: 12,
-            display: "-webkit-box", WebkitLineClamp: 6, WebkitBoxOrient: "vertical", overflow: "hidden",
-          }}
-        >
+        {row.purpose && <p className={k.muted} style={{ margin: 0 }}>{row.purpose}</p>}
+      </div>
+      <div className={k.cell}>
+        <p className={s.preview}>
           {plainTextPreview(row.body)}
         </p>
-
-        <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: row.assets.length > 0 || row.usedBy.length > 0 ? 12 : 0 }}>
-          <CopyButton text={row.body} />
-          <Link href={`/marketing/${row.id}`} className="btn sm ghost" style={{ minHeight: 44 }}>
-            {UI.version(row.versionNumber)} →
-          </Link>
-        </div>
-
+      </div>
+      <div className={k.cell}>
         {row.assets.length > 0 && (
           // Performance golden rule (spec §6c): a LIST never loads media. The
           // files are counted here and open with the item.
-          <div style={{ fontSize: 13, color: "var(--fg-mute)", display: "flex", alignItems: "center", gap: 6 }}>
+          <div className={`${k.muted} ${s.iconText}`}>
             <Paperclip size={14} aria-hidden="true" />
             {row.assets.length} fájl
           </div>
         )}
-
         {row.usedBy.length > 0 && (
-          <div className="flex gap-1.5 flex-wrap">
+          <div className={k.meta}>
             {row.usedBy.map((u) => (
-              <span key={u} style={{ fontSize: 12, color: "var(--fg-mute)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 20, padding: "2px 8px" }}>
+              <span key={u} className="badge-ds slate">
                 {u}
               </span>
             ))}
           </div>
         )}
+      </div>
+      <div className={k.cellEnd}>
+        <CopyButton text={row.body} />
+        <Link href={`/marketing/${row.id}`} className={k.btn}>
+          {UI.version(row.versionNumber)} →
+        </Link>
       </div>
     </div>
   );
@@ -127,34 +117,32 @@ export function LibraryClient({
 
   return (
     <div>
-      <div className="flex gap-2 flex-wrap" style={{ marginBottom: 20 }}>
-        <select style={selectStyle} value={searchParams.get("category") ?? "all"} onChange={(e) => setFilter("category", e.target.value)}>
+      <div className={s.filterRow}>
+        <select className={s.field} value={searchParams.get("category") ?? "all"} onChange={(e) => setFilter("category", e.target.value)}>
           <option value="all">{UI.category}: {UI.all}</option>
           {CONTENT_CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
         </select>
-        <select style={selectStyle} value={searchParams.get("campaign") ?? "all"} onChange={(e) => setFilter("campaign", e.target.value)}>
+        <select className={s.field} value={searchParams.get("campaign") ?? "all"} onChange={(e) => setFilter("campaign", e.target.value)}>
           <option value="all">{UI.campaign}: {UI.all}</option>
           {filterOptions.campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select style={selectStyle} value={searchParams.get("format") ?? "all"} onChange={(e) => setFilter("format", e.target.value)}>
+        <select className={s.field} value={searchParams.get("format") ?? "all"} onChange={(e) => setFilter("format", e.target.value)}>
           <option value="all">{UI.format}: {UI.all}</option>
           {filterOptions.formats.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>
       </div>
 
       {rows.length === 0 ? (
-        <div className="panel">
-          <div className="panel-pad" style={{ textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }}>{UI.noLiveMatch}</div>
-        </div>
+        <div className={`${k.empty} ${s.emptyC}`}>{UI.noLiveMatch}</div>
       ) : (
-        <div className="space-y-8">
+        <div className={s.stackLg}>
           {groups.map(([category, items]) => (
             <section key={category}>
-              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", marginBottom: 10 }}>
-                {CATEGORY_LABEL[category as ContentCategory] ?? category}
-                <span className="font-mono-ndt" style={{ marginLeft: 8, fontSize: 12, color: "var(--fg-faint)" }}>{items.length}</span>
-              </h2>
-              <div className="space-y-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(320px, 100%), 1fr))", gap: 12 }}>
+              <div className={k.groupHead}>
+                <h2 className={k.groupTitle}>{CATEGORY_LABEL[category as ContentCategory] ?? category}</h2>
+                <span className={`${k.muted} ${k.num}`}>{items.length}</span>
+              </div>
+              <div>
                 {items.map((row) => <Card key={row.id} row={row} />)}
               </div>
             </section>
@@ -162,21 +150,19 @@ export function LibraryClient({
         </div>
       )}
       {(page > 1 || hasMore) && (
-        <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
+        <div className={k.pager}>
           <button
             type="button"
-            className="btn sm"
-            style={{ minHeight: 44, opacity: page > 1 ? 1 : 0.5 }}
+            className={k.btn}
             disabled={page <= 1}
             onClick={() => setFilter("page", String(page - 1))}
           >
             {UI.pagePrev}
           </button>
-          <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>{UI.pageLabel(page)}</span>
+          <span className={k.muted}>{UI.pageLabel(page)}</span>
           <button
             type="button"
-            className="btn sm"
-            style={{ minHeight: 44, opacity: hasMore ? 1 : 0.5 }}
+            className={k.btn}
             disabled={!hasMore}
             onClick={() => setFilter("page", String(page + 1))}
           >

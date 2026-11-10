@@ -7,6 +7,8 @@ import { UI } from "@/lib/content/labels";
 import { A } from "@/lib/assistant/labels";
 import type { DecisionQueue, DecisionRow } from "@/lib/content/queries";
 import { setContentCheck } from "@/app/actions/content";
+import k from "@/components/astryx/page.module.css";
+import s from "../marketing.module.css";
 
 const SOURCE_LABEL: Record<string, string> = {
   rule: UI.decisionsFromRule,
@@ -40,51 +42,51 @@ function Row({ row }: { row: DecisionRow }) {
   return (
     <li
       id={String(row.checkId)}
-      className="panel-pad"
-      style={{ borderBottom: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 8, scrollMarginTop: 80 }}
+      className={k.row}
+      data-u={urgent ? "overdue" : undefined}
+      style={{ scrollMarginTop: 80, alignItems: "start" }}
     >
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="badge-ds slate">{sourceLabel(row.source)}</span>
-        <span style={{ fontSize: 12, fontWeight: 500, color: urgent ? "var(--coral)" : "var(--fg-mute)" }}>
+      <span className={k.bar} />
+      <div className={k.cell}>
+        <div className={k.nameLine}>
+          <span className="badge-ds slate">{sourceLabel(row.source)}</span>
+        </div>
+        <div className={k.strong} style={{ lineHeight: 1.4 }}>
+          {row.question}
+        </div>
+        <div className={k.muted}>
+          {UI.decisionsBlocks}{" "}
+          <Link href={`/marketing/${row.item.id}`} className={k.link}>
+            {row.item.title}
+          </Link>
+        </div>
+      </div>
+
+      <div className={k.cell}>
+        <textarea
+          aria-label={row.question}
+          placeholder={UI.decisionsAnswerPlaceholder}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={2}
+          className={s.field}
+          style={{ width: "100%", resize: "vertical" }}
+        />
+        {error && <p className={k.muted} style={{ color: "var(--coral)", margin: 0 }}>{error}</p>}
+      </div>
+
+      <div className={k.cell}>
+        <span className={k.muted} style={urgent ? { color: "var(--coral)", fontWeight: 500 } : undefined}>
           {UI.decisionsWaited(row.daysWaiting)}
         </span>
       </div>
 
-      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)", lineHeight: 1.4 }}>
-        {row.question}
-      </div>
-
-      <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>
-        {UI.decisionsBlocks}{" "}
-        <Link href={`/marketing/${row.item.id}`} style={{ color: "var(--fg-mute)" }}>
-          {row.item.title}
-        </Link>
-      </div>
-
-      <textarea
-        aria-label={row.question}
-        placeholder={UI.decisionsAnswerPlaceholder}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={2}
-        style={{
-          width: "100%", background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
-          borderRadius: 6, padding: "8px 10px", fontSize: 13, color: "var(--fg)", resize: "vertical",
-        }}
-      />
-
-      {error && <p style={{ fontSize: 12, color: "var(--coral)" }}>{error}</p>}
-
-      <div className="flex items-center gap-2">
+      <div className={k.cellEnd} style={{ flexWrap: "wrap" }}>
         <button
           type="button"
           disabled={disabled}
           onClick={() => submit("resolved")}
-          style={{
-            minHeight: 32, padding: "0 12px", borderRadius: 6, fontSize: 13, fontWeight: 500,
-            cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1,
-            background: "var(--mint-soft)", color: "var(--mint-fg)", border: "1px solid var(--mint-line)",
-          }}
+          className={`${k.btn} ${k.btnPrimary}`}
         >
           {UI.checkResolve}
         </button>
@@ -92,21 +94,14 @@ function Row({ row }: { row: DecisionRow }) {
           type="button"
           disabled={disabled}
           onClick={() => submit("waived")}
-          style={{
-            minHeight: 32, padding: "0 12px", borderRadius: 6, fontSize: 13, fontWeight: 500,
-            cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1,
-            background: "var(--bg-raised)", color: "var(--fg-mute)", border: "1px solid var(--line-soft)",
-          }}
+          className={k.btn}
         >
           {UI.checkWaive}
         </button>
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent("assistant:focus", { detail: { itemId: row.item.id } }))}
-          style={{
-            minHeight: 32, padding: "0 12px", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer",
-            background: "var(--bg-raised)", color: "var(--fg-mute)", border: "1px solid var(--line-soft)",
-          }}
+          className={k.btn}
         >
           {A.askAbout}
         </button>
@@ -118,12 +113,12 @@ function Row({ row }: { row: DecisionRow }) {
 function Group({ title, rows }: { title: string; rows: DecisionRow[] }) {
   if (rows.length === 0) return null;
   return (
-    <section style={{ marginBottom: 24 }}>
-      <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--fg)" }}>{title}</h2>
-        <span className="badge-ds" style={{ color: "var(--fg-mute)" }}>{UI.decisionsOpenCount(rows.length)}</span>
+    <section className={k.group}>
+      <div className={k.groupHead}>
+        <h2 className={k.groupTitle}>{title}</h2>
+        <span className="badge-ds" style={{ color: "var(--color-text-secondary)" }}>{UI.decisionsOpenCount(rows.length)}</span>
       </div>
-      <ul className="panel" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {rows.map((row) => (
           <Row key={row.checkId} row={row} />
         ))}
@@ -135,18 +130,14 @@ function Group({ title, rows }: { title: string; rows: DecisionRow[] }) {
 export function DecisionsClient({ queue }: { queue: DecisionQueue }) {
   if (queue.total === 0) {
     return (
-      <div className="panel">
-        <div className="panel-pad" style={{ textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }}>
-          {UI.decisionsEmpty}
-        </div>
-      </div>
+      <div className={`${k.empty} ${s.emptyC}`}>{UI.decisionsEmpty}</div>
     );
   }
 
   return (
     <div>
       {queue.truncated && (
-        <p style={{ fontSize: 12, color: "var(--fg-mute)", marginBottom: 16 }}>{UI.decisionsTruncated}</p>
+        <p className={k.muted} style={{ marginBottom: 16 }}>{UI.decisionsTruncated}</p>
       )}
       <Group title={UI.decisionsGroupAron} rows={queue.aron} />
       <Group title={UI.decisionsGroupPeter} rows={queue.peter} />

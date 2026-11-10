@@ -25,6 +25,8 @@ import { DRAFT_STATUSES, MAX_STEP, canEdit, canApprove, canSend, withFooter, typ
 import { canMarkSent, canMarkReplied, REPLY_TYPES, type ReplyType } from "@/lib/outreach/campaign";
 import { REPLY_TYPE_LABEL } from "@/lib/outreach/labels";
 import { MarkSentControl } from "./DueToday";
+import k from "@/components/astryx/page.module.css";
+import s from "./outreach.module.css";
 
 type Sender = { id: number; name: string };
 
@@ -45,13 +47,13 @@ const STATUS_LABEL: Record<DraftStatus, string> = {
 };
 
 const STATUS_TONE: Record<DraftStatus, string> = {
-  draft: "var(--fg-mute)",
-  approved: "var(--indigo)",
-  sending: "var(--indigo)",
+  draft: "var(--color-text-secondary)",
+  approved: "var(--color-accent)",
+  sending: "var(--color-accent)",
   sent: "var(--mint)",
   failed: "var(--coral)",
   replied: "var(--sky)",
-  cancelled: "var(--fg-faint)",
+  cancelled: "var(--color-text-secondary)",
 };
 
 function StatusBadge({ status }: { status: DraftStatus }) {
@@ -60,7 +62,7 @@ function StatusBadge({ status }: { status: DraftStatus }) {
     <span
       style={{
         fontSize: 12, fontWeight: 500, color, padding: "2px 8px", borderRadius: 999,
-        border: `1px solid ${color}`, background: "var(--bg-raised)", whiteSpace: "nowrap",
+        border: `1px solid ${color}`, background: "var(--color-background-card)", whiteSpace: "nowrap",
       }}
     >
       {STATUS_LABEL[status]}
@@ -282,75 +284,18 @@ export default function OutreachQueue({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Outreach piszkozatok</h1>
-          <p className="page-sub">Kampányonként megírt emailek jóváhagyása és küldése</p>
-        </div>
-        <button
-          onClick={() => setSettingsOpen((v) => !v)}
-          style={{
-            fontSize: 14, color: "var(--fg-mute)", background: "var(--bg-raised)",
-            border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px", cursor: "pointer",
-          }}
-        >
-          {settingsOpen ? "Beállítások bezárása" : "Beállítások"}
-        </button>
-      </div>
-
-      {settingsOpen && (
-        <div className="panel panel-pad" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <FormField label="Válaszcím (reply-to)" hint="Ide érkeznek a válaszok. Hagyd üresen, ha nem kell.">
-            <input
-              className="input-ds"
-              type="email"
-              value={replyTo}
-              onChange={(e) => setReplyTo(e.target.value)}
-              placeholder="pl. sales@ceged.hu"
-              style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px" }}
-            />
-          </FormField>
-          <FormField label="Lábléc (leiratkozási és jogi közlemény)" full>
-            <textarea
-              className="input-ds"
-              value={footer}
-              onChange={(e) => setFooter(e.target.value)}
-              rows={2}
-              placeholder={FOOTER_PLACEHOLDER}
-              style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical" }}
-            />
-            <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--amber)", marginTop: 4 }}>
-              <AlertTriangle size={14} aria-hidden="true" /> Ideiglenes szöveg: Áron még nem hagyta jóvá a végleges láblécet.
-            </p>
-          </FormField>
-          <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 12 }}>
-            <button
-              onClick={onSaveSettings}
-              disabled={settingsSaving}
-              style={{
-                fontSize: 14, fontWeight: 500, color: "var(--indigo)", background: "var(--indigo-soft)",
-                border: "1px solid var(--indigo-line)", borderRadius: 8, padding: "8px 16px",
-                cursor: settingsSaving ? "default" : "pointer", opacity: settingsSaving ? 0.5 : 1,
-              }}
-            >
-              {settingsSaving ? "Mentés…" : "Mentés"}
-            </button>
-            {settingsError && <span style={{ fontSize: 14, color: "var(--coral)" }}>{settingsError}</span>}
-          </div>
-        </div>
-      )}
-
-      <div className="panel panel-pad" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+    <div className={s.stack}>
+      <div className={s.toolbar}>
         <select
-          className="input-ds"
+          className={s.field}
+          // PROPOSAL copy
+          aria-label="Kampány"
           value={campaignFilter}
           onChange={(e) => {
             const v = e.target.value;
             setCampaignFilter(v);
             refetch({ campaign: v, step: stepFilter, status: statusFilter });
           }}
-          style={{ fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px" }}
         >
           <option value="">Minden kampány</option>
           {campaigns.map((c) => (
@@ -358,14 +303,15 @@ export default function OutreachQueue({
           ))}
         </select>
         <select
-          className="input-ds"
+          className={s.field}
+          // PROPOSAL copy
+          aria-label="Lépés"
           value={stepFilter}
           onChange={(e) => {
             const v = e.target.value;
             setStepFilter(v);
             refetch({ campaign: campaignFilter, step: v, status: statusFilter });
           }}
-          style={{ fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px" }}
         >
           <option value="">Minden lépés</option>
           {Array.from({ length: MAX_STEP }, (_, i) => i + 1).map((s) => (
@@ -373,14 +319,15 @@ export default function OutreachQueue({
           ))}
         </select>
         <select
-          className="input-ds"
+          className={s.field}
+          // PROPOSAL copy
+          aria-label="Állapot"
           value={statusFilter}
           onChange={(e) => {
             const v = e.target.value;
             setStatusFilter(v);
             refetch({ campaign: campaignFilter, step: stepFilter, status: v });
           }}
-          style={{ fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "7px 10px" }}
         >
           <option value="">Minden állapot</option>
           {DRAFT_STATUSES.map((s) => (
@@ -391,37 +338,76 @@ export default function OutreachQueue({
         <div style={{ flex: 1 }} />
 
         <button
+          onClick={() => setSettingsOpen((v) => !v)}
+          className={k.btn}
+        >
+          {settingsOpen ? "Beállítások bezárása" : "Beállítások"}
+        </button>
+        <button
           onClick={onApproveAll}
           disabled={!campaignFilter || approvingAll}
           title={!campaignFilter ? "Válassz kampányt a szűrőben" : undefined}
-          style={{
-            fontSize: 14, fontWeight: 500, color: "var(--indigo)", background: "var(--indigo-soft)",
-            border: "1px solid var(--indigo-line)", borderRadius: 8, padding: "8px 16px",
-            cursor: !campaignFilter || approvingAll ? "default" : "pointer",
-            opacity: !campaignFilter || approvingAll ? 0.5 : 1,
-          }}
+          className={`${k.btn} ${k.btnPrimary}`}
         >
           {approvingAll ? "Jóváhagyás…" : "Összes jóváhagyása"}
         </button>
       </div>
 
+      {settingsOpen && (
+        <div className={`${s.panelPad} ${s.settingsGrid}`}>
+          <FormField label="Válaszcím (reply-to)" hint="Ide érkeznek a válaszok. Hagyd üresen, ha nem kell.">
+            <input
+              className={s.field}
+              type="email"
+              value={replyTo}
+              onChange={(e) => setReplyTo(e.target.value)}
+              placeholder="pl. sales@ceged.hu"
+              style={{ width: "100%" }}
+            />
+          </FormField>
+          <FormField label="Lábléc (leiratkozási és jogi közlemény)" full>
+            <textarea
+              className={s.field}
+              value={footer}
+              onChange={(e) => setFooter(e.target.value)}
+              rows={2}
+              placeholder={FOOTER_PLACEHOLDER}
+              style={{ width: "100%" }}
+            />
+            <p className={k.muted} style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--amber)", marginTop: 4 }}>
+              <AlertTriangle size={14} aria-hidden="true" /> Ideiglenes szöveg: Áron még nem hagyta jóvá a végleges láblécet.
+            </p>
+          </FormField>
+          <div className={s.settingsFoot}>
+            <button
+              onClick={onSaveSettings}
+              disabled={settingsSaving}
+              className={`${k.btn} ${k.btnPrimary}`}
+            >
+              {settingsSaving ? "Mentés…" : "Mentés"}
+            </button>
+            {settingsError && <span className={k.muted} style={{ color: "var(--coral)" }}>{settingsError}</span>}
+          </div>
+        </div>
+      )}
+
       {truncated && (
-        <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-mute)", background: "var(--bg-raised)" }}>
+        <div className={`${s.panelPad} ${k.muted}`}>
           Csak az első 200 piszkozat látszik ennél a szűrésnél: szűrj tovább (kampány, lépés, állapot) a többi megtekintéséhez.
         </div>
       )}
 
       {loading ? (
-        <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center" }}>
+        <div className={`${k.empty} ${s.emptyC}`}>
           Betöltés…
         </div>
       ) : drafts.length === 0 ? (
-        <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center" }}>
+        <div className={`${k.empty} ${s.emptyC}`}>
           A szűrőnek egyetlen piszkozat sem felel meg
         </div>
       ) : (
-        <div className="panel" style={{ padding: 0, overflow: "hidden" }}>
-          {drafts.map((row, i) => {
+        <div>
+          {drafts.map((row) => {
             const expanded = expandedId === row.id;
             const edit = drafted[row.id];
             const bodyIsLoading = !!bodyLoading[row.id];
@@ -429,40 +415,41 @@ export default function OutreachQueue({
             const busy = busyId === row.id;
             const targetable = !["sent", "replied", "cancelled"].includes(row.status);
             return (
-              <div key={row.id} style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-soft)" }}>
+              <div key={row.id} className={s.draftItem}>
                 <div
                   onClick={() => toggleExpand(row)}
-                  className="tbl-row"
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer" }}
+                  className={k.rowCompact}
+                  data-u={row.status === "sent" || row.status === "replied" ? "done" : undefined}
+                  style={{ cursor: "pointer" }}
                 >
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <span className={k.bar} />
+                  <div className={k.cell}>
+                    <span className={`${k.name} ${s.nameShrink}`}>
                       {row.companyName}
-                      {row.personName && <span style={{ color: "var(--fg-faint)" }}> · {row.personName}</span>}
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {row.personName && <span className={k.muted}> · {row.personName}</span>}
+                    </span>
+                    <span className={k.muted}>
                       {row.campaign} · {row.step}. lépés · {row.subject}
-                    </div>
+                    </span>
                   </div>
-                  <StatusBadge status={row.status} />
                   {row.status === "replied" && (
-                    <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+                    <span className={k.muted}>
                       {REPLY_TYPE_LABEL[(row.replyType as ReplyType) ?? "unknown"]}
                     </span>
                   )}
+                  <StatusBadge status={row.status} />
                 </div>
 
                 <div
                   onClick={(e) => e.stopPropagation()}
-                  style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10, padding: "0 16px 10px" }}
+                  className={s.draftControls}
                 >
                   <FormField label="Küldő">
                     <select
-                      className="input-ds"
+                      className={s.field}
                       value={row.senderUserId ?? ""}
                       disabled={!targetable || busy}
                       onChange={(e) => onSetTarget(row, { senderUserId: e.target.value ? parseInt(e.target.value, 10) : null })}
-                      style={{ fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 8px" }}
                     >
                       <option value="">Nincs kiválasztva</option>
                       {senders.map((s) => (
@@ -473,7 +460,7 @@ export default function OutreachQueue({
                   <FormField label="Hullám">
                     <input
                       key={`wave-${row.id}-${row.wave ?? ""}`}
-                      className="input-ds"
+                      className={s.field}
                       type="number"
                       min={1}
                       defaultValue={row.wave ?? ""}
@@ -483,11 +470,11 @@ export default function OutreachQueue({
                         if (v === row.wave) return;
                         onSetTarget(row, { wave: v });
                       }}
-                      style={{ width: 70, fontSize: 13, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 8px" }}
+                      style={{ width: 80 }}
                     />
                   </FormField>
                   {row.dueAt && row.status !== "sent" && (
-                    <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+                    <span className={`${k.muted} ${k.num}`}>
                       Esedékes: {new Date(row.dueAt).toLocaleString("hu-HU")}
                     </span>
                   )}
@@ -495,11 +482,7 @@ export default function OutreachQueue({
                     onClick={() => onCopySubject(row)}
                     disabled={!!row.templateBlockedReason}
                     title={row.templateBlockedReason ?? undefined}
-                    style={{
-                      fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
-                      borderRadius: 8, padding: "6px 10px", cursor: row.templateBlockedReason ? "default" : "pointer",
-                      opacity: row.templateBlockedReason ? 0.5 : 1,
-                    }}
+                    className={k.btn}
                   >
                     {copied?.id === row.id && copied.kind === "subject" ? "Másolva" : "Tárgy másolása"}
                   </button>
@@ -507,111 +490,83 @@ export default function OutreachQueue({
                     onClick={() => onCopyBody(row)}
                     disabled={!savedFooter || !!row.templateBlockedReason}
                     title={row.templateBlockedReason ?? (savedFooter ? undefined : "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban")}
-                    style={{
-                      fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
-                      borderRadius: 8, padding: "6px 10px",
-                      cursor: savedFooter && !row.templateBlockedReason ? "pointer" : "default",
-                      opacity: savedFooter && !row.templateBlockedReason ? 1 : 0.5,
-                    }}
+                    className={k.btn}
                   >
                     {copied?.id === row.id && copied.kind === "body" ? "Másolva" : "Szöveg másolása"}
                   </button>
                 </div>
 
                 {row.templateBlockedReason && (
-                  <div style={{ padding: "0 16px 10px", fontSize: 13, color: "var(--amber)" }}>
+                  <div className={`${s.draftNote} ${k.muted}`} style={{ color: "var(--amber)" }}>
                     {row.templateBlockedReason}
                   </div>
                 )}
 
                 {row.status === "failed" && row.lastError && (
-                  <div style={{ padding: "0 16px 10px", fontSize: 14, color: "var(--coral)" }}>
+                  <div className={`${s.draftNote} ${k.muted}`} style={{ color: "var(--coral)" }}>
                     Küldési hiba: {row.lastError}
                   </div>
                 )}
 
                 {rowInfo[row.id]?.kind === "replied" && (
-                  <div style={{ padding: "0 16px 10px", fontSize: 14, color: "var(--fg-mute)" }}>
-                    <Link href={`/leads/${rowInfo[row.id].leadId}`} style={{ color: "var(--indigo)" }}>Lead létrehozva</Link>
+                  <div className={`${s.draftNote} ${k.muted}`}>
+                    <Link href={`/leads/${rowInfo[row.id].leadId}`} className={k.link}>Lead létrehozva</Link>
                   </div>
                 )}
 
                 {expanded && (
-                  <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div className={s.draftExpanded}>
                     <FormField label="Tárgy">
                       <input
-                        className="input-ds"
+                        className={s.field}
                         value={edit?.subject ?? row.subject}
                         disabled={!editable}
                         onChange={(e) =>
                           setDrafted((d) => ({ ...d, [row.id]: { subject: e.target.value, body: d[row.id]?.body ?? "" } }))
                         }
-                        style={{
-                          width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)",
-                          border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px",
-                          opacity: editable ? 1 : 0.6,
-                        }}
+                        style={{ width: "100%", opacity: editable ? 1 : 0.6 }}
                       />
                     </FormField>
                     <FormField label="Szöveg">
                       {bodyIsLoading ? (
-                        <div style={{ fontSize: 14, color: "var(--fg-faint)", padding: "8px 10px" }}>Betöltés…</div>
+                        <div className={k.muted} style={{ padding: "8px 10px" }}>Betöltés…</div>
                       ) : (
                         <textarea
-                          className="input-ds"
+                          className={s.field}
                           value={edit?.body ?? ""}
                           disabled={!editable}
                           rows={6}
                           onChange={(e) =>
                             setDrafted((d) => ({ ...d, [row.id]: { subject: d[row.id]?.subject ?? row.subject, body: e.target.value } }))
                           }
-                          style={{
-                            width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)",
-                            border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical",
-                            opacity: editable ? 1 : 0.6,
-                          }}
+                          style={{ width: "100%", opacity: editable ? 1 : 0.6 }}
                         />
                       )}
                     </FormField>
 
                     {rowError[row.id] && (
-                      <div style={{ fontSize: 14, color: "var(--coral)" }}>{rowError[row.id]}</div>
+                      <div className={k.muted} style={{ color: "var(--coral)" }}>{rowError[row.id]}</div>
                     )}
 
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div className={s.btnRow}>
                       <button
                         onClick={() => onSave(row)}
                         disabled={!editable || busy || bodyIsLoading}
-                        style={{
-                          fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)",
-                          border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px",
-                          cursor: !editable || busy || bodyIsLoading ? "default" : "pointer",
-                          opacity: !editable || busy || bodyIsLoading ? 0.5 : 1,
-                        }}
+                        className={k.btn}
                       >
                         Mentés
                       </button>
                       <button
                         onClick={() => onApprove(row)}
                         disabled={!canApprove(row.status) || busy}
-                        style={{
-                          fontSize: 14, fontWeight: 500, color: "var(--indigo)", background: "var(--indigo-soft)",
-                          border: "1px solid var(--indigo-line)", borderRadius: 8, padding: "8px 14px",
-                          cursor: !canApprove(row.status) || busy ? "default" : "pointer",
-                          opacity: !canApprove(row.status) || busy ? 0.5 : 1,
-                        }}
+                        className={k.btn}
                       >
                         Jóváhagyás
                       </button>
                       <button
                         onClick={() => onSend(row)}
                         disabled={!canSend(row.status) || busy}
-                        style={{
-                          fontSize: 14, fontWeight: 600, color: "var(--mint)", background: "var(--mint-soft)",
-                          border: "1px solid var(--mint-line)", borderRadius: 8, padding: "8px 14px",
-                          cursor: !canSend(row.status) || busy ? "default" : "pointer",
-                          opacity: !canSend(row.status) || busy ? 0.5 : 1,
-                        }}
+                        className={`${k.btn} ${k.btnPrimary}`}
                       >
                         Küldés
                       </button>
@@ -621,10 +576,7 @@ export default function OutreachQueue({
                       {canMarkReplied(row.status) && replyOpenId !== row.id && (
                         <button
                           onClick={() => openReplyForm(row)}
-                          style={{
-                            fontSize: 14, fontWeight: 500, color: "var(--sky)", background: "var(--bg-raised)",
-                            border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px", cursor: "pointer",
-                          }}
+                          className={k.btn}
                         >
                           Válasz jött
                         </button>
@@ -632,13 +584,12 @@ export default function OutreachQueue({
                     </div>
 
                     {canMarkReplied(row.status) && replyOpenId === row.id && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 420 }}>
+                      <div className={s.replyForm}>
                         <FormField label="Válasz típusa">
                           <select
-                            className="input-ds"
+                            className={s.field}
                             value={replyType}
                             onChange={(e) => setReplyType(e.target.value as ReplyType)}
-                            style={{ fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px" }}
                           >
                             <option value="">Válassz…</option>
                             {REPLY_TYPES.map((t) => (
@@ -648,32 +599,25 @@ export default function OutreachQueue({
                         </FormField>
                         <FormField label="Megjegyzés (nem kötelező)">
                           <textarea
-                            className="input-ds"
+                            className={s.field}
                             value={replyNote}
                             onChange={(e) => setReplyNote(e.target.value)}
                             rows={2}
-                            style={{ width: "100%", fontSize: 14, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 10px", resize: "vertical" }}
+                            style={{ width: "100%" }}
                           />
                         </FormField>
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div className={s.btnRow}>
                           <button
                             onClick={() => onMarkReplied(row)}
                             disabled={!replyType || replyPending}
-                            style={{
-                              fontSize: 14, fontWeight: 500, color: "var(--sky)", background: "var(--bg-raised)",
-                              border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px",
-                              cursor: !replyType || replyPending ? "default" : "pointer", opacity: !replyType || replyPending ? 0.5 : 1,
-                            }}
+                            className={`${k.btn} ${k.btnPrimary}`}
                           >
                             Rögzítés
                           </button>
                           <button
                             onClick={() => setReplyOpenId(null)}
                             disabled={replyPending}
-                            style={{
-                              fontSize: 14, color: "var(--fg-soft)", background: "var(--bg-raised)",
-                              border: "1px solid var(--line-soft)", borderRadius: 8, padding: "8px 14px", cursor: "pointer",
-                            }}
+                            className={k.btn}
                           >
                             Mégse
                           </button>

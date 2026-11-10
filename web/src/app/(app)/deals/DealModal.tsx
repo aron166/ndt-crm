@@ -140,8 +140,8 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
 
           {/* Dynamic custom fields */}
           {pipeline.customFields.length > 0 && (
-            <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>
+            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--color-text-secondary)", marginBottom: 10 }}>
                 Egyéni mezők
               </div>
               <div className="space-y-3">
@@ -164,7 +164,7 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
                           name={`cf_${f.key}`}
                           defaultValue={savedVal}
                           required={f.required}
-                          style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none" }}
+                          style={{ width: "100%", padding: "6px 8px", background: "var(--color-background-card)", border: "1px solid var(--color-border-emphasized)", borderRadius: "var(--radius-element)", color: "var(--color-text-primary)", fontSize: 14, minHeight: 40 }}
                         >
                           <option value="">-</option>
                           {opts.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -175,7 +175,7 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
                           {opts.map((o) => {
                             const checked = savedVal.split(",").includes(o);
                             return (
-                              <label key={o} className="flex items-center gap-1.5 cursor-pointer" style={{ fontSize: 14, color: "var(--fg-soft)" }}>
+                              <label key={o} className="flex items-center gap-1.5 cursor-pointer" style={{ fontSize: 14, color: "var(--color-text-primary)" }}>
                                 <input type="checkbox" name={`cf_${f.key}[]`} value={o} defaultChecked={checked} />
                                 {o}
                               </label>
@@ -190,7 +190,7 @@ export function DealModal({ open, onClose, pipeline, initial }: DealModalProps) 
             </div>
           )}
 
-          {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
+          {error && <p className="text-sm" style={{ color: "var(--color-text-error)" }}>{error}</p>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>Mégse</Button>

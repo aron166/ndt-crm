@@ -11,12 +11,8 @@ import { STATUS_LABELS, statusTone, CONTENT_STATUSES } from "@/lib/marketing/typ
 import type { InboxSections, InboxRow } from "@/lib/content/queries";
 import { ReviewerSettings } from "./ReviewerSettings";
 import { BulkBar } from "./BulkBar";
-
-const selectStyle: React.CSSProperties = {
-  padding: "6px 10px", fontSize: 14, minHeight: 44, maxWidth: "100%",
-  background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
-  borderRadius: 6, color: "var(--fg)", outline: "none",
-};
+import k from "@/components/astryx/page.module.css";
+import s from "./marketing.module.css";
 
 const VERDICT_COLOR: Record<Verdict, string> = {
   approve: "var(--mint)",
@@ -46,20 +42,20 @@ export function FilterBar({
   }
 
   return (
-    <div className="flex gap-2 flex-wrap" style={{ marginBottom: 20 }}>
-      <select style={selectStyle} value={searchParams.get("category") ?? "all"} onChange={(e) => setFilter("category", e.target.value)}>
+    <div className={s.filterRow}>
+      <select className={s.field} value={searchParams.get("category") ?? "all"} onChange={(e) => setFilter("category", e.target.value)}>
         <option value="all">{UI.category}: {UI.all}</option>
         {CONTENT_CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
       </select>
-      <select style={selectStyle} value={searchParams.get("campaign") ?? "all"} onChange={(e) => setFilter("campaign", e.target.value)}>
+      <select className={s.field} value={searchParams.get("campaign") ?? "all"} onChange={(e) => setFilter("campaign", e.target.value)}>
         <option value="all">{UI.campaign}: {UI.all}</option>
         {filterOptions.campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
-      <select style={selectStyle} value={searchParams.get("format") ?? "all"} onChange={(e) => setFilter("format", e.target.value)}>
+      <select className={s.field} value={searchParams.get("format") ?? "all"} onChange={(e) => setFilter("format", e.target.value)}>
         <option value="all">{UI.format}: {UI.all}</option>
         {filterOptions.formats.map((f) => <option key={f} value={f}>{f}</option>)}
       </select>
-      <select style={selectStyle} value={searchParams.get("status") ?? "all"} onChange={(e) => setFilter("status", e.target.value)}>
+      <select className={s.field} value={searchParams.get("status") ?? "all"} onChange={(e) => setFilter("status", e.target.value)}>
         <option value="all">{UI.status}: {UI.all}</option>
         {CONTENT_STATUSES.filter((s) => s !== "archived").map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
       </select>
@@ -86,16 +82,16 @@ export function Pager({
   }
 
   return (
-    <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
+    <div className={k.pager}>
       <button
-        type="button" className="btn sm" style={{ minHeight: 44, opacity: page > 1 ? 1 : 0.5 }}
+        type="button" className={k.btn}
         disabled={page <= 1} onClick={() => go(page - 1)}
       >
         {UI.pagePrev}
       </button>
-      <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>{UI.pageLabel(page)}</span>
+      <span className={k.muted}>{UI.pageLabel(page)}</span>
       <button
-        type="button" className="btn sm" style={{ minHeight: 44, opacity: hasMore ? 1 : 0.5 }}
+        type="button" className={k.btn}
         disabled={!hasMore} onClick={() => go(page + 1)}
       >
         {UI.pageNext}
@@ -127,93 +123,90 @@ function Row({
 }) {
   const router = useRouter();
   const [restoring, setRestoring] = useState(false);
+  const urgency = item.overdue ? "overdue" : item.status === "live" ? "done" : undefined;
   return (
-    <div className="flex items-start gap-2">
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={() => onToggle(item.id)}
-        aria-label={item.title}
-        style={{ marginTop: 18, width: 18, height: 18, flexShrink: 0 }}
-      />
-      <Link
-        href={`/marketing/${item.id}`}
-        className="block"
-        style={{
-          flex: 1, minWidth: 0,
-          background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
-          borderRadius: 8, padding: "14px 16px", textDecoration: "none",
-          minHeight: 44,
-        }}
-      >
-        <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 6 }}>
-          <span style={{ fontSize: 12, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+    <div className={k.row} data-u={urgency}>
+      <span className={k.bar} />
+      <div className={k.cell}>
+        <div className={k.nameLine}>
+          <Link href={`/marketing/${item.id}`} className={`${k.name} ${s.rowLink}`}>
+            {item.title}
+          </Link>
+        </div>
+        <div className={k.meta}>
+          <span className={k.muted}>
             {CATEGORY_LABEL[item.category as ContentCategory] ?? item.category}
           </span>
           <StatusChip status={item.status} />
           {item.campaign && (
-            <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>{item.campaign.name}</span>
+            <span className={k.muted}>{item.campaign.name}</span>
           )}
           {item.versionNumber !== null && (
-            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+            <span className={`${k.muted} ${k.num}`}>
               {UI.version(item.versionNumber)}
-            </span>
-          )}
-          {item.overdue && item.waitingSince && (
-            <span
-              style={{
-                fontSize: 12, color: "var(--coral)", background: "var(--coral-soft)",
-                borderRadius: 20, padding: "1px 8px", fontWeight: 500,
-              }}
-            >
-              {UI.waitingDays(daysSince(item.waitingSince))}
             </span>
           )}
           {item.openChecks > 0 && (
             <span className="badge-ds amber">{UI.checksOpen(item.openChecks)}</span>
           )}
           {item.selfScore !== null && (
-            <span className="badge-ds" style={{ color: "var(--fg-mute)" }}>
+            <span className="badge-ds" style={{ color: "var(--color-text-secondary)" }}>
               {UI.selfScoreShort(Math.round(item.selfScore * 100))}
             </span>
           )}
         </div>
-        <div style={{ fontSize: 15, fontWeight: 500, color: "var(--fg)", marginBottom: 3 }}>
-          {item.title}
-        </div>
+      </div>
+      <div className={k.cell}>
         {item.purpose && (
-          <p style={{ fontSize: 13, color: "var(--fg-mute)", marginBottom: 8 }}>{item.purpose}</p>
+          <p className={k.muted} style={{ margin: 0 }}>{item.purpose}</p>
         )}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className={k.meta}>
           {item.verdicts.map((v) => (
-            <span key={v.reviewerId} className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+            <span key={v.reviewerId} className={`${k.muted} ${s.verdict}`}>
               <span
+                className={s.dot}
                 style={{
-                  width: 8, height: 8, borderRadius: "50%",
-                  background: v.verdict ? VERDICT_COLOR[v.verdict as Verdict] : "var(--line-soft)",
+                  background: v.verdict ? VERDICT_COLOR[v.verdict as Verdict] : "var(--color-border-emphasized)",
                 }}
               />
               {v.reviewerName}: {v.verdict ? VERDICT_LABEL[v.verdict as Verdict] : UI.notYetReviewed}
             </span>
           ))}
         </div>
-      </Link>
-      {item.status === "archived" && (
-        <button
-          type="button"
-          className="btn sm"
-          style={{ marginTop: 14, minHeight: 44 }}
-          disabled={restoring}
-          onClick={async () => {
-            setRestoring(true);
-            const res = await restoreContent(item.id);
-            setRestoring(false);
-            if (res.ok) router.refresh();
-          }}
-        >
-          {UI.restore}
-        </button>
-      )}
+      </div>
+      <div className={k.cell}>
+        {item.overdue && item.waitingSince && (
+          <span className={`${k.strong} ${s.late}`}>
+            {UI.waitingDays(daysSince(item.waitingSince))}
+          </span>
+        )}
+      </div>
+      <div className={k.cellEnd}>
+        {item.status === "archived" && (
+          <button
+            type="button"
+            className={k.btn}
+            disabled={restoring}
+            onClick={async () => {
+              setRestoring(true);
+              const res = await restoreContent(item.id);
+              setRestoring(false);
+              if (res.ok) router.refresh();
+            }}
+          >
+            {UI.restore}
+          </button>
+        )}
+        <label className={s.checkHit}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggle(item.id)}
+            aria-label={item.title}
+            className={s.check}
+          />
+        </label>
+      </div>
     </div>
   );
 }
@@ -234,18 +227,18 @@ function GroupedByCategory({
   }, [items]);
 
   return (
-    <div className="space-y-5">
+    <div className={s.stack}>
       {groups.map(([category, groupItems]) => (
         <div key={category}>
-          <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-soft)" }}>
+          <div className={k.groupHead}>
+            <h3 className={k.groupTitle}>
               {CATEGORY_LABEL[category as ContentCategory] ?? category}
             </h3>
-            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+            <span className={`${k.muted} ${k.num}`}>
               {groupItems.length}
             </span>
           </div>
-          <div className="space-y-2">
+          <div>
             {groupItems.map((item) => (
               <Row key={item.id} item={item} selected={selected.has(item.id)} onToggle={onToggle} />
             ))}
@@ -264,23 +257,20 @@ function SectionHeader({
 }) {
   const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
   return (
-    <div className="flex items-center gap-2" style={{ padding: "6px 0" }}>
+    <div className={s.sectionHead}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2"
-        style={{ background: "transparent", border: "none", cursor: "pointer", minHeight: 44, textAlign: "left" }}
+        className={s.sectionToggle}
       >
-        {open ? <ChevronDown className="size-4" style={{ color: "var(--fg-faint)" }} /> : <ChevronRight className="size-4" style={{ color: "var(--fg-faint)" }} />}
-        <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{title}</h2>
-        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{count}</span>
+        {open ? <ChevronDown className="size-4" style={{ color: "var(--color-text-secondary)" }} /> : <ChevronRight className="size-4" style={{ color: "var(--color-text-secondary)" }} />}
+        <h2 className={k.groupTitle}>{title}</h2>
+        <span className={`${k.muted} ${k.num}`}>{count}</span>
       </button>
       {ids.length > 0 && (
         <button
           onClick={() => onSelectAll(ids)}
-          style={{
-            marginLeft: "auto", background: "transparent", border: "none", cursor: "pointer",
-            fontSize: 12, color: allSelected ? "var(--indigo)" : "var(--fg-faint)", minHeight: 44, padding: "0 6px",
-          }}
+          className={`${k.btn} ${s.selectAll}`}
+          aria-pressed={allSelected}
         >
           {UI.selectAll}
         </button>
@@ -341,20 +331,14 @@ export function InboxClient({
   return (
     <div className="mount">
       {sections.reviewers.length < 2 && (
-        <div
-          className="panel-pad"
-          style={{
-            background: "var(--coral-soft)", border: "1px solid var(--coral)",
-            borderRadius: 8, marginBottom: 16, color: "var(--coral)", fontSize: 14, fontWeight: 500,
-          }}
-        >
+        <div className={s.warn}>
           {UI.noReviewers}
         </div>
       )}
 
       <FilterBar filterOptions={filterOptions} />
 
-      <div className="space-y-8" style={{ paddingBottom: selected.size > 0 ? 72 : 0 }}>
+      <div className={s.stackLg} style={{ paddingBottom: selected.size > 0 ? 72 : 0 }}>
         {sections.isReviewer ? (
           <section>
             <SectionHeader
@@ -362,21 +346,13 @@ export function InboxClient({
               setOpen={() => {}} ids={sections.mine.map((r) => r.id)} selected={selected}
             />
             {sections.mine.length === 0 ? (
-              <div className="panel">
-                <div className="panel-pad" style={{ textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }}>
-                  {UI.nothingForYou}
-                </div>
-              </div>
+              <div className={`${k.empty} ${s.emptyC}`}>{UI.nothingForYou}</div>
             ) : (
               <GroupedByCategory items={sections.mine} selected={selected} onToggle={toggle} />
             )}
           </section>
         ) : (
-          <div className="panel">
-            <div className="panel-pad" style={{ textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }}>
-              {UI.notReviewer}
-            </div>
-          </div>
+          <div className={`${k.empty} ${s.emptyC}`}>{UI.notReviewer}</div>
         )}
 
         {!onlyMine && sections.otherReviewer.length > 0 && (
