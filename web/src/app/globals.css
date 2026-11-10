@@ -724,19 +724,20 @@ textarea.input-ds { padding-block: 8px; min-height: 80px; }
   border: 1px solid transparent;
   white-space: nowrap;
 }
-.badge-ds.dot::before {
+.badge-ds.dot::before, .badge-ds.amber::before, .badge-ds.mint::before, .badge-ds.coral::before {
   content: '';
   width: 6px; height: 6px; border-radius: 999px;
-  background: currentColor;
+  background: var(--badge-dot, var(--ui-text-muted));
   flex-shrink: 0;
 }
-.badge-ds.indigo { color: var(--ui-text); background: var(--ui-surface-muted); }
-.badge-ds.amber  { color: var(--ui-text); background: var(--ui-warning-surface); border-color: var(--ui-warning); }
-.badge-ds.mint   { color: var(--ui-text); background: var(--ui-success-surface); border-color: var(--ui-success); }
-.badge-ds.coral  { color: var(--ui-text); background: var(--ui-danger-surface); border-color: var(--ui-danger); }
-.badge-ds.sky    { color: var(--ui-text); background: var(--ui-info-surface); border-color: var(--ui-info-text); }
-.badge-ds.violet { color: var(--ui-text); background: var(--ui-info-surface); border-color: var(--ui-info-text); }
-.badge-ds.slate  { color: var(--ui-text-muted);   background: var(--ui-surface-muted); }
+/* Áron 2026-11-10: status is a quiet neutral chip; colour only where it means something (error, warning, success),
+   and then only on the small dot. Variant names stay so callers do not change. */
+.badge-ds, .badge-ds.indigo, .badge-ds.sky, .badge-ds.violet, .badge-ds.slate,
+.badge-ds.amber, .badge-ds.mint, .badge-ds.coral { color: var(--ui-text); background: var(--ui-surface-muted); border-color: transparent; }
+.badge-ds.slate { color: var(--ui-text-muted); }
+.badge-ds.amber { --badge-dot: var(--ui-warning); }
+.badge-ds.mint  { --badge-dot: var(--ui-success); }
+.badge-ds.coral { --badge-dot: var(--ui-danger); }
 
 .kpi {
   padding: 14px;
