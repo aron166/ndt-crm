@@ -20,11 +20,11 @@ export function dueInfo(due: Date | string | null, now: Date = new Date()): { re
   if (ms < 0) {
     const hours = Math.floor(-ms / 3_600_000);
     // PROPOSAL copy
-    return { rel: dayDiff <= -1 ? `${-dayDiff} napja lejárt` : `${Math.max(hours, 1)} órája lejárt`, color: "var(--coral)" };
+    return { rel: dayDiff <= -1 ? `${-dayDiff} napja lejárt` : `${Math.max(hours, 1)} órája lejárt`, color: "var(--ui-danger-text)" };
   }
-  if (dayDiff === 0) return { rel: "ma", color: "var(--amber)" };
+  if (dayDiff === 0) return { rel: "ma", color: "var(--ui-warning-text)" };
   // PROPOSAL copy
-  return { rel: dayDiff === 1 ? "holnap" : `${dayDiff} nap múlva`, color: "var(--fg-soft)" };
+  return { rel: dayDiff === 1 ? "holnap" : `${dayDiff} nap múlva`, color: "var(--ui-text)" };
 }
 
 export function NextStepStrip({
@@ -41,7 +41,7 @@ export function NextStepStrip({
   const [initial] = useState(status);
   const moved = status !== initial;
   const due = dueInfo(nextDue);
-  const urgency = !due ? "later" : due.color === "var(--coral)" ? "overdue" : due.color === "var(--amber)" ? "today" : "later";
+  const urgency = !due ? "later" : due.color === "var(--ui-danger-text)" ? "overdue" : due.color === "var(--ui-warning-text)" ? "today" : "later";
   return (
     <div key={status} data-u={urgency} className={`${s.strip} ${moved ? "strip-moved" : ""}`}>
       <div className={s.lead}>

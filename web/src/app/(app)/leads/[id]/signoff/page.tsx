@@ -32,7 +32,7 @@ export default async function SignOffPage({ params }: { params: Promise<{ id: st
         {lead.company?.name ?? "-"}{contactName ? `, ${contactName}` : ""}
       </p>
       {/* PROPOSAL copy */}
-      <p style={{ fontSize: 16, color: "var(--fg-mute)", margin: "0 0 16px" }}>
+      <p style={{ fontSize: 16, color: "var(--ui-text-muted)", margin: "0 0 16px" }}>
         Megrendelő: {order?.number ?? "nincs"}
       </p>
       <SignOffForm leadId={leadId} />

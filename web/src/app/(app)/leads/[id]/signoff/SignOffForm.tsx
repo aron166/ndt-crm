@@ -3,14 +3,12 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { signOffLeadAction } from "@/app/actions/documents";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
-const field: React.CSSProperties = {
-  width: "100%", minHeight: 48, padding: "10px 12px", fontSize: 18,
-  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-  borderRadius: 8, color: "var(--fg)",
-};
+const fieldClass = "min-h-12 text-lg"; // tablet signer: bigger touch targets
 const label: React.CSSProperties = { display: "block", fontSize: 16, fontWeight: 600, marginBottom: 6 };
-const btn: React.CSSProperties = { minHeight: 48, padding: "0 20px", fontSize: 18, borderRadius: 8, cursor: "pointer" };
 
 export function SignOffForm({ leadId }: { leadId: number }) {
   const [signerName, setSignerName] = useState("");
@@ -110,8 +108,8 @@ export function SignOffForm({ leadId }: { leadId: number }) {
         {/* PROPOSAL copy */}
         <p style={{ fontWeight: 600, margin: "0 0 16px" }}>Kész: {done.number}</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-          <a href={`/leads/${leadId}/documents/${done.id}/pdf`} target="_blank" rel="noreferrer" className="row-link" style={{ ...btn, display: "inline-flex", alignItems: "center", border: "1px solid var(--line-soft)" }}>PDF</a>
-          <Link href={`/leads/${leadId}`} className="row-link" style={{ ...btn, display: "inline-flex", alignItems: "center", border: "1px solid var(--line-soft)" }}>Vissza a laphoz</Link>
+          <a href={`/leads/${leadId}/documents/${done.id}/pdf`} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", size: "lg" })}>PDF</a>
+          <Link href={`/leads/${leadId}`} className={buttonVariants({ variant: "outline", size: "lg" })}>Vissza a laphoz</Link>
         </div>
       </div>
     );
@@ -122,12 +120,12 @@ export function SignOffForm({ leadId }: { leadId: number }) {
       <div>
         {/* PROPOSAL copy */}
         <label htmlFor="so-name" style={label}>Aláíró neve</label>
-        <input id="so-name" style={field} value={signerName} onChange={(e) => setSignerName(e.target.value)} autoComplete="off" />
+        <Input id="so-name" className={fieldClass} value={signerName} onChange={(e) => setSignerName(e.target.value)} autoComplete="off" />
       </div>
       <div>
         {/* PROPOSAL copy */}
         <label htmlFor="so-scope" style={label}>Elvégzett munka</label>
-        <textarea id="so-scope" rows={5} style={field} value={doneScope} onChange={(e) => setDoneScope(e.target.value)} />
+        <Textarea id="so-scope" rows={5} className={fieldClass} value={doneScope} onChange={(e) => setDoneScope(e.target.value)} />
       </div>
       <div>
         <label htmlFor="so-change" style={{ ...label, display: "flex", alignItems: "center", gap: 12, minHeight: 48 }}>
@@ -139,10 +137,10 @@ export function SignOffForm({ leadId }: { leadId: number }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {/* PROPOSAL copy */}
             <label htmlFor="so-change-text" style={label}>Módosítás leírása</label>
-            <input id="so-change-text" style={field} value={changeText} onChange={(e) => setChangeText(e.target.value)} />
+            <Input id="so-change-text" className={fieldClass} value={changeText} onChange={(e) => setChangeText(e.target.value)} />
             {/* PROPOSAL copy */}
             <label htmlFor="so-net" style={label}>Új nettó ár (Ft)</label>
-            <input id="so-net" type="number" inputMode="numeric" min={0} step={1} style={field} value={newNet} onChange={(e) => setNewNet(e.target.value)} />
+            <Input id="so-net" type="number" inputMode="numeric" min={0} step={1} className={fieldClass} value={newNet} onChange={(e) => setNewNet(e.target.value)} />
           </div>
         )}
       </div>
@@ -150,22 +148,22 @@ export function SignOffForm({ leadId }: { leadId: number }) {
         {/* PROPOSAL copy */}
         <p id="so-sig-help" style={label}>Kérjük, írja alá a keretben</p>
         {/* PROPOSAL copy */}
-        {resized && <p role="status" style={{ fontSize: 16, color: "var(--amber)", marginBottom: 6 }}>A képernyő elfordult: kérjük, írja alá újra.</p>}
+        {resized && <p role="status" style={{ fontSize: 16, color: "var(--ui-warning-text)", marginBottom: 6 }}>A képernyő elfordult: kérjük, írja alá újra.</p>}
         <canvas
           ref={canvas}
           aria-label="Aláírás" // PROPOSAL copy
           aria-describedby="so-sig-help"
           onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
-          style={{ width: "100%", height: 220, background: "#fff", border: "2px solid var(--line-soft)", borderRadius: 8, touchAction: "none", display: "block" }}
+          style={{ width: "100%", height: 220, background: "#fff", border: "2px solid var(--ui-border-strong)", borderRadius: "var(--ui-radius-control)", touchAction: "none", display: "block" }}
         />
         {/* PROPOSAL copy */}
-        <button type="button" onClick={clear} style={{ ...btn, marginTop: 8, border: "1px solid var(--line-soft)", background: "transparent", color: "var(--fg)" }}>Törlés</button>
+        <Button type="button" variant="outline" size="lg" onClick={clear} className="mt-2">Törlés</Button>
       </div>
-      {error && <p role="alert" style={{ fontSize: 18, color: "var(--coral)", margin: 0 }}>{error}</p>}
+      {error && <p role="alert" style={{ fontSize: 18, color: "var(--ui-danger-text)", margin: 0 }}>{error}</p>}
       {/* PROPOSAL copy */}
-      <button type="submit" disabled={!canSubmit} style={{ ...btn, minHeight: 56, fontWeight: 600, background: "#4f46e5", color: "#fff", border: "none", opacity: canSubmit ? 1 : 0.5 }}>
+      <Button type="submit" size="lg" disabled={!canSubmit} className="min-h-14">
         Aláírás és teljesítésigazolás
-      </button>
+      </Button>
     </form>
   );
 }

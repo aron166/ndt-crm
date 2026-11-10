@@ -43,7 +43,7 @@ function DraftChip() {
   return (
     <span
       className="badge-ds"
-      style={{ marginLeft: 6, color: "var(--fg-faint)", borderColor: "var(--line-soft)", fontWeight: 500 }}
+      style={{ marginLeft: 6, color: "var(--ui-text-muted)", borderColor: "var(--ui-border)", fontWeight: 500 }}
       title="A kérdés szövege még javaslat, Áron véglegesíti"
     >
       javaslat
@@ -91,29 +91,29 @@ function FormAnswersBlock({
       <div className="panel-head"><div className="panel-title">Az űrlapon ezt válaszolta</div></div>
       <div className="panel-pad space-y-3">
         {headerParts.length > 0 && formEntries.length > 0 && (
-          <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>{headerParts.join(" · ")}</div>
+          <div style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>{headerParts.join(" · ")}</div>
         )}
 
         {formEntries.length === 0 && legacyEntries.length === 0 ? (
-          <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>Nincs űrlapos válasz.</div>
+          <div style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>Nincs űrlapos válasz.</div>
         ) : (
           <>
             {formEntries.map(([slug, rec]) => {
               const q = bySlug.get(slug);
               return (
                 <div key={slug} className="flex justify-between" style={{ fontSize: 13, gap: 10 }}>
-                  <span style={{ color: q ? "var(--fg-mute)" : "var(--fg-faint)" }}>
+                  <span style={{ color: q ? "var(--ui-text-muted)" : "var(--ui-text-muted)" }}>
                     {q ? q.label : slug}
                     {!q && <span style={{ fontStyle: "italic" }}> (kérdés törölve)</span>}
                   </span>
-                  <span style={{ color: "var(--fg)", textAlign: "right" }}>{rec.form!.value}</span>
+                  <span style={{ color: "var(--ui-text)", textAlign: "right" }}>{rec.form!.value}</span>
                 </div>
               );
             })}
 
             {legacyEntries.length > 0 && (
-              <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line-soft)" }}>
-                <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 6 }}>
+              <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--ui-border)" }}>
+                <div style={{ fontSize: 11, color: "var(--ui-text-muted)", marginBottom: 6 }}>
                   forrás ismeretlen (a rögzítés előttről)
                 </div>
                 <div className="space-y-2">
@@ -121,8 +121,8 @@ function FormAnswersBlock({
                     const q = bySlug.get(slug);
                     return (
                       <div key={slug} className="flex justify-between" style={{ fontSize: 13, gap: 10 }}>
-                        <span style={{ color: "var(--fg-faint)" }}>{q ? q.label : slug}</span>
-                        <span style={{ color: "var(--fg-faint)", textAlign: "right" }}>{value}</span>
+                        <span style={{ color: "var(--ui-text-muted)" }}>{q ? q.label : slug}</span>
+                        <span style={{ color: "var(--ui-text-muted)", textAlign: "right" }}>{value}</span>
                       </div>
                     );
                   })}
@@ -194,7 +194,7 @@ function CallAnswersBlock({
               <label className="field-label">
                 {phoneWording(q)}
                 {q.required && (
-                  <span style={{ marginLeft: 6, fontSize: 11, color: "var(--coral)" }}>kötelező</span>
+                  <span style={{ marginLeft: 6, fontSize: 11, color: "var(--ui-danger-text)" }}>kötelező</span>
                 )}
                 {q.draft && <DraftChip />}
               </label>
@@ -218,30 +218,30 @@ function CallAnswersBlock({
                   <datalist id={`q-${q.slug}-options`}>
                     {q.options.map((o) => <option key={o} value={o} />)}
                   </datalist>
-                  <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: "var(--ui-text-muted)", marginTop: 2 }}>
                     {q.options.join(" · ")}
                   </div>
                 </>
               )}
               {rec?.form && (
-                <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: "var(--ui-text-muted)", marginTop: 2 }}>
                   Űrlapon: «{rec.form.value}» · {formatDateTime(rec.form.at)}
                 </div>
               )}
               {rec?.setter && rec?.form && (
                 // Only where there is a form answer to outrank — on a slug the
                 // form never answered, "ez az érvényes" says nothing.
-                <div style={{ fontSize: 11, color: "var(--mint)", marginTop: 2 }}>ez az érvényes</div>
+                <div style={{ fontSize: 11, color: "var(--ui-success-text)", marginTop: 2 }}>ez az érvényes</div>
               )}
             </div>
           );
         })}
-        {error && <p style={{ fontSize: 12, color: "var(--coral)" }}>{error}</p>}
+        {error && <p style={{ fontSize: 12, color: "var(--ui-danger-text)" }}>{error}</p>}
         <div className="flex items-center gap-2">
-          <Button className="btn primary" size="sm" onClick={handleSave} disabled={isPending || !dirty}>
+          <Button size="sm" onClick={handleSave} disabled={isPending || !dirty}>
             {isPending ? "Mentés…" : "Mentés"}
           </Button>
-          {saved && !dirty && <span style={{ fontSize: 12, color: "var(--mint)" }}>Mentve</span>}
+          {saved && !dirty && <span style={{ fontSize: 12, color: "var(--ui-success-text)" }}>Mentve</span>}
         </div>
       </div>
     </div>

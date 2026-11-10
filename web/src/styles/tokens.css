@@ -64,3 +64,8 @@
   --ui-dur-fast: 150ms;
   --ui-dur: 220ms;
 }
+
+/* appended for the leads codemod: tinted accent surface (chips, picked rows) */
+[data-astryx-theme] {
+  --ui-accent-surface: var(--color-accent-muted);
+}

@@ -202,12 +202,12 @@ export default async function LeadsPage({
     <Link
       key={href}
       href={href}
-      className="rounded-full font-mono-ndt"
+      className="rounded-full"
       style={{
         minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
-        background: active ? (color ? "var(--bg-hover)" : "var(--indigo-soft)") : "var(--bg-panel)",
-        color: active ? (color ?? "var(--indigo)") : "var(--fg-mute)",
-        border: `1px solid ${active ? (color ?? "var(--indigo-line)") : "var(--line-soft)"}`,
+        background: active ? (color ? "var(--ui-hover)" : "var(--ui-accent-surface)") : "var(--ui-surface)",
+        color: active ? (color ?? "var(--ui-accent)") : "var(--ui-text-muted)",
+        border: `1px solid ${active ? (color ?? "var(--ui-accent)") : "var(--ui-border)"}`,
       }}
     >
       {label}

@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/FormField";
 import { createLeadOfferAction, sendLeadOfferAction, acceptLeadOfferAction } from "@/app/actions/offers";
 import { OFFER_TEMPLATES, OFFER_TEMPLATE_LABEL, type OfferTemplate } from "@/lib/offers/offer";
@@ -27,11 +28,7 @@ export interface LeadDocumentRow {
   createdAt: string | Date;
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 10px", fontSize: 14,
-  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-  borderRadius: 6, color: "var(--fg)", outline: "none",
-};
+const selectClass = "min-h-[var(--ui-control-h)] w-full rounded-[var(--ui-radius-control)] border border-[var(--ui-border-strong)] bg-[var(--ui-surface)] px-3 py-1 text-sm text-[var(--ui-text)]";
 
 export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId: number; offers: LeadOffer[]; documents: LeadDocumentRow[]; status: string | null }) {
   const router = useRouter();
@@ -92,7 +89,7 @@ export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId:
       <form onSubmit={create} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", marginBottom: 12 }}>
         {/* PROPOSAL copy */}
         <FormField label="Sablon">
-          <select style={inputStyle} value={template} onChange={(e) => setTemplate(e.target.value as OfferTemplate)}>
+          <select className={selectClass} value={template} onChange={(e) => setTemplate(e.target.value as OfferTemplate)}>
             {OFFER_TEMPLATES.map((t) => <option key={t} value={t}>{OFFER_TEMPLATE_LABEL[t]}</option>)}
           </select>
         </FormField>
@@ -100,11 +97,11 @@ export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId:
           <>
             {/* PROPOSAL copy */}
             <FormField label="Terület (m2)">
-              <input type="number" min={0} step="any" style={inputStyle} value={areaM2} onChange={(e) => setAreaM2(e.target.value)} />
+              <Input type="number" min={0} step="any" value={areaM2} onChange={(e) => setAreaM2(e.target.value)} />
             </FormField>
             {/* PROPOSAL copy */}
             <FormField label="Csomag">
-              <select style={inputStyle} value={bigPackage} onChange={(e) => setBigPackage(e.target.value as "standard" | "unlimited")}>
+              <select className={selectClass} value={bigPackage} onChange={(e) => setBigPackage(e.target.value as "standard" | "unlimited")}>
                 <option value="standard">Standard</option>
                 <option value="unlimited">Unlimited</option>
               </select>
@@ -114,21 +111,21 @@ export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId:
         {template === "rental" && (
           // PROPOSAL copy
           <FormField label="Hónapok">
-            <input type="number" min={1} step={1} style={inputStyle} value={months} onChange={(e) => setMonths(e.target.value)} />
+            <Input type="number" min={1} step={1} value={months} onChange={(e) => setMonths(e.target.value)} />
           </FormField>
         )}
         {/* PROPOSAL copy */}
-        <Button type="submit" disabled={pending} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+        <Button type="submit" disabled={pending}>
           Ajánlat készítése
         </Button>
       </form>
 
-      {note && <p className="text-sm" style={{ color: "var(--amber)", marginBottom: 8 }}>{note}</p>}
-      {error && <p className="text-sm" style={{ color: "var(--coral)", marginBottom: 8 }}>{error}</p>}
+      {note && <p className="text-sm" style={{ color: "var(--ui-warning-text)", marginBottom: 8 }}>{note}</p>}
+      {error && <p className="text-sm" style={{ color: "var(--ui-danger-text)", marginBottom: 8 }}>{error}</p>}
 
       {offers.length === 0 ? (
         // PROPOSAL copy
-        <p className="text-sm" style={{ color: "var(--fg-mute)" }}>Még nincs ajánlat.</p>
+        <p className="text-sm" style={{ color: "var(--ui-text-muted)" }}>Még nincs ajánlat.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {offers.map((o) => {
@@ -137,8 +134,8 @@ export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId:
               <div key={o.id} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", fontSize: 13 }}>
                 <strong>{o.quoteNumber}</strong>
                 <span>{OFFER_TEMPLATE_LABEL[o.template as OfferTemplate] ?? o.template}</span>
-                <span style={{ color: "var(--fg-mute)" }}>{o.status}</span>
-                <span style={{ color: "var(--fg-mute)" }}>{formatDateTime(o.createdAt)}</span>
+                <span style={{ color: "var(--ui-text-muted)" }}>{o.status}</span>
+                <span style={{ color: "var(--ui-text-muted)" }}>{formatDateTime(o.createdAt)}</span>
                 <a href={`/leads/${leadId}/offers/${o.id}/pdf`} target="_blank" rel="noreferrer" className="row-link">PDF</a>
                 {open && (
                   <>
@@ -159,7 +156,7 @@ export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId:
             <div key={d.id} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", fontSize: 13 }}>
               <span>{DOCUMENT_TITLE[d.kind as DocumentKind] ?? d.kind}</span>
               <strong>{d.number}</strong>
-              <span style={{ color: "var(--fg-mute)" }}>{formatDateTime(d.createdAt)}</span>
+              <span style={{ color: "var(--ui-text-muted)" }}>{formatDateTime(d.createdAt)}</span>
               <a href={`/leads/${leadId}/documents/${d.id}/pdf`} target="_blank" rel="noreferrer" className="row-link">PDF</a>
             </div>
           ))}
@@ -168,7 +165,7 @@ export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId:
 
       {status === "ordered" && (
         // PROPOSAL copy
-        <Link href={`/leads/${leadId}/signoff`} className="inline-flex items-center rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4" style={{ minHeight: 44, marginTop: 12 }}>
+        <Link href={`/leads/${leadId}/signoff`} className={buttonVariants({ className: "mt-3" })}>
           Helyszíni átvétel (aláírás)
         </Link>
       )}
