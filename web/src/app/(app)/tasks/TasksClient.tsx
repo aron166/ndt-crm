@@ -6,7 +6,6 @@ import { TaskModal } from "./TaskModal";
 import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { reopenTask, deleteTask } from "@/app/actions/tasks";
 import { useTaskCompletion } from "@/components/useTaskCompletion";
-import { formatDate } from "@/lib/utils";
 import { CheckCircle2, RotateCcw, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@astryxdesign/core/Badge";
@@ -38,6 +37,8 @@ interface TasksClientProps {
   tasks: Task[];
 }
 
+// Calendar-like: "nov. 17." fits the when-column; the year only matters past this year, and the group says late or later.
+const shortDay = new Intl.DateTimeFormat("hu-HU", { timeZone: "Europe/Budapest", month: "short", day: "numeric" });
 const budapestFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit" });
 function budapestDayKey(d: Date): string {
   return budapestFmt.format(d);
@@ -191,7 +192,7 @@ export function TasksClient({ tasks }: TasksClientProps) {
                         <span className={k.time}>
                           {timed && !dateOnly(t.dueDate)
                             ? new Intl.DateTimeFormat("hu-HU", { timeZone: "Europe/Budapest", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t.dueDate))
-                            : formatDate(t.dueDate)}
+                            : shortDay.format(new Date(t.dueDate))}
                         </span>
                         {REL[g.key] && <span className={k.muted}>{REL[g.key]}</span>}
                       </>
