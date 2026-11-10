@@ -48,24 +48,34 @@ export function groupQueue<T extends { nextDue: Date | null }>(
   const by = new Map<GroupKey, T[]>();
   for (const r of rows) {
     const k = groupKey(r.nextDue, now);
-    by.set(k, [...(by.get(k) ?? []), r]);
+    const arr = by.get(k);
+    if (arr) arr.push(r); else by.set(k, [r]);
   }
   return ORDER.filter((k) => by.has(k)).map((k) => ({ key: k, label: GROUP_LABEL[k], rows: by.get(k)! }));
 }
 
+/** Pure: the one where shared by the queue rows and the queue total. null = everyone. */
+export function queueWhere(assignedToId: number | null) {
+  return {
+    tenantId: TENANT_ID, outcome: "open", convertedDealId: null,
+    OR: [{ status: null }, { status: { notIn: [...SIDE_STAGES] } }],
+    ...(assignedToId != null ? { assignedToId } : {}),
+  };
+}
+
+export function getQueueTotal(assignedToId: number | null) {
+  return db.lead.count({ where: queueWhere(assignedToId) });
+}
+
 export async function getQueueRows(assignedToId: number | null): Promise<QueueRow[]> {
   const leads = await db.lead.findMany({
-    where: {
-      tenantId: TENANT_ID, outcome: "open", convertedDealId: null,
-      OR: [{ status: null }, { status: { notIn: [...SIDE_STAGES] } }],
-      ...(assignedToId != null ? { assignedToId } : {}),
-    },
+    where: queueWhere(assignedToId),
     select: {
       id: true, tier: true, attempts: true, nextAction: true, nextDue: true, status: true,
       subject: true, serviceInterest: true, qualification: true, customFields: true,
-      company: { select: { id: true, name: true, city: true } },
+      company: { select: { name: true, city: true } },
       contact: {
-        select: { phone: true, email: true, role: true, person: { select: { firstName: true, lastName: true, phone: true } } },
+        select: { phone: true, role: true, person: { select: { firstName: true, lastName: true, phone: true } } },
       },
     },
     orderBy: [{ nextDue: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
@@ -91,7 +101,7 @@ export async function getQueueRows(assignedToId: number | null): Promise<QueueRo
 export async function getFooterCounts() {
   const [recall, lost] = await Promise.all([
     db.lead.count({ where: { tenantId: TENANT_ID, outcome: "open", convertedDealId: null, status: "recall" } }),
-    db.lead.count({ where: { tenantId: TENANT_ID, outcome: "lost" } }),
+    db.lead.count({ where: { tenantId: TENANT_ID, outcome: "lost", convertedDealId: null } }),
   ]);
   return { recall, lost };
 }

@@ -5,21 +5,29 @@ import { QueueRow } from "./QueueRow";
 import s from "./queue.module.css";
 
 export function CallQueue({
-  groups, statuses, now, recall, lost,
+  groups, statuses, now, recall, lost, owner, ownerName, total, loaded,
 }: {
   groups: ReturnType<typeof groupQueue<Row>>;
   statuses: LeadStatusDef[];
   now: Date;
   recall: number;
   lost: number;
+  owner: string; // "me" | "all" | user id
+  ownerName: string | null;
+  total: number;
+  loaded: number;
 }) {
   return (
     <div>
       {groups.length === 0 ? (
         <div className={s.empty}>
           {/* PROPOSAL copy */}
-          <span>Nincs rád osztott nyitott lead.</span>
-          <Link href="/leads?owner=all" className={s.link}>Mindenki listája</Link>
+          <span>
+            {owner === "me" ? "Nincs rád osztott nyitott lead."
+              : owner === "all" ? "Nincs nyitott lead."
+              : `${ownerName ?? "Ennek a felhasználónak"} nevén nincs nyitott lead.`}
+          </span>
+          {owner !== "all" && <Link href="/leads?owner=all" className={s.link}>Mindenki listája</Link>}
         </div>
       ) : (
         groups.map((g) => (
@@ -37,10 +45,13 @@ export function CallQueue({
           </section>
         ))
       )}
+      {total > loaded && (
+        <span className={s.muted}>{loaded} / {total} lead látszik, a legsürgősebbek.</span> /* PROPOSAL copy */
+      )}
       <div className={s.footer}>
         {/* PROPOSAL copy */}
-        <Link href="/leads?view=recall" className={s.link}>Visszahívásra vár: {recall} lead</Link>
-        <Link href="/leads?view=lost" className={s.link}>Elveszett: {lost}</Link>
+        <Link href="/leads?view=recall" className={s.link}>{leadStatusLabel("recall", statuses)}: {recall} lead</Link>
+        <Link href="/leads?view=lost" className={s.link}>{leadStatusLabel("lost", statuses)}: {lost}</Link>
       </div>
     </div>
   );

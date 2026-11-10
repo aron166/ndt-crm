@@ -6,7 +6,7 @@ import { lostReasonLabel } from "@/lib/leads/lifecycle";
 import s from "../queue/queue.module.css";
 
 const PAGE_SIZE = 30;
-const CLOSED_WHERE = { tenantId: 1, OR: [{ outcome: { not: "open" } }, { convertedDealId: { not: null } }] };
+export const CLOSED_WHERE = { tenantId: 1, OR: [{ outcome: { not: "open" } }, { convertedDealId: { not: null } }] };
 
 export async function ClosedList({ page, total }: { page: number; total: number }) {
   const rows = await db.lead.findMany({
@@ -22,7 +22,7 @@ export async function ClosedList({ page, total }: { page: number; total: number 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const pageHref = (p: number) => `/leads?view=closed&page=${p}`;
 
-  if (rows.length === 0) return <span className={s.muted}>Még nincs lezárt lead.</span>; // PROPOSAL copy
+  if (total === 0) return <span className={s.muted}>Még nincs lezárt lead.</span>; // PROPOSAL copy
   return (
     <div>
       {rows.map((l) => {
@@ -48,11 +48,14 @@ export async function ClosedList({ page, total }: { page: number; total: number 
           </div>
         );
       })}
-      {totalPages > 1 && (
+      {(totalPages > 1 || page > totalPages) && (
         <div className={s.pager}>
-          <span className={s.muted}>{(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString("hu-HU")}</span>
+          <span className={s.muted}>
+            {rows.length === 0 ? `0 / ${total.toLocaleString("hu-HU")}` : `${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)} / ${total.toLocaleString("hu-HU")}`}
+          </span>
           <div style={{ display: "flex", gap: 16 }}>
-            {page > 1 && <Link href={pageHref(page - 1)} className={s.link}>Előző</Link>}
+            {page > totalPages && <Link href={pageHref(1)} className={s.link}>Vissza az 1. oldalra</Link>} {/* PROPOSAL copy */}
+            {page > 1 && page <= totalPages && <Link href={pageHref(page - 1)} className={s.link}>Előző</Link>}
             {page < totalPages && <Link href={pageHref(page + 1)} className={s.link}>Következő</Link>}
           </div>
         </div>

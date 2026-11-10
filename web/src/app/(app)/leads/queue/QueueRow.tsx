@@ -53,7 +53,7 @@ export function QueueRow({ row, group, now, stageLabel }: { row: Row; group: Gro
           </>
         ) : <span className={s.muted}>-</span>}
       </div>
-      <CallButton id={row.id} phone={row.phone} primary={group === "overdue"} />
+      <CallButton id={row.id} name={row.name} phone={row.phone} primary={group === "overdue"} />
     </div>
   );
 }

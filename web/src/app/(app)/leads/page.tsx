@@ -14,8 +14,8 @@ import { getActor } from "@/lib/actor";
 import { LeadsHeader } from "./queue/LeadsHeader";
 import { CallQueue } from "./queue/CallQueue";
 import { TripsAside } from "./queue/TripsAside";
-import { groupQueue, getQueueRows, getFooterCounts } from "./queue/queue-data";
-import { ClosedList } from "./closed/ClosedList";
+import { groupQueue, getQueueRows, getQueueTotal, getFooterCounts } from "./queue/queue-data";
+import { ClosedList, CLOSED_WHERE } from "./closed/ClosedList";
 import qcss from "./queue/queue.module.css";
 
 const TENANT_ID = 1;
@@ -40,15 +40,22 @@ export default async function LeadsPage({
 
   // Counts power the toggle. Won (= converted to a deal) and lost leads leave
   // the active board — the "Lezárt" list keeps them for history.
-  const CLOSED_WHERE = { tenantId: TENANT_ID, OR: [{ outcome: { not: "open" } }, { convertedDealId: { not: null } }] };
-  const [activeCount, convertedCount] = await Promise.all([
+  const [actor, users, activeCount, convertedCount] = await Promise.all([
+    getActor(TENANT_ID),
+    db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: null, outcome: "open" } }),
     db.lead.count({ where: CLOSED_WHERE }),
   ]);
 
+  const ownerParam = rawOwner === "all" || users.some((u) => String(u.id) === rawOwner) ? rawOwner! : "me";
+  // "me" without a resolved user must see nothing (-1), never everyone.
+  const assignedToId = ownerParam === "all" ? null : ownerParam === "me" ? (actor.userId ?? -1) : Number(ownerParam);
+  // Non-queue views show the tab count for the default (me) list; the queue branch reuses its own total.
+  const queueTotalOther = isQueue ? 0 : await getQueueTotal(actor.userId ?? -1);
+
   const header = (
-    props: Pick<React.ComponentProps<typeof LeadsHeader>, "view" | "title" | "help" | "owner" | "actions">,
-  ) => <LeadsHeader {...props} openCount={activeCount} closedCount={convertedCount} />;
+    props: Pick<React.ComponentProps<typeof LeadsHeader>, "view" | "title" | "help" | "owner" | "actions"> & { queueCount?: number },
+  ) => <LeadsHeader {...props} queueCount={props.queueCount ?? queueTotalOther} openCount={activeCount} closedCount={convertedCount} />;
 
   if (showConverted) {
     return (
@@ -61,14 +68,11 @@ export default async function LeadsPage({
 
   if (isQueue) {
     const now = new Date();
-    const [actor, users, statuses] = await Promise.all([
-      getActor(TENANT_ID),
-      db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-      getLeadStatuses(TENANT_ID),
+    const [statuses, rows, counts, queueTotal] = await Promise.all([
+      getLeadStatuses(TENANT_ID), getQueueRows(assignedToId), getFooterCounts(), getQueueTotal(assignedToId),
     ]);
-    const ownerParam = rawOwner === "all" || users.some((u) => String(u.id) === rawOwner) ? rawOwner! : "me";
-    const assignedToId = ownerParam === "all" ? null : ownerParam === "me" ? (actor.userId ?? null) : Number(ownerParam);
-    const [rows, counts] = await Promise.all([getQueueRows(assignedToId), getFooterCounts()]);
+    // Heading counts come from the loaded rows (at most 200, most urgent first), so
+    // past the cap they undercount; the list footer says so.
     const groups = groupQueue(rows, now);
     const n = (k: string) => groups.find((g) => g.key === k)?.rows.length ?? 0;
     const late = n("overdue");
@@ -78,12 +82,16 @@ export default async function LeadsPage({
     return (
       <div className="mount">
         {header({
-          view: "queue", title,
+          view: "queue", title, queueCount: queueTotal,
           help: "Felülről lefelé haladj. A Hívás gomb tárcsáz és megnyitja a lead lapját.",
           owner: { current: ownerParam, users },
         })}
         <div className={qcss.split}>
-          <CallQueue groups={groups} statuses={statuses} now={now} recall={counts.recall} lost={counts.lost} />
+          <CallQueue
+            groups={groups} statuses={statuses} now={now} recall={counts.recall} lost={counts.lost}
+            owner={ownerParam} ownerName={users.find((u) => String(u.id) === ownerParam)?.name ?? null}
+            total={queueTotal} loaded={rows.length}
+          />
           <TripsAside now={now} />
         </div>
       </div>

@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { atBudapest } from "@/lib/leads/lifecycle";
 import s from "./queue.module.css";
 
 const TZ = "Europe/Budapest";
 
 export async function TripsAside({ now }: { now: Date }) {
+  const dayKey = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(d);
+  const [y, m, d] = dayKey(now).split("-").map(Number);
   const tasks = await db.task.findMany({
     where: {
       tenantId: 1,
-      startsAt: { gte: now, lte: new Date(now.getTime() + 10 * 86_400_000) },
+      startsAt: { gte: atBudapest(y, m, d, 0), lte: new Date(now.getTime() + 10 * 86_400_000) },
       status: { notIn: ["done", "cancelled"] },
       bookingKind: { not: null },
     },
@@ -20,9 +23,11 @@ export async function TripsAside({ now }: { now: Date }) {
     orderBy: { startsAt: "asc" },
     take: 50,
   });
-  const dayKey = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(d);
   const days = new Map<string, typeof tasks>();
-  for (const t of tasks) days.set(dayKey(t.startsAt!), [...(days.get(dayKey(t.startsAt!)) ?? []), t]);
+  for (const t of tasks) {
+    const k = dayKey(t.startsAt!);
+    days.set(k, [...(days.get(k) ?? []), t]);
+  }
   const dateLabel = (d: Date) =>
     new Intl.DateTimeFormat("hu-HU", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" }).format(d);
 

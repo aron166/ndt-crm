@@ -11,12 +11,13 @@ const VIEWS: { key: LeadsViewName; label: string; href: string }[] = [
 ];
 
 export function LeadsHeader({
-  view, title, help, openCount, closedCount, owner, now = new Date(), actions,
+  view, title, help, openCount, queueCount, closedCount, owner, now = new Date(), actions,
 }: {
   view: LeadsViewName;
   title: string;
   help?: string;
   openCount: number;
+  queueCount: number;
   closedCount: number;
   owner?: { current: string; users: { id: number; name: string }[] };
   now?: Date;
@@ -26,7 +27,7 @@ export function LeadsHeader({
   const dateLine = new Intl.DateTimeFormat("hu-HU", {
     timeZone: "Europe/Budapest", weekday: "long", year: "numeric", month: "long", day: "numeric",
   }).format(now);
-  const counts: Record<LeadsViewName, number | null> = { queue: openCount, board: openCount, closed: closedCount };
+  const counts: Record<LeadsViewName, number | null> = { queue: queueCount, board: openCount, closed: closedCount };
   const ownerLinks = owner && [
     { key: "me", label: "Enyém" }, // PROPOSAL copy
     { key: "all", label: "Mindenki" },
