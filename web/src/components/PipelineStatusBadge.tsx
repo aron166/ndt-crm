@@ -1,14 +1,14 @@
 // Pipeline status: 0=KUKA 1=Nem hívtuk 2=NV 3=Érdeklődő 4=Nem érdekelt 5=Kéri 6=Folyamatban 7=CL 8=CW
-const STATUS_MAP: Record<number, { label: string; color: string; bg: string; border: string }> = {
-  0: { label: "KUKA",        color: "var(--fg-faint)",  bg: "var(--bg-raised)",   border: "var(--line-soft)" },
-  1: { label: "Nem hívtuk",  color: "var(--fg-mute)",   bg: "var(--bg-raised)",   border: "var(--line-soft)" },
-  2: { label: "NV",          color: "var(--amber-fg)",      bg: "var(--amber-soft)",  border: "var(--amber-line)" },
-  3: { label: "Érdeklődő",   color: "var(--sky-fg)",        bg: "var(--sky-soft)",    border: "var(--sky-line)" },
-  4: { label: "Nem érdekelt",color: "var(--coral-fg)",      bg: "var(--coral-soft)",  border: "var(--coral-line)" },
-  5: { label: "Kéri",        color: "var(--mint-fg)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
-  6: { label: "Folyamatban", color: "var(--indigo-fg)",     bg: "var(--indigo-soft)", border: "var(--indigo-line)" },
-  7: { label: "CL",          color: "var(--fg-faint)",   bg: "var(--bg-raised)",   border: "var(--line-soft)" },
-  8: { label: "CW",          color: "var(--mint-fg)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
+const STATUS_MAP: Record<number, { label: string; tone: string }> = {
+  0: { label: "KUKA",         tone: "slate" },
+  1: { label: "Nem hívtuk",   tone: "slate" },
+  2: { label: "NV",           tone: "amber" },
+  3: { label: "Érdeklődő",    tone: "sky" },
+  4: { label: "Nem érdekelt", tone: "coral" },
+  5: { label: "Kéri",         tone: "mint" },
+  6: { label: "Folyamatban",  tone: "indigo" },
+  7: { label: "CL",           tone: "slate" },
+  8: { label: "CW",           tone: "mint" },
 };
 
 export function PipelineStatusBadge({
@@ -19,27 +19,6 @@ export function PipelineStatusBadge({
   const key = status != null ? parseInt(String(status), 10) : 1;
   const s = STATUS_MAP[isNaN(key) ? 1 : key] ?? STATUS_MAP[1];
   return (
-    <span
-      className="inline-flex items-center gap-1.5 font-mono-ndt"
-      style={{
-        height: 20, padding: "0 8px",
-        fontSize: 12, fontWeight: 500,
-        borderRadius: 999,
-        border: `1px solid ${s.border}`,
-        background: s.bg,
-        color: s.color,
-        whiteSpace: "nowrap",
-      }}
-    >
-      <span
-        style={{
-          width: 5, height: 5, borderRadius: 999,
-          background: "currentColor",
-          boxShadow: "0 0 var(--glow-size-sm) currentColor",
-          flexShrink: 0,
-        }}
-      />
-      {s.label}
-    </span>
+    <span className={`badge-ds dot ${s.tone}`}>{s.label}</span>
   );
 }

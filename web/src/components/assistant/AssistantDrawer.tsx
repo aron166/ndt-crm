@@ -4,6 +4,9 @@ import { Fragment, memo, useCallback, useEffect, useRef, useState, useTransition
 import Link from "next/link";
 import { ArrowRight, Bug, CheckCircle, ExternalLink, Gavel, Inbox, Scale, StickyNote, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { A } from "@/lib/assistant/labels";
 import {
   addItemNote, deleteConversation, executeAction, getConversation, openAssistant, whatsWaiting,
@@ -41,31 +44,13 @@ const lsSet = (id: number | null) => {
   try { if (id == null) localStorage.removeItem(LS_KEY); else localStorage.setItem(LS_KEY, String(id)); } catch { /* storage unavailable */ }
 };
 
-const field: React.CSSProperties = {
-  width: "100%", background: "var(--bg-raised)", border: "1px solid var(--line-soft)",
-  borderRadius: 6, padding: "8px 10px", fontSize: 16, color: "var(--fg)", minHeight: 36,
-};
-const btn: React.CSSProperties = {
-  minHeight: 36, padding: "0 14px", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer",
-  background: "var(--mint-soft)", color: "var(--mint-fg)", border: "1px solid var(--mint-line)",
-};
-const btnQuiet: React.CSSProperties = {
-  ...btn, background: "var(--bg-raised)", color: "var(--fg-mute)", border: "1px solid var(--line-soft)",
-};
-const btnPrimary: React.CSSProperties = {
-  ...btn, background: "var(--mint)", color: "var(--fg-on-accent)", border: "1px solid var(--mint)", fontWeight: 600,
-};
-const chip: React.CSSProperties = {
-  minHeight: 36, padding: "0 14px", borderRadius: 18, fontSize: 14, cursor: "pointer",
-  background: "var(--bg-raised)", color: "var(--fg)", border: "1px solid var(--line)",
-};
 const CARD_ICON: Record<ActionProposal["type"], LucideIcon> = {
   open_item: ExternalLink, navigate: ArrowRight, waiting: Inbox, review: CheckCircle,
   answer_decision: Gavel, create_decision: Scale, note: StickyNote, ticket: Bug, none: StickyNote,
 };
-const errStyle: React.CSSProperties = { fontSize: 13, color: "var(--coral)" };
-const linkStyle: React.CSSProperties = { color: "var(--mint-fg)", overflowWrap: "anywhere" };
-const small: React.CSSProperties = { fontSize: 12, color: "var(--fg-faint)" };
+const errStyle: React.CSSProperties = { fontSize: 13, color: "var(--ui-danger-text)" };
+const linkStyle: React.CSSProperties = { color: "var(--ui-text-link)", overflowWrap: "anywhere" };
+const small: React.CSSProperties = { fontSize: 12, color: "var(--ui-text-muted)" };
 
 function proposalRows(p: ActionProposal): [string, string][] {
   switch (p.type) {
@@ -146,7 +131,7 @@ function turnsToMsgs(c: ConversationView): Msg[] {
 const budapestDate = (iso: string) => new Date(iso).toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest" });
 
 function WaitingList({ w }: { w: WaitingView }) {
-  if (w.items.length === 0 && w.decisions.length === 0) return <p role="status" style={{ fontSize: 14, color: "var(--fg-mute)", margin: 0 }}>{A.nothingWaiting}</p>;
+  if (w.items.length === 0 && w.decisions.length === 0) return <p role="status" style={{ fontSize: 14, color: "var(--ui-text-muted)", margin: 0 }}>{A.nothingWaiting}</p>;
   return (
     <div style={{ display: "grid", gap: 8 }}>
       {w.items.length > 0 && (
@@ -156,7 +141,7 @@ function WaitingList({ w }: { w: WaitingView }) {
             {w.items.map((i) => (
               <li key={i.id}>
                 <Link href={i.href} style={linkStyle}>{i.title}</Link>
-                {i.days != null && <span style={{ color: "var(--fg-faint)" }}> {A.daysAgo(i.days)}</span>}
+                {i.days != null && <span style={{ color: "var(--ui-text-muted)" }}> {A.daysAgo(i.days)}</span>}
               </li>
             ))}
           </ul>
@@ -169,7 +154,7 @@ function WaitingList({ w }: { w: WaitingView }) {
             {w.decisions.map((d) => (
               <li key={d.checkId}>
                 <Link href={d.href} style={linkStyle}>{d.question}</Link>
-                <span style={{ color: "var(--fg-faint)" }}>
+                <span style={{ color: "var(--ui-text-muted)" }}>
                   {" "}{A.fDecidedBy}: {A.forWhom[d.forWhom] ?? d.forWhom}
                   {d.deadline ? `, ${A.fDeadline}: ${d.deadline}` : ""}, {A.daysAgo(d.days)}
                 </span>
@@ -191,9 +176,9 @@ function Card({ card, st, onRun, onDismiss, locked }: { card: ActionCard; st: Ca
   const Icon = CARD_ICON[card.proposal.type];
   const external = st.href?.startsWith("http");
   return (
-    <div style={{ border: "1px solid var(--line-soft)", background: "var(--bg-raised)", borderRadius: 8, padding: 10, display: "grid", gap: 6 }}>
+    <div style={{ border: "1px solid var(--ui-border)", background: "var(--ui-surface-muted)", borderRadius: "var(--ui-radius-control)", padding: 10, display: "grid", gap: 6 }}>
       <div style={{ fontSize: 14, fontWeight: 600, display: "flex", gap: 8, alignItems: "flex-start" }}>
-        <Icon size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: "var(--mint-fg)" }} />
+        <Icon size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: "var(--ui-success-text)" }} />
         <span>{card.summary}</span>
       </div>
       {rows.map(([k, v]) => (
@@ -202,20 +187,20 @@ function Card({ card, st, onRun, onDismiss, locked }: { card: ActionCard; st: Ca
         </div>
       ))}
       {st.waiting && <WaitingList w={st.waiting} />}
-      {st.message && <p role="status" style={{ margin: 0, fontSize: 13, color: "var(--mint-fg)" }}>{st.message}</p>}
+      {st.message && <p role="status" style={{ margin: 0, fontSize: 13, color: "var(--ui-success-text)" }}>{st.message}</p>}
       {st.state && <div style={{ fontSize: 13 }}><span style={small}>{A.newState}: </span>{st.state}</div>}
       {st.href && (external
         ? <a href={st.href} target="_blank" rel="noopener noreferrer" style={linkStyle}>{A.open}</a>
         : <Link href={st.href} style={linkStyle}>{A.open}</Link>)}
       {st.error && <p role="alert" style={{ ...errStyle, margin: 0 }}>{st.error}</p>}
-      {executed && st.phase !== "done" && <p role="status" style={{ margin: 0, fontSize: 13, color: "var(--mint-fg)" }}>{A.executed}</p>}
+      {executed && st.phase !== "done" && <p role="status" style={{ margin: 0, fontSize: 13, color: "var(--ui-success-text)" }}>{A.executed}</p>}
       {!finished && (
         <div style={{ display: "flex", gap: 8 }}>
           {/* locked while a reply streams: the route appends to the stored turns at the end of the stream */}
-          <button type="button" disabled={running || locked} onClick={onRun} style={{ ...btnPrimary, ...(running || locked ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>
+          <Button type="button" size="sm" disabled={running || locked} onClick={onRun}>
             {running ? A.executing : A.execute}
-          </button>
-          <button type="button" disabled={running} onClick={onDismiss} style={btnQuiet}>{A.dismiss}</button>
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled={running} onClick={onDismiss}>{A.dismiss}</Button>
         </div>
       )}
     </div>
@@ -230,7 +215,7 @@ type RowProps = {
 const MsgRow = memo(function MsgRow({ m, i, cards, onRun, onDismiss, locked }: RowProps) {
   return (
     <div style={m.role === "user"
-      ? { justifySelf: "end", maxWidth: "85%", background: "var(--mint-soft)", borderRadius: 8, padding: "6px 10px", fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
+      ? { justifySelf: "end", maxWidth: "85%", background: "var(--ui-success-surface)", borderRadius: "var(--ui-radius-control)", padding: "6px 10px", fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }
       : { display: "grid", gap: 6 }}>
       {m.role === "user" ? m.content : m.streaming ? (
         <div style={{ fontSize: 14, lineHeight: 1.45, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
@@ -485,10 +470,9 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
 
   const noAi = !configured;
   const tabBtn = (t: Tab, label: string) => (
-    <button type="button" role="tab" aria-selected={tab === t} onClick={() => { pinned.current = true; setTab(t); }}
-      style={{ ...btnQuiet, ...(tab === t ? { background: "var(--mint-soft)", color: "var(--mint-fg)", border: "1px solid var(--mint-line)" } : {}) }}>
+    <Button type="button" size="sm" variant={tab === t ? "secondary" : "ghost"} role="tab" aria-selected={tab === t} onClick={() => { pinned.current = true; setTab(t); }}>
       {label}
-    </button>
+    </Button>
   );
 
   const ticketChip = itemId != null && item?.id === itemId;
@@ -498,36 +482,36 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
         .assistant-drawer { position: fixed; top: var(--topbar-h, 60px); right: 0; bottom: calc(var(--statusbar-h, 26px) + env(safe-area-inset-bottom)); width: 420px; z-index: 40; display: flex; flex-direction: column;
           transform: translateX(100%); opacity: 0; visibility: hidden; pointer-events: none;
           transition: transform 200ms ease, opacity 200ms ease, visibility 0s linear 200ms;
-          background: var(--bg-page); color: var(--fg); border-left: 1px solid var(--line-soft); }
+          background: var(--ui-surface-overlay); color: var(--ui-text); box-shadow: var(--ui-shadow-overlay); }
         .assistant-drawer[data-open="true"] { transform: none; opacity: 1; visibility: visible; pointer-events: auto; transition: transform 200ms ease, opacity 200ms ease, visibility 0s; }
-        .assistant-chip:hover:not(:disabled) { border-color: var(--mint-line); background: var(--mint-soft); }
+        .assistant-chip:hover:not(:disabled) { border-color: var(--ui-accent); }
         .assistant-chip:disabled { opacity: 0.5; cursor: not-allowed; }
         @media (max-width: 767px) { .assistant-drawer { width: 100vw; border-left: 0; } }
         @keyframes assistantFade { from { opacity: 0 } to { opacity: 1 } }
         @keyframes assistantBlink { 50% { opacity: 0 } }
         .assistant-fade { animation: assistantFade 180ms ease-out; }
-        .assistant-caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: text-bottom; background: var(--fg-mute); animation: assistantBlink 1s steps(1) infinite; }
+        .assistant-caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: text-bottom; background: var(--ui-text-muted); animation: assistantBlink 1s steps(1) infinite; }
         @media (prefers-reduced-motion: reduce) { .assistant-fade, .assistant-caret { animation: none; } .assistant-drawer, .assistant-drawer[data-open="true"] { transition: none; } }
       `}</style>
       <div ref={dialogRef} className="assistant-drawer" role="dialog" aria-modal="false" data-open={vis ? "true" : "false"} aria-hidden={vis ? undefined : true} aria-label={A.dialog} tabIndex={-1}
         onKeyDown={(e) => { if (e.key === "Escape" && !e.defaultPrevented) onClose(); }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--line-soft)", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--ui-border)", flexWrap: "wrap" }}>
           <strong style={{ fontSize: 15, flex: 1 }}>{A.dialog}</strong>
-          <button type="button" onClick={fresh} style={btnQuiet}>{A.newChat}</button>
-          <button type="button" onClick={removeConversation} style={btnQuiet}>{A.del}</button>
-          <button type="button" onClick={onClose} aria-label={A.close} style={btnQuiet}>{A.close}</button>
+          <Button type="button" size="sm" variant="outline" onClick={fresh}>{A.newChat}</Button>
+          <Button type="button" size="sm" variant="outline" onClick={removeConversation}>{A.del}</Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onClose} aria-label={A.close}>{A.close}</Button>
         </div>
-        <details style={{ padding: "6px 12px", borderBottom: "1px solid var(--line-soft)" }}>
-          <summary style={{ fontSize: 13, color: "var(--fg-mute)", cursor: "pointer", minHeight: 36, display: "flex", alignItems: "center" }}>{A.previous}</summary>
+        <details style={{ padding: "6px 12px", borderBottom: "1px solid var(--ui-border)" }}>
+          <summary style={{ fontSize: 13, color: "var(--ui-text-muted)", cursor: "pointer", minHeight: 36, display: "flex", alignItems: "center" }}>{A.previous}</summary>
           {recent.length === 0 && <p style={{ ...small, margin: "4px 0" }}>{A.noPrevious}</p>}
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 2 }}>
             {recent.map((c) => (
               <li key={c.id}>
-                <button type="button" onClick={() => loadConversation(c.id)}
-                  style={{ ...btnQuiet, width: "100%", textAlign: "left", display: "flex", justifyContent: "space-between", gap: 8, border: "0", fontWeight: c.id === convRef.current ? 700 : 400 }}>
+                <Button type="button" size="sm" variant="ghost" onClick={() => loadConversation(c.id)}
+                  className="w-full justify-between" style={{ fontWeight: c.id === convRef.current ? 700 : 400 }}>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || A.untitled}</span>
                   <span style={{ ...small, flexShrink: 0, alignSelf: "center" }}>{budapestDate(c.updatedAt)}</span>
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -543,23 +527,23 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
             <div ref={listRef} onScroll={(e) => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 40; }} style={{ flex: 1, overflowY: "auto", padding: "8px 12px", display: "grid", gap: 10, alignContent: "start" }}>
               {msgs.length === 0 && (
                 <div role="group" aria-label={A.suggestions} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button type="button" className="assistant-chip" disabled={quickWait || streaming} onClick={quickWaiting} style={chip}>{A.quickWaiting}</button>
-                  <button type="button" className="assistant-chip" disabled={noAi || streaming} onClick={() => send(A.quickDrafts)} style={chip}>{A.quickDrafts}</button>
+                  <Button type="button" variant="outline" className="assistant-chip rounded-full" disabled={quickWait || streaming} onClick={quickWaiting}>{A.quickWaiting}</Button>
+                  <Button type="button" variant="outline" className="assistant-chip rounded-full" disabled={noAi || streaming} onClick={() => send(A.quickDrafts)}>{A.quickDrafts}</Button>
                   {ticketChip && item ? (
-                    <button type="button" className="assistant-chip" disabled={noAi || streaming} onClick={() => send(`${A.chipTicket}: ${item.title}`)} style={chip}>{A.chipTicket}</button>
+                    <Button type="button" variant="outline" className="assistant-chip rounded-full" disabled={noAi || streaming} onClick={() => send(`${A.chipTicket}: ${item.title}`)}>{A.chipTicket}</Button>
                   ) : (
-                    <button type="button" className="assistant-chip" disabled={noAi || streaming} onClick={() => send(A.quickAbilities)} style={chip}>{A.quickAbilities}</button>
+                    <Button type="button" variant="outline" className="assistant-chip rounded-full" disabled={noAi || streaming} onClick={() => send(A.quickAbilities)}>{A.quickAbilities}</Button>
                   )}
                 </div>
               )}
-              {noAi && <p style={{ fontSize: 13, color: "var(--fg-mute)", margin: 0 }}>{A.notConfigured}</p>}
+              {noAi && <p style={{ fontSize: 13, color: "var(--ui-text-muted)", margin: 0 }}>{A.notConfigured}</p>}
               {msgs.map((m, i) => <MsgRow key={i} m={m} i={i} cards={cards} onRun={run} onDismiss={dismissCard} locked={streaming} />)}
               {chatError && <p role="alert" style={{ ...errStyle, margin: 0 }}>{chatError}</p>}
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); void send(input); }} style={{ display: "flex", gap: 8, padding: "8px 12px", borderTop: "1px solid var(--line-soft)" }}>
-              <input ref={inputRef} aria-label={A.inputPlaceholder} placeholder={A.inputPlaceholder} maxLength={2000} value={input} disabled={noAi}
-                onChange={(e) => setInput(e.target.value)} style={{ ...field, flex: 1, ...(noAi ? { opacity: 0.5 } : {}) }} />
-              <button type="submit" disabled={noAi || streaming || !input.trim()} style={{ ...btn, ...(noAi || streaming || !input.trim() ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>{A.send}</button>
+            <form onSubmit={(e) => { e.preventDefault(); void send(input); }} style={{ display: "flex", gap: 8, padding: "8px 12px", borderTop: "1px solid var(--ui-border)" }}>
+              <Input ref={inputRef} aria-label={A.inputPlaceholder} placeholder={A.inputPlaceholder} maxLength={2000} value={input} disabled={noAi}
+                onChange={(e) => setInput(e.target.value)} style={{ flex: 1 }} />
+              <Button type="submit" disabled={noAi || streaming || !input.trim()}>{A.send}</Button>
             </form>
           </>
         )}
@@ -567,20 +551,19 @@ export function AssistantDrawer({ open, pathname, itemId, onClose }: { open: boo
         {tab === "notes" && (
           <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px", display: "grid", gap: 10, alignContent: "start" }}>
             {item == null ? (
-              <p style={{ fontSize: 14, color: "var(--fg-mute)", margin: 0 }}>{A.noteNeedItem}</p>
+              <p style={{ fontSize: 14, color: "var(--ui-text-muted)", margin: 0 }}>{A.noteNeedItem}</p>
             ) : (
               <>
                 <div style={small}>#{item.id} {item.title}</div>
-                <textarea aria-label={A.notePlaceholder} placeholder={A.notePlaceholder} rows={3} value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)} style={{ ...field, resize: "vertical" }} />
+                <Textarea aria-label={A.notePlaceholder} placeholder={A.notePlaceholder} rows={3} value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)} />
                 {noteError && <p style={{ ...errStyle, margin: 0 }}>{noteError}</p>}
                 <div>
-                  <button type="button" disabled={saving || !noteText.trim() || !!loadError} onClick={saveNote}
-                    style={{ ...btn, ...(saving || !noteText.trim() ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}>{A.noteSave}</button>
+                  <Button type="button" disabled={saving || !noteText.trim() || !!loadError} onClick={saveNote}>{A.noteSave}</Button>
                 </div>
-                {notes.length === 0 && <p style={{ fontSize: 13, color: "var(--fg-faint)", margin: 0 }}>{A.noteEmpty}</p>}
+                {notes.length === 0 && <p style={{ fontSize: 13, color: "var(--ui-text-muted)", margin: 0 }}>{A.noteEmpty}</p>}
                 {notes.map((n) => (
-                  <div key={n.id} style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 8 }}>
+                  <div key={n.id} style={{ borderTop: "1px solid var(--ui-border)", paddingTop: 8 }}>
                     <div style={{ ...small, marginBottom: 4 }}>{n.author} {new Date(n.createdAt).toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</div>
                     <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 14, lineHeight: 1.45 }}>{n.body}</div>
                   </div>

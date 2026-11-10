@@ -24,10 +24,7 @@ export function LogInteractionButton({
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        className="bg-green-600 hover:bg-green-700 text-white gap-2"
-      >
+      <Button type="button" onClick={() => setOpen(true)}>
         <Phone className="size-4" />
         Naplózás
       </Button>

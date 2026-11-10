@@ -125,17 +125,17 @@ export function AssistantLauncher({ userId, pending }: { userId: number | null; 
     <>
       <style>{`
         .assistant-launcher { position: fixed; z-index: 30; right: 16px; bottom: calc(var(--statusbar-h, 26px) + 12px + env(safe-area-inset-bottom));
-          min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 22px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: var(--ui-radius-pill); display: inline-flex; align-items: center; justify-content: center; gap: 8px;
           font-size: 14px; font-weight: 500; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
-          background: var(--bg-raised); color: var(--fg); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
+          background: var(--ui-surface-overlay); color: var(--ui-text); border: 1px solid var(--ui-border-strong); box-shadow: var(--ui-shadow-overlay); }
         .assistant-launcher[data-placed="true"] { right: auto; bottom: auto; transition: left 200ms ease, top 200ms ease; }
         .assistant-launcher[data-dragging="true"] { transition: none; cursor: grabbing; }
-        .assistant-launcher:hover { border-color: var(--mint-line); }
+        .assistant-launcher:hover { border-color: var(--ui-accent); }
         .assistant-launcher-label { display: none; }
         .assistant-launcher-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
-          background: var(--mint); color: var(--fg-on-accent); }
+          background: var(--ui-accent); color: var(--ui-on-accent); }
         .assistant-launcher[data-pulse="true"] { animation: assistantPulse 1.6s ease-out 2; }
-        @keyframes assistantPulse { 0% { box-shadow: 0 0 0 0 var(--mint-glow, rgba(80, 200, 160, 0.4)); } 100% { box-shadow: 0 0 0 14px transparent; } }
+        @keyframes assistantPulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ui-accent) 40%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
         @media (min-width: 768px) { .assistant-launcher-label { display: inline; } }
         @media (max-width: 767px) {
           /* clear the fixed review action bar (about 64px plus safe area) */

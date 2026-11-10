@@ -4,6 +4,8 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { TagChip } from "./TagChip";
 import { Tag } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface TagOption { id: number; name: string; color: string; }
 interface TagFilterProps { activeTagName?: string; }
@@ -43,7 +45,7 @@ function TagFilterInner({ activeTagName }: TagFilterProps) {
   if (activeTagName) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs" style={{ color: "var(--fg-faint)" }}>Szűrés:</span>
+        <span className="text-xs" style={{ color: "var(--ui-text-muted)" }}>Szűrés:</span>
         <TagChip name={activeTagName} color="#6366f1" onRemove={clearTag} />
       </div>
     );
@@ -51,44 +53,37 @@ function TagFilterInner({ activeTagName }: TagFilterProps) {
 
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors"
-        style={{ border: "1px solid var(--line-soft)", color: "var(--fg-mute)", background: "transparent" }}
-      >
+      <Button type="button" variant="outline" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         <Tag className="size-3.5" />
         Tag szűrő
-      </button>
+      </Button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-56 rounded-lg shadow-md" style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)" }}>
-          <div className="p-2" style={{ borderBottom: "1px solid var(--line-soft)" }}>
-            <input
+        <div className="absolute z-50 mt-1 w-56" style={{ background: "var(--ui-surface-overlay)", borderRadius: "var(--ui-radius-surface)", boxShadow: "var(--ui-shadow-overlay)" }}>
+          <div className="p-2" style={{ borderBottom: "1px solid var(--ui-border)" }}>
+            <Input
               autoFocus
               type="text"
               placeholder="Tag keresése..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full text-xs px-2 py-1 rounded outline-none"
-              style={{ border: "1px solid var(--line-soft)", background: "var(--bg-raised)", color: "var(--fg)" }}
             />
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
             {options.length === 0 && (
-              <p className="px-3 py-2 text-xs" style={{ color: "var(--fg-faint)" }}>Nincs tag</p>
+              <p className="px-3 py-2 text-xs" style={{ color: "var(--ui-text-muted)" }}>Nincs tag</p>
             )}
             {options.map((t) => (
-              <button
+              <Button
                 key={t.id}
                 type="button"
+                variant="ghost"
                 onClick={() => applyTag(t.name)}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-xs"
-                style={{ color: "var(--fg-soft)" }}
+                className="w-full justify-start"
               >
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
                 {t.name}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

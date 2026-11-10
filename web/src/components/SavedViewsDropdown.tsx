@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Bookmark, Plus, Trash2, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { createSavedView, deleteSavedView } from "@/app/actions/saved-views";
 
 interface SavedView {
@@ -72,27 +74,21 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
 
   return (
     <div style={{ position: "relative" }}>
-      <button
+      <Button
+        type="button"
+        variant="outline"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5"
-        style={{
-          padding: "5px 10px",
-          background: activeView ? "var(--indigo-soft)" : "var(--bg-panel)",
-          border: `1px solid ${activeView ? "var(--indigo-line)" : "var(--line-soft)"}`,
-          borderRadius: 6, fontSize: 14,
-          color: activeView ? "var(--indigo)" : "var(--fg-soft)",
-          cursor: "pointer",
-          transition: "border-color .15s, background .15s",
-        }}
+        aria-expanded={open}
+        style={activeView ? { color: "var(--ui-text-link)", borderColor: "var(--ui-accent)" } : undefined}
       >
         <Bookmark style={{ width: 12, height: 12 }} />
         {activeView ? activeView.name : "Nézetek"}
         {views.length > 0 && !activeView && (
-          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+          <span style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
             {views.length}
           </span>
         )}
-      </button>
+      </Button>
 
       {open && (
         <>
@@ -106,14 +102,14 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
             style={{
               position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 50,
               minWidth: 220,
-              background: "var(--bg-panel)", border: "1px solid var(--line-soft)",
-              borderRadius: 8, boxShadow: "0 8px 24px var(--shadow-color)",
+              background: "var(--ui-surface-overlay)",
+              borderRadius: "var(--ui-radius-surface)", boxShadow: "var(--ui-shadow-overlay)",
               overflow: "hidden",
             }}
           >
             {views.length > 0 && (
               <>
-                <div style={{ padding: "8px 12px 4px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)" }}>
+                <div style={{ padding: "8px 12px 4px", fontSize: 12, fontWeight: 600, color: "var(--ui-text-muted)" }}>
                   Mentett nézetek
                 </div>
                 {views.map((v) => {
@@ -122,80 +118,61 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
                     <div
                       key={v.id}
                       style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", cursor: "pointer", transition: "background .12s" }}
-                      onMouseOver={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+                      onMouseOver={(e) => (e.currentTarget.style.background = "var(--ui-hover)")}
                       onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
                     >
                       <div style={{ flex: 1 }} onClick={() => applyView(v)}>
-                        <span style={{ fontSize: 14, color: active ? "var(--indigo)" : "var(--fg-soft)", fontWeight: active ? 500 : 400 }}>
+                        <span style={{ fontSize: 14, color: active ? "var(--ui-text-link)" : "var(--ui-text-muted)", fontWeight: active ? 500 : 400 }}>
                           {v.name}
                         </span>
                       </div>
-                      {active && <Check style={{ width: 12, height: 12, color: "var(--indigo)", flexShrink: 0 }} />}
-                      <button
+                      {active && <Check style={{ width: 12, height: 12, color: "var(--ui-text-link)", flexShrink: 0 }} />}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={`Törlés: ${v.name}`} // PROPOSAL copy
                         onClick={() => handleDelete(v.id)}
-                        style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--fg-faint)", flexShrink: 0 }}
-                        onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
-                        onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}
                       >
-                        <Trash2 style={{ width: 11, height: 11 }} />
-                      </button>
+                        <Trash2 style={{ width: 12, height: 12 }} />
+                      </Button>
                     </div>
                   );
                 })}
                 {deleteError && (
-                  <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "var(--coral)" }}>
+                  <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "var(--ui-danger-text)" }}>
                     {deleteError}
                   </div>
                 )}
-                <div style={{ borderTop: "1px solid var(--line-soft)", margin: "4px 0" }} />
+                <div style={{ borderTop: "1px solid var(--ui-border)", margin: "4px 0" }} />
               </>
             )}
 
             {/* Save current view */}
             {hasFilters && !saving && (
-              <button
-                onClick={() => setSaving(true)}
-                className="flex items-center gap-2 w-full"
-                style={{ padding: "8px 12px", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--fg-mute)", transition: "background .12s" }}
-                onMouseOver={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
-                onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
-              >
+              <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => setSaving(true)}>
                 <Plus style={{ width: 12, height: 12 }} />
                 Jelenlegi nézet mentése
-              </button>
+              </Button>
             )}
 
             {saving && (
               <div style={{ padding: "8px 12px", display: "flex", gap: 6 }}>
-                <input
+                <Input
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setSaving(false); }}
                   placeholder="Nézet neve…"
-                  style={{
-                    flex: 1, padding: "4px 8px", fontSize: 14,
-                    background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-                    borderRadius: 4, color: "var(--fg)", outline: "none",
-                  }}
                 />
-                <button
-                  onClick={handleSave}
-                  disabled={!name.trim() || isPending}
-                  style={{
-                    padding: "4px 10px", borderRadius: 4, fontSize: 14,
-                    background: "var(--indigo)", color: "white", border: "none",
-                    cursor: name.trim() ? "pointer" : "default",
-                    opacity: name.trim() ? 1 : 0.5,
-                  }}
-                >
+                <Button type="button" onClick={handleSave} disabled={!name.trim() || isPending}>
                   Ment
-                </button>
+                </Button>
               </div>
             )}
 
             {!hasFilters && views.length === 0 && (
-              <div style={{ padding: "12px", fontSize: 14, color: "var(--fg-faint)", textAlign: "center" }}>
+              <div style={{ padding: "12px", fontSize: 14, color: "var(--ui-text-muted)", textAlign: "center" }}>
                 Szűrj rá valamire, majd mentsd el nézetre.
               </div>
             )}

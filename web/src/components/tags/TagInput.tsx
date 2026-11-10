@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useTransition } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { TagChip } from "./TagChip";
 import { addTag, removeTag, type TaggableType } from "@/app/actions/tags";
 
@@ -88,35 +90,35 @@ export function TagInput({ taggableType, taggableId, initialTags }: TagInputProp
       </div>
 
       <div className="relative">
-        <input
+        <Input
           type="text"
           value={query}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
           onFocus={() => { if (query) fetchSuggestions(query); }}
           placeholder="Tag hozzáadása..."
-          className="h-7 w-full rounded-lg border border-input bg-transparent px-2.5 text-xs outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
           disabled={isPending}
         />
 
         {open && (
-          <div className="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-md">
+          <div className="absolute z-50 mt-1 w-full rounded-[var(--ui-radius-surface)] bg-[var(--ui-surface-overlay)] shadow-[var(--ui-shadow-overlay)]">
             {suggestions.map((s) => (
-              <button
+              <Button
                 key={s.id}
                 type="button"
+                variant="ghost"
                 onMouseDown={(e) => { e.preventDefault(); applyTag(s); }}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-xs hover:bg-slate-50 text-left"
+                className="w-full justify-start"
               >
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                 {s.name}
-              </button>
+              </Button>
             ))}
             {!exactMatch && query.trim() && (
               <>
-                {suggestions.length > 0 && <div className="border-t border-slate-100" />}
+                {suggestions.length > 0 && <div className="border-t border-[var(--ui-border)]" />}
                 <div className="px-3 py-2">
-                  <p className="text-xs text-slate-500 mb-1.5">
+                  <p className="text-xs text-[var(--ui-text-muted)] mb-1.5">
                     Létrehozás: <strong>{query.trim()}</strong>
                   </p>
                   <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
@@ -134,18 +136,19 @@ export function TagInput({ taggableType, taggableId, initialTags }: TagInputProp
                       />
                     ))}
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
+                    size="xs"
                     onMouseDown={(e) => { e.preventDefault(); createAndApply(); }}
-                    className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
                   >
                     + Enter lenyomásával is létrehozható
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
             {suggestions.length === 0 && exactMatch && (
-              <div className="px-3 py-2 text-xs text-slate-400">Már hozzá van adva</div>
+              <div className="px-3 py-2 text-xs text-[var(--ui-text-muted)]">Már hozzá van adva</div>
             )}
           </div>
         )}

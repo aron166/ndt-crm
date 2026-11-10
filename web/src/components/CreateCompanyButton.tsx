@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { CreateCompanyModal } from "@/components/CreateCompanyModal";
 
 export function CreateCompanyButton() {
@@ -8,7 +9,7 @@ export function CreateCompanyButton() {
   return (
     <>
       <CreateCompanyModal open={open} onClose={() => setOpen(false)} />
-      <button className="btn primary" onClick={() => setOpen(true)}>+ Új cég</button>
+      <Button type="button" onClick={() => setOpen(true)}>+ Új cég</Button>
     </>
   );
 }
