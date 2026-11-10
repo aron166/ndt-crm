@@ -11,17 +11,17 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-const getUser = vi.fn();
+const getClaims = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: { getUser: () => getUser() } }),
+  createClient: async () => ({ auth: { getClaims: () => getClaims() } }),
 }));
 
 import { diff, writeAuditLog } from "@/lib/audit";
 
 beforeEach(() => {
   auditCreate.mockReset();
-  getUser.mockReset();
-  getUser.mockResolvedValue({ data: { user: { id: "user-abc" } } });
+  getClaims.mockReset();
+  getClaims.mockResolvedValue({ data: { claims: { sub: "user-abc" } } });
 });
 
 describe("diff", () => {
@@ -94,7 +94,7 @@ describe("writeAuditLog", () => {
     expect(data.tenantId).toBe(1);
     expect(data.actorUserId).toBe("user-abc");
     expect(data.actorAgentId).toBeNull();
-    expect(getUser).toHaveBeenCalledTimes(1);
+    expect(getClaims).toHaveBeenCalledTimes(1);
   });
 
   it("honours an explicit tenantId override", async () => {
@@ -123,7 +123,7 @@ describe("writeAuditLog", () => {
     const data = auditCreate.mock.calls[0][0].data;
     expect(data.actorAgentId).toBe("agent-7");
     expect(data.actorUserId).toBeNull();
-    expect(getUser).not.toHaveBeenCalled();
+    expect(getClaims).not.toHaveBeenCalled();
   });
 
   it("does not consult the session for system actors", async () => {
@@ -136,7 +136,7 @@ describe("writeAuditLog", () => {
       options: { actor: "system" },
     });
 
-    expect(getUser).not.toHaveBeenCalled();
+    expect(getClaims).not.toHaveBeenCalled();
     expect(auditCreate.mock.calls[0][0].data.actorUserId).toBeNull();
   });
 
