@@ -29,7 +29,7 @@ export const TIER_LABEL: Record<LeadTier, string> = {
 
 /** Board/card colours. Neutral except A, which doubles as the overdue-flag danger colour (LeadsKanban). */
 export const TIER_COLOR: Record<LeadTier, string> = {
-  A: "var(--ui-danger)",
+  A: "var(--ui-text)",
   B: "var(--ui-text)",
   C: "var(--ui-text-muted)",
   D: "var(--ui-text-muted)",

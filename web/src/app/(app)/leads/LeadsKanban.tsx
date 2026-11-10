@@ -17,7 +17,6 @@ import {
 } from "@/lib/leads/outcomes";
 import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
-import { dataInk } from "@/lib/data-color";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 // Hungarian copy is PROPOSAL until Áron approves.
 import { displayScriptText, isPlaceholderText } from "@/lib/leads/placeholder";
@@ -154,9 +153,9 @@ function LeadCard({
         <div
           style={{
             display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 3, marginLeft: 6,
-            color: lead.tierFlag === "overdue" ? "var(--ui-surface)" : TIER_COLOR.A,
-            background: lead.tierFlag === "overdue" ? TIER_COLOR.A : "var(--ui-hover)",
-            border: `1px solid ${TIER_COLOR.A}`,
+            color: lead.tierFlag === "overdue" ? "var(--ui-surface)" : "var(--ui-danger)",
+            background: lead.tierFlag === "overdue" ? "var(--ui-danger)" : "var(--ui-hover)",
+            border: `1px solid ${"var(--ui-danger)"}`,
             fontWeight: lead.tierFlag === "overdue" ? 700 : 500,
           }}
         >
@@ -390,11 +389,9 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
             key={status.key}
             className="kcol mount"
             style={{
-              background: isHover
-                ? `${status.color}10`
-                : status.isCommitment ? `${status.color}0d` : "var(--ui-surface-muted)",
-              border: `1px solid ${isHover || status.isCommitment ? status.color : "var(--ui-border)"}`,
-              ...(status.isCommitment ? { boxShadow: `0 0 0 1px ${status.color}55, 0 0 6px ${status.color}22` } : {}),
+              // Stage colour is user data: only the header dot carries it (taste rule, 2026-11-10).
+              background: isHover ? "var(--ui-hover)" : "var(--ui-surface-muted)",
+              border: `1px solid ${isHover ? "var(--ui-border-strong)" : "var(--ui-border)"}`,
               transition: "border-color .15s, background .15s",
             }}
             onDragOver={(e) => { e.preventDefault(); setHoverCol(status.key); }}
@@ -402,15 +399,15 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
             onDrop={() => handleDrop(status.key)}
           >
             <div className="kcol-head">
-              <span className="kcol-dot" style={{ background: status.color, boxShadow: `0 0 6px ${status.color}` }} />
+              <span className="kcol-dot" style={{ background: status.color }} />
               <span className="kcol-title">{status.label}</span>
               {status.isCommitment && (
                 <span
                   title="Az időpont lefoglalása maga a megrendelés"
                   style={{
                     fontSize: 12, fontWeight: 700,
-                    color: dataInk(status.color), background: `${status.color}1f`,
-                    border: `1px solid ${status.color}55`, borderRadius: 4, padding: "1px 5px",
+                    color: "var(--ui-text-muted)", background: "var(--ui-surface)",
+                    border: "1px solid var(--ui-border)", borderRadius: 4, padding: "1px 5px",
                   }}
                 >
                   Megrendelés
