@@ -30,7 +30,7 @@ vi.mock("./queries", () => ({
 vi.mock("@/lib/db", () => ({
   db: {
     lead: { findFirst: vi.fn(), updateMany: vi.fn() },
-    task: { updateMany: vi.fn(), create: vi.fn() },
+    task: { updateMany: vi.fn(), create: vi.fn(), findFirst: vi.fn() },
     user: { findFirst: vi.fn() },
     interaction: { create: vi.fn() },
     company: { updateMany: vi.fn() },
@@ -41,7 +41,7 @@ vi.mock("@/lib/db", () => ({
 type M = ReturnType<typeof vi.fn>;
 const mockDb = db as unknown as {
   lead: { findFirst: M; updateMany: M };
-  task: { updateMany: M; create: M };
+  task: { updateMany: M; create: M; findFirst: M };
   $transaction: M;
 };
 const ctx: LeadCtx = { tenantId: 1, userId: 2, actor: "user" };
@@ -300,6 +300,22 @@ describe("completeOpenLeadCallTasks is the single shared query", () => {
 
 describe("logLeadCallOutcome — bookings", () => {
   const inDays = (n: number) => new Date(Date.now() + n * 86_400_000);
+
+  it("existingBookingTaskId: logs against the drawer's meeting, no second task, scoped lookup", async () => {
+    const startsAt = inDays(2);
+    mockDb.task.findFirst.mockResolvedValueOnce({ assignedToId: 7, startsAt, dueDate: startsAt });
+    const res = await logLeadCallOutcome(10, { outcome: "meeting_booked", note: "foglalva", existingBookingTaskId: 55 }, ctx);
+    expect(res).toMatchObject({ success: true });
+    expect(mockDb.task.findFirst.mock.calls[0][0].where).toMatchObject({ id: 55, tenantId: ctx.tenantId, leadId: 10, type: "meeting" });
+    expect(txTaskCreate).not.toHaveBeenCalled();
+  });
+
+  it("existingBookingTaskId of another lead, tenant or a done meeting: rejected, nothing written", async () => {
+    mockDb.task.findFirst.mockResolvedValueOnce(null);
+    const res = await logLeadCallOutcome(10, { outcome: "meeting_booked", note: "foglalva", existingBookingTaskId: 99 }, ctx);
+    expect(res).toMatchObject({ error: expect.any(String) });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
 
   it("user ctx, meeting_booked without bookingAt: rejected with issues.bookingAt, no task created", async () => {
     const res = await logLeadCallOutcome(10, {
