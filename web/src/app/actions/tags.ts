@@ -45,7 +45,7 @@ export async function addTag(
   const tag = await db.tag.upsert({
     where: { tenantId_name: { tenantId: TENANT_ID, name: trimmed } },
     update: {},
-    create: { tenantId: TENANT_ID, name: trimmed, color: color ?? "#6366f1" },
+    create: { tenantId: TENANT_ID, name: trimmed, color: color ?? "#6366f1" }, // design-allow: user data colour
   });
 
   const tagging = await db.tagging.upsert({

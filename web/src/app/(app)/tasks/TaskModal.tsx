@@ -231,13 +231,13 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
           </div>
 
           <details
-            className="rounded-lg border border-slate-200"
+            className="rounded-[var(--ui-radius-control)] border border-[var(--ui-border)]"
             open={!!(initial?.costCode || type === "field_visit")}
           >
-            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-slate-600 flex items-center justify-between">
+            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-[var(--ui-text-muted)] flex items-center justify-between">
               <span>Költség / elszámolás</span>
               {liveAmount != null && (
-                <span className="font-mono-ndt text-slate-500">{formatHUF(liveAmount)}</span>
+                <span className="text-[var(--ui-text-muted)]">{formatHUF(liveAmount)}</span>
               )}
             </summary>
             <div className="px-3 pb-3 space-y-3">
@@ -283,17 +283,17 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
                   />
                 </FormField>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[var(--ui-text-muted)]">
                 Összeg:{" "}
-                <span className="font-mono-ndt text-slate-700">
+                <span className="text-[var(--ui-text)]">
                   {liveAmount != null ? formatHUF(liveAmount) : "-"}
                 </span>
-                <span className="text-slate-400"> · mennyiség × egységár, automatikusan</span>
+                <span className="text-[var(--ui-text-disabled)]"> · mennyiség × egységár, automatikusan</span>
               </p>
             </div>
           </details>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p style={{ color: "var(--ui-danger-text)" }} className="text-sm">{error}</p>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
@@ -301,7 +301,6 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
             </Button>
             <Button
               type="submit"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
               disabled={isPending}
             >
               {isPending ? "Mentés..." : isEdit ? "Mentés" : "Létrehozás"}

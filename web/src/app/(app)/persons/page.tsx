@@ -14,11 +14,8 @@ const PAGE_SIZE = 30;
 const TENANT_ID = 1;
 
 function avatarBg(id: number) {
-  const palette = [
-    "var(--ui-accent)", "var(--mint)", "var(--amber)",
-    "var(--sky)", "var(--violet)", "var(--coral)",
-  ];
-  return palette[id % palette.length];
+  void id; // one neutral avatar style (taste rules)
+  return "var(--ui-surface-muted)";
 }
 
 interface SearchParams {

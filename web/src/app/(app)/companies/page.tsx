@@ -23,18 +23,15 @@ const PAGE_SIZE = 30;
 const TENANT_ID = 1;
 
 function avatarBg(id: number) {
-  const palette = [
-    "var(--ui-accent)", "var(--mint)", "var(--amber)",
-    "var(--sky)", "var(--violet)", "var(--coral)",
-  ];
-  return palette[id % palette.length];
+  void id; // one neutral avatar style (taste rules)
+  return "var(--ui-surface-muted)";
 }
 
 const FRESHNESS_COLOR: Record<string, string> = {
-  mint:   "var(--mint)",
+  mint:   "var(--ui-success)",
   mute:   "var(--ui-text-muted)",
-  amber:  "var(--amber)",
-  coral:  "var(--coral)",
+  amber:  "var(--ui-warning)",
+  coral:  "var(--ui-danger)",
 };
 
 const PIPELINE_LABELS: Record<string, string> = {

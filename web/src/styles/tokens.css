@@ -64,3 +64,11 @@
   --ui-dur-fast: 150ms;
   --ui-dur: 220ms;
 }
+
+/* chart series: calm steps of the accent, then a neutral (added by the UI sweep) */
+[data-astryx-theme] {
+  --ui-chart-1: var(--ui-accent);
+  --ui-chart-2: color-mix(in oklch, var(--ui-accent) 65%, var(--ui-surface));
+  --ui-chart-3: color-mix(in oklch, var(--ui-accent) 40%, var(--ui-surface));
+  --ui-chart-4: var(--ui-border-strong);
+}

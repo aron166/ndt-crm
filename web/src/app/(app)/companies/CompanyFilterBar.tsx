@@ -86,7 +86,7 @@ function FilterGroup({
           {label}
         </span>
         {selectedCount > 0 && (
-          <span className="rounded-full px-1.5 font-mono-ndt"
+          <span className="rounded-full px-1.5"
             style={{ fontSize: 12, background: "var(--ui-surface-muted)", color: "var(--ui-accent)" }}>
             {selectedCount}
           </span>
@@ -255,7 +255,7 @@ function CompanyFilterBarInner({ facets }: { facets: CompanyFacets }) {
         <SlidersHorizontal className="size-3.5" />
         Szűrők
         {activeCount > 0 && (
-          <span className="font-mono-ndt" style={{ fontSize: 12 }}>({activeCount})</span>
+          <span style={{ fontSize: 12 }}>({activeCount})</span>
         )}
       </button>
 

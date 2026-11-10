@@ -46,7 +46,7 @@ function TagFilterInner({ activeTagName }: TagFilterProps) {
     return (
       <div className="flex items-center gap-2">
         <span className="text-xs" style={{ color: "var(--ui-text-muted)" }}>Szűrés:</span>
-        <TagChip name={activeTagName} color="#6366f1" onRemove={clearTag} />
+        <TagChip name={activeTagName} color="#6366f1" /* design-allow: user data colour */ onRemove={clearTag} />
       </div>
     );
   }

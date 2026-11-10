@@ -61,8 +61,8 @@ interface Person {
 }
 
 const TYPE_COLOR: Record<string, string> = {
-  call: "var(--mint)", email: "var(--sky)", meeting: "var(--violet)",
-  site_visit: "var(--amber)", note: "var(--ui-text-muted)",
+  call: "var(--ui-text-muted)", email: "var(--ui-text-muted)", meeting: "var(--ui-text-muted)",
+  site_visit: "var(--ui-text-muted)", note: "var(--ui-text-muted)",
 };
 const TYPE_LABEL: Record<string, string> = {
   call: "Hívás", email: "Email", meeting: "Találkozó",
@@ -185,7 +185,7 @@ export function PersonDetailClient({
           style={{
             display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
             padding: "10px 16px", borderRadius: "var(--ui-radius-surface)",
-            background: "var(--coral-soft)", border: "1px solid var(--coral)",
+            background: "var(--ui-danger-surface)", border: "1px solid var(--ui-danger)",
           }}
         >
           <span style={{ fontSize: 14, color: "var(--ui-text)", flex: 1 }}>
@@ -415,7 +415,7 @@ export function PersonDetailClient({
                 {conversations.map((conv) => (
                   <div key={conv.id} className={k.section}>
                     <div className={k.nameLine}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--violet)", flexShrink: 0 }} />
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--ui-text-muted)", flexShrink: 0 }} />
                       <span className={k.strong}>
                         {conv.summary ?? conv.channel}
                       </span>
@@ -435,7 +435,7 @@ export function PersonDetailClient({
                             borderRadius: "var(--ui-radius-control)",
                             fontSize: 14,
                             lineHeight: 1.5,
-                            background: msg.role === "user" ? "var(--ui-surface-muted)" : "var(--violet-surface)",
+                            background: msg.role === "user" ? "var(--ui-surface-muted)" : "var(--ui-accent-surface)",
                             color: msg.role === "user" ? "var(--ui-text-muted)" : "var(--ui-text)",
                             marginLeft: msg.role === "user" ? 0 : 16,
                             border: "1px solid var(--ui-border)",
@@ -553,7 +553,7 @@ export function PersonDetailClient({
             <div style={{
               width: 48, height: 48, borderRadius: "50%",
               background: avatarColor, display: "grid", placeItems: "center",
-              fontWeight: 600, fontSize: 16, color: "var(--ui-on-accent)",
+              fontWeight: 600, fontSize: 16, color: "var(--ui-text-muted)",
             }}>
               {initials}
             </div>

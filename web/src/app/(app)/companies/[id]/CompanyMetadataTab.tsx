@@ -168,7 +168,7 @@ function AttrSection({ companyId, type, attributes }: { companyId: number; type:
         )
       )}
 
-      {error && <div style={{ fontSize: 14, color: "var(--coral)" }}>{error}</div>}
+      {error && <div style={{ fontSize: 14, color: "var(--ui-danger-text)" }}>{error}</div>}
 
       {/* History */}
       {history.length > 0 && (

@@ -452,7 +452,7 @@ function DoneCard({
 }) {
   return (
     <div className={`${k.card} ${c.center}`}>
-      <CheckCircle2 size={32} aria-hidden="true" style={{ color: "var(--mint)" }} />
+      <CheckCircle2 size={32} aria-hidden="true" style={{ color: "var(--ui-success-text)" }} />
       <h2 className={k.h2}>Hívókör kész</h2>
       <p className={k.muted} style={{ margin: 0 }}>{totalDone} hívás naplózva ebben a körben.</p>
       {totalDone > 0 && (

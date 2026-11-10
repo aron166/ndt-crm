@@ -92,16 +92,11 @@ interface Props {
 }
 
 const WARMTH_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  cold: { bg: "var(--sky-soft)",    color: "var(--sky)",    label: "Hideg" },
-  warm: { bg: "var(--amber-soft)",  color: "var(--amber)",  label: "Meleg" },
-  hot:  { bg: "var(--coral-soft)",  color: "var(--coral)",  label: "Forró" },
+  cold: { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)",   label: "Hideg" },
+  warm: { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)",   label: "Meleg" },
+  hot:  { bg: "var(--ui-surface-muted)", color: "var(--ui-danger-text)",  label: "Forró" },
 };
 
-const NDT_METHOD_COLOR: Record<string, string> = {
-  VT: "var(--sky)", PT: "var(--violet)", MT: "var(--amber)", UT: "var(--ui-accent)",
-  RT: "var(--coral)", DRT: "var(--mint)", LT: "var(--ui-text-muted)", HT: "var(--amber)",
-  SPECTRO: "var(--sky)", consultation: "var(--ui-text-muted)",
-};
 
 const PRODUCT_AREA_LABEL: Record<string, string> = {
   w: "Hegesztés", wp: "Hegeszt. előkészítés", f: "Gyártás", c: "Öntés", t: "Tesztelés", p: "Nyomástartó",
@@ -118,8 +113,8 @@ function formatRevenue(v: bigint | null): string {
 }
 
 const TYPE_COLOR: Record<string, string> = {
-  call: "var(--mint)", email: "var(--sky)", meeting: "var(--violet)",
-  site_visit: "var(--amber)", note: "var(--ui-text-muted)",
+  call: "var(--ui-text-muted)", email: "var(--ui-text-muted)", meeting: "var(--ui-text-muted)",
+  site_visit: "var(--ui-text-muted)", note: "var(--ui-text-muted)",
 };
 const TYPE_LABEL: Record<string, string> = {
   call: "Hívás", email: "Email", meeting: "Találkozó",
@@ -241,7 +236,7 @@ export function CompanyDetailClient({
           style={{
             display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
             padding: "10px 16px", borderRadius: 8,
-            background: "var(--coral-soft)", border: "1px solid var(--coral)",
+            background: "var(--ui-danger-surface)", border: "1px solid var(--ui-danger)",
           }}
         >
           <span style={{ fontSize: 14, color: "var(--ui-text)", flex: 1 }}>
@@ -509,7 +504,7 @@ export function CompanyDetailClient({
                   {saving ? "Mentés..." : "Mentés"}
                 </button>
                 {saveError && (
-                  <p style={{ fontSize: 14, color: "var(--coral)", marginTop: 6 }}>{saveError}</p>
+                  <p style={{ fontSize: 14, color: "var(--ui-danger-text)", marginTop: 6 }}>{saveError}</p>
                 )}
               </div>
             ) : (
@@ -573,7 +568,7 @@ export function CompanyDetailClient({
                   <span className={s.chips}>
                     {company.ndtMethods.map((m) => (
                       <span key={m} style={{ fontSize: 12, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
-                        background: "var(--ui-surface-muted)", color: NDT_METHOD_COLOR[m] ?? "var(--ui-text-muted)", fontFamily: "var(--font-mono)" }}>
+                        background: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" }}>
                         {m}
                       </span>
                     ))}
@@ -590,9 +585,9 @@ export function CompanyDetailClient({
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {engagementBreakdown.map((x, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: 999, background: x.color, boxShadow: `0 0 var(--glow-size) ${x.color}`, flexShrink: 0 }} />
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: x.color, flexShrink: 0 }} />
                     <span style={{ flex: 1, color: "var(--ui-text-muted)" }}>{x.label}</span>
-                    <span style={{ fontFamily: "var(--font-mono)", color: "var(--ui-text-muted)" }}>{x.value}</span>
+                    <span style={{ color: "var(--ui-text-muted)" }}>{x.value}</span>
                   </div>
                 ))}
               </div>
@@ -640,7 +635,7 @@ export function CompanyDetailClient({
                   </div>
                 )}
                 {geocodeMsg && (
-                  <div style={{ padding: "6px 16px", fontSize: 12, color: geocodeMsg.includes("siker") ? "var(--mint)" : "var(--coral)", borderTop: "1px solid var(--ui-border)" }}>
+                  <div style={{ padding: "6px 16px", fontSize: 12, color: geocodeMsg.includes("siker") ? "var(--ui-success-text)" : "var(--ui-danger-text)", borderTop: "1px solid var(--ui-border)" }}>
                     {geocodeMsg}
                   </div>
                 )}
@@ -771,9 +766,9 @@ export function CompanyDetailClient({
                   {["VT","PT","MT","UT","RT","DRT","LT","HT","SPECTRO","consultation"].map((m) => {
                     const active = company.ndtMethods.includes(m);
                     return (
-                      <div key={m} style={{ padding: "6px 12px", borderRadius: 6, fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 600,
+                      <div key={m} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 14, fontWeight: 600,
                         background: active ? "var(--ui-surface-muted)" : "transparent",
-                        color: active ? (NDT_METHOD_COLOR[m] ?? "var(--ui-text)") : "var(--ui-text-muted)",
+                        color: active ? "var(--ui-text)" : "var(--ui-text-muted)",
                         border: `1px solid ${active ? "var(--ui-border)" : "transparent"}`,
                         opacity: active ? 1 : 0.3,
                       }}>
@@ -805,7 +800,7 @@ export function CompanyDetailClient({
                 <div className={s.chipsStart}>
                   {company.materials.map((m) => (
                     <span key={m} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 14,
-                      background: "var(--ui-surface-muted)", color: "var(--amber)", fontFamily: "var(--font-mono)" }}>
+                      background: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" }}>
                       {MATERIAL_LABEL[m] ?? m}
                     </span>
                   ))}
@@ -847,7 +842,7 @@ export function CompanyDetailClient({
               {company.isPedCompliant !== null && (
                 <div className={k.kv}>
                   <span>PED megfelelőség</span>
-                  <span style={{ color: company.isPedCompliant ? "var(--mint)" : "var(--ui-text-muted)" }}>
+                  <span style={{ color: company.isPedCompliant ? "var(--ui-success)" : "var(--ui-text-muted)" }}>
                     {company.isPedCompliant ? "Igen" : "Nem"}
                   </span>
                 </div>
@@ -859,7 +854,7 @@ export function CompanyDetailClient({
                 <h2 className={k.h2}>Versenytársak</h2>
                 <div className={s.list}>
                   {[company.competitor1, company.competitor2, company.competitor3].filter(Boolean).map((c, i) => (
-                    <div key={i} style={{ fontSize: 14, padding: "5px 8px", background: "var(--ui-surface-muted)", borderRadius: 5, color: "var(--coral)" }}>
+                    <div key={i} style={{ fontSize: 14, padding: "5px 8px", background: "var(--ui-surface-muted)", borderRadius: 5, color: "var(--ui-danger-text)" }}>
                       {c}
                     </div>
                   ))}
@@ -897,11 +892,11 @@ export function CompanyDetailClient({
           <section className={`${k.card} mount`}>
             <div className="tl">
               {appEvents.map((ev) => (
-                <div key={ev.id} className="tl-item" style={{ "--accent": "var(--sky)" } as React.CSSProperties}>
+                <div key={ev.id} className="tl-item" style={{ "--accent": "var(--ui-text-muted)" } as React.CSSProperties}>
                   <div className="tl-dot" />
                   <div className="tl-head">
                     <span className="who">
-                      <span className="font-mono-ndt" style={{ color: "var(--sky)", fontWeight: 500 }}>{ev.eventType}</span>
+                      <span style={{ color: "var(--ui-text-muted)", fontWeight: 500 }}>{ev.eventType}</span>
                       <span style={{ color: "var(--ui-text-muted)", margin: "0 6px" }}>·</span>
                       <span style={{ color: "var(--ui-text-muted)" }}>{ev.sourceApp}</span>
                       {ev.agent && (

@@ -12,21 +12,21 @@ import { cn } from "@/lib/utils";
 import { BOOKING_KIND_LABEL, isBookingKind } from "@/lib/booking/priority";
 
 const COLUMNS = [
-  { key: "created",     label: "Kiírva",      color: "var(--ui-text-muted)",  glow: "var(--mute-glow)" },
-  { key: "in_progress", label: "Folyamatban", color: "var(--ui-accent)",   glow: "var(--ui-accent)"  },
-  { key: "done",        label: "Elvégezve",   color: "var(--mint)",     glow: "var(--mint-glow)"  },
-  { key: "cancelled",   label: "Törölve",     color: "var(--coral)",    glow: "var(--coral-glow)"   },
+  { key: "created",     label: "Kiírva",      color: "var(--ui-text-muted)" },
+  { key: "in_progress", label: "Folyamatban", color: "var(--ui-accent)" },
+  { key: "done",        label: "Elvégezve",   color: "var(--ui-success-text)" },
+  { key: "cancelled",   label: "Törölve",     color: "var(--ui-danger-text)" },
 ] as const;
 
 type Status = (typeof COLUMNS)[number]["key"];
 
 const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
-  call:        { bg: "var(--mint-soft)",   color: "var(--mint)"   },
-  email:       { bg: "var(--ui-surface-muted)", color: "var(--ui-accent)" },
-  meeting:     { bg: "var(--sky-soft)",    color: "var(--sky)"    },
-  document:    { bg: "var(--amber-soft)",  color: "var(--amber)"  },
-  field_visit: { bg: "var(--coral-soft)",  color: "var(--coral)"  },
-  internal:    { bg: "var(--ui-surface-muted)",   color: "var(--ui-text-muted)"},
+  call:        { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  email:       { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  meeting:     { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  document:    { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  field_visit: { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  internal:    { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -62,21 +62,16 @@ function isOverdue(dueDate: Date | null, status: string) {
 }
 
 function avatarColor(name: string) {
-  const colors = [
-    "var(--ui-accent)", "var(--mint)", "var(--amber)",
-    "var(--sky)", "var(--violet)", "var(--coral)",
-  ];
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return colors[Math.abs(h) % colors.length];
+  void name; // one neutral avatar style (taste rules)
+  return "var(--ui-surface-muted)";
 }
 
 function PersonAvatar({ name }: { name: string }) {
   const initials = name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
   return (
     <span
-      className="inline-flex items-center justify-center rounded-full font-mono-ndt shrink-0"
-      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name), color: "var(--ui-on-accent)" }}
+      className="inline-flex items-center justify-center rounded-full shrink-0"
+      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name), color: "var(--ui-text-muted)" }}
     >
       {initials}
     </span>
@@ -129,18 +124,17 @@ function KanbanCard({
     >
       {/* Top row: ID + type badge */}
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
+        <span  style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
           #{task.id}
         </span>
         {task.type && (
           <span
-            className="font-mono-ndt rounded"
+            className="rounded"
             style={{
               fontSize: 12, padding: "1px 6px",
               background: typeStyle.bg,
               color: typeStyle.color,
-              border: `1px solid ${typeStyle.color}40`,
-            }}
+                          }}
           >
             {TYPE_LABEL[task.type] ?? task.type}
           </span>
@@ -166,15 +160,15 @@ function KanbanCard({
 
       {/* Booking: start time + priority-rung chip (task with startsAt IS a booking) */}
       {task.startsAt && (
-        <div className="flex items-center gap-2 font-mono-ndt" style={{ marginBottom: 8 }}>
-          <span className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--sky)", fontWeight: 600 }}>
+        <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+          <span className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--ui-text-muted)", fontWeight: 600 }}>
             <Clock style={{ width: 9, height: 9 }} />
             {new Date(task.startsAt).toLocaleString("hu-HU", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           </span>
           {isBookingKind(task.bookingKind) && (
             <span
-              className="font-mono-ndt rounded"
-              style={{ fontSize: 11, padding: "1px 6px", background: "var(--sky-soft)", color: "var(--sky)", border: "1px solid var(--sky)40" }}
+              className="rounded"
+              style={{ fontSize: 11, padding: "1px 6px", background: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" }}
             >
               {BOOKING_KIND_LABEL[task.bookingKind]}
             </span>
@@ -219,13 +213,13 @@ function KanbanCard({
       )}
 
       {/* Bottom: due date + est. minutes */}
-      <div className="flex items-center gap-2 font-mono-ndt">
+      <div className="flex items-center gap-2">
         {task.dueDate && (
           <span
             className="flex items-center gap-1"
             style={{
               fontSize: 12,
-              color: overdue ? "var(--coral)" : "var(--ui-text-muted)",
+              color: overdue ? "var(--ui-danger-text)" : "var(--ui-text-muted)",
               fontWeight: overdue ? 600 : 400,
             }}
           >
@@ -322,7 +316,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
           <button
             key={key}
             onClick={() => setFilter(key as typeof filter)}
-            className="rounded-full font-mono-ndt transition-colors"
+            className="rounded-full transition-colors"
             style={{
               height: 26, padding: "0 10px", fontSize: 12,
               background: filter === key ? "var(--ui-surface-muted)" : "var(--ui-surface)",
@@ -334,7 +328,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
           </button>
         ))}
 
-        <div className="ml-auto flex items-center gap-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
+        <div className="ml-auto flex items-center gap-4" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
           {COLUMNS.map((col) => (
             <span key={col.key} className="flex items-center gap-1">
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: col.color }} />
@@ -377,20 +371,19 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
                   style={{
                     width: 8, height: 8,
                     background: col.color,
-                    boxShadow: `0 0 8px ${col.glow}`,
                   }}
                 />
                 <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ui-text)", letterSpacing: "0.02em" }}>
                   {col.label}
                 </span>
                 <span
-                  className="font-mono-ndt rounded"
+                  className="rounded"
                   style={{ marginLeft: "auto", fontSize: 12, background: "var(--ui-surface-muted)", color: "var(--ui-text-muted)", padding: "1px 6px" }}
                 >
                   {cards.length}
                 </span>
                 {mins > 0 && (
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
+                  <span  style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
                     {h > 0 ? `${h}h` : ""}{m > 0 ? ` ${m}m` : ""}
                   </span>
                 )}

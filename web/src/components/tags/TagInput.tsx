@@ -7,9 +7,9 @@ import { TagChip } from "./TagChip";
 import { addTag, removeTag, type TaggableType } from "@/app/actions/tags";
 
 const PRESET_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e",
-  "#f97316", "#eab308", "#22c55e", "#14b8a6",
-  "#3b82f6", "#64748b",
+  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", // design-allow: user data colour
+  "#f97316", "#eab308", "#22c55e", "#14b8a6", // design-allow: user data colour
+  "#3b82f6", "#64748b", // design-allow: user data colour
 ];
 
 interface Tag { id: number; name: string; color: string; }

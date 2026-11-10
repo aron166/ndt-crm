@@ -11,10 +11,8 @@ import k from "@/components/astryx/page.module.css";
 
 const TENANT_ID = 1;
 
-const AVATAR_PALETTE = [
-  "var(--ui-accent)", "var(--mint)", "var(--amber)",
-  "var(--sky)", "var(--violet)", "var(--coral)",
-];
+// One neutral avatar style (taste rules): no per-name colours.
+const AVATAR_PALETTE = ["var(--ui-surface-muted)"];
 
 export default async function PersonDetailPage({
   params,
