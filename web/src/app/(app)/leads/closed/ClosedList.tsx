@@ -15,7 +15,7 @@ export async function ClosedList({ page, total }: { page: number; total: number 
       company: { select: { id: true, name: true } },
       contact: { select: { person: { select: { firstName: true, lastName: true } } } },
     },
-    orderBy: [{ closedAt: { sort: "desc", nulls: "last" } }, { convertedAt: "desc" }],
+    orderBy: [{ closedAt: { sort: "desc", nulls: "last" } }, { convertedAt: "desc" }, { id: "desc" }],
     skip: (page - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
   });
