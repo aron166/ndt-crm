@@ -33,6 +33,7 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/events" ||
     pathname === "/api/conversations" ||
     pathname === "/api/leads" ||
+    pathname === "/api/suppressions" ||
     pathname.startsWith("/api/leads/") ||
     pathname === "/api/content" ||
     // Content approval loop (app key): queue, live, claim, versions. Anchored —

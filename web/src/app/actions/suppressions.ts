@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
-import { isSuppressed, parseSuppressionTarget } from "@/lib/suppression";
+import { parseSuppressionTarget } from "@/lib/suppression";
+import { cancelQueuedDraftsFor } from "@/lib/suppression/cancel";
 
 const TENANT_ID = 1;
 const CHANNELS = ["email", "phone", "linkedin", "in_person"];
@@ -58,23 +59,7 @@ export async function addSuppression(formData: FormData) {
   await audit("suppression", row.id, "create", null, { email, domain, requestedAt, channel, source });
 
   // Queued drafts to the new entry must not go out: cancel them now.
-  const queued = await db.emailDraft.findMany({
-    where: { tenantId: TENANT_ID, status: { in: ["draft", "approved", "failed"] } },
-    select: { id: true, status: true, toEmail: true, personId: true, companyId: true },
-  });
-  const set = { emails: new Set(email ? [email] : []), domains: new Set(domain ? [domain] : []) };
-  let cancelled = 0;
-  for (const d of queued) {
-    // ponytail: one lookup per row; batch when the queue is hundreds
-    if (!isSuppressed(await resolveDraftRecipient(TENANT_ID, d), set)) continue;
-    const res = await db.emailDraft.updateMany({
-      where: { id: d.id, tenantId: TENANT_ID, status: d.status },
-      data: { status: "cancelled" },
-    });
-    if (res.count === 0) continue;
-    cancelled += 1;
-    await audit("email_draft", d.id, "update", { status: d.status }, { status: "cancelled", reason: "suppressed" });
-  }
+  const cancelled = await cancelQueuedDraftsFor(TENANT_ID, { email, domain }, { actor: "user" });
 
   revalidatePath("/settings/suppressions");
   return { success: true as const, cancelled };
