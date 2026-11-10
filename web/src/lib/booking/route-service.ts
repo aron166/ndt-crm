@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 import { audit, type AuditOptions } from "@/lib/audit";
 import { answersFrom } from "@/lib/leads/qualification";
 import { isBookingKind, type BookingKind } from "./priority";
@@ -31,6 +32,9 @@ export interface SettlementOut extends Place {
   postcodes: string[];
 }
 
+/** The plain client or a transaction: the booking write runs its check on the transaction's own connection (pool max 3). */
+type Client = typeof db | Prisma.TransactionClient;
+
 const settlementSelect = { id: true, name: true, county: true, district: true, lat: true, lng: true, postcodes: true } as const;
 
 // ── Settlements (reference data, not tenant-owned) ─────────────────────────
@@ -49,8 +53,8 @@ export async function searchSettlements(q: string, limit = 15): Promise<Settleme
   });
 }
 
-export async function getSettlement(id: number): Promise<SettlementOut | null> {
-  return db.huSettlement.findUnique({ where: { id }, select: settlementSelect });
+export async function getSettlement(id: number, c: Client = db): Promise<SettlementOut | null> {
+  return c.huSettlement.findUnique({ where: { id }, select: settlementSelect });
 }
 
 // ── Machines and config ────────────────────────────────────────────────────
@@ -60,8 +64,8 @@ export interface MachineOut extends Machine {
 }
 
 /** Bookable equipment of this tenant that has a base. Ordered by id: the first one also carries pre-W8b bookings. */
-export async function loadMachines(tenantId: number): Promise<MachineOut[]> {
-  const rows = await db.equipment.findMany({
+export async function loadMachines(tenantId: number, c: Client = db): Promise<MachineOut[]> {
+  const rows = await c.equipment.findMany({
     where: { tenantId, bookable: true, baseSettlementId: { not: null } },
     select: { id: true, name: true, baseSettlement: { select: settlementSelect } },
     orderBy: { id: "asc" },
@@ -69,8 +73,8 @@ export async function loadMachines(tenantId: number): Promise<MachineOut[]> {
   return rows.flatMap((r) => (r.baseSettlement ? [{ id: r.id, name: r.name, base: r.baseSettlement }] : []));
 }
 
-export async function loadBookingConfig(tenantId: number): Promise<BookingConfig> {
-  const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+export async function loadBookingConfig(tenantId: number, c: Client = db): Promise<BookingConfig> {
+  const tenant = await c.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
   return bookingConfigFromSettings(tenant?.settings);
 }
 
@@ -83,13 +87,15 @@ export async function loadBookingConfig(tenantId: number): Promise<BookingConfig
  */
 export async function loadRouteStops(
   tenantId: number,
+  /** ALL the tenant's machines, not a filtered list: the first one carries pre-W8b bookings. */
   machines: Machine[],
   cfg: BookingConfig,
   from: Date,
   to: Date,
+  c: Client = db,
 ): Promise<RouteStop[]> {
   if (machines.length === 0) return [];
-  const rows = await db.task.findMany({
+  const rows = await c.task.findMany({
     where: {
       tenantId,
       startsAt: { gte: from, lt: to },
@@ -139,7 +145,7 @@ export async function leadSite(tenantId: number, leadId: number): Promise<LeadSi
   if (!lead) return null;
   const postcode = answersFrom(lead.qualification).postcode?.match(/\b\d{4}\b/)?.[0];
   if (postcode) {
-    const [s] = await searchSettlements(postcode, 1);
+    const s = await uniqueByPostcode(postcode);
     if (s) return { settlement: s, address: null, source: "stated" };
   }
   const c = lead.company;
@@ -150,10 +156,16 @@ export async function leadSite(tenantId: number, leadId: number): Promise<LeadSi
   return { settlement: null, address: null, source: null };
 }
 
+/** 335 postcodes are shared by several villages: only an unambiguous one may prefill a site. */
+async function uniqueByPostcode(pc: string): Promise<SettlementOut | null> {
+  const hits = await searchSettlements(pc, 2);
+  return hits.length === 1 ? hits[0] : null;
+}
+
 async function settlementFor(zip?: string | null, city?: string | null): Promise<SettlementOut | null> {
   const pc = zip?.match(/\b\d{4}\b/)?.[0];
   if (pc) {
-    const [s] = await searchSettlements(pc, 1);
+    const s = await uniqueByPostcode(pc);
     if (s) return s;
   }
   const name = city?.trim();
@@ -189,7 +201,10 @@ export const checkQuerySchema = routeQuerySchema.extend({ startsAt: z.coerce.dat
 
 interface Prepared {
   cfg: BookingConfig;
+  /** Machines to place on (filtered by machineId). */
   machines: MachineOut[];
+  /** Every machine of the tenant, for loading the timeline. */
+  allMachines: MachineOut[];
   place: SettlementOut | null;
   kind: BookingKind | null;
   minutes: number;
@@ -197,18 +212,18 @@ interface Prepared {
 
 type Fail = { error: string; status: number };
 
-async function prepare(tenantId: number, q: z.infer<typeof routeQuerySchema>): Promise<Prepared | Fail> {
+async function prepare(tenantId: number, q: z.infer<typeof routeQuerySchema>, c: Client): Promise<Prepared | Fail> {
   const [cfg, allMachines, place] = await Promise.all([
-    loadBookingConfig(tenantId),
-    loadMachines(tenantId),
-    q.settlementId != null ? getSettlement(q.settlementId) : Promise.resolve(null),
+    loadBookingConfig(tenantId, c),
+    loadMachines(tenantId, c),
+    q.settlementId != null ? getSettlement(q.settlementId, c) : Promise.resolve(null),
   ]);
   if (q.settlementId != null && !place) return { error: "Ismeretlen település", status: 400 };
   if (allMachines.length === 0) return { error: "Nincs foglalható gép beállítva", status: 409 };
   const machines = q.machineId != null ? allMachines.filter((m) => m.id === q.machineId) : allMachines;
   if (machines.length === 0) return { error: "Ismeretlen gép", status: 400 };
   const kind = (q.kind ?? null) as BookingKind | null;
-  return { cfg, machines, place, kind, minutes: q.minutes ?? visitMinutes(cfg, kind) };
+  return { cfg, machines, allMachines, place, kind, minutes: q.minutes ?? visitMinutes(cfg, kind) };
 }
 
 /** Start of tomorrow, Budapest: no same-day bookings (as the existing proposer). */
@@ -240,16 +255,22 @@ export async function proposeSlotsFor(
   tenantId: number,
   q: z.infer<typeof slotsQuerySchema>,
   now = new Date(),
+  c: Client = db,
 ): Promise<SlotsResult | Fail> {
-  const p = await prepare(tenantId, q);
+  const p = await prepare(tenantId, q, c);
   if ("error" in p) return p;
   const notBefore = tomorrow(now);
   const lead = p.kind ? p.cfg.minLeadWorkingDaysByKind[p.kind] ?? 0 : 0;
   const leadDay = atLocal(addWorkingDays(localDay(now), lead), 0);
-  const from = leadDay > notBefore ? leadDay : notBefore;
+  let from = leadDay > notBefore ? leadDay : notBefore;
+  // A customer who wants a later day gets slots from that day on, not three earlier ones.
+  if (q.wanted) {
+    const wantedStart = atLocal(localDay(q.wanted), 0);
+    if (wantedStart > from) from = wantedStart;
+  }
   const days = q.days ?? 21;
   const [winFrom, winTo] = timelineWindow(p.cfg, from, days);
-  const stops = await loadRouteStops(tenantId, p.machines, p.cfg, winFrom, winTo);
+  const stops = await loadRouteStops(tenantId, p.allMachines, p.cfg, winFrom, winTo, c);
   const slots = proposeRouteSlots({
     place: p.place, minutes: p.minutes, machines: p.machines, stops, from, days, count: q.count ?? 3,
     cfg: p.cfg, drive, wanted: q.wanted, urgent: q.urgent, excludeId: q.excludeTaskId, notBefore,
@@ -279,11 +300,12 @@ export async function checkTimeFor(
   tenantId: number,
   q: z.infer<typeof checkQuerySchema>,
   now = new Date(),
+  c: Client = db,
 ): Promise<CheckResult | Fail> {
-  const p = await prepare(tenantId, q);
+  const p = await prepare(tenantId, q, c);
   if ("error" in p) return p;
   const [winFrom, winTo] = timelineWindow(p.cfg, q.startsAt, 7);
-  const stops = await loadRouteStops(tenantId, p.machines, p.cfg, winFrom, winTo);
+  const stops = await loadRouteStops(tenantId, p.allMachines, p.cfg, winFrom, winTo, c);
   const assumed = q.siteSource === "company_address_assumed";
   const results = p.machines.map((m) => ({
     ...withSiteFlag(
@@ -311,7 +333,7 @@ export async function checkTimeFor(
     const dayStart = atLocal(localDay(q.startsAt), 0);
     const altFrom = dayStart > notBefore ? dayStart : notBefore;
     const [aFrom, aTo] = timelineWindow(p.cfg, altFrom, 10);
-    const altStops = aFrom >= winFrom && aTo <= winTo ? stops : await loadRouteStops(tenantId, p.machines, p.cfg, aFrom, aTo);
+    const altStops = aFrom >= winFrom && aTo <= winTo ? stops : await loadRouteStops(tenantId, p.allMachines, p.cfg, aFrom, aTo, c);
     alternatives = proposeRouteSlots({ ...slotInput, stops: altStops, from: altFrom, days: 10, count: 3 }).map((s) => withSiteFlag(s, assumed));
   }
   return {
@@ -356,6 +378,7 @@ export async function createBooking(ctx: BookingCtx, raw: unknown, auditOpts: Au
   const parsed = createBookingSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Érvénytelen adat", status: 400 };
   const input = parsed.data;
+  if (input.startsAt.getTime() < Date.now()) return { error: "Múltbeli időpontra nem lehet foglalni", status: 400 };
 
   const lead = await db.lead.findFirst({
     where: { id: input.leadId, tenantId: ctx.tenantId },
@@ -371,31 +394,45 @@ export async function createBooking(ctx: BookingCtx, raw: unknown, auditOpts: Au
     assignedToId = host;
   }
 
-  const check = await checkTimeFor(ctx.tenantId, {
-    settlementId: input.settlementId, startsAt: input.startsAt, kind: input.kind, minutes: input.minutes,
-    machineId: input.machineId, siteSource: input.siteSource,
-  });
-  if ("error" in check) return check;
-
-  const machineId = input.machineId ?? check.bestMachineId ?? check.machines[0].machineId;
-  const onMachine = check.machines.find((m) => m.machineId === machineId)!;
-  const overridden = !onMachine.feasible;
-  if (overridden && !input.overrideReason) {
-    return { error: "Ez az időpont nem elérhető a géppel. Válassz a javasolt időpontok közül, vagy add meg az okát.", status: 409, check };
-  }
-
+  const cfg = await loadBookingConfig(ctx.tenantId);
   const who = lead.company?.name ?? `Lead #${lead.id}`;
   const title = `Demó: ${who}`;
-  const task = await db.task.create({
-    data: {
-      tenantId: ctx.tenantId, leadId: lead.id, companyId: lead.companyId, personId: lead.contact?.personId ?? null,
-      assignedToId, title, type: "meeting", category: "revenue_generating", status: "created",
-      startsAt: input.startsAt, dueDate: input.startsAt, bookingKind: input.kind, estimatedMinutes: check.minutes,
-      siteSettlementId: input.settlementId, siteAddress: input.siteAddress || null, siteSource: input.siteSource,
-      equipmentId: machineId, overrideReason: overridden ? input.overrideReason! : null,
-    },
-    select: { id: true },
-  });
+  // Check and write under one per-tenant lock: two clicks (or Áron and Péter at
+  // once) must not both see a free machine. The check reads on the transaction's
+  // connection; a second booking waits on the lock until the first commits.
+  const out = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('w8b_booking'), ${ctx.tenantId})`;
+    const check = await checkTimeFor(ctx.tenantId, {
+      settlementId: input.settlementId, startsAt: input.startsAt, kind: input.kind, minutes: input.minutes,
+      machineId: input.machineId, siteSource: input.siteSource,
+    }, new Date(), tx);
+    if ("error" in check) return check;
+
+    const machineId = input.machineId ?? check.bestMachineId ?? check.machines[0].machineId;
+    const onMachine = check.machines.find((m) => m.machineId === machineId)!;
+    // A visit typed shorter than its kind needs would hide the real visit from later checks: same rule as a red flag.
+    const short = check.minutes < visitMinutes(cfg, input.kind);
+    const overridden = !onMachine.feasible || short;
+    if (overridden && !input.overrideReason) {
+      const error = short
+        ? "A megadott időtartam rövidebb, mint ami ehhez a foglalástípushoz kell: add meg az okát."
+        : "Ez az időpont nem elérhető a géppel. Válassz a javasolt időpontok közül, vagy add meg az okát.";
+      return { error, status: 409, check };
+    }
+    const task = await tx.task.create({
+      data: {
+        tenantId: ctx.tenantId, leadId: lead.id, companyId: lead.companyId, personId: lead.contact?.personId ?? null,
+        assignedToId, title, type: "meeting", category: "revenue_generating", status: "created",
+        startsAt: input.startsAt, dueDate: input.startsAt, bookingKind: input.kind, estimatedMinutes: check.minutes,
+        siteSettlementId: input.settlementId, siteAddress: input.siteAddress || null, siteSource: input.siteSource,
+        equipmentId: machineId, overrideReason: overridden ? input.overrideReason! : null,
+      },
+      select: { id: true },
+    });
+    return { task, check, machineId, overridden };
+  }, { timeout: 15_000 });
+  if (out.error !== undefined) return { error: out.error, status: out.status, check: "check" in out ? out.check : undefined };
+  const { task, check, machineId, overridden } = out;
   audit("task", task.id, "create", null, {
     title, startsAt: input.startsAt.toISOString(), bookingKind: input.kind, leadId: lead.id,
     siteSettlementId: input.settlementId, equipmentId: machineId, overrideReason: overridden ? input.overrideReason : null,

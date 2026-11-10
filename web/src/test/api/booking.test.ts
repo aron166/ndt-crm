@@ -17,7 +17,10 @@ const { db, audit, getActor } = vi.hoisted(() => ({
   getActor: vi.fn(),
 }));
 
-vi.mock("@/lib/db", () => ({ db }));
+// createBooking runs its check and create inside db.$transaction (advisory lock): the tx is the same table mocks.
+vi.mock("@/lib/db", () => ({
+  db: { ...db, $transaction: (fn: (tx: unknown) => unknown) => fn({ ...db, $executeRaw: vi.fn() }) },
+}));
 vi.mock("@/lib/audit", () => ({ audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/actor", () => ({ getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
@@ -131,6 +134,18 @@ describe("bookings", () => {
     const res = await bookingsPOST(req("bookings", { ...impossible, settlementId: 1184, startsAt: "2026-11-26T10:00:00+01:00" }));
     expect(res.status).toBe(201);
     expect(db.task.create.mock.calls[0][0].data.overrideReason).toBeNull();
+  });
+
+  it("409 when the typed minutes are shorter than the kind needs, unless a reason is given", async () => {
+    const short = { ...impossible, settlementId: 1184, startsAt: "2026-11-26T10:00:00+01:00", kind: "multi_unit_demo", minutes: 15 };
+    expect((await bookingsPOST(req("bookings", short))).status).toBe(409);
+    expect(db.task.create).not.toHaveBeenCalled();
+    expect((await bookingsPOST(req("bookings", { ...short, overrideReason: "only the handover" }))).status).toBe(201);
+  });
+
+  it("400 for a time in the past", async () => {
+    const past = { ...impossible, settlementId: 1184, startsAt: "2026-11-19T10:00:00+01:00" };
+    expect((await bookingsPOST(req("bookings", past))).status).toBe(400);
   });
 
   it("404 when the lead is not in the tenant", async () => {
