@@ -6,21 +6,33 @@ import { StackBar } from "@/components/viz/StackBar";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { formatDate } from "@/lib/utils";
 import { serializeDates } from "@/lib/serialize";
+import { PageHeader, Seg } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "./analytics.module.css";
 import { AnalyticsClient } from "./AnalyticsClient";
 
 const TENANT_ID = 1;
 
 const PIPELINE_COLORS: Record<number, string> = {
-  0: "var(--fg-faint)",
+  0: "var(--color-text-secondary)",
   1: "var(--sky)",
   2: "var(--amber)",
   3: "var(--mint)",
   4: "var(--coral)",
   5: "var(--violet)",
-  6: "var(--indigo)",
-  7: "var(--fg-faint)",
+  6: "var(--color-accent)",
+  7: "var(--color-text-secondary)",
   8: "var(--mint)",
 };
+
+const RANGE_LABEL = "Időszak"; // PROPOSAL copy
+const RANGE_ITEMS = [
+  { key: "7d",      label: "7 nap" },
+  { key: "30d",     label: "30 nap" },
+  { key: "90d",     label: "90 nap" },
+  { key: "quarter", label: "Negyedév" },
+  { key: "ytd",     label: "YTD" },
+];
 
 interface SearchParams { range?: string; }
 
@@ -133,213 +145,179 @@ export default async function AnalyticsPage({
   });
 
   // ── Derived ────────────────────────────────────────────────
-  const totalRevenue = revenueByYear.reduce((s, r) => s + r.total, 0);
+  const totalRevenue = revenueByYear.reduce((sum, r) => sum + r.total, 0);
   const revenueSeries = revenueByYear.map((r) => r.total / 1_000_000); // in millions
   const revenueMonthSeries = revenueByMonth.map((r) => r.total / 1_000_000);
 
   const pipelineItems = pipelineDistribution.map((row) => ({
     status: row.status ?? "",
     count: Number(row.count),
-    color: PIPELINE_COLORS[parseInt(row.status ?? "1")] ?? "var(--fg-faint)",
+    color: PIPELINE_COLORS[parseInt(row.status ?? "1")] ?? "var(--color-text-secondary)",
   }));
 
   return (
-    <div className="mount space-y-8">
-      {/* Header */}
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">
-            Analytics
-            <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-mute)", fontWeight: 400 }}>
-              · Controllabor Kft.
-            </span>
-          </h1>
-          <p className="page-sub">Valós adatok az adatbázisból. Minden szám kattintható.</p>
-        </div>
+    <div className={`mount ${s.page}`}>
+      <PageHeader
+        title={<>Analytics<span className={k.muted}> · Controllabor Kft.</span></>}
+        help="Valós adatok az adatbázisból. Minden szám kattintható."
+        views={
+          <Seg
+            label={RANGE_LABEL}
+            current={range}
+            items={RANGE_ITEMS.map((it) => ({ ...it, href: `/analytics?range=${it.key}` }))}
+          />
+        }
+      />
 
-        {/* Time range selector */}
-        <div className="flex items-center gap-1" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: 2 }}>
-          {[
-            { key: "7d",      label: "7 nap" },
-            { key: "30d",     label: "30 nap" },
-            { key: "90d",     label: "90 nap" },
-            { key: "quarter", label: "Negyedév" },
-            { key: "ytd",     label: "YTD" },
-          ].map(({ key, label }) => (
-            <Link
-              key={key}
-              href={`/analytics?range=${key}`}
-              className="font-mono-ndt rounded"
-              style={{
-                fontSize: 12, padding: "3px 10px",
-                background: range === key ? "var(--bg-hover)" : "transparent",
-                color: range === key ? "var(--fg)" : "var(--fg-mute)",
-              }}
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* KPI Strip — inline grid so no missing CSS class dependency */}
-      <div className="mount mount-1" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        <div className="kpi" style={{ "--accent": "var(--indigo)" } as React.CSSProperties}>
-          <Link href="/companies" className="k-label" style={{ textDecoration: "none" }}>Cégek</Link>
-          <Link href="/companies" className="k-value font-mono-ndt" style={{ textDecoration: "none" }}>
+      {/* KPI strip */}
+      <div className={`mount mount-1 ${s.kpis}`}>
+        <div className={`${k.card} ${k.stat}`}>
+          <Link href="/companies" className={`${k.statK} ${s.plain}`}>Cégek</Link>
+          <Link href="/companies" className={`${k.statV} ${s.plain}`}>
             {totalCompanies.toLocaleString("hu-HU")}
           </Link>
-          <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
+          <span className={k.muted}>
             {contacted.toLocaleString("hu-HU")} érintett ·{" "}
-            <Link href="/companies?never_contacted=1" style={{ color: "var(--amber)", textDecoration: "none" }}>
+            <Link href="/companies?never_contacted=1" className={s.plain} style={{ color: "var(--amber)" }}>
               {neverContacted.toLocaleString("hu-HU")} soha
             </Link>
-          </div>
-          <div className="k-spark">
-            <Sparkline data={pipelineItems.map((p) => p.count)} width={80} height={28} color="var(--indigo)" />
+          </span>
+          <div className={s.spark}>
+            <Sparkline data={pipelineItems.map((p) => p.count)} width={80} height={28} color="var(--color-accent)" />
           </div>
         </div>
 
-        <Link href="/persons" className="kpi" style={{ "--accent": "var(--sky)" } as React.CSSProperties}>
-          <div className="k-label">Személyek</div>
-          <div className="k-value font-mono-ndt">{totalPersons.toLocaleString("hu-HU")}</div>
-          <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
-            2023-as kontakt snapshot
-          </div>
+        <Link href="/persons" className={`${k.card} ${k.stat} ${s.plain}`}>
+          <span className={k.statK}>Személyek</span>
+          <span className={k.statV}>{totalPersons.toLocaleString("hu-HU")}</span>
+          <span className={k.muted}>2023-as kontakt snapshot</span>
         </Link>
 
-        <Link href="/analytics/invoices" className="kpi" style={{ "--accent": "var(--mint)" } as React.CSSProperties}>
-          <div className="k-label">Összbevétel (HUF)</div>
-          <div className="k-value font-mono-ndt" style={{ fontSize: 22 }}>
-            {(totalRevenue / 1_000_000).toFixed(1)}M
-          </div>
-          <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>2010–2023 · 2016 számla</div>
-          <div className="k-spark">
+        <Link href="/analytics/invoices" className={`${k.card} ${k.stat} ${s.plain}`}>
+          <span className={k.statK}>Összbevétel (HUF)</span>
+          <span className={k.statV}>{(totalRevenue / 1_000_000).toFixed(1)}M</span>
+          <span className={k.muted}>2010–2023 · 2016 számla</span>
+          <div className={s.spark}>
             <Sparkline data={revenueSeries.slice(-12)} width={80} height={28} color="var(--mint)" />
           </div>
         </Link>
 
-        <Link href={`/analytics?range=${range}#interactions`} className="kpi" style={{ "--accent": "var(--amber)" } as React.CSSProperties}>
-          <div className="k-label">Interakciók ({range.toUpperCase()})</div>
-          <div className="k-value font-mono-ndt">{recentInteractions.toLocaleString("hu-HU")}</div>
-          <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
+        <Link href={`/analytics?range=${range}#interactions`} className={`${k.card} ${k.stat} ${s.plain}`}>
+          <span className={k.statK}>Interakciók ({range.toUpperCase()})</span>
+          <span className={k.statV}>{recentInteractions.toLocaleString("hu-HU")}</span>
+          <span className={k.muted}>
             {openTasks > 0 ? `${openTasks} nyitott feladat` : "Nincs nyitott feladat"}
-          </div>
+          </span>
         </Link>
       </div>
 
       {/* Pipeline coverage strip */}
-      <div className="panel mount mount-2">
-        <div className="panel-head">
-          <div className="panel-title">Pipeline státusz megoszlás</div>
-          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+      <section className={`${k.section} mount mount-2`}>
+        <div className={s.head}>
+          <h2 className={k.h2}>Pipeline státusz megoszlás</h2>
+          <span className={k.muted}>
             {totalCompanies.toLocaleString("hu-HU")} cég
           </span>
         </div>
-        <div className="panel-pad space-y-4">
-          <StackBar
-            segments={pipelineItems.filter((p) => p.count > 0).map((p) => ({
-              label: p.status,
-              value: p.count,
-              color: p.color,
-            }))}
-            height={12}
-          />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-            {pipelineItems.filter((p) => p.count > 0).map((p) => (
-              <Link
-                key={p.status}
-                href={`/companies?pipeline_status=${p.status}`}
-                className="flex items-center gap-2"
-                style={{ fontSize: 14, color: "var(--fg-soft)" }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color, flexShrink: 0, boxShadow: `0 0 var(--glow-size) ${p.color}` }} />
-                <PipelineStatusBadge status={p.status} />
-                <span className="font-mono-ndt ml-auto" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
-                  {p.count.toLocaleString("hu-HU")}
-                </span>
-              </Link>
-            ))}
-          </div>
+        <StackBar
+          segments={pipelineItems.filter((p) => p.count > 0).map((p) => ({
+            label: p.status,
+            value: p.count,
+            color: p.color,
+          }))}
+          height={12}
+        />
+        <div className={s.pipeGrid}>
+          {pipelineItems.filter((p) => p.count > 0).map((p) => (
+            <Link
+              key={p.status}
+              href={`/companies?pipeline_status=${p.status}`}
+              className={s.pipeItem}
+            >
+              <span className={s.dot} style={{ background: p.color }} />
+              <PipelineStatusBadge status={p.status} />
+              <span className={`${s.count} ${k.num}`}>
+                {p.count.toLocaleString("hu-HU")}
+              </span>
+            </Link>
+          ))}
         </div>
-      </div>
+      </section>
 
       {/* Revenue chart */}
-      <div className="panel mount mount-3">
-        <div className="panel-head">
-          <div className="panel-title">Forgalom · éves bontás (M HUF)</div>
-          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)" }}>
+      <section className={`${k.section} mount mount-3`}>
+        <div className={s.head}>
+          <h2 className={k.h2}>Forgalom · éves bontás (M HUF)</h2>
+          <span className={k.num} style={{ fontSize: 14, color: "var(--mint)" }}>
             {(totalRevenue / 1_000_000).toFixed(1)}M HUF összesen
           </span>
         </div>
-        <div style={{ padding: 20 }}>
-          <AreaChart data={revenueSeries} height={200} color="var(--indigo)" />
-          <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}>
-            {revenueByYear.map((r) => (
-              <Link
-                key={r.year}
-                href={`/analytics/invoices?year=${r.year}`}
-                style={{ textAlign: "center", flexShrink: 0, minWidth: 44, textDecoration: "none" }}
-                title={`Számlák: ${r.year}`}
-              >
-                <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)", fontWeight: 500 }}>
-                  {(r.total / 1_000_000).toFixed(0)}M
-                </div>
-                <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{r.year}</div>
-              </Link>
-            ))}
-          </div>
+        <AreaChart data={revenueSeries} height={200} color="var(--color-accent)" />
+        <div className={s.years}>
+          {revenueByYear.map((r) => (
+            <Link
+              key={r.year}
+              href={`/analytics/invoices?year=${r.year}`}
+              className={s.year}
+              title={`Számlák: ${r.year}`}
+            >
+              <span className={k.num} style={{ fontSize: 14, color: "var(--mint)", fontWeight: 500 }}>
+                {(r.total / 1_000_000).toFixed(0)}M
+              </span>
+              <span className={k.muted}>{r.year}</span>
+            </Link>
+          ))}
         </div>
-      </div>
+      </section>
 
       {/* Top companies + cold companies side by side */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className={s.pair}>
         {/* Top companies by revenue */}
-        <div className="panel mount mount-4">
-          <div className="panel-head">
-            <div className="panel-title">Top cégek bevétel szerint</div>
-          </div>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Cég</th>
-                <th style={{ textAlign: "right" }}>Bevétel (M HUF)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topCompaniesByRevenue.map((row, i) => (
-                <tr key={i}>
-                  <td className="name">
-                    {row.company_id ? (
-                      <Link href={`/companies/${row.company_id}`} className="row-link">
-                        {row.company_name ?? "-"}
-                      </Link>
-                    ) : (
-                      <span style={{ color: "var(--fg-soft)" }}>{row.company_name ?? "-"}</span>
-                    )}
-                  </td>
-                  <td className="num" style={{ textAlign: "right", color: "var(--mint)" }}>
-                    {(row.total / 1_000_000).toFixed(2)}M
-                  </td>
+        <section className={`${k.section} mount`}>
+          <h2 className={k.h2}>Top cégek bevétel szerint</h2>
+          <div className={k.tableWrap}>
+            <table className={k.table} style={{ minWidth: 0 }}>
+              <thead>
+                <tr>
+                  <th>Cég</th>
+                  <th className={s.right}>Bevétel (M HUF)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {topCompaniesByRevenue.map((row, i) => (
+                  <tr key={i}>
+                    <td>
+                      {row.company_id ? (
+                        <Link href={`/companies/${row.company_id}`} className={s.cellName}>
+                          {row.company_name ?? "-"}
+                        </Link>
+                      ) : (
+                        <span style={{ color: "var(--color-text-primary)" }}>{row.company_name ?? "-"}</span>
+                      )}
+                    </td>
+                    <td className={`${s.right} ${k.num}`} style={{ color: "var(--mint)" }}>
+                      {(row.total / 1_000_000).toFixed(2)}M
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {/* Cold companies — actionable */}
-        <div className="panel mount mount-4">
-          <div className="panel-head">
-            <div className="panel-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)", boxShadow: "0 0 6px var(--amber)" }} />
+        <section className={`${k.section} mount`}>
+          <div className={s.head}>
+            <h2 className={k.h2} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)" }} />
               Hívandók (90+ nap inaktív)
-            </div>
-            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--coral)" }}>
+            </h2>
+            <span className={k.num} style={{ fontSize: 14, color: "var(--coral)" }}>
               {coldCompanies.length} cég
             </span>
           </div>
-          <div style={{ maxHeight: 400, overflowY: "auto" }}>
-            <table className="tbl">
+          <div className={`${k.tableWrap} ${s.scroll}`}>
+            <table className={k.table} style={{ minWidth: 0 }}>
               <thead>
                 <tr>
                   <th>Cég</th>
@@ -349,17 +327,17 @@ export default async function AnalyticsPage({
               <tbody>
                 {coldCompanies.map((c) => (
                   <tr key={c.id}>
-                    <td className="name">
-                      <Link href={`/companies/${c.id}`} className="row-link">{c.name}</Link>
-                      {c.city && <div className="sub">{c.city}</div>}
+                    <td>
+                      <Link href={`/companies/${c.id}`} className={s.cellName}>{c.name}</Link>
+                      {c.city && <div className={k.muted}>{c.city}</div>}
                     </td>
                     <td>
                       {c.lastInteractionDate ? (
-                        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--amber)" }}>
+                        <span className={k.num} style={{ fontSize: 14, color: "var(--amber)" }}>
                           {formatDate(c.lastInteractionDate)}
                         </span>
                       ) : (
-                        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--coral)" }}>Soha</span>
+                        <span className={k.num} style={{ fontSize: 14, color: "var(--coral)" }}>Soha</span>
                       )}
                     </td>
                   </tr>
@@ -367,18 +345,20 @@ export default async function AnalyticsPage({
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Data explorer — client-side filterable tables */}
-      <AnalyticsClient
-        revenueByMonth={serializeDates(revenueByMonth)}
-        totalCompanies={totalCompanies}
-        totalPersons={totalPersons}
-        neverContacted={neverContacted}
-        openTasks={openTasks}
-        openDeals={openDeals}
-      />
+      <div style={{ marginBlockStart: 8 }}>
+        <AnalyticsClient
+          revenueByMonth={serializeDates(revenueByMonth)}
+          totalCompanies={totalCompanies}
+          totalPersons={totalPersons}
+          neverContacted={neverContacted}
+          openTasks={openTasks}
+          openDeals={openDeals}
+        />
+      </div>
     </div>
   );
 }

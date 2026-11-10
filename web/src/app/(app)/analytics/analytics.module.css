@@ -1,0 +1,58 @@
+/* Analytics screens (Astryx direction A). Layout the page kit lacks. Astryx tokens only. */
+
+.page { display: flex; flex-direction: column; gap: 32px; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-block-end: 8px; }
+.spark { margin-block-start: 8px; }
+.plain { text-decoration: none; }
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.center { text-align: center; }
+.right { text-align: right; }
+.axis { font-size: 12px; color: var(--color-text-secondary); }
+
+/* Two sections side by side: the section padding and divider move to the grid */
+.pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.pair > section { padding: 0; border-top: 0; }
+
+/* Pipeline status legend */
+.pipeGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pipeItem { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; color: var(--color-text-secondary); text-decoration: none; }
+.pipeItem:hover { color: var(--color-text-primary); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.count { margin-inline-start: auto; font-size: 14px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+
+/* Year drill-down under the revenue chart */
+.years { display: flex; gap: 8px; margin-block-start: 12px; overflow-x: auto; padding-block-end: 4px; }
+.year { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; min-width: 44px; text-decoration: none; }
+
+/* Tables */
+.cellName { color: var(--color-text-primary); font-weight: 500; text-decoration: none; overflow-wrap: anywhere; }
+.cellName:hover { text-decoration: underline; }
+.scroll { max-height: 400px; overflow-y: auto; }
+
+/* Data explorer tiles */
+.links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.linkTile { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-element); background: var(--color-background-card); font-size: 14px; color: var(--color-text-primary); text-decoration: none; }
+.linkTile:hover { border-color: var(--color-accent); background: var(--color-background-muted); }
+.linkTile:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* Invoices: search field, empty row, overflow note */
+.field { box-sizing: border-box; width: 200px; max-width: 100%; min-height: 40px; padding: 8px 12px; font: inherit; font-size: 14px; border: 1px solid var(--color-border-emphasized); border-radius: var(--radius-element); background: var(--color-background-card); color: var(--color-text-primary); }
+.field:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.emptyCell { padding: 48px 16px; text-align: center; }
+.note { padding: 12px 16px; text-align: center; border-top: 1px solid var(--color-border); }
+
+/* Plain buttons used as a segmented control (state lives in React) */
+.segBtn { border: 0; font-family: inherit; cursor: pointer; background: transparent; }
+.segBtn[aria-pressed="true"] { background: var(--color-background-card); }
+
+@media (max-width: 960px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .pipeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .links { grid-template-columns: minmax(0, 1fr); }
+}

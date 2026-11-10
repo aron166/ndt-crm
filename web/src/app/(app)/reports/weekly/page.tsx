@@ -7,32 +7,33 @@ import { callOutcomeLabel } from "@/lib/leads/outcomes";
 import { getWeeklyReport, lastDays, type WeeklyReport } from "@/lib/reports/weekly";
 import { monthUsage } from "@/lib/assistant/cap";
 import { REPORT_UI, formatMinutesOrDash } from "@/lib/reports/labels";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "./weekly.module.css";
 
 const TENANT_ID = 1;
 // Hungarian copy (lib/reports/labels.ts) is PROPOSAL until Áron approves.
 
-const R = { textAlign: "right" } as const;
-
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="panel">
-      <div className="panel-head"><div className="panel-title">{title}</div></div>
-      <div className="panel-pad">{children}</div>
-    </div>
+    <section className={k.section}>
+      <h3 className={k.h2}>{title}</h3>
+      {children}
+    </section>
   );
 }
 
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
-  if (rows.length === 0) return <p style={{ fontSize: 13, color: "var(--fg-faint)" }}>{REPORT_UI.empty}</p>;
+  if (rows.length === 0) return <p className={k.muted}>{REPORT_UI.empty}</p>;
   return (
-    <div style={{ overflowX: "auto" }}>
-    <table className="tbl">
+    <div className={k.tableWrap}>
+    <table className={k.table}>
       <thead>
-        <tr>{head.map((h, i) => <th key={h} style={i === head.length - 1 ? R : undefined}>{h}</th>)}</tr>
+        <tr>{head.map((h, i) => <th key={h} className={i === head.length - 1 ? s.right : undefined}>{h}</th>)}</tr>
       </thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i}>{r.map((c, j) => <td key={j} style={j === r.length - 1 ? R : undefined}>{c}</td>)}</tr>
+          <tr key={i}>{r.map((c, j) => <td key={j} className={j === r.length - 1 ? `${s.right} ${k.num}` : undefined}>{c}</td>)}</tr>
         ))}
       </tbody>
     </table>
@@ -42,22 +43,20 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="kpi">
-      <div className="k-label">{label}</div>
-      <div className="k-value font-mono-ndt" style={{ fontSize: 22 }}>{value}</div>
+    <div className={`${k.card} ${k.stat} ${s.stat}`}>
+      <div className={k.statK}>{label}</div>
+      <div className={k.statV}>{value}</div>
     </div>
   );
 }
 
-const grid = (min: number) => ({ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))`, gap: 12 }) as const;
-
 function Window({ title, r, statuses }: { title: string; r: WeeklyReport; statuses: LeadStatusDef[] }) {
   const t = r.tierA;
   return (
-    <section className="space-y-4">
-      <h2 className="panel-title" style={{ fontSize: 16 }}>{title}</h2>
+    <section className={s.window}>
+      <h2 className={k.h2}>{title}</h2>
 
-      <div style={grid(110)}>
+      <div className={s.stats}>
         <Stat label={REPORT_UI.leadsCreated} value={r.leadsTotal} />
         <Stat label={REPORT_UI.calls} value={r.callsTotal} />
         <Stat label={REPORT_UI.demosBooked} value={r.demos.booked} />
@@ -108,7 +107,7 @@ function Window({ title, r, statuses }: { title: string; r: WeeklyReport; status
       <Panel title={REPORT_UI.topCompanies}>
         <Table
           head={[REPORT_UI.topCompanies, REPORT_UI.touches]}
-          rows={r.topCompanies.map((c) => [<Link key={c.companyId} href={`/companies/${c.companyId}`} className="tbl-link">{c.name}</Link>, c.touches])}
+          rows={r.topCompanies.map((c) => [<Link key={c.companyId} href={`/companies/${c.companyId}`} className={k.link}>{c.name}</Link>, c.touches])}
         />
       </Panel>
     </section>
@@ -128,11 +127,11 @@ export default async function WeeklyReportPage() {
 
   return (
     <div className="mount space-y-8">
-      <div className="page-head">
-        <h1 className="page-title">{REPORT_UI.title}</h1>
-      </div>
-      <p style={{ fontSize: 13, color: "var(--fg-faint)" }}>{REPORT_UI.assistantMonth(assistant.calls, assistant.tokens, assistant.costUsd)}</p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", gap: 24, alignItems: "start" }}>
+      <PageHeader
+        title={REPORT_UI.title}
+        eyebrow={REPORT_UI.assistantMonth(assistant.calls, assistant.tokens, assistant.costUsd)}
+      />
+      <div className={s.columns}>
         <Window title={REPORT_UI.last7} r={r7} statuses={statuses} />
         <Window title={REPORT_UI.last28} r={r28} statuses={statuses} />
       </div>

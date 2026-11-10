@@ -11,9 +11,9 @@ import {
   reorderLeadStatuses,
   seedDefaultLeadStatuses,
 } from "@/app/actions/leads";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@astryxdesign/core/Badge";
+import k from "@/components/astryx/page.module.css";
+import m from "./setup.module.css";
 import { isPlaceholderText } from "@/lib/leads/placeholder";
 import { STAGE_DESCRIPTION_PLACEHOLDER, STAGE_DESCRIPTION_MAX } from "@/lib/leads/statuses";
 
@@ -75,35 +75,28 @@ function StatusRow({
 
   if (!editing) {
     return (
-      <div
-        className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
-        style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)", cursor: "pointer" }}
-        onClick={() => setEditing(true)}
-      >
+      <div className={m.row} onClick={() => setEditing(true)}>
         <span
           {...dragHandle}
           onClick={(e) => e.stopPropagation()}
           title="Húzd az átrendezéshez"
-          style={{ display: "flex", flexShrink: 0, cursor: dragHandle ? "grab" : "default", touchAction: "none" }}
+          className={m.grip}
+          style={{ cursor: dragHandle ? "grab" : "default" }}
         >
-          <GripVertical style={{ width: 14, height: 14, color: "var(--fg-faint)" }} />
+          <GripVertical style={{ width: 14, height: 14 }} />
         </span>
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: status.color, flexShrink: 0, boxShadow: `0 0 var(--glow-size) ${status.color}` }} />
-        <span style={{ flex: 1, fontSize: 14, color: "var(--fg)" }}>{status.label}</span>
-        {status.isInitial && <span className="badge-ds indigo" style={{ fontSize: 12 }}>Kezdő</span>}
-        {status.isCommitment && (
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--mint-fg)", background: "var(--mint-soft)", border: "1px solid var(--mint-line)", borderRadius: 4, padding: "1px 6px" }}>
-            Megrendelés
-          </span>
-        )}
-        {status.isTerminal && <span className="badge-ds coral" style={{ fontSize: 12 }}>Lezárt</span>}
-        {(!status.description || isPlaceholderText(status.description)) && (
-          <span className="badge-ds coral" style={{ fontSize: 12 }}>Nincs script</span>
-        )}
+        <span className={m.dot} style={{ background: status.color }} />
+        <span className={m.rowLabel}>{status.label}</span>
+        <div className={m.badges}>
+          {status.isInitial && <Badge variant="info" label="Kezdő" />}
+          {status.isCommitment && <Badge variant="success" label="Megrendelés" />}
+          {status.isTerminal && <Badge variant="error" label="Lezárt" />}
+          {(!status.description || isPlaceholderText(status.description)) && (
+            <Badge variant="error" label="Nincs script" />
+          )}
+        </div>
         <button aria-label={`Törlés: ${status.label}`} onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-          style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
-          onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
-          onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}
+          className={`${k.btn} ${k.btnIcon} ${m.danger}`}
         >
           <Trash2 style={{ width: 13, height: 13 }} />
         </button>
@@ -112,18 +105,18 @@ function StatusRow({
   }
 
   return (
-    <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--indigo-line)", background: "var(--bg-panel)" }}>
+    <div className={m.editor}>
       <div>
-        <label className="field-label">Státusz neve</label>
-        <Input value={label} onChange={(e) => setLabel(e.target.value)} />
+        <label className={m.label}>Státusz neve</label>
+        <input className={m.field} value={label} onChange={(e) => setLabel(e.target.value)} />
       </div>
       <div>
-        <label className="field-label">Szín</label>
-        <div className="flex gap-2 flex-wrap">
+        <label className={m.label}>Szín</label>
+        <div className={m.swatches}>
           {STATUS_COLORS.map((c) => (
-            <button key={c} type="button" onClick={() => setColor(c)}
+            <button key={c} type="button" onClick={() => setColor(c)} className={m.swatch}
               style={{
-                width: 24, height: 24, borderRadius: "50%", background: c, cursor: "pointer",
+                background: c,
                 outline: color === c ? `2px solid ${c}` : "none", outlineOffset: 2,
                 // affordance, not decoration — keep a literal radius in both themes so the selected swatch stays visible
                 boxShadow: color === c ? `0 0 8px ${c}` : "none",
@@ -133,37 +126,38 @@ function StatusRow({
         </div>
       </div>
       <div>
-        <label className="field-label">Mit csinálunk ebben a fázisban? (script)</label>
-        <Textarea
+        <label className={m.label}>Mit csinálunk ebben a fázisban? (script)</label>
+        <textarea
+          className={`${m.field} ${m.textarea}`}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={6}
           maxLength={STAGE_DESCRIPTION_MAX}
           placeholder={STAGE_DESCRIPTION_PLACEHOLDER}
         />
-        <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>
+        <p className={`${k.muted} ${m.hint}`}>
           Ez jelenik meg a kanban oszlop fejlécében és a hívás-modalban. Sortörések megmaradnak.
         </p>
       </div>
-      <div className="flex gap-4 text-sm flex-wrap" style={{ color: "var(--fg-soft)" }}>
-        <label className="flex items-center gap-2 cursor-pointer">
+      <div className={m.checks}>
+        <label className={m.check}>
           <input type="checkbox" checked={isInitial} onChange={(e) => { setIsInitial(e.target.checked); if (e.target.checked) { setIsTerminal(false); setIsCommitment(false); } }} />
           Kezdő (ide érkeznek a leadek)
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className={m.check}>
           <input type="checkbox" checked={isCommitment} onChange={(e) => { setIsCommitment(e.target.checked); if (e.target.checked) { setIsInitial(false); setIsTerminal(false); } }} />
           Megrendelés (a lefoglalás = az order)
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className={m.check}>
           <input type="checkbox" checked={isTerminal} onChange={(e) => { setIsTerminal(e.target.checked); if (e.target.checked) { setIsInitial(false); setIsCommitment(false); } }} />
           Lezárt (greyed)
         </label>
       </div>
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>Mégse</Button>
-        <Button type="button" size="sm" className="btn primary" onClick={save} disabled={isPending}>
+      <div className={m.footer}>
+        <button type="button" className={k.btn} onClick={() => setEditing(false)}>Mégse</button>
+        <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={save} disabled={isPending}>
           {isPending ? "Mentés..." : "Mentés"}
-        </Button>
+        </button>
       </div>
     </div>
   );
@@ -219,27 +213,27 @@ export function LeadStatusSetupClient({ statuses }: { statuses: LeadStatus[] }) 
 
   if (items.length === 0) {
     return (
-      <div className="panel">
-        <div className="panel-pad" style={{ textAlign: "center", padding: "32px 0" }}>
-          <p style={{ fontSize: 14, color: "var(--fg-mute)", marginBottom: 16 }}>
+      <section className={k.section}>
+        <div className={`${k.empty} ${m.centerEmpty}`}>
+          <p className={k.muted}>
             Még nincsenek lead státuszok.
           </p>
-          <Button
+          <button
             type="button"
-            className="btn primary"
+            className={`${k.btn} ${k.btnPrimary}`}
             disabled={isPending}
             onClick={() => startTransition(async () => { await seedDefaultLeadStatuses(); router.refresh(); })}
           >
             Alapértelmezett státuszok létrehozása
-          </Button>
+          </button>
         </div>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="panel">
-      <div className="panel-pad space-y-2">
+    <section className={k.section}>
+      <div className={m.list}>
         {items.map((status, i) => {
           const showIndicator = dragIndex !== null && overIndex === i && dragIndex !== i;
           return (
@@ -249,7 +243,7 @@ export function LeadStatusSetupClient({ statuses }: { statuses: LeadStatus[] }) 
               onDrop={handleDrop}
               style={{
                 opacity: dragIndex === i ? 0.4 : 1,
-                borderTop: `2px solid ${showIndicator ? "var(--indigo)" : "transparent"}`,
+                borderTop: `2px solid ${showIndicator ? "var(--color-accent)" : "transparent"}`,
                 borderRadius: 2,
                 transition: "opacity .15s",
               }}
@@ -267,10 +261,11 @@ export function LeadStatusSetupClient({ statuses }: { statuses: LeadStatus[] }) 
         })}
 
         {adding ? (
-          <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--indigo-line)", background: "var(--bg-panel)" }}>
+          <div className={m.editor}>
             <div>
-              <label className="field-label">Státusz neve</label>
-              <Input
+              <label className={m.label}>Státusz neve</label>
+              <input
+                className={m.field}
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
                 placeholder="pl. Ajánlat egyeztetés alatt"
@@ -279,35 +274,33 @@ export function LeadStatusSetupClient({ statuses }: { statuses: LeadStatus[] }) 
               />
             </div>
             <div>
-              <label className="field-label">Szín</label>
-              <div className="flex gap-2 flex-wrap">
+              <label className={m.label}>Szín</label>
+              <div className={m.swatches}>
                 {STATUS_COLORS.map((c) => (
-                  <button key={c} type="button" onClick={() => setNewColor(c)}
+                  <button key={c} type="button" onClick={() => setNewColor(c)} className={m.swatch}
                     style={{
-                      width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer",
+                      background: c,
                       outline: newColor === c ? `2px solid ${c}` : "none", outlineOffset: 2,
                     }}
                   />
                 ))}
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => { setAdding(false); setNewLabel(""); }}>Mégse</Button>
-              <Button type="button" size="sm" className="btn primary" onClick={handleAdd} disabled={isPending || !newLabel.trim()}>
+            <div className={m.footer}>
+              <button type="button" className={k.btn} onClick={() => { setAdding(false); setNewLabel(""); }}>Mégse</button>
+              <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={handleAdd} disabled={isPending || !newLabel.trim()}>
                 Hozzáadás
-              </Button>
+              </button>
             </div>
           </div>
         ) : (
-          <button
-            className="flex items-center gap-2"
-            style={{ fontSize: 14, color: "var(--indigo)", padding: "8px 0", background: "none", border: "none", cursor: "pointer" }}
-            onClick={() => setAdding(true)}
-          >
-            <Plus style={{ width: 14, height: 14 }} /> Státusz hozzáadása
-          </button>
+          <div>
+            <button className={k.btn} onClick={() => setAdding(true)}>
+              <Plus style={{ width: 14, height: 14 }} /> Státusz hozzáadása
+            </button>
+          </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }

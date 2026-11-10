@@ -1,0 +1,27 @@
+/* Automations screens (Astryx direction A). Layout the page kit lacks. Astryx tokens only. */
+
+.list { display: flex; flex-direction: column; gap: 12px; }
+.form { display: flex; flex-direction: column; gap: 16px; }
+.stepHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hint { margin-block-start: 6px; }
+.footer { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+
+/* Rule row */
+.ruleRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ruleMain { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.ruleName { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.name { font-size: 16px; font-weight: 600; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.ruleActions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 14px; color: var(--color-text-secondary); cursor: pointer; }
+button.danger { color: var(--coral); }
+
+/* Form field labels */
+.label { display: block; font-size: 14px; color: var(--color-text-secondary); margin-block-end: 4px; }
+
+/* Condition row */
+.condRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Inputs, selects and textareas */
+.field { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 12px; font: inherit; font-size: 14px; border: 1px solid var(--color-border-emphasized); border-radius: var(--radius-element); background: var(--color-background-card); color: var(--color-text-primary); }
+.field:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.textarea { min-height: 120px; resize: vertical; }

@@ -14,6 +14,8 @@ import Link from "next/link";
 // Hungarian copy is PROPOSAL until Áron approves.
 import { displayScriptLabel, displayScriptText, isPlaceholderText } from "@/lib/leads/placeholder";
 import type { BookingConflictInfo } from "@/lib/leads/service";
+import k from "@/components/astryx/page.module.css";
+import m from "./drive.module.css";
 
 // datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
 function toDatetimeLocal(d: Date): string {
@@ -33,19 +35,13 @@ const OUTCOME_TONE: Partial<Record<CallOutcomeKey, "red" | "green">> = {
   meeting_booked: "green",
 };
 
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "10px 12px", fontSize: 16,
-  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-  borderRadius: 8, color: "var(--fg)", outline: "none",
-};
-
 function outcomeBtnStyle(tone: "red" | "green" | undefined): React.CSSProperties {
   return {
     width: "100%", minHeight: 56, padding: "10px 16px",
     fontSize: 16, fontWeight: 600, borderRadius: 10,
-    border: "1px solid " + (tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--line)"),
-    background: tone === "red" ? "var(--coral-soft)" : tone === "green" ? "var(--mint-soft)" : "var(--bg-1)",
-    color: tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--fg)",
+    border: "1px solid " + (tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--color-border-emphasized)"),
+    background: tone === "red" ? "var(--coral-soft)" : tone === "green" ? "var(--mint-soft)" : "var(--color-background-card)",
+    color: tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--color-text-primary)",
     cursor: "pointer",
   };
 }
@@ -190,7 +186,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   // Rendered on the lead card AND on the empty-queue screen: the last call of a
   // drive can be the one that collides.
   const notice = conflictNotice && (
-        <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
+        <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 14, padding: "8px 10px", borderRadius: 6 }}>
           <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve: de ütközik a naptárban:</p>
           {conflictNotice.map((c) => (
             <p key={c.taskId} style={{ margin: 0 }}>
@@ -200,7 +196,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
                 : "ez az új foglalás az alacsonyabb prioritású, ezt lehet áthelyezni."}
             </p>
           ))}
-          <button onClick={() => setConflictNotice(null)} style={{ marginTop: 6, background: "none", border: "1px solid var(--amber)", color: "var(--amber)", borderRadius: 6, fontSize: 12, padding: "4px 10px", cursor: "pointer" }}>
+          <button onClick={() => setConflictNotice(null)} className={k.btn} style={{ marginTop: 6, border: "1px solid var(--amber)", color: "var(--amber)", fontSize: 14 }}>
             Rendben
           </button>
         </div>
@@ -208,9 +204,9 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
 
   if (!lead) {
     return (
-      <div style={{ maxWidth: 480, margin: "0 auto", padding: 24, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: 24, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center", background: "var(--color-background-body)", color: "var(--color-text-primary)" }}>
         {notice}
-        <p style={{ fontSize: 16, color: "var(--fg-soft)" }}>Nincs több lead a sorban.</p>
+        <p style={{ fontSize: 16, color: "var(--color-text-primary)" }}>Nincs több lead a sorban.</p>
         <button style={outcomeBtnStyle(undefined)} onClick={() => router.refresh()}>Frissítés</button>
       </div>
     );
@@ -222,14 +218,14 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
     lead.message,
   ].filter((v): v is string => !!v && v.trim().length > 0);
 
-  const tierColor = lead.tier && isTier(lead.tier) ? TIER_COLOR[lead.tier] : "var(--fg-faint)";
+  const tierColor = lead.tier && isTier(lead.tier) ? TIER_COLOR[lead.tier] : "var(--color-text-secondary)";
   const tierLabel = lead.tier && isTier(lead.tier) ? TIER_LABEL[lead.tier] : lead.tier;
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px 16px 32px", minHeight: "100dvh", display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, color: "var(--fg-mute)" }}>
+    <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px 16px 32px", minHeight: "100dvh", display: "flex", flexDirection: "column", gap: 16, background: "var(--color-background-body)", color: "var(--color-text-primary)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 14, color: "var(--color-text-secondary)" }}>
         <span>{remaining} / {queue.length}</span>
-        <button onClick={skip} disabled={pending} style={{ background: "none", border: "none", color: "var(--fg-mute)", fontSize: 13, padding: 4, cursor: "pointer" }}>
+        <button onClick={skip} disabled={pending} className={k.btn}>
           Kihagyom
         </button>
       </div>
@@ -237,10 +233,10 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
       {notice}
 
       <div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--fg)", margin: 0, lineHeight: 1.25 }}>{lead.companyName}</h1>
-        {lead.personName && <div style={{ fontSize: 16, color: "var(--fg-soft)", marginTop: 2 }}>{lead.personName}</div>}
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--color-text-primary)", margin: 0, lineHeight: 1.25 }}>{lead.companyName}</h1>
+        {lead.personName && <div style={{ fontSize: 16, color: "var(--color-text-primary)", marginTop: 2 }}>{lead.personName}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, alignItems: "center" }}>
-          {lead.city && <span style={{ fontSize: 13, color: "var(--fg-mute)" }}>{lead.city}</span>}
+          {lead.city && <span style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>{lead.city}</span>}
           {lead.tier && (
             <span style={{ fontSize: 12, fontWeight: 600, color: tierColor, border: `1px solid ${tierColor}`, borderRadius: 999, padding: "2px 8px" }}>
               {tierLabel}
@@ -257,34 +253,34 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
       {lead.phone ? (
         <a
           href={`tel:${lead.phone.replace(/\s+/g, "")}`}
+          className={`${k.btn} ${k.btnPrimary}`}
           style={{
             display: "block", width: "100%", textAlign: "center", boxSizing: "border-box",
             padding: "18px 16px", fontSize: 22, fontWeight: 700, borderRadius: 12,
-            background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
-            color: "white", textDecoration: "none",
+            textDecoration: "none",
           }}
         >
           {lead.phone}
         </a>
       ) : (
-        <div style={{ width: "100%", boxSizing: "border-box", textAlign: "center", padding: "18px 16px", fontSize: 18, fontWeight: 600, borderRadius: 12, background: "var(--bg-1)", color: "var(--fg-faint)", border: "1px solid var(--line-soft)" }}>
+        <div style={{ width: "100%", boxSizing: "border-box", textAlign: "center", padding: "18px 16px", fontSize: 18, fontWeight: 600, borderRadius: 12, background: "var(--color-background-card)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border)" }}>
           Nincs telefonszám
         </div>
       )}
 
       {(contextLines.length > 0 || lead.lastNote) && (
-        <div style={{ background: "var(--bg-1)", border: "1px solid var(--line-soft)", borderRadius: 10, padding: "12px 14px", fontSize: 14, color: "var(--fg-soft)" }}>
+        <div className={m.panel} style={{ fontSize: 14, color: "var(--color-text-primary)" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, ...(expanded ? {} : { maxHeight: 88, overflow: "hidden" }) }}>
             {contextLines.map((line, i) => <p key={i} style={{ margin: 0, lineHeight: 1.5 }}>{line}</p>)}
             {lead.lastNote && (
               <div>
-                <div style={{ fontSize: 11, color: "var(--fg-faint)", marginBottom: 2 }}>Utolsó jegyzet</div>
+                <div style={{ fontSize: 14, color: "var(--color-text-secondary)", marginBottom: 2 }}>Utolsó jegyzet</div>
                 <p style={{ margin: 0, lineHeight: 1.5 }}>{lead.lastNote}</p>
               </div>
             )}
           </div>
           {(contextLines.length > 0 || lead.lastNote) && (
-            <button onClick={() => setExpanded((e) => !e)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 12, padding: "6px 0 0", cursor: "pointer" }}>
+            <button onClick={() => setExpanded((e) => !e)} className={m.link}>
               {expanded ? "kevesebb" : "több"}
             </button>
           )}
@@ -292,23 +288,23 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
       )}
 
       {scriptVariants.length > 0 && (
-        <div style={{ background: "var(--bg-1)", border: "1px solid var(--line-soft)", borderRadius: 10, padding: "10px 14px" }}>
+        <div className={m.panel}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <select style={{ ...inputStyle, width: "auto", flex: 1 }} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
+            <select className={`${m.field} ${m.grow}`} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
               <option value="">Nincs szkript</option>
               {scriptVariants.map((v) => <option key={v.key} value={v.key}>{displayScriptLabel(v.label)}</option>)}
             </select>
             {script && (script.body || script.liveMissing) && (
-              <button onClick={() => setScriptOpen((o) => !o)} style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 13, padding: 4, cursor: "pointer" }}>
+              <button onClick={() => setScriptOpen((o) => !o)} className={m.link}>
                 {scriptOpen ? "Szkript elrejtése" : "Szkript megjelenítése"}
               </button>
             )}
           </div>
           {scriptOpen && script && (script.body || script.liveMissing) && (
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+            <p style={{ margin: "8px 0 0", fontSize: 14, color: "var(--color-text-primary)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
               {script.liveMissing ? "Nincs élő változat: a szkript még jóváhagyásra vár." : displayScriptText(script.body)}
               {!script.liveMissing && isPlaceholderText(script.body) && (
-                <> <Link href="/leads/setup" style={{ color: "var(--indigo)" }}>Beállítás</Link></>
+                <> <Link href="/leads/setup" className={k.link}>Beállítás</Link></>
               )}
             </p>
           )}
@@ -316,15 +312,15 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
       )}
 
       <div>
-        <div style={{ fontSize: 12, color: "var(--fg-mute)", marginBottom: 4 }}>Ügyfél szava a technológiára</div>
+        <div style={{ fontSize: 14, color: "var(--color-text-secondary)", marginBottom: 4 }}>Ügyfél szava a technológiára</div>
         <input
-          style={inputStyle}
+          className={m.field}
           value={technologyWord}
           onChange={(e) => setTechnologyWord(e.target.value)}
           maxLength={TECHNOLOGY_WORD_MAX}
           placeholder="pl. anyagvizsgálat"
         />
-        <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--fg-mute)" }}>
+        <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--color-text-secondary)" }}>
           Amit az ügyfél mondott, szó szerint. Opcionális.
         </p>
       </div>
@@ -334,17 +330,18 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
         onChange={(e) => setNote(e.target.value)}
         placeholder="Jegyzet"
         rows={3}
-        style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+        className={`${m.field} ${m.textarea}`}
+        style={{ fontFamily: "inherit" }}
       />
 
-      {error && <p style={{ margin: 0, fontSize: 14, color: "var(--coral)" }}>{error}</p>}
-      {queuedMessage && <p style={{ margin: 0, fontSize: 14, color: "var(--mint)" }}>{queuedMessage}</p>}
+      {error && <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-error)" }}>{error}</p>}
+      {queuedMessage && <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-success)" }}>{queuedMessage}</p>}
 
       {/* Once an outcome needs a detail, the other five buttons go away: in a
           car the screen must hold one decision at a time, not seven. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {(selectedOutcome ? CALL_OUTCOMES.filter((o) => o.key === selectedOutcome) : CALL_OUTCOMES).map((o) => (
-          <button key={o.key} disabled={pending} onClick={() => tapOutcome(o.key)} style={outcomeBtnStyle(OUTCOME_TONE[o.key])}>
+          <button key={o.key} disabled={pending} onClick={() => tapOutcome(o.key)} className={k.btn} style={outcomeBtnStyle(OUTCOME_TONE[o.key])}>
             {o.label}
           </button>
         ))}
@@ -357,11 +354,12 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           <button
             disabled={pending || note.trim() === ""}
             onClick={queueTranscript}
+            className={k.btn}
             style={outcomeBtnStyle(undefined)}
           >
             {AUTO_OUTCOME_LABELS.analyze}
           </button>
-          <p style={{ margin: 0, fontSize: 12, color: "var(--fg-mute)", textAlign: "center" }}>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-secondary)", textAlign: "center" }}>
             {AUTO_OUTCOME_LABELS.analyzeHint}
           </p>
         </div>
@@ -370,44 +368,44 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
       {selectedOutcome && (NEEDS_FIELD.has(selectedOutcome) || note.trim() === "") && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {note.trim() === "" && (
-            <p style={{ margin: 0, fontSize: 13, color: "var(--coral)" }}>A jegyzet kötelező</p>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-error)" }}>A jegyzet kötelező</p>
           )}
           {selectedOutcome === "callback_requested" && (
-            <input type="datetime-local" style={inputStyle} value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} />
+            <input type="datetime-local" className={m.field} value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} />
           )}
           {selectedOutcome === "meeting_booked" && (
             <>
-              <div style={{ display: "flex", gap: 16, fontSize: 15, color: "var(--fg)" }}>
+              <div style={{ display: "flex", gap: 16, fontSize: 16, color: "var(--color-text-primary)" }}>
                 {(["aron", "peter"] as const).map((w) => (
-                  <label key={w} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <label key={w} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", minHeight: 40 }}>
                     <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
                     {w === "aron" ? "Áron" : "Péter"}
                   </label>
                 ))}
               </div>
-              <input type="datetime-local" style={inputStyle} value={bookingAt} min={toDatetimeLocal(new Date())} onChange={(e) => setBookingAt(e.target.value)} />
-              <select style={inputStyle} value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
+              <input type="datetime-local" className={m.field} value={bookingAt} min={toDatetimeLocal(new Date())} onChange={(e) => setBookingAt(e.target.value)} />
+              <select className={m.field} value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
                 <option value="">Foglalás típusa…</option>
-                {BOOKING_KINDS.map((k) => <option key={k} value={k}>{BOOKING_KIND_LABEL[k]}</option>)}
+                {BOOKING_KINDS.map((bk) => <option key={bk} value={bk}>{BOOKING_KIND_LABEL[bk]}</option>)}
               </select>
             </>
           )}
           {(selectedOutcome === "not_interested" || selectedOutcome === "disqualified") && (
             <input
-              style={inputStyle}
+              className={m.field}
               value={lostReason}
               onChange={(e) => setLostReason(e.target.value)}
               maxLength={LOST_REASON_MAX}
               placeholder="Miért veszett el? (kötelező)"
             />
           )}
-          <button disabled={pending || note.trim() === ""} onClick={() => submit(selectedOutcome)} style={outcomeBtnStyle("green")}>
+          <button disabled={pending || note.trim() === ""} onClick={() => submit(selectedOutcome)} className={k.btn} style={outcomeBtnStyle("green")}>
             {pending ? "Mentés…" : "Mentés"}
           </button>
           <button
             disabled={pending}
             onClick={() => { setSelectedOutcome(null); setError(null); }}
-            style={{ background: "none", border: "none", color: "var(--fg-mute)", fontSize: 14, padding: 8, cursor: "pointer" }}
+            className={k.btn}
           >
             Mégsem
           </button>
