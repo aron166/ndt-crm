@@ -24,6 +24,10 @@ import { CompanyMetadataTab } from "./CompanyMetadataTab";
 import { DossierTab } from "@/components/DossierTab";
 import type { AttrRow } from "@/lib/companies/attributes";
 import { useDeferredValue, useState, useTransition } from "react";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import { Badge } from "@astryxdesign/core/Badge";
+import k from "@/components/astryx/page.module.css";
+import s from "../companies.module.css";
 
 interface Contact {
   id: number; personId: number; role: string | null;
@@ -79,7 +83,7 @@ interface Props {
   mapsConnected: boolean;
   revenueSeries: number[];
   engagementBreakdown: { label: string; value: number; color: string }[];
-  kpis: { label: string; value: string | number; accent: string }[];
+  kpis: { label: string; value: string | number }[];
   avatarColor: string;
   initials: string;
   initialTags: { id: number; name: string; color: string }[];
@@ -94,9 +98,9 @@ const WARMTH_STYLE: Record<string, { bg: string; color: string; label: string }>
 };
 
 const NDT_METHOD_COLOR: Record<string, string> = {
-  VT: "var(--sky)", PT: "var(--violet)", MT: "var(--amber)", UT: "var(--indigo)",
-  RT: "var(--coral)", DRT: "var(--mint)", LT: "var(--fg-soft)", HT: "var(--amber)",
-  SPECTRO: "var(--sky)", consultation: "var(--fg-mute)",
+  VT: "var(--sky)", PT: "var(--violet)", MT: "var(--amber)", UT: "var(--color-accent)",
+  RT: "var(--coral)", DRT: "var(--mint)", LT: "var(--color-text-secondary)", HT: "var(--amber)",
+  SPECTRO: "var(--sky)", consultation: "var(--color-text-secondary)",
 };
 
 const PRODUCT_AREA_LABEL: Record<string, string> = {
@@ -115,7 +119,7 @@ function formatRevenue(v: bigint | null): string {
 
 const TYPE_COLOR: Record<string, string> = {
   call: "var(--mint)", email: "var(--sky)", meeting: "var(--violet)",
-  site_visit: "var(--amber)", note: "var(--fg-mute)",
+  site_visit: "var(--amber)", note: "var(--color-text-secondary)",
 };
 const TYPE_LABEL: Record<string, string> = {
   call: "Hívás", email: "Email", meeting: "Találkozó",
@@ -240,12 +244,12 @@ export function CompanyDetailClient({
             background: "var(--coral-soft)", border: "1px solid var(--coral)",
           }}
         >
-          <span style={{ fontSize: 14, color: "var(--fg)", flex: 1 }}>
+          <span style={{ fontSize: 14, color: "var(--color-text-primary)", flex: 1 }}>
             Ez a cég törölve van: nem jelenik meg a keresésben, és az adatai nem
             menthetők, amíg vissza nem állítod.
           </span>
           <button
-            className="btn primary"
+            className={`${k.btn} ${k.btnPrimary}`}
             disabled={restoring}
             onClick={() => startRestore(async () => { await restoreCompany(company.id); router.refresh(); })}
           >
@@ -254,65 +258,32 @@ export function CompanyDetailClient({
         </div>
       )}
 
-      {/* Detail header */}
-      <div className="detail-header mount">
-        <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
-          {/* Avatar */}
-          <div style={{
-            width: 72, height: 72, borderRadius: 14,
-            background: avatarColor, display: "grid", placeItems: "center",
-            fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 22, color: "var(--fg-on-accent)",
-            position: "relative", flexShrink: 0,
-          }}>
-            {initials}
-            <div style={{ position: "absolute", inset: 0, borderRadius: 14, boxShadow: "var(--shadow-inset-deep)" }} />
-          </div>
-
-          {/* Company info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg)" }}>
-                {company.name}
-              </h1>
-            </div>
-            <div style={{ marginTop: 6, color: "var(--fg-soft)", fontSize: 14, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-              <span>{[company.city, company.county].filter(Boolean).join(" · ")}</span>
-              {company.vatNumber && (
-                <span style={{ fontFamily: "var(--font-mono)", color: "var(--fg-faint)" }}>
-                  {company.vatNumber}
-                </span>
-              )}
-              {company.warmth && WARMTH_STYLE[company.warmth] && (
-                <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, fontWeight: 600,
-                  background: WARMTH_STYLE[company.warmth].bg, color: WARMTH_STYLE[company.warmth].color }}>
-                  {WARMTH_STYLE[company.warmth].label}
-                </span>
-              )}
-              {company.accountType && (
-                <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 4, background: "var(--bg-3)", color: "var(--fg-mute)" }}>
-                  {attrValueLabel("account_type", company.accountType)}
-                </span>
-              )}
-              {company.teaorCode && (
-                <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--fg-faint)" }}>
-                  TEÁOR {company.teaorCode}
-                </span>
-              )}
-            </div>
-            {company.scopeOfActivity && (
-              <div style={{ marginTop: 6, fontSize: 14, color: "var(--fg-mute)", fontStyle: "italic", maxWidth: 600 }}>
-                {company.scopeOfActivity}
-              </div>
+      {/* Detail header: name, meta line, help line, actions */}
+      <PageHeader
+        title={company.name}
+        eyebrow={
+          <span className={s.metaLine}>
+            <span className={s.avatar} aria-hidden="true" style={{ background: avatarColor }}>
+              {initials}
+              <span style={{ position: "absolute", inset: 0, borderRadius: 10, boxShadow: "var(--shadow-inset-deep)" }} />
+            </span>
+            <span>{[company.city, company.county].filter(Boolean).join(" · ")}</span>
+            {company.vatNumber && <span className={s.taxNo}>{company.vatNumber}</span>}
+            {company.warmth && WARMTH_STYLE[company.warmth] && (
+              <span className={s.chip} style={{ background: WARMTH_STYLE[company.warmth].bg, color: WARMTH_STYLE[company.warmth].color }}>
+                {WARMTH_STYLE[company.warmth].label}
+              </span>
             )}
-            {/* Tags */}
-            <div style={{ marginTop: 12 }}>
-              <TagInput taggableType="company" taggableId={company.id} initialTags={initialTags} />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-            <button className="btn primary" onClick={() => { setLogPerson(contacts.find(c => !c.endedAt) ?? null); setLogOpen(true); }}>
+            {company.accountType && (
+              <span className={s.chip}>{attrValueLabel("account_type", company.accountType)}</span>
+            )}
+            {company.teaorCode && <span className={s.taxNo}>TEÁOR {company.teaorCode}</span>}
+          </span>
+        }
+        help={company.scopeOfActivity || undefined}
+        actions={
+          <>
+            <button className={`${k.btn} ${k.btnPrimary}`} onClick={() => { setLogPerson(contacts.find(c => !c.endedAt) ?? null); setLogOpen(true); }}>
               <Phone style={{ width: 13, height: 13 }} /> Naplózás
             </button>
             <SendEmailButton
@@ -321,44 +292,52 @@ export function CompanyDetailClient({
               defaultTo={activeContact?.email || activeContact?.person.email || undefined}
               contextLabel={company.name}
             />
-            <button className="btn" onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
-            <NewQuoteDialog presetCompany={{ id: company.id, name: company.name }} triggerLabel="+ Árajánlat" triggerClassName="btn" />
-            <button
-              className="btn"
-              onClick={handleEnrich}
-              disabled={enriching}
-              style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}
-            >
+            <button className={k.btn} onClick={() => setAddOpen(true)}>+ Új kapcsolat</button>
+            <NewQuoteDialog presetCompany={{ id: company.id, name: company.name }} triggerLabel="+ Árajánlat" triggerClassName={k.btn} />
+            <button className={k.btn} onClick={handleEnrich} disabled={enriching}>
               <Loader2 size={14} aria-hidden="true" style={{ animation: enriching ? "spin 1.2s linear infinite" : "none" }} />
               {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
             </button>
             <button
-              className="btn ghost"
-              style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
+              className={`${k.btn} ${k.btnIcon}`}
+              aria-label="Cég törlése" /* PROPOSAL copy */
+              style={{ color: "var(--color-text-error)" }}
               onClick={handleDelete}
               disabled={deleting}
               title="Cég törlése"
             >
               <Trash2 style={{ width: 11, height: 11 }} />
             </button>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        {/* KPI strip */}
-        <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-          {kpis.map((k, i) => (
-            <div key={i} className="kpi" style={{ "--accent": k.accent } as React.CSSProperties}>
-              <div className="k-label">{k.label}</div>
-              <div className="k-value">{k.value}</div>
+      <div className={s.tagRow}>
+        <TagInput taggableType="company" taggableId={company.id} initialTags={initialTags} />
+      </div>
+
+      {/* KPI strip */}
+      <div className={s.kpis}>
+        {kpis.map((kpi, i) => (
+          <div key={i} className={k.card}>
+            <div className={k.stat}>
+              <span className={k.statK}>{kpi.label}</span>
+              <span className={k.statV}>{kpi.value}</span>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
       {/* Tabs */}
-      <div className="tabs-ds" style={{ marginTop: 18 }} aria-busy={switching}>
+      <div className={k.seg} role="tablist" aria-busy={switching}>
         {TABS.map(({ key, label }) => (
-          <button key={key} className={`tab-ds ${tab === key ? "active" : ""}`} onClick={() => setTab(key)}>
+          <button
+            key={key}
+            role="tab"
+            aria-selected={tab === key}
+            className={`${k.segItem} ${s.tabBtn} ${tab === key ? k.segItemOn : ""}`}
+            onClick={() => setTab(key)}
+          >
             {label}
           </button>
         ))}
@@ -374,67 +353,62 @@ export function CompanyDetailClient({
 
       {/* Overview */}
       {shownTab === "overview" && (
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>
-          <div className="panel mount">
-            <div className="panel-head">
-              <div className="panel-title">Forgalom · 24 hónap</div>
-            </div>
-            <div style={{ padding: 18 }}>
+        <div className={`${k.split} ${s.tabBody}`}>
+          <div className={s.stack}>
+            <section className={`${k.card} mount`}>
+              <h2 className={k.h2}>Forgalom · 24 hónap</h2>
               {revenueSeries.length >= 2 ? (
-                <AreaChart data={revenueSeries} height={180} color="var(--indigo)" />
+                <AreaChart data={revenueSeries} height={180} color="var(--color-accent)" />
               ) : (
-                <div style={{ height: 180, display: "grid", placeItems: "center", color: "var(--fg-faint)", fontSize: 14 }}>
-                  Nincs elegendő számladat a grafikonhoz.
+                <div className={s.chartEmpty}>Nincs elegendő számladat a grafikonhoz.</div>
+              )}
+              {company.lastInteractionDate && (
+                <div className={k.kv}>
+                  <span>Utolsó interakció</span>
+                  <span className={k.num}>{formatDate(company.lastInteractionDate)}</span>
                 </div>
               )}
-              <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-                {company.lastInteractionDate && (
-                  <div>
-                    <div className="field-label">Utolsó interakció</div>
-                    <div className="field-value mono">{formatDate(company.lastInteractionDate)}</div>
-                  </div>
-                )}
-                <div>
-                  <div className="field-label">Kapcsolatok</div>
-                  <div className="field-value mono">{contacts.filter(c => !c.endedAt).length} aktív</div>
-                </div>
-                <div>
-                  <div className="field-label">Rögzítve</div>
-                  <div className="field-value mono">{formatDate(company.createdAt)}</div>
-                </div>
+              <div className={k.kv}>
+                <span>Kapcsolatok</span>
+                <span className={k.num}>{contacts.filter(c => !c.endedAt).length} aktív</span>
               </div>
-            </div>
+              <div className={k.kv}>
+                <span>Rögzítve</span>
+                <span className={k.num}>{formatDate(company.createdAt)}</span>
+              </div>
+            </section>
           </div>
 
-          <div className="panel mount">
-            <div className="panel-head">
-              <div className="panel-title">Cég adatok</div>
-              <button
-                className="btn sm"
-                onClick={() => {
-                  if (editing) {
-                    setForm({
-                      name:           company.name,
-                      vatNumber:      company.vatNumber ?? "",
-                      status:         company.status ?? "",
-                      accountType:    company.accountType ?? "",
-                      pipelineStatus: company.pipelineStatus ?? "",
-                      city:           company.city ?? "",
-                      county:         company.county ?? "",
-                      address:        company.address ?? "",
-                      zipCode:        company.zipCode ?? "",
-                      country:        company.country ?? "",
-                      website:        company.website ?? "",
-                    });
-                  }
-                  setEditing(!editing);
-                }}
-              >
-                {editing ? "Mégse" : <><Pencil style={{ width: 11, height: 11 }} /> Szerkesztés</>}
-              </button>
-            </div>
+          <div className={s.stack}>
+            <section className={`${k.card} mount`}>
+              <div className={s.head}>
+                <h2 className={k.h2}>Cég adatok</h2>
+                <button
+                  className={k.btn}
+                  onClick={() => {
+                    if (editing) {
+                      setForm({
+                        name:           company.name,
+                        vatNumber:      company.vatNumber ?? "",
+                        status:         company.status ?? "",
+                        accountType:    company.accountType ?? "",
+                        pipelineStatus: company.pipelineStatus ?? "",
+                        city:           company.city ?? "",
+                        county:         company.county ?? "",
+                        address:        company.address ?? "",
+                        zipCode:        company.zipCode ?? "",
+                        country:        company.country ?? "",
+                        website:        company.website ?? "",
+                      });
+                    }
+                    setEditing(!editing);
+                  }}
+                >
+                  {editing ? "Mégse" : <><Pencil style={{ width: 11, height: 11 }} /> Szerkesztés</>}
+                </button>
+              </div>
             {editing ? (
-              <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className={s.form}>
                 {(
                   [
                     { key: "name",           label: "Név",             type: "text" },
@@ -448,47 +422,51 @@ export function CompanyDetailClient({
                   ] as { key: keyof typeof form; label: string; type: string }[]
                 ).map(({ key, label, type }) => (
                   <div key={key}>
-                    <div className="field-label">{label}</div>
+                    <div className={k.muted}>{label}</div>
                     <input
+                      className={s.formInput}
                       type={type}
                       value={form[key]}
                       onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                       style={{
                         width: "100%", fontSize: 14, padding: "5px 8px",
-                        background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-                        borderRadius: 5, color: "var(--fg)", outline: "none",
+                        background: "var(--color-background-card)", border: "1px solid var(--color-border)",
+                        borderRadius: 5, color: "var(--color-text-primary)",
                       }}
                     />
                   </div>
                 ))}
                 <div>
-                  <div className="field-label">Státusz</div>
+                  <div className={k.muted}>Státusz</div>
                   <select
+                    className={s.formInput}
                     value={form.status}
                     onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                    style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
+                    style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--color-background-card)", border: "1px solid var(--color-border)", borderRadius: 5, color: "var(--color-text-primary)" }}
                   >
                     <option value="">-</option>
                     {COMPANY_ATTR_DEFS.status.options!.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                   </select>
                 </div>
                 <div>
-                  <div className="field-label">Fióktípus</div>
+                  <div className={k.muted}>Fióktípus</div>
                   <select
+                    className={s.formInput}
                     value={form.accountType}
                     onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value }))}
-                    style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
+                    style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--color-background-card)", border: "1px solid var(--color-border)", borderRadius: 5, color: "var(--color-text-primary)" }}
                   >
                     <option value="">-</option>
                     {COMPANY_ATTR_DEFS.account_type.options!.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                   </select>
                 </div>
                 <div>
-                  <div className="field-label">Pipeline státusz</div>
+                  <div className={k.muted}>Pipeline státusz</div>
                   <select
+                    className={s.formInput}
                     value={form.pipelineStatus}
                     onChange={(e) => setForm((f) => ({ ...f, pipelineStatus: e.target.value }))}
-                    style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)" }}
+                    style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--color-background-card)", border: "1px solid var(--color-border)", borderRadius: 5, color: "var(--color-text-primary)" }}
                   >
                     <option value="">-</option>
                     <option value="0">0 · KUKA</option>
@@ -503,7 +481,7 @@ export function CompanyDetailClient({
                   </select>
                 </div>
                 <button
-                  className="btn primary"
+                  className={`${k.btn} ${k.btnPrimary}`}
                   disabled={saving}
                   onClick={() => {
                     startSave(async () => {
@@ -535,98 +513,98 @@ export function CompanyDetailClient({
                 )}
               </div>
             ) : (
-            <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <>
               {company.website && (
-                <div>
-                  <div className="field-label">Website</div>
+                <div className={k.kv}>
+                  <span>Website</span>
                   <a href={company.website.startsWith("http") ? company.website : `https://${company.website}`}
                     target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 14, color: "var(--indigo)", wordBreak: "break-all" }}>
+                    className={k.link} style={{ wordBreak: "break-all" }}>
                     {company.website.replace(/^https?:\/\//, "")}
                   </a>
                 </div>
               )}
               {company.linkedinUrl && (
-                <div>
-                  <div className="field-label">LinkedIn</div>
-                  <a href={company.linkedinUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 14, color: "var(--indigo)" }}>Profil →</a>
+                <div className={k.kv}>
+                  <span>LinkedIn</span>
+                  <a href={company.linkedinUrl} target="_blank" rel="noopener noreferrer" className={k.link}>Profil →</a>
                 </div>
               )}
               {company.teaorDescription && (
-                <div>
-                  <div className="field-label">TEÁOR {company.teaorCode}</div>
-                  <div className="field-value">{company.teaorDescription}</div>
+                <div className={k.kv}>
+                  <span>TEÁOR {company.teaorCode}</span>
+                  <span>{company.teaorDescription}</span>
                 </div>
               )}
               {company.industryEn && (
-                <div>
-                  <div className="field-label">Iparág</div>
-                  <div className="field-value">{company.industryEn}</div>
+                <div className={k.kv}>
+                  <span>Iparág</span>
+                  <span>{company.industryEn}</span>
                 </div>
               )}
               {company.leadSource && (
-                <div>
-                  <div className="field-label">Lead forrás</div>
-                  <div className="field-value">{company.leadSource}</div>
+                <div className={k.kv}>
+                  <span>Lead forrás</span>
+                  <span>{company.leadSource}</span>
                 </div>
               )}
               {/* Revenue summary */}
               {(company.revenue2022 || company.revenue2023 || company.revenue2024) && (
-                <div>
-                  <div className="field-label">Éves forgalom (HUF)</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 4 }}>
+                <div className={k.kv}>
+                  <span>Éves forgalom (HUF)</span>
+                  <span className={s.yearTiles}>
                     {[
                       { year: "2022", val: company.revenue2022 },
                       { year: "2023", val: company.revenue2023 },
                       { year: "2024", val: company.revenue2024 },
                     ].map(({ year, val }) => (
-                      <div key={year} style={{ textAlign: "center", padding: "6px 4px", background: "var(--bg-3)", borderRadius: 6 }}>
-                        <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{year}</div>
-                        <div style={{ fontSize: 14, fontFamily: "var(--font-mono)", color: "var(--fg-soft)" }}>{formatRevenue(val)}</div>
-                      </div>
+                      <span key={year} className={s.yearTile}>
+                        <span className={k.statK} style={{ display: "block" }}>{year}</span>
+                        <span className={k.num} style={{ fontSize: 14, color: "var(--color-text-primary)" }}>{formatRevenue(val)}</span>
+                      </span>
                     ))}
-                  </div>
+                  </span>
                 </div>
               )}
               {/* NDT methods quick glance */}
               {company.ndtMethods.length > 0 && (
-                <div>
-                  <div className="field-label">NDT módszerek</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                <div className={k.kv}>
+                  <span>NDT módszerek</span>
+                  <span className={s.chips}>
                     {company.ndtMethods.map((m) => (
                       <span key={m} style={{ fontSize: 12, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
-                        background: "var(--bg-3)", color: NDT_METHOD_COLOR[m] ?? "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>
+                        background: "var(--color-background-muted)", color: NDT_METHOD_COLOR[m] ?? "var(--color-text-secondary)", fontFamily: "var(--font-mono)" }}>
                         {m}
                       </span>
                     ))}
-                  </div>
+                  </span>
                 </div>
               )}
-            </div>
+            </>
             )}
+            </section>
 
-            <div className="panel-head" style={{ borderTop: "1px solid var(--line-soft)" }}><div className="panel-title">Interakció típusok</div></div>
-            <div className="panel-pad">
+            <section className={`${k.card} mount`}>
+              <h2 className={k.h2}>Interakció típusok</h2>
               <StackBar segments={engagementBreakdown} />
-              <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {engagementBreakdown.map((x, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
                     <span style={{ width: 6, height: 6, borderRadius: 999, background: x.color, boxShadow: `0 0 var(--glow-size) ${x.color}`, flexShrink: 0 }} />
-                    <span style={{ flex: 1, color: "var(--fg-soft)" }}>{x.label}</span>
-                    <span style={{ fontFamily: "var(--font-mono)", color: "var(--fg-mute)" }}>{x.value}</span>
+                    <span style={{ flex: 1, color: "var(--color-text-secondary)" }}>{x.label}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{x.value}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
             {/* Map widget */}
-            <div className="panel mount" style={{ marginTop: 12 }}>
-              <div className="panel-head">
-                <div className="panel-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <MapPin style={{ width: 13, height: 13, color: "var(--indigo)" }} />
+            <section className={`${k.card} mount`}>
+              <div className={s.head}>
+                <h2 className={k.h2} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <MapPin style={{ width: 16, height: 16, color: "var(--color-accent)" }} />
                   Helyszín
-                </div>
+                </h2>
                 {mapsConnected && (
                   <button
                     onClick={() => {
@@ -638,14 +616,14 @@ export function CompanyDetailClient({
                       });
                     }}
                     disabled={geocoding}
-                    style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: geocoding ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                    style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, background: "var(--color-background-muted)", border: "1px solid var(--color-border-emphasized)", color: "var(--color-accent)", cursor: geocoding ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 4 }}
                   >
                     {geocoding && <Loader2 style={{ width: 11, height: 11, animation: "spin 1s linear infinite" }} />}
                     {geocoding ? "Geocodálás..." : company.lat ? "Újra" : "Geocodálás"}
                   </button>
                 )}
               </div>
-              <div style={{ padding: "0 0 0" }}>
+              <div>
                 {company.lat && company.lng ? (
                   <iframe
                     src={`https://www.google.com/maps?q=${company.lat},${company.lng}&z=15&output=embed`}
@@ -654,143 +632,149 @@ export function CompanyDetailClient({
                     title={`${company.name} térképen`}
                   />
                 ) : (
-                  <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
+                  <div className={`${k.muted} ${s.placeholder}`}>
                     {mapsConnected
                       ? "Kattints a Geocodálás gombra a cím meghatározásához."
-                      : <span>Google Maps nincs csatlakoztatva. <a href="/settings" style={{ color: "var(--indigo)" }}>Beállítások →</a></span>
+                      : <span>Google Maps nincs csatlakoztatva. <a href="/settings" className={k.link}>Beállítások →</a></span>
                     }
                   </div>
                 )}
                 {geocodeMsg && (
-                  <div style={{ padding: "6px 16px", fontSize: 12, color: geocodeMsg.includes("siker") ? "var(--mint)" : "var(--coral)", borderTop: "1px solid var(--line-soft)" }}>
+                  <div style={{ padding: "6px 16px", fontSize: 12, color: geocodeMsg.includes("siker") ? "var(--mint)" : "var(--coral)", borderTop: "1px solid var(--color-border)" }}>
                     {geocodeMsg}
                   </div>
                 )}
               </div>
-            </div>
+            </section>
           </div>
         </div>
       )}
 
       {/* Contacts */}
       {shownTab === "contacts" && (
-        <div className="panel mount" style={{ marginTop: 16, overflow: "hidden" }}>
-          <div className="panel-head">
-            <div className="panel-title">Kapcsolatok</div>
-            <button className="btn sm" onClick={() => setAddOpen(true)}>+ Hozzáadás</button>
-          </div>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Személy</th><th>Beosztás</th><th>Email</th><th>Telefon</th><th>Státusz</th><th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {contacts.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--fg-faint)", padding: "32px 16px" }}>Nincs kapcsolat.</td></tr>
-              )}
-              {contacts.map((c) => (
-                <tr key={c.id}>
-                  <td className="name">
-                    <Link href={`/persons/${c.personId}`} className="row-link">
-                      {c.person.firstName} {c.person.lastName}
-                    </Link>
-                  </td>
-                  <td>{c.role ?? "-"}</td>
-                  <td className="num">{c.email ?? c.person.email ?? "-"}</td>
-                  <td className="num">{c.phone ?? c.person.phone ?? "-"}</td>
-                  <td>
-                    {c.endedAt
-                      ? <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>Volt ({formatDate(c.endedAt)})</span>
-                      : <span className="badge-ds dot mint">Aktív</span>
-                    }
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                      {!c.endedAt && (
-                        <>
-                          <button className="btn sm" onClick={() => { setLogPerson(c); setLogOpen(true); }}>
-                            <Phone style={{ width: 11, height: 11 }} /> Log
-                          </button>
-                          <button className="btn sm ghost" onClick={() => handleCloseContact(c)}>
-                            <X style={{ width: 11, height: 11 }} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className={s.tabBody}>
+          <section className={`${k.card} mount`}>
+            <div className={s.head}>
+              <h2 className={k.h2}>Kapcsolatok</h2>
+              <button className={k.btn} onClick={() => setAddOpen(true)}>+ Hozzáadás</button>
+            </div>
+            <div className={k.tableWrap}>
+              <table className={k.table}>
+                <thead>
+                  <tr>
+                    <th>Személy</th><th>Beosztás</th><th>Email</th><th>Telefon</th><th>Státusz</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contacts.length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: "center" }}><span className={k.muted}>Nincs kapcsolat.</span></td></tr>
+                  )}
+                  {contacts.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <Link href={`/persons/${c.personId}`} className={k.strong}>
+                          {c.person.firstName} {c.person.lastName}
+                        </Link>
+                      </td>
+                      <td>{c.role ?? "-"}</td>
+                      <td className={k.num}>{c.email ?? c.person.email ?? "-"}</td>
+                      <td className={k.num}>{c.phone ?? c.person.phone ?? "-"}</td>
+                      <td>
+                        {c.endedAt
+                          ? <span className={k.muted}>Volt ({formatDate(c.endedAt)})</span>
+                          : <Badge variant="success" label="Aktív" />
+                        }
+                      </td>
+                      <td>
+                        <div className={s.rowActions}>
+                          {!c.endedAt && (
+                            <>
+                              <button className={k.btn} onClick={() => { setLogPerson(c); setLogOpen(true); }}>
+                                <Phone style={{ width: 11, height: 11 }} /> Log
+                              </button>
+                              <button className={`${k.btn} ${k.btnIcon}`} aria-label="Kapcsolat lezárása" /* PROPOSAL copy */ onClick={() => handleCloseContact(c)}>
+                                <X style={{ width: 11, height: 11 }} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       )}
 
       {/* Activity */}
       {shownTab === "activity" && (
-        <div className="panel mount" style={{ marginTop: 16, padding: "18px 22px" }}>
-          {interactions.length === 0 ? (
-            <div style={{ textAlign: "center", color: "var(--fg-mute)", padding: "32px 0", fontSize: 14 }}>
-              Nincs interakció. Naplózáshoz kattints a Contacts fülön.
-            </div>
-          ) : (
-            <div className="tl">
-              {interactions.map((r) => {
-                const accentColor = TYPE_COLOR[r.type ?? "note"] ?? "var(--fg-mute)";
-                return (
-                  <div key={r.id} className="tl-item" style={{ "--accent": accentColor } as React.CSSProperties}>
-                    <div className="tl-dot" />
-                    <div className="tl-head">
-                      <span className="who">
-                        <span style={{ color: accentColor, fontWeight: 500 }}>
-                          {TYPE_LABEL[r.type ?? ""] ?? r.type ?? "Ismeretlen"}
+        <div className={s.tabBody}>
+          <section className={`${k.card} mount`}>
+            {interactions.length === 0 ? (
+              <div className={k.muted} style={{ textAlign: "center", padding: "32px 0" }}>
+                Nincs interakció. Naplózáshoz kattints a Contacts fülön.
+              </div>
+            ) : (
+              <div className="tl">
+                {interactions.map((r) => {
+                  const accentColor = TYPE_COLOR[r.type ?? "note"] ?? "var(--color-text-secondary)";
+                  return (
+                    <div key={r.id} className="tl-item" style={{ "--accent": accentColor } as React.CSSProperties}>
+                      <div className="tl-dot" />
+                      <div className="tl-head">
+                        <span className="who">
+                          <span style={{ color: accentColor, fontWeight: 500 }}>
+                            {TYPE_LABEL[r.type ?? ""] ?? r.type ?? "Ismeretlen"}
+                          </span>
+                          {r.direction && <span style={{ color: "var(--color-text-secondary)", margin: "0 6px" }}>·</span>}
+                          {r.direction && <span style={{ color: "var(--color-text-secondary)" }}>{interactionDirectionLabel(r.direction)}</span>}
+                          {r.person && (
+                            <>
+                              <span style={{ color: "var(--color-text-secondary)", margin: "0 6px" }}>·</span>
+                              <Link href={`/persons/${r.person.id}`} className="row-link" style={{ color: "var(--color-text-secondary)" }}>
+                                {r.person.firstName} {r.person.lastName}
+                              </Link>
+                            </>
+                          )}
                         </span>
-                        {r.direction && <span style={{ color: "var(--fg-faint)", margin: "0 6px" }}>·</span>}
-                        {r.direction && <span style={{ color: "var(--fg-mute)" }}>{interactionDirectionLabel(r.direction)}</span>}
-                        {r.person && (
-                          <>
-                            <span style={{ color: "var(--fg-faint)", margin: "0 6px" }}>·</span>
-                            <Link href={`/persons/${r.person.id}`} className="row-link" style={{ color: "var(--fg-mute)" }}>
-                              {r.person.firstName} {r.person.lastName}
-                            </Link>
-                          </>
-                        )}
-                      </span>
-                      <span className="when">{formatDateTime(r.occurredAt)}</span>
+                        <span className="when">{formatDateTime(r.occurredAt)}</span>
+                      </div>
+                      {r.notes && <div className="tl-body">{r.notes}</div>}
+                      {r.outcome && <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 4 }}>Eredmény: {r.outcome}</div>}
                     </div>
-                    {r.notes && <div className="tl-body">{r.notes}</div>}
-                    {r.outcome && <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Eredmény: {r.outcome}</div>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </div>
       )}
 
       {/* Tasks */}
       {shownTab === "tasks" && (
-        <div style={{ marginTop: 16 }}>
+        <div className={s.tabBody}>
           <ContextTasksTab tasks={tasks} companyId={company.id} companyName={company.name} />
         </div>
       )}
 
       {/* NDT Profil */}
       {shownTab === "ndt" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>
+        <div className={`${s.twoCol} ${s.tabBody}`}>
           {/* Left column: capabilities */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className={s.stack}>
             {company.ndtMethods.length > 0 && (
-              <div className="panel mount">
-                <div className="panel-head"><div className="panel-title">NDT módszerek</div></div>
-                <div className="panel-pad" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <section className={`${k.card} mount`}>
+                <h2 className={k.h2}>NDT módszerek</h2>
+                <div className={s.chipsStart}>
                   {["VT","PT","MT","UT","RT","DRT","LT","HT","SPECTRO","consultation"].map((m) => {
                     const active = company.ndtMethods.includes(m);
                     return (
                       <div key={m} style={{ padding: "6px 12px", borderRadius: 6, fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 600,
-                        background: active ? "var(--bg-3)" : "transparent",
-                        color: active ? (NDT_METHOD_COLOR[m] ?? "var(--fg)") : "var(--fg-faint)",
-                        border: `1px solid ${active ? "var(--line-soft)" : "transparent"}`,
+                        background: active ? "var(--color-background-muted)" : "transparent",
+                        color: active ? (NDT_METHOD_COLOR[m] ?? "var(--color-text-primary)") : "var(--color-text-secondary)",
+                        border: `1px solid ${active ? "var(--color-border)" : "transparent"}`,
                         opacity: active ? 1 : 0.3,
                       }}>
                         {m}
@@ -798,114 +782,110 @@ export function CompanyDetailClient({
                     );
                   })}
                 </div>
-              </div>
+              </section>
             )}
 
             {company.productAreas.length > 0 && (
-              <div className="panel mount">
-                <div className="panel-head"><div className="panel-title">Termékterület</div></div>
-                <div className="panel-pad" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <section className={`${k.card} mount`}>
+                <h2 className={k.h2}>Termékterület</h2>
+                <div className={s.chipsStart}>
                   {company.productAreas.map((pa) => (
                     <span key={pa} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 14,
-                      background: "var(--bg-3)", color: "var(--fg-soft)", border: "1px solid var(--line-soft)" }}>
+                      background: "var(--color-background-muted)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border)" }}>
                       {PRODUCT_AREA_LABEL[pa] ?? pa}
                     </span>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
             {company.materials.length > 0 && (
-              <div className="panel mount">
-                <div className="panel-head"><div className="panel-title">Vizsgált anyagok</div></div>
-                <div className="panel-pad" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <section className={`${k.card} mount`}>
+                <h2 className={k.h2}>Vizsgált anyagok</h2>
+                <div className={s.chipsStart}>
                   {company.materials.map((m) => (
                     <span key={m} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 14,
-                      background: "var(--bg-3)", color: "var(--amber)", fontFamily: "var(--font-mono)" }}>
+                      background: "var(--color-background-muted)", color: "var(--amber)", fontFamily: "var(--font-mono)" }}>
                       {MATERIAL_LABEL[m] ?? m}
                     </span>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
             {company.products.length > 0 && (
-              <div className="panel mount">
-                <div className="panel-head"><div className="panel-title">Gyártmányok</div></div>
-                <div className="panel-pad" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <section className={`${k.card} mount`}>
+                <h2 className={k.h2}>Gyártmányok</h2>
+                <div className={s.chipsStart} style={{ gap: 6 }}>
                   {company.products.map((p, i) => (
                     <span key={i} style={{ padding: "3px 8px", borderRadius: 4, fontSize: 12,
-                      background: "var(--bg-3)", color: "var(--fg-mute)" }}>
+                      background: "var(--color-background-muted)", color: "var(--color-text-secondary)" }}>
                       {p}
                     </span>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
           </div>
 
           {/* Right column: inspection profile + addresses + competitors */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div className="panel mount">
-              <div className="panel-head"><div className="panel-title">Vizsgálati profil</div></div>
-              <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {company.inspectionFrequency && (
-                  <div>
-                    <div className="field-label">Vizsgálati gyakoriság</div>
-                    <div className="field-value">{company.inspectionFrequency}</div>
-                  </div>
-                )}
-                {company.hasInternalLab !== null && (
-                  <div>
-                    <div className="field-label">Labor típus</div>
-                    <div className="field-value">{company.hasInternalLab ? "Belső és külső labor" : "Csak külső labor"}</div>
-                  </div>
-                )}
-                {company.isPedCompliant !== null && (
-                  <div>
-                    <div className="field-label">PED megfelelőség</div>
-                    <div className="field-value" style={{ color: company.isPedCompliant ? "var(--mint)" : "var(--fg-mute)" }}>
-                      {company.isPedCompliant ? "Igen" : "Nem"}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+          <div className={s.stack}>
+            <section className={`${k.card} mount`}>
+              <h2 className={k.h2}>Vizsgálati profil</h2>
+              {company.inspectionFrequency && (
+                <div className={k.kv}>
+                  <span>Vizsgálati gyakoriság</span>
+                  <span>{company.inspectionFrequency}</span>
+                </div>
+              )}
+              {company.hasInternalLab !== null && (
+                <div className={k.kv}>
+                  <span>Labor típus</span>
+                  <span>{company.hasInternalLab ? "Belső és külső labor" : "Csak külső labor"}</span>
+                </div>
+              )}
+              {company.isPedCompliant !== null && (
+                <div className={k.kv}>
+                  <span>PED megfelelőség</span>
+                  <span style={{ color: company.isPedCompliant ? "var(--mint)" : "var(--color-text-secondary)" }}>
+                    {company.isPedCompliant ? "Igen" : "Nem"}
+                  </span>
+                </div>
+              )}
+            </section>
 
             {(company.competitor1 || company.competitor2 || company.competitor3) && (
-              <div className="panel mount">
-                <div className="panel-head"><div className="panel-title">Versenytársak</div></div>
-                <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <section className={`${k.card} mount`}>
+                <h2 className={k.h2}>Versenytársak</h2>
+                <div className={s.list}>
                   {[company.competitor1, company.competitor2, company.competitor3].filter(Boolean).map((c, i) => (
-                    <div key={i} style={{ fontSize: 14, padding: "5px 8px", background: "var(--bg-3)", borderRadius: 5, color: "var(--coral)" }}>
+                    <div key={i} style={{ fontSize: 14, padding: "5px 8px", background: "var(--color-background-muted)", borderRadius: 5, color: "var(--coral)" }}>
                       {c}
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
             {(company.siteCity || company.siteStreet) && (
-              <div className="panel mount">
-                <div className="panel-head"><div className="panel-title">Telephely</div></div>
-                <div className="panel-pad" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <div className="field-label">Székhely</div>
-                  <div style={{ fontSize: 14, color: "var(--fg-soft)" }}>
-                    {[company.zipCode, company.city, company.address].filter(Boolean).join(", ") || "-"}
-                  </div>
-                  {company.siteCity && (
-                    <>
-                      <div className="field-label" style={{ marginTop: 8 }}>Telephely</div>
-                      <div style={{ fontSize: 14, color: "var(--fg-soft)" }}>
-                        {[company.siteZip, company.siteCity, company.siteStreet].filter(Boolean).join(", ")}
-                      </div>
-                      {company.siteCounty && (
-                        <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{company.siteCounty}</div>
-                      )}
-                    </>
-                  )}
+              <section className={`${k.card} mount`}>
+                <h2 className={k.h2}>Telephely</h2>
+                <div className={k.kv}>
+                  <span>Székhely</span>
+                  <span>{[company.zipCode, company.city, company.address].filter(Boolean).join(", ") || "-"}</span>
                 </div>
-              </div>
+                {company.siteCity && (
+                  <div className={k.kv}>
+                    <span>Telephely</span>
+                    <span>
+                      {[company.siteZip, company.siteCity, company.siteStreet].filter(Boolean).join(", ")}
+                      {company.siteCounty && (
+                        <span className={k.muted} style={{ display: "block" }}>{company.siteCounty}</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </section>
             )}
           </div>
         </div>
@@ -913,45 +893,47 @@ export function CompanyDetailClient({
 
       {/* App Events */}
       {shownTab === "events" && (
-        <div className="panel mount" style={{ marginTop: 16, padding: "18px 22px" }}>
-          <div className="tl">
-            {appEvents.map((ev) => (
-              <div key={ev.id} className="tl-item" style={{ "--accent": "var(--sky)" } as React.CSSProperties}>
-                <div className="tl-dot" />
-                <div className="tl-head">
-                  <span className="who">
-                    <span className="font-mono-ndt" style={{ color: "var(--sky)", fontWeight: 500 }}>{ev.eventType}</span>
-                    <span style={{ color: "var(--fg-faint)", margin: "0 6px" }}>·</span>
-                    <span style={{ color: "var(--fg-mute)" }}>{ev.sourceApp}</span>
-                    {ev.agent && (
-                      <>
-                        <span style={{ color: "var(--fg-faint)", margin: "0 6px" }}>via</span>
-                        <span style={{ color: "var(--fg-soft)" }}>{ev.agent.name}</span>
-                      </>
-                    )}
-                  </span>
-                  <span className="when">{formatDateTime(ev.createdAt)}</span>
+        <div className={s.tabBody}>
+          <section className={`${k.card} mount`}>
+            <div className="tl">
+              {appEvents.map((ev) => (
+                <div key={ev.id} className="tl-item" style={{ "--accent": "var(--sky)" } as React.CSSProperties}>
+                  <div className="tl-dot" />
+                  <div className="tl-head">
+                    <span className="who">
+                      <span className="font-mono-ndt" style={{ color: "var(--sky)", fontWeight: 500 }}>{ev.eventType}</span>
+                      <span style={{ color: "var(--color-text-secondary)", margin: "0 6px" }}>·</span>
+                      <span style={{ color: "var(--color-text-secondary)" }}>{ev.sourceApp}</span>
+                      {ev.agent && (
+                        <>
+                          <span style={{ color: "var(--color-text-secondary)", margin: "0 6px" }}>via</span>
+                          <span style={{ color: "var(--color-text-primary)" }}>{ev.agent.name}</span>
+                        </>
+                      )}
+                    </span>
+                    <span className="when">{formatDateTime(ev.createdAt)}</span>
+                  </div>
+                  <div className="tl-body" style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--color-text-secondary)" }}>
+                    {JSON.stringify(ev.payload, null, 0).slice(0, 120)}
+                    {JSON.stringify(ev.payload).length > 120 ? "…" : ""}
+                  </div>
                 </div>
-                <div className="tl-body" style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-faint)" }}>
-                  {JSON.stringify(ev.payload, null, 0).slice(0, 120)}
-                  {JSON.stringify(ev.payload).length > 120 ? "…" : ""}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </section>
         </div>
       )}
 
       {/* Metadata (effective-dated attributes) */}
       {shownTab === "metadata" && (
-        <div style={{ marginTop: 16 }}>
+        <div className={s.tabBody}>
           <CompanyMetadataTab companyId={company.id} attributes={attributes} />
         </div>
       )}
 
       {/* Dossier — closeness score + research notes from the enrichment agent */}
       {shownTab === "dossier" && (
-        <div style={{ marginTop: 16 }}>
+        <div className={s.tabBody}>
           <DossierTab
             enrichment={company.enrichment}
             closenessScore={company.closenessScore ?? null}
@@ -963,8 +945,10 @@ export function CompanyDetailClient({
 
       {/* History */}
       {shownTab === "history" && (
-        <div className="panel mount" style={{ marginTop: 16, padding: "18px 22px" }}>
-          <AuditLogEntries entries={auditEntries} />
+        <div className={s.tabBody}>
+          <section className={`${k.card} mount`}>
+            <AuditLogEntries entries={auditEntries} />
+          </section>
         </div>
       )}
       </div>

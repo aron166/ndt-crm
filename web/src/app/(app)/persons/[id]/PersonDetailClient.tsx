@@ -16,11 +16,15 @@ import { TaskModal } from "@/app/(app)/tasks/TaskModal";
 import { SetEmployerModal } from "./SetEmployerModal";
 import { DossierTab } from "@/components/DossierTab";
 import { formatDate, formatDateTime } from "@/lib/utils";
-import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { Mail, Phone, MapPin, Trash2, Loader2 } from "lucide-react";
+import { interactionDirectionLabel } from "@/lib/interactions";
+import { Loader2, Trash2 } from "lucide-react";
 import { updatePerson, deletePerson, restorePerson } from "@/app/actions/persons";
 import { personLeftCompany } from "@/app/actions/contacts";
 import { employerState } from "@/lib/persons/employer";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import { Badge } from "@astryxdesign/core/Badge";
+import k from "@/components/astryx/page.module.css";
+import s from "../persons.module.css";
 
 interface Contact {
   id: number; companyId: number; role: string | null;
@@ -58,7 +62,7 @@ interface Person {
 
 const TYPE_COLOR: Record<string, string> = {
   call: "var(--mint)", email: "var(--sky)", meeting: "var(--violet)",
-  site_visit: "var(--amber)", note: "var(--fg-mute)",
+  site_visit: "var(--amber)", note: "var(--color-text-secondary)",
 };
 const TYPE_LABEL: Record<string, string> = {
   call: "Hívás", email: "Email", meeting: "Találkozó",
@@ -178,19 +182,18 @@ export function PersonDetailClient({
 
       {isDeleted && (
         <div
-          className="mount"
           style={{
             display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
-            padding: "10px 16px", borderRadius: 8,
+            padding: "10px 16px", borderRadius: "var(--radius-container)",
             background: "var(--coral-soft)", border: "1px solid var(--coral)",
           }}
         >
-          <span style={{ fontSize: 14, color: "var(--fg)", flex: 1 }}>
+          <span style={{ fontSize: 14, color: "var(--color-text-primary)", flex: 1 }}>
             Ez a személy törölve van: nem jelenik meg a keresésben, és az adatai nem
             menthetők, amíg vissza nem állítod.
           </span>
           <button
-            className="btn primary"
+            className={`${k.btn} ${k.btnPrimary}`}
             disabled={restoring}
             onClick={() => startRestore(async () => { await restorePerson(person.id); router.refresh(); })}
           >
@@ -199,79 +202,19 @@ export function PersonDetailClient({
         </div>
       )}
 
-      {/* Detail header */}
-      <div className="detail-header mount">
-        <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
-          {/* Avatar */}
-          <div style={{
-            width: 72, height: 72, borderRadius: "50%",
-            background: avatarColor, display: "grid", placeItems: "center",
-            fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 22, color: "var(--fg-on-accent)",
-            flexShrink: 0, position: "relative",
-          }}>
-            {initials}
-            {/* online dot */}
-            <div style={{
-              position: "absolute", right: 0, bottom: 0,
-              width: 14, height: 14, borderRadius: "50%",
-              background: "var(--mint)", border: "2px solid var(--bg-page)",
-              boxShadow: "0 0 8px var(--mint)",
-            }} />
-          </div>
-
-          {/* Name + info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg)" }}>
-              {person.lastName} {person.firstName}
-            </h1>
-            {currentContact && (
-              <div style={{ marginTop: 6, color: "var(--fg-soft)", fontSize: 14 }}>
-                {currentContact.role && <span>{currentContact.role} </span>}
-                <span style={{ color: "var(--fg-faint)" }}>at</span>{" "}
-                <Link href={`/companies/${currentContact.companyId}`} className="row-link">
-                  {currentContact.company.name}
-                </Link>
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-              {person.email && (
-                <a href={`mailto:${person.email}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-soft)" }} className="row-link">
-                  <Mail style={{ width: 13, height: 13 }} />
-                  <span style={{ fontFamily: "var(--font-mono)" }}>{person.email}</span>
-                </a>
-              )}
-              {person.phone && (
-                <a href={`tel:${person.phone}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-soft)" }} className="row-link">
-                  <Phone style={{ width: 13, height: 13 }} />
-                  <span style={{ fontFamily: "var(--font-mono)" }}>{person.phone}</span>
-                </a>
-              )}
-              {currentContact?.company.city && (
-                <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-soft)" }}>
-                  <MapPin style={{ width: 13, height: 13 }} /> {currentContact.company.city}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Signal strength panel */}
-          <div style={{
-            minWidth: 180, background: "var(--bg-1)",
-            border: "1px solid var(--line-soft)", borderRadius: 8, padding: 14, flexShrink: 0,
-          }}>
-            <div className="field-label">Relationship signal</div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4 }}>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 500 }}>{signalLevel}.0</span>
-              <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>/ 6.0</span>
-            </div>
-            <SignalMeter level={signalLevel} />
-            <div style={{ fontSize: 12, color: "var(--fg-mute)", marginTop: 8, lineHeight: 1.4 }}>
-              {signalLabel}
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+      <PageHeader
+        title={<>{person.lastName} {person.firstName}</>}
+        eyebrow={currentContact ? (
+          <>
+            {currentContact.role && <span>{currentContact.role} </span>}
+            <span>at</span>{" "}
+            <Link href={`/companies/${currentContact.companyId}`} className={k.link}>
+              {currentContact.company.name}
+            </Link>
+          </>
+        ) : undefined}
+        actions={
+          <>
             <LogInteractionButton
               personId={person.id}
               companyId={currentContact?.companyId}
@@ -284,179 +227,171 @@ export function PersonDetailClient({
               defaultTo={person.email || undefined}
               contextLabel={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
             />
-            <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
+            <button className={k.btn} onClick={() => setTaskOpen(true)}>+ Feladat</button>
             <button
-              className="btn"
+              className={k.btn}
               onClick={handleEnrich}
               disabled={enriching}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
             >
               <Loader2 size={14} aria-hidden="true" style={{ animation: enriching ? "spin 1.2s linear infinite" : "none" }} />
               {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
             </button>
             <button
-              className="btn ghost"
-              style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
+              className={`${k.btn} ${k.btnIcon}`}
+              style={{ color: "var(--color-error)" }}
               onClick={handleDelete}
               disabled={deleting}
               title="Személy törlése"
+              aria-label="Személy törlése"
             >
-              <Trash2 style={{ width: 11, height: 11 }} />
+              <Trash2 style={{ width: 14, height: 14 }} />
             </button>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        {/* Engagement strip */}
-        <div style={{
-          marginTop: 18, padding: 14,
-          background: "var(--bg-0)", borderRadius: 8, border: "1px solid var(--line-soft)",
-          display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16, alignItems: "center",
-        }}>
-          <div>
-            <div className="field-label">Aktivitás · elmúlt 24 hét</div>
-            <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-              <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 20, color: "var(--fg)" }}>{interactions.length}</div>
-                <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>interakció</div>
+      <div className={k.split}>
+        {/* Left: engagement, tabs and tab content. While the deferred body is still rendering the new
+            pill is lit but the OLD body is on screen — `inert` stops a click or
+            a Tab key landing on the tab the user left. No dimming: the urgent
+            pass fires on every switch, so it would flash. (Vanda, PR #83.) */}
+        <div>
+          <div className={k.card} style={{ marginBottom: 16 }}>
+            <span className={k.statK}>Aktivitás · elmúlt 24 hét</span>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 24 }}>
+              <div className={k.stat}>
+                <span className={k.statV}>{interactions.length}</span>
+                <span className={k.statK}>interakció</span>
               </div>
-              <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 20, color: "var(--fg)" }}>{tasks.filter(t => t.status !== "done").length}</div>
-                <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>nyitott feladat</div>
+              <div className={k.stat}>
+                <span className={k.statV}>{tasks.filter(t => t.status !== "done").length}</span>
+                <span className={k.statK}>nyitott feladat</span>
               </div>
-              <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 20, color: "var(--fg)" }}>{contacts.length}</div>
-                <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>munkahely</div>
+              <div className={k.stat}>
+                <span className={k.statV}>{contacts.length}</span>
+                <span className={k.statK}>munkahely</span>
+              </div>
+              <div style={{ flex: "1 1 200px", minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
+                <Sparkline data={engagementSeries} width={240} height={48} color="var(--color-accent)" />
               </div>
             </div>
           </div>
-          <Sparkline data={engagementSeries} width={400} height={48} color="var(--indigo)" />
-        </div>
 
-        {/* Tags */}
-        <div style={{ marginTop: 14 }}>
-          <TagInput taggableType="person" taggableId={person.id} initialTags={initialTags} />
-        </div>
-      </div>
+          <div className={k.seg} aria-busy={switching}>
+            {TABS.map(({ key, label, count }) => (
+              <button
+                key={key}
+                type="button"
+                className={`${k.segItem} ${tab === key ? k.segItemOn : ""}`}
+                onClick={() => setTab(key)}
+              >
+                {label}
+                <span className={k.num} style={{ marginLeft: 6 }}>{count}</span>
+              </button>
+            ))}
+          </div>
 
-      {/* Tabs + content */}
-      <div style={{ marginTop: 18 }}>
-        <div className="tabs-ds" aria-busy={switching}>
-          {TABS.map(({ key, label, count }) => (
-            <button key={key} className={`tab-ds ${tab === key ? "active" : ""}`} onClick={() => setTab(key)}>
-              {label}
-              <span className="tcount">{count}</span>
-            </button>
-          ))}
-        </div>
+          {/* Quick action strip — always visible below tabs */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "16px 0" }}>
+            <LogInteractionButton
+              personId={person.id}
+              companyId={currentContact?.companyId}
+              personName={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
+              companyName={currentContact?.company.name}
+            />
+            <button className={k.btn} onClick={() => setTaskOpen(true)}>+ Feladat</button>
+          </div>
 
-        {/* Quick action strip — always visible below tabs */}
-        <div style={{ display: "flex", gap: 8, padding: "10px 0", borderBottom: "1px solid var(--line-soft)", marginBottom: 2 }}>
-          <LogInteractionButton
-            personId={person.id}
-            companyId={currentContact?.companyId}
-            personName={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
-            companyName={currentContact?.company.name}
-          />
-          <button className="btn" onClick={() => setTaskOpen(true)}>+ Feladat</button>
-        </div>
-
-        <div className="split-grid" style={{ marginTop: 16 }}>
-          {/* Left: tab content. While the deferred body is still rendering the new
-              pill is lit but the OLD body is on screen — `inert` stops a click or
-              a Tab key landing on the tab the user left. No dimming: the urgent
-              pass fires on every switch, so it would flash. (Vanda, PR #83.) */}
           <div inert={switching}>
             {/* Activity */}
             {shownTab === "activity" && (
-              <div className="panel mount">
-                <div style={{ padding: "18px 22px" }}>
-                  {interactions.length === 0 ? (
-                    <div style={{ textAlign: "center", color: "var(--fg-mute)", padding: "32px 0", fontSize: 14 }}>
-                      Nincs interakció rögzítve.
-                    </div>
-                  ) : (
-                    <div className="tl">
-                      {interactions.map((r) => {
-                        const accent = TYPE_COLOR[r.type ?? "note"] ?? "var(--fg-mute)";
-                        return (
-                          <div key={r.id} className="tl-item" style={{ "--accent": accent } as React.CSSProperties}>
-                            <div className="tl-dot" />
-                            <div className="tl-head">
-                              <span className="who">
-                                <span style={{ color: accent, fontWeight: 500 }}>
-                                  {TYPE_LABEL[r.type ?? ""] ?? r.type ?? "Ismeretlen"}
-                                </span>
-                                {r.direction && (
-                                  <>
-                                    <span style={{ color: "var(--fg-faint)", margin: "0 6px" }}>·</span>
-                                    <span style={{ color: "var(--fg-mute)" }}>{interactionDirectionLabel(r.direction)}</span>
-                                  </>
-                                )}
+              <div className={k.card}>
+                {interactions.length === 0 ? (
+                  <div className={k.empty}>Nincs interakció rögzítve.</div>
+                ) : (
+                  <div className={k.list}>
+                    {interactions.map((r) => {
+                      const accent = TYPE_COLOR[r.type ?? "note"] ?? "var(--color-text-secondary)";
+                      return (
+                        <div key={r.id} className={k.rowCompact}>
+                          <span className={k.bar} style={{ background: accent }} />
+                          <div className={k.cell}>
+                            <span className={k.nameLine}>
+                              <span style={{ color: accent, fontWeight: 500 }}>
+                                {TYPE_LABEL[r.type ?? ""] ?? r.type ?? "Ismeretlen"}
                               </span>
-                              <span className="when">{formatDateTime(r.occurredAt)}</span>
-                            </div>
-                            {r.notes && <div className="tl-body">{r.notes}</div>}
-                            {r.outcome && <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Eredmény: {r.outcome}</div>}
+                              {r.direction && (
+                                <span className={k.muted}>· {interactionDirectionLabel(r.direction)}</span>
+                              )}
+                              <span className={`${k.muted} ${k.num}`}>{formatDateTime(r.occurredAt)}</span>
+                            </span>
+                            {(r.notes || r.outcome) && (
+                              <p className={s.note}>
+                                {r.notes}
+                                {r.notes && r.outcome && <br />}
+                                {r.outcome && <span className={k.muted}>Eredmény: {r.outcome}</span>}
+                              </p>
+                            )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Career */}
             {shownTab === "career" && (
-              <div className="panel mount">
-                <div style={{ padding: "22px 24px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                    <span className="h-section" style={{ margin: 0 }}>Karrierút</span>
-                    <span style={{ fontSize: 12, color: "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>
-                      {contacts.length} munkahely
-                    </span>
-                    <button className="btn" style={{ marginLeft: "auto" }} onClick={() => setEmployerOpen(true)}>
-                      + Munkahelyváltás
+              <div className={k.card}>
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <h2 className={k.h2}>Karrierút</h2>
+                  <span className={`${k.muted} ${k.num}`}>
+                    {contacts.length} munkahely
+                  </span>
+                  <button className={k.btn} style={{ marginLeft: "auto" }} onClick={() => setEmployerOpen(true)}>
+                    + Munkahelyváltás
+                  </button>
+                  {currentContact && (
+                    <button className={k.btn} disabled={leaving} onClick={handleLeftConfirm}>
+                      Kilépett
                     </button>
-                    {currentContact && (
-                      <button className="btn" disabled={leaving} onClick={handleLeftConfirm}>
-                        Kilépett
-                      </button>
-                    )}
-                  </div>
-                  {leaveError && (
-                    <div style={{ marginBottom: 12, fontSize: 13, color: "var(--coral)" }}>{leaveError}</div>
                   )}
-                  {employerState(contacts).kind === "unknown" && (
-                    <div style={{ marginBottom: 12, fontSize: 13, color: "var(--fg-mute)" }}>
-                      Jelenlegi munkahely ismeretlen.
-                    </div>
-                  )}
-                  <div className="tl">
-                    {contacts.map((c, i) => (
-                      <div key={c.id} className="tl-item" style={{ "--accent": c.endedAt ? "var(--fg-mute)" : "var(--indigo)" } as React.CSSProperties}>
-                        <div className="tl-dot" />
-                        <div className="tl-head">
-                          <span className="who">
-                            <span style={{ fontWeight: 500 }}>{c.role ?? "Munkatárs"}</span>
-                            <span style={{ color: "var(--fg-faint)", margin: "0 6px" }}>at</span>
-                            <Link href={`/companies/${c.companyId}`} className="row-link">{c.company.name}</Link>
-                            {!c.endedAt && (
-                              <span className="badge-ds indigo" style={{ marginLeft: 8 }}>current</span>
-                            )}
-                          </span>
-                          <span className="when">
-                            {c.startedAt ? formatDate(c.startedAt) : "?"} → {c.endedAt ? formatDate(c.endedAt) : "jelenleg"}
-                          </span>
-                        </div>
-                        <div className="tl-body">{c.company.city}{c.company.city ? " · " : ""}{c.company.vatNumber ?? ""}</div>
+                </div>
+                {leaveError && (
+                  <p className={k.error} style={{ margin: 0 }}>{leaveError}</p>
+                )}
+                {employerState(contacts).kind === "unknown" && (
+                  <span className={k.muted}>
+                    Jelenlegi munkahely ismeretlen.
+                  </span>
+                )}
+                <div className={k.list}>
+                  {contacts.map((c) => (
+                    <div key={c.id} className={k.row}>
+                      <span className={k.bar} style={{ background: c.endedAt ? "var(--color-border-emphasized)" : "var(--color-accent)" }} />
+                      <div className={k.cell}>
+                        <span className={k.nameLine}>
+                          <span className={k.strong}>{c.role ?? "Munkatárs"}</span>
+                          <span className={k.muted}>at</span>
+                          <Link href={`/companies/${c.companyId}`} className={k.link}>{c.company.name}</Link>
+                          {!c.endedAt && <Badge variant="blue" label="current" />}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: 18, padding: 14, border: "1px dashed var(--line-soft)", borderRadius: 8, fontSize: 14, color: "var(--fg-mute)", lineHeight: 1.5 }}>
-                    <div style={{ color: "var(--fg)", fontWeight: 500, marginBottom: 4 }}>Miért tároljuk a karriertörténetet</div>
+                      <div className={k.cell}>
+                        <span className={k.muted}>{c.company.city}{c.company.city ? " · " : ""}{c.company.vatNumber ?? ""}</span>
+                      </div>
+                      <span className={`${k.muted} ${k.num}`}>
+                        {c.startedAt ? formatDate(c.startedAt) : "?"} → {c.endedAt ? formatDate(c.endedAt) : "jelenleg"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className={k.cardMuted}>
+                  <div className={k.strong} style={{ marginBottom: 4 }}>Miért tároljuk a karriertörténetet</div>
+                  <span className={k.muted}>
                     Ha a személy céget vált, a teljes kapcsolati történet követi. A kapcsolat az érték: nem az adott munkáltatónál lévő rekord.
-                  </div>
+                  </span>
                 </div>
               </div>
             )}
@@ -476,39 +411,37 @@ export function PersonDetailClient({
 
             {/* Conversations */}
             {shownTab === "conversations" && (
-              <div className="panel mount space-y-4" style={{ padding: "18px 22px" }}>
+              <div className={k.card}>
                 {conversations.map((conv) => (
-                  <div key={conv.id} style={{ borderBottom: "1px solid var(--line-soft)", paddingBottom: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--violet)", boxShadow: "0 0 6px var(--violet)", flexShrink: 0 }} />
-                      <span style={{ fontWeight: 500, color: "var(--fg)", fontSize: 14 }}>
+                  <div key={conv.id} className={k.section}>
+                    <div className={k.nameLine}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--violet)", flexShrink: 0 }} />
+                      <span className={k.strong}>
                         {conv.summary ?? conv.channel}
                       </span>
                       {conv.agent && (
-                        <span className="badge-ds" style={{ background: "var(--violet-soft)", color: "var(--violet)", border: "1px solid var(--violet-line)", fontSize: 12 }}>
-                          {conv.agent.name} · {conv.agent.owner ?? conv.agent.role}
-                        </span>
+                        <Badge variant="neutral" label={`${conv.agent.name} · ${conv.agent.owner ?? conv.agent.role}`} />
                       )}
-                      <span className="font-mono-ndt" style={{ marginLeft: "auto", fontSize: 12, color: "var(--fg-faint)" }}>
+                      <span className={`${k.muted} ${k.num}`} style={{ marginLeft: "auto" }}>
                         {formatDateTime(conv.startedAt)}
                       </span>
                     </div>
-                    <div className="space-y-2">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {conv.messages.map((msg) => (
                         <div
                           key={msg.id}
                           style={{
                             padding: "8px 12px",
-                            borderRadius: 6,
+                            borderRadius: "var(--radius-element)",
                             fontSize: 14,
                             lineHeight: 1.5,
-                            background: msg.role === "user" ? "var(--bg-0)" : "var(--violet-surface)",
-                            color: msg.role === "user" ? "var(--fg-soft)" : "var(--fg)",
+                            background: msg.role === "user" ? "var(--color-background-muted)" : "var(--violet-surface)",
+                            color: msg.role === "user" ? "var(--color-text-secondary)" : "var(--color-text-primary)",
                             marginLeft: msg.role === "user" ? 0 : 16,
-                            border: "1px solid var(--line-soft)",
+                            border: "1px solid var(--color-border)",
                           }}
                         >
-                          <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                          <span className={k.muted} style={{ display: "block", fontSize: 12, marginBottom: 4 }}>
                             {msg.role}
                           </span>
                           {msg.content}
@@ -522,84 +455,82 @@ export function PersonDetailClient({
 
             {/* Adatok — inline edit */}
             {shownTab === "adatok" && (
-              <div className="panel mount" style={{ padding: "18px 22px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {(
-                    [
-                      { key: "lastName",   label: "Vezetéknév",  type: "text"  },
-                      { key: "firstName",  label: "Keresztnév",  type: "text"  },
-                      { key: "email",      label: "Email",       type: "email" },
-                      { key: "phone",      label: "Telefon",     type: "tel"   },
-                      { key: "linkedinUrl", label: "LinkedIn URL", type: "url" },
-                    ] as { key: keyof typeof form; label: string; type: string }[]
-                  ).map(({ key, label, type }) => (
-                    <div key={key}>
-                      <div className="field-label">{label}</div>
-                      <input
-                        type={type}
-                        value={form[key]}
-                        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                        style={{
-                          width: "100%", fontSize: 14, padding: "5px 8px",
-                          background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-                          borderRadius: 5, color: "var(--fg)", outline: "none",
-                        }}
-                      />
-                    </div>
-                  ))}
-                  <div>
-                    <div className="field-label">Megjegyzés</div>
-                    <textarea
-                      value={form.notes}
-                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                      rows={4}
+              <div className={k.card}>
+                {(
+                  [
+                    { key: "lastName",   label: "Vezetéknév",  type: "text"  },
+                    { key: "firstName",  label: "Keresztnév",  type: "text"  },
+                    { key: "email",      label: "Email",       type: "email" },
+                    { key: "phone",      label: "Telefon",     type: "tel"   },
+                    { key: "linkedinUrl", label: "LinkedIn URL", type: "url" },
+                  ] as { key: keyof typeof form; label: string; type: string }[]
+                ).map(({ key, label, type }) => (
+                  <div key={key}>
+                    <div className={k.muted}>{label}</div>
+                    <input
+                      type={type}
+                      value={form[key]}
+                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                       style={{
-                        width: "100%", fontSize: 14, padding: "5px 8px",
-                        background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-                        borderRadius: 5, color: "var(--fg)", outline: "none", resize: "vertical",
+                        width: "100%", fontSize: 14, padding: "8px 10px", boxSizing: "border-box",
+                        background: "var(--color-background-card)", border: "1px solid var(--color-border)",
+                        borderRadius: "var(--radius-element)", color: "var(--color-text-primary)",
                       }}
                     />
                   </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                    <button
-                      className="btn primary"
-                      disabled={saving}
-                      onClick={() => {
-                        startSave(async () => {
-                          setSaveError(null);
-                          const res = await updatePerson(person.id, {
-                            firstName:   form.firstName   || undefined,
-                            lastName:    form.lastName    || undefined,
-                            email:       form.email       || undefined,
-                            phone:       form.phone       || undefined,
-                            linkedinUrl: form.linkedinUrl || undefined,
-                            notes:       form.notes       || undefined,
-                          });
-                          if (res?.error) { setSaveError(res.error); return; }
-                          router.refresh();
-                        });
-                      }}
-                    >
-                      {saving ? "Mentés..." : "Mentés"}
-                    </button>
-                    <button
-                      className="btn"
-                      onClick={() => setForm({
-                        firstName:   person.firstName   ?? "",
-                        lastName:    person.lastName    ?? "",
-                        email:       person.email       ?? "",
-                        phone:       person.phone       ?? "",
-                        linkedinUrl: "",
-                        notes:       person.notes       ?? "",
-                      })}
-                    >
-                      Mégse
-                    </button>
-                  </div>
-                  {saveError && (
-                    <p style={{ fontSize: 14, color: "var(--coral)", marginTop: 4 }}>{saveError}</p>
-                  )}
+                ))}
+                <div>
+                  <div className={k.muted}>Megjegyzés</div>
+                  <textarea
+                    value={form.notes}
+                    onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                    rows={4}
+                    style={{
+                      width: "100%", fontSize: 14, padding: "8px 10px", boxSizing: "border-box",
+                      background: "var(--color-background-card)", border: "1px solid var(--color-border)",
+                      borderRadius: "var(--radius-element)", color: "var(--color-text-primary)", resize: "vertical",
+                    }}
+                  />
                 </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <button
+                    className={`${k.btn} ${k.btnPrimary}`}
+                    disabled={saving}
+                    onClick={() => {
+                      startSave(async () => {
+                        setSaveError(null);
+                        const res = await updatePerson(person.id, {
+                          firstName:   form.firstName   || undefined,
+                          lastName:    form.lastName    || undefined,
+                          email:       form.email       || undefined,
+                          phone:       form.phone       || undefined,
+                          linkedinUrl: form.linkedinUrl || undefined,
+                          notes:       form.notes       || undefined,
+                        });
+                        if (res?.error) { setSaveError(res.error); return; }
+                        router.refresh();
+                      });
+                    }}
+                  >
+                    {saving ? "Mentés..." : "Mentés"}
+                  </button>
+                  <button
+                    className={k.btn}
+                    onClick={() => setForm({
+                      firstName:   person.firstName   ?? "",
+                      lastName:    person.lastName    ?? "",
+                      email:       person.email       ?? "",
+                      phone:       person.phone       ?? "",
+                      linkedinUrl: "",
+                      notes:       person.notes       ?? "",
+                    })}
+                  >
+                    Mégse
+                  </button>
+                </div>
+                {saveError && (
+                  <p className={k.error} style={{ margin: 0 }}>{saveError}</p>
+                )}
               </div>
             )}
 
@@ -613,79 +544,111 @@ export function PersonDetailClient({
               />
             )}
           </div>
+        </div>
 
-          {/* Right: sidebar panels */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Current employer */}
-            {!currentContact && (
-              <div className="panel mount">
-                <div className="panel-head"><div className="panel-title">Jelenlegi munkahely</div></div>
-                <div className="panel-pad" style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 14, color: "var(--fg-mute)", marginBottom: 10 }}>
-                    Nincs rögzített munkahely.
-                  </div>
-                  <button className="btn primary" onClick={() => setEmployerOpen(true)}>
-                    + Munkahely beállítása
-                  </button>
-                </div>
+        {/* Right: sidebar panels */}
+        <div className={k.asideFirst} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Summary: contact facts, signal, tags */}
+          <div className={k.card}>
+            <div style={{
+              width: 48, height: 48, borderRadius: "50%",
+              background: avatarColor, display: "grid", placeItems: "center",
+              fontWeight: 600, fontSize: 16, color: "var(--color-on-accent)",
+            }}>
+              {initials}
+            </div>
+            {person.email && (
+              <div className={k.kv}>
+                <span>Email</span>
+                <a href={`mailto:${person.email}`} className={k.link}>{person.email}</a>
               </div>
             )}
-            {currentContact && (
-              <div className="panel mount">
-                <div className="panel-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div className="panel-title">Jelenlegi munkahely</div>
-                  <button className="btn" style={{ padding: "2px 10px", fontSize: 12 }} onClick={() => setEmployerOpen(true)}>
-                    Módosítás
-                  </button>
-                </div>
-                <div className="panel-pad">
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{
-                      width: 42, height: 42, borderRadius: 8,
-                      background: "var(--indigo-soft)", display: "grid", placeItems: "center",
-                      fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 14, color: "var(--indigo)",
-                    }}>
-                      {currentContact.company.name.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <Link href={`/companies/${currentContact.companyId}`} className="row-link" style={{ fontWeight: 500 }}>
-                        {currentContact.company.name}
-                      </Link>
-                      {currentContact.company.city && (
-                        <div style={{ fontSize: 12, color: "var(--fg-mute)", marginTop: 2 }}>
-                          {currentContact.company.city}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
-                    {currentContact.company.vatNumber && (
-                      <div>
-                        <div className="field-label">VAT</div>
-                        <div className="field-value mono">{currentContact.company.vatNumber}</div>
-                      </div>
-                    )}
-                    {currentContact.role && (
-                      <div>
-                        <div className="field-label">Beosztás</div>
-                        <div className="field-value">{currentContact.role}</div>
-                      </div>
-                    )}
-                    <div>
-                      <div className="field-label">Munkaviszony kezdete</div>
-                      <div className="field-value mono">{currentContact.startedAt ? formatDate(currentContact.startedAt) : "Ismeretlen"}</div>
-                    </div>
-                  </div>
-                </div>
+            {person.phone && (
+              <div className={k.kv}>
+                <span>Telefon</span>
+                <a href={`tel:${person.phone}`} className={k.link}>{person.phone}</a>
               </div>
             )}
-
-            {/* Audit */}
-            <div className="panel mount">
-              <div className="panel-head"><div className="panel-title">History</div></div>
-              <div style={{ padding: "12px 16px", maxHeight: 300, overflowY: "auto" }}>
-                <AuditLogEntries entries={auditEntries} />
+            {currentContact?.company.city && (
+              <div className={k.kv}>
+                <span>Város</span> {/* PROPOSAL copy */}
+                <span>{currentContact.company.city}</span>
               </div>
+            )}
+            <div className={k.kv}>
+              <span>Relationship signal</span>
+              <span className={k.num}>{signalLevel}.0 <span className={k.muted}>/ 6.0</span></span>
+            </div>
+            <SignalMeter level={signalLevel} />
+            <span className={k.muted}>{signalLabel}</span>
+            <div style={{ marginTop: 8 }}>
+              <TagInput taggableType="person" taggableId={person.id} initialTags={initialTags} />
+            </div>
+          </div>
+
+          {/* Current employer */}
+          {!currentContact && (
+            <div className={k.card}>
+              <h2 className={k.h2}>Jelenlegi munkahely</h2>
+              <span className={k.muted}>Nincs rögzített munkahely.</span>
+              <div>
+                <button className={`${k.btn} ${k.btnPrimary}`} onClick={() => setEmployerOpen(true)}>
+                  + Munkahely beállítása
+                </button>
+              </div>
+            </div>
+          )}
+          {currentContact && (
+            <div className={k.card}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <h2 className={k.h2}>Jelenlegi munkahely</h2>
+                <button className={k.btn} onClick={() => setEmployerOpen(true)}>
+                  Módosítás
+                </button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{
+                  width: 42, height: 42, borderRadius: "var(--radius-element)",
+                  background: "var(--color-background-muted)", display: "grid", placeItems: "center",
+                  fontWeight: 600, fontSize: 14, color: "var(--color-accent)", flexShrink: 0,
+                }}>
+                  {currentContact.company.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Link href={`/companies/${currentContact.companyId}`} className={k.link}>
+                    {currentContact.company.name}
+                  </Link>
+                  {currentContact.company.city && (
+                    <div className={k.muted}>
+                      {currentContact.company.city}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {currentContact.company.vatNumber && (
+                <div className={k.kv}>
+                  <span>VAT</span>
+                  <span className={k.num}>{currentContact.company.vatNumber}</span>
+                </div>
+              )}
+              {currentContact.role && (
+                <div className={k.kv}>
+                  <span>Beosztás</span>
+                  <span>{currentContact.role}</span>
+                </div>
+              )}
+              <div className={k.kv}>
+                <span>Munkaviszony kezdete</span>
+                <span className={k.num}>{currentContact.startedAt ? formatDate(currentContact.startedAt) : "Ismeretlen"}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Audit */}
+          <div className={k.card}>
+            <h2 className={k.h2}>History</h2>
+            <div style={{ maxHeight: 300, overflowY: "auto" }}>
+              <AuditLogEntries entries={auditEntries} />
             </div>
           </div>
         </div>
