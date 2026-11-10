@@ -11,7 +11,7 @@ const VIEWS: { key: LeadsViewName; label: string; href: string }[] = [
 ];
 
 export function LeadsHeader({
-  view, title, help, openCount, queueCount, closedCount, owner, now = new Date(), actions,
+  view, title, help, openCount, queueCount, closedCount, owner, ownerHref, now = new Date(), actions,
 }: {
   view: LeadsViewName;
   title: string;
@@ -22,6 +22,7 @@ export function LeadsHeader({
   owner?: { current: string; users: { id: number; name: string }[] };
   now?: Date;
   actions?: React.ReactNode;
+  ownerHref?: (key: string) => string;
 }) {
   // PROPOSAL copy
   const dateLine = new Intl.DateTimeFormat("hu-HU", {
@@ -61,7 +62,7 @@ export function LeadsHeader({
               {ownerLinks.map((o) => (
                 <Link
                   key={o.key}
-                  href={view === "queue" ? `/leads?view=queue&owner=${o.key}` : `/leads?owner=${o.key}`}
+                  href={ownerHref ? ownerHref(o.key) : `/leads?owner=${o.key}`}
                   aria-current={o.key === owner.current ? "true" : undefined}
                   className={`${s.segItem} ${o.key === owner.current ? s.segItemOn : ""}`}
                 >

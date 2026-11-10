@@ -40,27 +40,37 @@ export default async function LeadsPage({
 
   // Counts power the toggle. Won (= converted to a deal) and lost leads leave
   // the active board: the "Lezárt" list keeps them for history.
-  const [actor, users, activeCount, convertedCount] = await Promise.all([
+  const [actor, users, convertedCount] = await Promise.all([
     getActor(TENANT_ID),
     db.user.findMany({ where: { tenantId: TENANT_ID, email: { not: { endsWith: "@system" } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    // Recall leads sit off the main columns, so the "Tábla · N" count leaves them out too.
-    db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: null, outcome: "open", OR: [{ status: null }, { status: { notIn: [...SIDE_STAGES] } }] } }),
     db.lead.count({ where: CLOSED_WHERE }),
   ]);
 
   const explicitOwner = rawOwner === "all" || users.some((u) => String(u.id) === rawOwner);
   // No owner chosen and the signed-in user owns no open lead: show everyone's queue, not an
   // empty page (Aron could not find his leads in prod, 2026-11-10). The owner filter shows "Mindenki".
-  const ownsNone = !explicitOwner && rawOwner !== "me" && (actor.userId == null || (await getQueueTotal(actor.userId)) === 0);
+  const myTotal = !explicitOwner && rawOwner !== "me" && actor.userId != null ? await getQueueTotal(actor.userId) : null;
+  const ownsNone = !explicitOwner && rawOwner !== "me" && (actor.userId == null || myTotal === 0);
   const ownerParam = explicitOwner ? rawOwner! : ownsNone ? "all" : "me";
   // An explicit ?owner=me without a resolved user sees nothing (-1), never everyone.
   const assignedToId = ownerParam === "all" ? null : ownerParam === "me" ? (actor.userId ?? -1) : Number(ownerParam);
-  // Non-queue views show the tab count for the default (me) list; the queue branch reuses its own total.
-  const queueTotalOther = isQueue ? 0 : await getQueueTotal(actor.userId ?? -1);
+  // Board main columns and the queue are the same set (open, recall and lost off), so one count serves both tabs
+  // and follows the owner filter. Recall leads sit off the main columns and stay out of it.
+  const openTotal = ownerParam === "me" && myTotal != null ? myTotal : await getQueueTotal(assignedToId);
+  const queueTotalOther = openTotal;
 
   const header = (
     props: Pick<React.ComponentProps<typeof LeadsHeader>, "view" | "title" | "help" | "owner" | "actions"> & { queueCount?: number },
-  ) => <LeadsHeader {...props} queueCount={props.queueCount ?? queueTotalOther} openCount={activeCount} closedCount={convertedCount} />;
+  ) => <LeadsHeader {...props} queueCount={props.queueCount ?? queueTotalOther} openCount={openTotal} ownerHref={ownerHref} closedCount={convertedCount} />;
+  // Owner links keep the view and, on the board, the tier and side filters.
+  const ownerHref = (key: string) => {
+    const q = new URLSearchParams();
+    if (isQueue) q.set("view", "queue");
+    else if (sideView) q.set("view", sideView);
+    if (!isQueue && tier) q.set("tier", tier);
+    q.set("owner", key);
+    return `/leads?${q.toString()}`;
+  };
   // PROPOSAL copy
   const ownerHelp = ownsNone ? "Nincs hozzád rendelt nyitott lead, ezért mindenki leadjei látszanak." : undefined;
 
@@ -76,7 +86,7 @@ export default async function LeadsPage({
   if (isQueue) {
     const now = new Date();
     const [statuses, rows, counts, queueTotal] = await Promise.all([
-      getLeadStatuses(TENANT_ID), getQueueRows(assignedToId), getFooterCounts(), getQueueTotal(assignedToId),
+      getLeadStatuses(TENANT_ID), getQueueRows(assignedToId), getFooterCounts(), openTotal,
     ]);
     // Heading counts come from the loaded rows (at most 200, most urgent first), so
     // past the cap they undercount; the list footer says so.

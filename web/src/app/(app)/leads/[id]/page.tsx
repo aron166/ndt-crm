@@ -66,7 +66,8 @@ export default async function LeadDetailPage({
     }),
     getEntityHistory("lead", leadId),
     getLeadStatuses(TENANT_ID),
-    db.user.findMany({ where: { tenantId: TENANT_ID, email: { not: { endsWith: "@system" } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    // A lead already owned by a @system user keeps that owner in the select.
+    db.user.findMany({ where: { tenantId: TENANT_ID, OR: [{ email: { not: { endsWith: "@system" } } }, { assignedLeads: { some: { id: leadId, tenantId: TENANT_ID } } }] }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     db.task.findMany({
       where: { tenantId: TENANT_ID, leadId, status: { in: ["created", "in_progress"] } },
       select: { id: true, title: true, dueDate: true, type: true, assignedTo: { select: { name: true } } },
