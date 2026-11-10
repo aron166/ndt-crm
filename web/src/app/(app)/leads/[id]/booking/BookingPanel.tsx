@@ -87,6 +87,9 @@ export function BookingPanel({ leadId, leadOpen }: { leadId: number; leadOpen: b
       setProbes({});
       setExtra(null);
       setConflict(false);
+      // Old cards would keep a live book button for a slot never proposed for this site or kind.
+      setCards([]);
+      setSelectedKey(null);
     });
     postSlots({ settlementId: settlement.id, kind, siteSource, count: 3, days }).then(async (r) => {
       if (id !== run.current) return;
@@ -233,9 +236,13 @@ export function BookingPanel({ leadId, leadOpen }: { leadId: number; leadOpen: b
         </>
       )}
 
+      {conflict && (
+        <strong role="status">
+          {allCards.length > 0 ? "Időközben megváltozott a nap, itt az új lehetőség:" : "Időközben megváltozott a nap, és nincs új szabad időpont. Válassz másik napot vagy helyszínt."}
+        </strong> // PROPOSAL copy
+      )}
       {allCards.length > 0 && (
         <div className={css.stack} role="group" aria-label="Javaslatok">
-          {conflict && <strong role="status">Időközben megváltozott a nap, itt az új lehetőség:</strong>}
           {allCards.map((s) => {
             const rank = s === extra ? undefined : cards.indexOf(s) + 1;
             const m = machineOf(s.machineId);
@@ -273,6 +280,8 @@ export function BookingPanel({ leadId, leadOpen }: { leadId: number; leadOpen: b
 
       {settlement && (
         <ManualTimeCheck
+          // Remount on a new site or kind: drops a result checked for the old one, and any check still in flight.
+          key={`${settlement.id}:${kind}:${siteSource}`}
           search={{ settlementId: settlement.id, kind, siteSource }}
           machines={machines}
           onBook={(a) => book(a, "manual")}

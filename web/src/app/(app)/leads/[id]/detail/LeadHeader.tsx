@@ -84,7 +84,7 @@ export function LeadHeader(p: {
         <div className={s.reach}>
           {p.email && <a href={`mailto:${p.email}`} className={s.mail}><Mail size={18} />{p.email}</a>}
           {p.phone ? (
-            <a href={`tel:${p.phone}`} className={s.call}><Phone size={20} />{`Hívás ${p.phone}`}</a>
+            <a href={`tel:${p.phone.replace(/[^\d+]/g, "")}`} className={s.call}><Phone size={20} />{`Hívás ${p.phone}`}</a>
           ) : (
             <>
               {/* PROPOSAL copy */}

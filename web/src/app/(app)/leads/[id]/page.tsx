@@ -119,6 +119,7 @@ export default async function LeadDetailPage({
       </Link>
 
       <LeadDetailClient
+        key={leadId}
         keyFacts={keyFacts}
         firstContactMin={firstContactMin}
         lead={serializeDates({
@@ -138,7 +139,7 @@ export default async function LeadDetailPage({
         scriptVariants={scriptVariants}
         callTypeCounts={callTypeGroups.map((g) => ({ callType: g.callType, count: g._count._all }))}
         // The booking API refuses a lead that is not open (409), so a closed lead gets the note, not the search.
-        bookingPanel={<BookingPanel leadId={leadId} leadOpen={lead.outcome === "open" && lead.convertedDealId == null} />}
+        bookingPanel={<BookingPanel key={leadId} leadId={leadId} leadOpen={lead.outcome === "open" && lead.convertedDealId == null} />}
         offersPanel={<LeadOffersPanel leadId={leadId} offers={serializeDates(offers)} documents={serializeDates(documents)} status={lead.status} />}
       />
     </div>

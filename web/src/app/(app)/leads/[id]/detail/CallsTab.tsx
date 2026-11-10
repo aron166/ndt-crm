@@ -18,7 +18,7 @@ export interface Interaction {
   supersedesInteractionId?: number | null;
 }
 
-// ⚠️ HU string below is a PROPOSAL, unreviewed by Áron (same convention as
+// HU string below is a PROPOSAL, unreviewed by Áron (same convention as
 // AUTO_OUTCOME_LABELS in lib/calls/auto-outcome.ts). `outcome: "transcribed"`
 // marks a queued dictation, not a real call outcome: it has no entry in
 // CALL_OUTCOMES, so the raw English key must never reach the chip.

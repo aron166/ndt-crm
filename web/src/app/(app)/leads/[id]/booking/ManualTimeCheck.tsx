@@ -88,7 +88,7 @@ export function ManualTimeCheck({ search, machines, onBook, pending, bookError }
               label="Mégis foglalom" // PROPOSAL copy
               isDisabled={!reasonOk}
               isLoading={pending}
-              onClick={() => onBook({ startsAt: result.startsAt, machineId: result.machines[0]?.machineId, overrideReason: reason.trim() })}
+              onClick={() => onBook({ startsAt: result.startsAt, machineId: best?.machineId, overrideReason: reason.trim() })}
             />
           </>
         )}

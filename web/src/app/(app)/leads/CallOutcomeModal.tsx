@@ -12,6 +12,7 @@ import type { BookingConflictInfo } from "@/lib/leads/service";
 import { CALL_OUTCOMES, CALL_TYPES, type CallOutcomeKey, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { FormField } from "@/components/ui/FormField";
+import { localInputToIso } from "./[id]/booking/booking-view";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 
 // datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
@@ -99,10 +100,10 @@ export function CallOutcomeModal({
     startTransition(async () => {
       const payload = {
         outcome, note,
-        // datetime-local is wall-clock; Date parses it as local time → ISO for the wire.
-        callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
+        // datetime-local is Budapest wall-clock time, whatever zone the browser is in.
+        callbackAt: outcome === "callback_requested" && callbackAt ? localInputToIso(callbackAt) : null,
         demoWith: outcome === "meeting_booked" ? demoWith : null,
-        bookingAt: outcome === "meeting_booked" && bookingAt ? new Date(bookingAt).toISOString() : null,
+        bookingAt: outcome === "meeting_booked" && bookingAt ? localInputToIso(bookingAt) : null,
         bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
         lostReason: isLostCallOutcome(outcome) ? lostReason : null,
         scriptVariant: scriptKey || undefined,
