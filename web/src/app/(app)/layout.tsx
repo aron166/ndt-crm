@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { sessionClaims } from "@/lib/supabase/claims";
 import { AppShell } from "@/components/layout/AppShell";
 import { db } from "@/lib/db";
 import { serializeDates } from "@/lib/serialize";
@@ -13,9 +14,8 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  // Local JWT check, see proxy.ts.
-  const { data: claimsData } = await supabase.auth.getClaims();
-  if (!claimsData?.claims) redirect("/login");
+  const claims = await sessionClaims(supabase);
+  if (!claims) redirect("/login");
 
   const { userId } = await getActor(1);
   // A Supabase session is not a CRM user: signups are open, and `users` is the
@@ -54,7 +54,7 @@ export default async function AppLayout({
 
   return (
     <AppShell
-      email={(claimsData.claims.email as string | undefined) ?? ""}
+      email={claims.email ?? ""}
       overdueCount={overdueCount}
       overdueLeadCount={overdueLeadCount}
       marketingReviewCount={marketingReviewCount}

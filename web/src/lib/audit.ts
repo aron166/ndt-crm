@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { db } from "./db";
 import { reportError } from "./report-error";
 import { createClient } from "./supabase/server";
+import { sessionClaims } from "./supabase/claims";
 
 // TODO(ctx): tenant should come from the request context (AppContext) once the
 // ctx system lands (ADR/002 item 1 / current-sprint Platform Foundations #1).
@@ -64,8 +65,7 @@ export async function writeAuditLog(input: WriteAuditInput): Promise<void> {
   // callers run outside a user session and attribute themselves via actorAgentId.
   if (actor === "user") {
     const supabase = await createClient();
-    const { data } = await supabase.auth.getClaims();
-    actorUserId = data?.claims?.sub ?? null;
+    actorUserId = (await sessionClaims(supabase))?.sub ?? null;
   }
 
   await db.auditLog.create({

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { isCrmUserEmail } from "@/lib/crm-user";
+import { sessionClaims } from "@/lib/supabase/claims";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
@@ -79,12 +80,8 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // getClaims verifies the ES256 access token locally against the cached JWKS (and refreshes an
-  // expired session through the cookies above) instead of a round trip to the Auth server per request,
-  // as getUser did. Trade-off: a session revoked elsewhere stays valid until its access token expires
-  // (Supabase default 1 h). Measured 2026-11-10: getUser median 58 ms, getClaims 0 ms after the first call.
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const user = claimsData?.claims ? { email: claimsData.claims.email as string | undefined } : null;
+  // Local JWT check (lib/supabase/claims.ts); refreshes an expired session through setAll above.
+  const user = await sessionClaims(supabase);
 
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth/");

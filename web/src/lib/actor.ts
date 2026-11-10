@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { crmUserIdForEmail } from "./crm-user";
 import { createClient } from "./supabase/server";
+import { sessionClaims } from "./supabase/claims";
 import type { LeadCtx } from "./leads/service";
 
 // Who is acting, as a `users` row id (the FK interactions.user_id /
@@ -23,9 +24,7 @@ import { normalizeEmail } from "./email";
 // two of them (Vanda, #110).
 export const getActor = cache(async (tenantId: number): Promise<Actor> => {
   const supabase = await createClient();
-  // Local JWT check (see proxy.ts), not an Auth server round trip.
-  const { data } = await supabase.auth.getClaims();
-  const email = normalizeEmail(data?.claims?.email as string | undefined);
+  const email = normalizeEmail((await sessionClaims(supabase))?.email);
   if (!email) return { userId: null, email: null };
   // Cached email → users.id (lib/crm-user.ts). The proxy resolved the same
   // email for this request, so this is normally free (2026-09-17 query pass).
