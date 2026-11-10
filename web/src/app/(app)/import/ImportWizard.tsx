@@ -137,7 +137,7 @@ export function ImportWizard() {
             ref={fileRef}
             type="file"
             accept=".xlsx,.xls,.csv"
-            className="hidden"
+            className="sr-only"
             disabled={loading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
           />

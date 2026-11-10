@@ -439,7 +439,7 @@ function RuleForm({
       <h2 className={k.h2}>{editing ? "Szabály szerkesztése" : "Új szabály"}</h2>
       <section className={k.card}>
         <div>
-          <label className="field-label">Név</label>
+          <label className={s.label}>Név</label>
           <input className={s.field} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="pl. Új lead → megkeresési feladat" autoFocus />
         </div>
       </section>
@@ -447,9 +447,9 @@ function RuleForm({
       {/* Trigger */}
       <section className={k.card}>
           <h3 className={k.h2}>Trigger: amikor…</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="field-label">Esemény</label>
+              <label className={s.label}>Esemény</label>
               <select className={s.field} value={form.triggerType} onChange={(e) => { set("triggerType", e.target.value); set("conditions", []); }}>
                 {TRIGGERS.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
               </select>
@@ -457,7 +457,7 @@ function RuleForm({
 
             {form.triggerType === "lead_status_changed" && (
               <div>
-                <label className="field-label">Célállapot (üres = bármelyik)</label>
+                <label className={s.label}>Célállapot (üres = bármelyik)</label>
                 <select className={s.field} value={form.toStatus} onChange={(e) => set("toStatus", e.target.value)}>
                   <option value="">Bármelyik státusz</option>
                   {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -467,7 +467,7 @@ function RuleForm({
 
             {form.triggerType === "deal_stage_changed" && (
               <div>
-                <label className="field-label">Célfázis (üres = bármelyik)</label>
+                <label className={s.label}>Célfázis (üres = bármelyik)</label>
                 <select className={s.field} value={form.toStageId} onChange={(e) => set("toStageId", e.target.value)}>
                   <option value="">Bármelyik fázis</option>
                   {stages.map((s) => <option key={s.id} value={String(s.id)}>{s.label}</option>)}
@@ -478,14 +478,14 @@ function RuleForm({
             {form.triggerType === "deal_idle_in_stage" && (
               <>
                 <div>
-                  <label className="field-label">Fázis (üres = bármelyik)</label>
+                  <label className={s.label}>Fázis (üres = bármelyik)</label>
                   <select className={s.field} value={form.stageId} onChange={(e) => set("stageId", e.target.value)}>
                     <option value="">Bármelyik fázis</option>
                     {stages.map((s) => <option key={s.id} value={String(s.id)}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="field-label">Tétlen napok száma</label>
+                  <label className={s.label}>Tétlen napok száma</label>
                   <input type="number" min={1} className={s.field} value={form.idleDays} onChange={(e) => set("idleDays", e.target.value)} />
                 </div>
               </>
@@ -493,14 +493,14 @@ function RuleForm({
             {form.triggerType === "lead_idle" && (
               <>
                 <div>
-                  <label className="field-label">Lead státusz (üres = bármelyik nyitott)</label>
+                  <label className={s.label}>Lead státusz (üres = bármelyik nyitott)</label>
                   <select className={s.field} value={form.leadIdleStatus} onChange={(e) => set("leadIdleStatus", e.target.value)}>
                     <option value="">Bármelyik</option>
                     {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="field-label">Napok az utolsó kapcsolat óta</label>
+                  <label className={s.label}>Napok az utolsó kapcsolat óta</label>
                   <input type="number" min={1} className={s.field} value={form.idleDays} onChange={(e) => set("idleDays", e.target.value)} />
                 </div>
               </>
@@ -552,7 +552,7 @@ function RuleForm({
           <h3 className={k.h2}>Művelet</h3>
           <div className="space-y-3">
             <div>
-              <label className="field-label">Művelet típusa</label>
+              <label className={s.label}>Művelet típusa</label>
               <select className={s.field} value={form.actionType} onChange={(e) => set("actionType", e.target.value)}>
                 <option value="create_task">Feladat létrehozása</option>
                 <option value="send_email">Email küldése</option>
@@ -564,7 +564,7 @@ function RuleForm({
 
             {form.actionType === "change_lead_status" && (
               <div>
-                <label className="field-label">Új státusz</label>
+                <label className={s.label}>Új státusz</label>
                 <select className={s.field} value={form.toStatus2} onChange={(e) => set("toStatus2", e.target.value)}>
                   <option value="">válassz</option>
                   {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -574,7 +574,7 @@ function RuleForm({
             )}
             {form.actionType === "assign_lead" && (
               <div>
-                <label className="field-label">Felelős</label>
+                <label className={s.label}>Felelős</label>
                 <select className={s.field} value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
                   <option value="">válassz</option>
                   {users.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
@@ -583,7 +583,7 @@ function RuleForm({
             )}
             {form.actionType === "webhook_out" && (
               <div>
-                <label className="field-label">Webhook URL</label>
+                <label className={s.label}>Webhook URL</label>
                 <input className={s.field} value={form.webhookUrl} onChange={(e) => set("webhookUrl", e.target.value)} placeholder="https://n8n.example.com/webhook/…" />
                 <p className={`${k.muted} ${s.hint}`}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát. Csak <strong>https://</strong>: nincs auth fejléc, a titkot az URL-be tedd.</p>
               </div>
@@ -592,11 +592,11 @@ function RuleForm({
             {form.actionType === "send_email" ? (
               <>
                 <div>
-                  <label className="field-label">Tárgy</label>
+                  <label className={s.label}>Tárgy</label>
                   <input className={s.field} value={form.subjectTemplate} onChange={(e) => set("subjectTemplate", e.target.value)} placeholder="pl. Ajánlatunk: {company}" />
                 </div>
                 <div>
-                  <label className="field-label">Üzenet</label>
+                  <label className={s.label}>Üzenet</label>
                   <textarea className={`${s.field} ${s.textarea}`} value={form.bodyTemplate} onChange={(e) => set("bodyTemplate", e.target.value)} placeholder={"Tisztelt Cím!\n\n..."} />
                 </div>
                 <p className={k.muted}>
@@ -611,33 +611,33 @@ function RuleForm({
             ) : form.actionType !== "create_task" ? null : (
               <>
                 <div>
-                  <label className="field-label">Feladat címe</label>
+                  <label className={s.label}>Feladat címe</label>
                   <input className={s.field} value={form.titleTemplate} onChange={(e) => set("titleTemplate", e.target.value)} placeholder="pl. Lead megkeresése: {company}" />
                   <p className={`${k.muted} ${s.hint}`}>Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="field-label">Típus</label>
+                    <label className={s.label}>Típus</label>
                     <select className={s.field} value={form.taskType} onChange={(e) => set("taskType", e.target.value)}>
                       {TASK_TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="field-label">Kategória</label>
+                    <label className={s.label}>Kategória</label>
                     <select className={s.field} value={form.category} onChange={(e) => set("category", e.target.value)}>
                       {CATEGORIES.map((c) => <option key={c.v} value={c.v}>{c.l}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="field-label">Határidő (nap múlva)</label>
+                    <label className={s.label}>Határidő (nap múlva)</label>
                     <input type="number" min={0} className={s.field} value={form.dueInDays} onChange={(e) => set("dueInDays", e.target.value)} placeholder="pl. 1" />
                   </div>
                   <div>
-                    <label className="field-label">Határidő (perc)</label>
+                    <label className={s.label}>Határidő (perc)</label>
                     <input type="number" min={1} className={s.field} value={form.dueInMinutes} onChange={(e) => set("dueInMinutes", e.target.value)} placeholder="pl. 60" />
                   </div>
                   <div>
-                    <label className="field-label">Felelős</label>
+                    <label className={s.label}>Felelős</label>
                     <select className={s.field} value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
                       <option value="">Nincs</option>
                       {users.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
@@ -645,7 +645,7 @@ function RuleForm({
                   </div>
                 </div>
                 <div>
-                  <label className="field-label">Leírás (opcionális)</label>
+                  <label className={s.label}>Leírás (opcionális)</label>
                   <input className={s.field} value={form.descriptionTemplate} onChange={(e) => set("descriptionTemplate", e.target.value)} placeholder="pl. Új lead a(z) {sourceApp} csatornán." />
                 </div>
               </>

@@ -43,9 +43,9 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className={`${k.card} ${k.stat}`}>
-      <div className={k.statV}>{value}</div>
+    <div className={`${k.card} ${k.stat} ${s.stat}`}>
       <div className={k.statK}>{label}</div>
+      <div className={k.statV}>{value}</div>
     </div>
   );
 }

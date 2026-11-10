@@ -15,6 +15,9 @@
 .toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 14px; color: var(--color-text-secondary); cursor: pointer; }
 button.danger { color: var(--coral); }
 
+/* Form field labels */
+.label { display: block; font-size: 14px; color: var(--color-text-secondary); margin-block-end: 4px; }
+
 /* Condition row */
 .condRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 

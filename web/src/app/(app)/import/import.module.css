@@ -1,6 +1,7 @@
 /* Import wizard (Astryx direction A). Layout the page kit lacks. Astryx tokens only. */
 
 .drop { border: 1px dashed var(--color-border-emphasized); background: var(--color-background-muted); }
+.drop:focus-within { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .dropText { font-size: 14px; color: var(--color-text-primary); }
 
 /* Radix select trigger (shadcn SelectTrigger), styled as an Astryx field */
@@ -8,7 +9,7 @@
 .select[data-slot="select-trigger"]:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 
 /* Plain buttons used as a segmented control (state lives in React) */
-.segBtn { border: 0; font: inherit; cursor: pointer; background: transparent; }
+.segBtn { border: 0; font-family: inherit; cursor: pointer; background: transparent; }
 .segBtn[aria-pressed="true"] { background: var(--color-background-card); }
 
 .selectCell { width: 220px; }

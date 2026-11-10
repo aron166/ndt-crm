@@ -3,4 +3,5 @@
 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 24px; align-items: start; }
 .window { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
+.stats > .stat { flex-direction: column-reverse; }
 .right { text-align: right; }

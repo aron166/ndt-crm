@@ -15,6 +15,7 @@
 .headActions { display: flex; gap: 8px; flex-wrap: wrap; }
 .fields { display: flex; flex-direction: column; }
 .fieldRow { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--color-border); cursor: pointer; }
+.fieldRow:has(input:checked) { background: var(--color-overlay-hover); }
 .fieldMain { flex: 1; min-width: 0; }
 .fieldLine { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-block-end: 4px; }
 .fieldKey { font-size: 14px; font-weight: 600; color: var(--color-text-primary); }
@@ -34,7 +35,7 @@
 .status { font-size: 14px; font-weight: 600; }
 
 /* Tabs (plain buttons used as a segmented control) */
-.segBtn { border: 0; font: inherit; cursor: pointer; background: transparent; }
+.segBtn { border: 0; font-family: inherit; cursor: pointer; background: transparent; }
 .segBtn[aria-pressed="true"] { background: var(--color-background-card); }
 
 /* Runs table */

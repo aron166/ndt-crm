@@ -271,12 +271,12 @@ export default async function AnalyticsPage({
       </section>
 
       {/* Top companies + cold companies side by side */}
-      <div className={`${s.pair} mount mount-4`}>
+      <div className={s.pair}>
         {/* Top companies by revenue */}
-        <section className={k.section}>
+        <section className={`${k.section} mount`}>
           <h2 className={k.h2}>Top cégek bevétel szerint</h2>
           <div className={k.tableWrap}>
-            <table className={k.table}>
+            <table className={k.table} style={{ minWidth: 0 }}>
               <thead>
                 <tr>
                   <th>Cég</th>
@@ -306,10 +306,10 @@ export default async function AnalyticsPage({
         </section>
 
         {/* Cold companies — actionable */}
-        <section className={k.section}>
+        <section className={`${k.section} mount`}>
           <div className={s.head}>
             <h2 className={k.h2} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)", boxShadow: "0 0 6px var(--amber)" }} />
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)" }} />
               Hívandók (90+ nap inaktív)
             </h2>
             <span className={k.num} style={{ fontSize: 14, color: "var(--coral)" }}>
@@ -317,7 +317,7 @@ export default async function AnalyticsPage({
             </span>
           </div>
           <div className={`${k.tableWrap} ${s.scroll}`}>
-            <table className={k.table}>
+            <table className={k.table} style={{ minWidth: 0 }}>
               <thead>
                 <tr>
                   <th>Cég</th>
@@ -349,14 +349,16 @@ export default async function AnalyticsPage({
       </div>
 
       {/* Data explorer — client-side filterable tables */}
-      <AnalyticsClient
-        revenueByMonth={serializeDates(revenueByMonth)}
-        totalCompanies={totalCompanies}
-        totalPersons={totalPersons}
-        neverContacted={neverContacted}
-        openTasks={openTasks}
-        openDeals={openDeals}
-      />
+      <div style={{ marginBlockStart: 8 }}>
+        <AnalyticsClient
+          revenueByMonth={serializeDates(revenueByMonth)}
+          totalCompanies={totalCompanies}
+          totalPersons={totalPersons}
+          neverContacted={neverContacted}
+          openTasks={openTasks}
+          openDeals={openDeals}
+        />
+      </div>
     </div>
   );
 }

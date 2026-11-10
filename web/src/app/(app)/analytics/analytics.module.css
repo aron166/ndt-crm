@@ -1,6 +1,6 @@
 /* Analytics screens (Astryx direction A). Layout the page kit lacks. Astryx tokens only. */
 
-.page { display: flex; flex-direction: column; }
+.page { display: flex; flex-direction: column; gap: 32px; }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-block-end: 8px; }
 .spark { margin-block-start: 8px; }
 .plain { text-decoration: none; }
@@ -42,7 +42,7 @@
 .note { padding: 12px 16px; text-align: center; border-top: 1px solid var(--color-border); }
 
 /* Plain buttons used as a segmented control (state lives in React) */
-.segBtn { border: 0; font: inherit; cursor: pointer; background: transparent; }
+.segBtn { border: 0; font-family: inherit; cursor: pointer; background: transparent; }
 .segBtn[aria-pressed="true"] { background: var(--color-background-card); }
 
 @media (max-width: 960px) {
