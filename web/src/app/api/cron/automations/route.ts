@@ -1,5 +1,6 @@
 import { runIdleAutomations } from "@/lib/automations/idle";
 import { runLifecycleSweep } from "@/lib/leads/lifecycle-sweep";
+import { runNurture } from "@/lib/nurture/engine";
 import { db } from "@/lib/db";
 import { reportError } from "@/lib/report-error";
 
@@ -26,7 +27,14 @@ export async function GET(request: Request) {
       try { lifecycle.push({ tenantId: t.tenantId, ...(await runLifecycleSweep(t.tenantId)) }); }
       catch (err) { reportError("cron.automations.lifecycle", err, { tenantId: t.tenantId }); }
     }
-    return Response.json({ ok: result != null, ...(result ?? {}), lifecycle });
+    // W9 nurture: sends only when nurture_enabled and the template is approved by Áron.
+    const nurtureTenants = await db.nurtureSequence.findMany({ distinct: ["tenantId"], select: { tenantId: true } });
+    const nurture = [];
+    for (const t of nurtureTenants) {
+      try { nurture.push({ tenantId: t.tenantId, ...(await runNurture(t.tenantId)) }); }
+      catch (err) { reportError("cron.automations.nurture", err, { tenantId: t.tenantId }); }
+    }
+    return Response.json({ ok: result != null, ...(result ?? {}), lifecycle, nurture });
   } catch (err) {
     reportError("cron.automations", err);
     return Response.json({ ok: false, error: "Internal error" }, { status: 500 });

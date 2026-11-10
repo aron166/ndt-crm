@@ -55,6 +55,10 @@ export interface SendEmailInput {
   skipLog?: boolean;
   /** Display name on the From line instead of the tenant's (e.g. the lead's owner). Address unchanged. */
   fromName?: string | null;
+  /** Optional HTML part next to the text (nurture). */
+  html?: string;
+  /** Extra headers (nurture: List-Unsubscribe, List-Unsubscribe-Post). */
+  headers?: Record<string, string>;
   /** Files to attach (Resend: base64 content). */
   attachments?: { filename: string; content: string }[];
 }
@@ -118,6 +122,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         text: input.text,
         ...(input.replyTo ? { reply_to: input.replyTo } : {}),
         ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+        ...(input.html ? { html: input.html } : {}),
+        ...(input.headers ? { headers: input.headers } : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));

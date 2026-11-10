@@ -20,7 +20,7 @@ export type AuditEntityType =
   | "task" | "interaction" | "tag" | "tagging"
   | "deal" | "lead" | "proposal" | "invoice" | "quote"
   | "equipment" | "integration_credential" | "custom_field"
-  | "automation_rule"
+  | "automation_rule" | "nurture_template"
   | "campaign" | "content_item" | "content_version" | "content_review" | "email_draft"
   | "cost_rate" | "suppression"
   // Tenant-level config (tenants.settings — e.g. the setter question list).
