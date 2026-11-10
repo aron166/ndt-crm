@@ -89,15 +89,16 @@ export function proposeRouteSlots(input: RouteSlotsInput): RankedSlot[] {
   }
   const byCost = [...found].sort((a, b) => a.cost - b.cost || a.startsAt.getTime() - b.startsAt.getTime());
   const picks: RankedSlot[] = [];
+  const same = (a: RankedSlot, b: RankedSlot) => a.startsAt.getTime() === b.startsAt.getTime() && a.machineId === b.machineId;
   const add = (s: RankedSlot | undefined) => {
-    if (s && !picks.includes(s)) picks.push(s);
+    if (s && !picks.some((p) => same(p, s))) picks.push(s);
   };
 
   add(byCost[0]);
   const earliest = found[0];
-  if (earliest && !picks.includes(earliest)) {
-    if (earliest.reason !== "same_trip" && earliest.reason !== "on_the_way") earliest.reason = "earliest";
-    add(earliest);
+  if (earliest && !picks.some((p) => same(p, earliest))) {
+    const keep = earliest.reason === "same_trip" || earliest.reason === "on_the_way";
+    add(keep ? earliest : { ...earliest, reason: "earliest" });
   }
   const weeks = () => new Set(picks.map((p) => weekKey(localDay(p.startsAt))));
   add(byCost.find((s) => !weeks().has(weekKey(localDay(s.startsAt)))));

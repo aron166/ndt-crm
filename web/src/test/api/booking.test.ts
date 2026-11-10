@@ -48,7 +48,7 @@ const debrecenTask = {
 };
 const lead = { id: 5, outcome: "open", companyId: null, assignedToId: 7, contact: null, company: { name: "Teszt Kft" } };
 
-const impossible = { leadId: 5, settlementId: 3001, siteSource: "stated", kind: "single_machine_demo", startsAt: "2026-11-25T15:00:00+01:00" };
+const impossible = { leadId: 5, settlementId: 3001, siteSource: "stated", kind: "single_machine_demo", startsAt: "2026-11-25T16:00:00+01:00" };
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -91,14 +91,19 @@ describe("slots", () => {
 describe("check", () => {
   it("impossible time: infeasible, with feasible alternatives", async () => {
     db.task.findMany.mockResolvedValue([debrecenTask]);
-    const res = await checkPOST(req("check", { settlementId: 3001, startsAt: "2026-11-25T15:00:00+01:00", kind: "single_machine_demo" }));
+    const res = await checkPOST(req("check", { settlementId: 3001, startsAt: "2026-11-25T16:00:00+01:00", kind: "single_machine_demo" }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.feasible).toBe(false);
-    const codes = body.machines[0].flags.map((f: { code: string }) => f.code);
-    expect(codes.some((c: string) => c === "machine_clash" || c === "infeasible")).toBe(true);
+    expect(body.machines[0].flags.some((f: { code: string; leg?: string }) => f.code === "infeasible" && f.leg === "before")).toBe(true);
     expect(body.alternatives.length).toBeGreaterThan(0);
     for (const a of body.alternatives) expect(a.feasible).toBe(true);
+  });
+
+  it("scopes task and equipment queries to the tenant", async () => {
+    await checkPOST(req("check", { settlementId: 3001, startsAt: "2026-11-25T16:00:00+01:00", kind: "single_machine_demo" }));
+    expect(db.task.findMany.mock.calls[0][0].where.tenantId).toBe(1);
+    expect(db.equipment.findMany.mock.calls[0][0].where.tenantId).toBe(1);
   });
 });
 

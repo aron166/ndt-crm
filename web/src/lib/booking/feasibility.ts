@@ -49,16 +49,21 @@ export function checkPlacement(
     .filter((s) => s.machineId === machine.id && s.id !== candidate.id && localDay(s.startsAt).key === day.key)
     .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
 
+  const floor = atLocal(day, cfg.visitFrom);
+  const clamp = (d: Date) => (d < floor ? floor : d);
+
   for (const s of dayStops) {
     if (s.startsAt < end && start < endOf(s)) {
-      flags.push({ code: "machine_clash", severity: "block", againstId: s.id, earliestStart: endOf(s) });
+      const need =
+        s.place && candidate.place ? drive.minutes(s.place, candidate.place).min + cfg.siteBufferMinutes : cfg.noSiteGapMinutes;
+      flags.push({ code: "machine_clash", severity: "block", againstId: s.id, earliestStart: clamp(addMin(endOf(s), need)) });
     }
   }
 
   const prev = [...dayStops].reverse().find((s) => endOf(s) <= start) ?? null;
   const next = dayStops.find((s) => s.startsAt >= end) ?? null;
 
-  let noSite = false;
+  let noSite = !candidate.place;
   const legCheck = (leg: Leg, other: RouteStop): LegInfo => {
     const before = leg === "before";
     const aPlace = before ? other.place : candidate.place;
@@ -78,7 +83,7 @@ export function checkPlacement(
     const base: Flag = { code: "infeasible", severity: "block", leg, againstId: other.id, gapMinutes: gap, slackMinutes: slack };
     if (band) base.drive = band;
     if (gap < need) {
-      if (before) base.earliestStart = addMin(endOf(other), need);
+      if (before) base.earliestStart = clamp(addMin(endOf(other), need));
       else base.latestStart = addMin(other.startsAt, -need - candidate.minutes);
       flags.push(base);
     } else if (band && slack < cfg.tightSlackMinutes) {
@@ -100,7 +105,7 @@ export function checkPlacement(
         severity: "block",
         leg: "from_base",
         drive: band,
-        earliestStart: atLocal(day, cfg.leaveBaseFrom + band.min),
+        earliestStart: clamp(atLocal(day, cfg.leaveBaseFrom + band.min)),
       });
     } else if (startMin - band.max < cfg.leaveBaseFrom) {
       flags.push({ code: "tight", severity: "warn", leg: "from_base", drive: band });

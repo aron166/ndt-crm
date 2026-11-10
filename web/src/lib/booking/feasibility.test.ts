@@ -103,6 +103,30 @@ describe("checkPlacement", () => {
     expect(codes(no).filter((c) => c === "no_site")).toHaveLength(1);
   });
 
+  it("machine_clash earliestStart adds the drive from the clashing stop", () => {
+    const stops = [stop(10, 0, 90, SOPRON)];
+    const r = checkPlacement(cand(11, 0, 60, DEBRECEN), stops, A, cfg, drive);
+    const f = r.flags.find((x) => x.code === "machine_clash");
+    expect(f?.earliestStart).toEqual(
+      new Date(at(11, 30).getTime() + (straightLineBand(SOPRON, DEBRECEN).min + cfg.siteBufferMinutes) * 60_000),
+    );
+    const n = checkPlacement(cand(11, 0, 60, null), stops, A, cfg, drive);
+    expect(n.flags.find((x) => x.code === "machine_clash")?.earliestStart).toEqual(at(12, 0));
+  });
+
+  it("earliestStart is clamped to visitFrom", () => {
+    const stops = [stop(5, 0, 30, null)];
+    const r = checkPlacement(cand(5, 10, 30, null), stops, A, cfg, drive);
+    expect(r.flags.find((x) => x.code === "machine_clash")?.earliestStart).toEqual(atLocal(DAY, cfg.visitFrom));
+    const b = checkPlacement(cand(5, 40, 30, null), stops, A, cfg, drive);
+    expect(b.flags.find((x) => x.leg === "before")?.earliestStart).toEqual(atLocal(DAY, cfg.visitFrom));
+  });
+
+  it("a candidate without a place gets one no_site even alone on the day", () => {
+    const r = checkPlacement(cand(10, 0, 60, null), [], A, cfg, drive);
+    expect(codes(r).filter((c) => c === "no_site")).toHaveLength(1);
+  });
+
   it("from_base: Debrecen at 07:00 infeasible, 10:00 feasible", () => {
     const early = checkPlacement(cand(7, 0, 90, DEBRECEN), [], A, cfg, drive);
     expect(early.feasible).toBe(false);
