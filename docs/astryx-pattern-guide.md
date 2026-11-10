@@ -60,4 +60,4 @@ easy-to-use UI everywhere, it really is important, Péter is not good with tech.
 
 ## Theme variants (preview)
 
-Off by default. To preview `glass-light` or `warm-glass`: start the app with `UI_THEME_PREVIEW=1` and set the cookie `ui-theme=glass-light` (or `warm-glass`); delete the cookie to go back. Tokens live in `web/src/styles/themes.css`.
+Off by default. To preview `glass-light` or `warm-glass`: start the app with `UI_THEME_PREVIEW=1` and set the cookie `ui-theme=glass-light` (or `warm-glass`); delete the cookie to go back. Tokens live in `web/src/styles/themes.css`. Set UI_THEME_PREVIEW only on Vercel Preview (never Production: it makes every route dynamic), and it must be present at build time.

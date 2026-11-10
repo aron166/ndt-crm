@@ -1,16 +1,17 @@
 /* Preview-only theme variants (docs/astryx-pattern-guide.md, "Theme variants (preview)").
    Applied via data-ui-theme on <html> only when UI_THEME_PREVIEW=1 and the ui-theme cookie is set (layout.tsx).
    Override --ui-* tokens only; hooks below are scoped under [data-ui-theme] so the default theme is untouched.
-   Rules: gradient only on primary buttons and the page backdrop; blur 8-14px on overlay-ish surfaces only;
-   repeated cards/rows are plain translucent colour (no blur).
+   Rules: gradient only on primary buttons and the page backdrop; dialogs, drawers and menus are opaque; only the
+   dialog scrim blurs; cards are translucent.
 
-   CONTRAST (WCAG, worst point = lightest-to-darkest page stop under the translucent white surface, alpha .72 / .6):
-   glass-light  page #e6ebf7 -> surface rgb(248,249,253)/(245,247,252)
-     text #0f172a 17.01 / 16.65 ; muted #3b4559 9.17 / 8.98 ; accent text #3730a3 9.46 / 9.27
+   CONTRAST (WCAG, worst point = lightest-to-darkest page stop under the translucent white surface, alpha .72):
+   glass-light  page #e6ebf7 -> surface rgb(248,249,253)
+     text #0f172a 17.01 ; muted #3b4559 9.17 ; accent text #3730a3 9.46
      white on gradient stops #4338ca 7.90, #3730a3 9.93
-   warm-glass   page #e9e1d2 -> surface rgb(249,247,242)/(246,243,237)
-     text #1c1612 16.68 / 16.17 ; muted #4a4036 9.42 / 9.13 ; accent text #8c2f14 7.73 / 7.49
+   warm-glass   page #e9e1d2 -> surface rgb(249,247,242)
+     text #1c1612 16.68 ; muted #4a4036 9.42 ; accent text #8c2f14 7.73
      white on gradient stops #a3391b 6.65, #8c2f14 8.29
+   Scope: pairs computed for the app's --ui-* text tokens on the 0.72 card surface over the darkest page stop; Astryx components read --color-text-*, which the variants do not retune.
    warm-glass accent: terracotta over ink teal, because it harmonises with the sand tint (teal would read as a second
    cool accent next to warm neutrals) and still gives 6.6:1 or better with white text. Status colours are unchanged. */
 
@@ -30,7 +31,6 @@
   --ui-surface-glass: rgb(255 255 255 / 0.72);
   --ui-surface-glass-overlay: #ffffff; /* dialogs and drawers opaque: page text read through at 0.86 and 0.94 */
   --ui-backdrop: blur(12px) saturate(1.3);
-  --ui-border-glass: rgb(255 255 255 / 0.7);
   --ui-text: #0f172a;
   --ui-text-muted: #3b4559;
   --ui-accent: #3730a3;
@@ -59,7 +59,6 @@
   --ui-surface-glass: rgb(255 255 255 / 0.72);
   --ui-surface-glass-overlay: #ffffff; /* dialogs and drawers opaque: page text read through at 0.86 and 0.94 */
   --ui-backdrop: blur(12px) saturate(1.15);
-  --ui-border-glass: rgb(255 255 255 / 0.7);
   --ui-text: #1c1612;
   --ui-text-muted: #4a4036;
   --ui-accent: #8c2f14;
@@ -79,24 +78,24 @@
     --ui-surface-glass: #ffffff;
     --ui-surface-glass-overlay: #ffffff;
     --ui-backdrop: none;
+    --color-background-card: #ffffff;
+    --color-background-surface: #ffffff;
+    --ui-surface: #ffffff;
   }
 }
 
 /* hooks */
-/* The app frame stays see-through so the page gradient shows; overlays (Astryx Drawer renders a native <dialog>) get
-   the frosted overlay surface. */
+/* The app frame stays see-through so the page gradient shows; dialogs (Astryx Drawer renders a native <dialog>),
+   drawers and menus are opaque; only the dialog scrim blurs. */
 [data-ui-theme] .astryx-app-shell,
 [data-ui-theme] .astryx-layout,
 [data-ui-theme] .astryx-layout-content { background: transparent; }
 [data-ui-theme] dialog {
   background: var(--ui-surface-glass-overlay);
-  -webkit-backdrop-filter: var(--ui-backdrop);
-  backdrop-filter: var(--ui-backdrop);
 }
 [data-ui-theme] body {
   background-color: var(--ui-page);
   background-image: var(--ui-page-gradient);
-  background-attachment: fixed;
   color: var(--ui-text);
 }
 [data-ui-theme] .panel { background: var(--ui-surface-glass); box-shadow: var(--ui-shadow-raised); }
@@ -107,18 +106,13 @@
 [data-ui-theme] [data-slot="dropdown-menu-content"],
 [data-ui-theme] [data-slot="select-content"] {
   background: var(--ui-surface-glass-overlay);
-  -webkit-backdrop-filter: var(--ui-backdrop);
-  backdrop-filter: var(--ui-backdrop);
   box-shadow: var(--ui-shadow-overlay);
 }
-[data-ui-theme] .astryx-side-nav { box-shadow: 1px 0 0 var(--ui-border-glass); }
+[data-ui-theme] .astryx-side-nav { box-shadow: 1px 0 0 rgb(255 255 255 / 0.7); }
 [data-ui-theme] [data-slot="dialog-overlay"] {
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 @media (prefers-reduced-transparency: reduce) {
   [data-ui-theme] [data-slot="dialog-overlay"] { -webkit-backdrop-filter: none; backdrop-filter: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  [data-ui-theme] * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
