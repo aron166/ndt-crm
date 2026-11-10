@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Heading } from "@astryxdesign/core/Heading";
 import { LeadMoveDialog } from "@/components/LeadMoveDialog";
 import { setLeadOutcomeAction, deleteLead, assignLeadAction } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
@@ -10,11 +11,12 @@ import { CallOutcomeModal } from "../CallOutcomeModal";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/leads/qualification";
 import type { ScriptVariant } from "@/lib/leads/scripts";
-import type { LeadOutcome } from "@/lib/leads/outcomes";
+import type { CallOutcomeKey, LeadOutcome } from "@/lib/leads/outcomes";
 import { fullName } from "@/lib/utils";
 import { LeadHeader, type HeaderLead } from "./detail/LeadHeader";
-import { LeadTabs, parseTab } from "./detail/LeadTabs";
-import { OverviewTab, type OpenTask } from "./detail/OverviewTab";
+import { OutcomePad } from "./detail/OutcomePad";
+import { OpenTasks, FormMessage, type OpenTask } from "./detail/OverviewTab";
+import s from "./detail/lead.module.css";
 import { CallsTab, type Interaction } from "./detail/CallsTab";
 import { HistoryTab, type AuditEntry } from "./detail/HistoryTab";
 
@@ -53,6 +55,7 @@ export function LeadDetailClient({
   callTypeCounts,
   offersPanel,
   keyFacts,
+  bookingPanel,
 }: {
   lead: Lead;
   firstContactMin: number | null;
@@ -69,9 +72,15 @@ export function LeadDetailClient({
   callTypeCounts: { callType: string | null; count: number }[];
   offersPanel: React.ReactNode;
   keyFacts: { label: string; value: string }[];
+  bookingPanel?: React.ReactNode;
 }) {
   const router = useRouter();
-  const tab = parseTab(useSearchParams().get("tab"));
+  const tab = useSearchParams().get("tab");
+  // Old ?tab= deep links now scroll to the matching section.
+  useEffect(() => {
+    const id = tab === "overview" ? "facts" : tab === "calls" || tab === "offers" || tab === "history" ? tab : null;
+    if (id) document.getElementById(id)?.scrollIntoView();
+  }, [tab]);
   const [status, setStatus] = useState(lead.status ?? "new");
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<string>(lead.outcome);
@@ -80,6 +89,7 @@ export function LeadDetailClient({
   const [converted, setConverted] = useState<number | null>(lead.convertedDealId ?? null);
   const [editing, setEditing] = useState(false);
   const [logging, setLogging] = useState(false);
+  const [padOutcome, setPadOutcome] = useState<CallOutcomeKey | undefined>(undefined);
   // Non-null while the modal is open to correct THAT auto-derived interaction.
   const [correcting, setCorrecting] = useState<number | null>(null);
   const [deleting, startDelete] = useTransition();
@@ -148,6 +158,8 @@ export function LeadDetailClient({
       <LeadHeader
         lead={lead}
         displayName={displayName}
+        contactName={personName || (cf.contact_name as string | undefined) || null}
+        role={lead.contact?.role ?? null}
         personHref={person ? `/persons/${person.id}` : null}
         email={email}
         phone={phone}
@@ -168,7 +180,6 @@ export function LeadDetailClient({
         onAssign={handleAssign}
         onEdit={() => setEditing(true)}
         onDelete={handleDelete}
-        onLog={() => setLogging(true)}
       />
 
       {moveTarget && (
@@ -182,58 +193,77 @@ export function LeadDetailClient({
       )}
 
       {actionError && (
-        <div className="panel" style={{ marginBottom: 12 }}>
-          <div className="panel-pad" style={{ fontSize: 14, color: "var(--coral)" }}>{actionError}</div>
-        </div>
+        <p className={s.error} role="alert">{actionError}</p>
       )}
 
-      <LeadTabs active={tab} callCount={interactions.length} />
-
-      {/* All tabs stay mounted (hidden when inactive) so an unsaved qualification draft survives a tab switch (Vanda C1). */}
-      <div hidden={tab !== "overview"}>
-        <OverviewTab openTasks={openTasks} message={lead.message}>
-          <LeadQualificationPanel
-            leadId={lead.id}
-            questions={questions}
-            qualification={qualification}
-            answerSources={answerSources}
-            campaign={lead.campaign}
-            receivedDate={lead.receivedDate}
-            sets={questionSets}
-          />
-        </OverviewTab>
-      </div>
-      <div hidden={tab !== "calls"}>
-        <CallsTab
-          leadId={lead.id}
-          interactions={interactions}
-          callTypeCounts={callTypeCounts}
-          closed={closed}
-          onCorrect={(id) => { setCorrecting(id); setLogging(true); }}
-        />
-      </div>
-      <div hidden={tab !== "offers"}>{offersPanel}</div>
-      <div hidden={tab !== "history"}>
-        <HistoryTab
-          sourceApp={lead.sourceApp}
-          source={lead.source}
-          campaign={lead.campaign}
-          outcome={outcome}
-          lostReason={lead.lostReason}
-          customFields={lead.customFields}
-          auditEntries={auditEntries}
-        />
+      <div className={s.cols}>
+        <div className={s.main}>
+          <section id="outcome" className={s.section}>
+            <Heading level={2} className={s.h2}>{/* PROPOSAL copy */}Hívás eredménye</Heading>
+            <OutcomePad
+              closed={closed}
+              onPick={(k) => { setPadOutcome(k); setLogging(true); }}
+              onLog={() => { setPadOutcome(undefined); setLogging(true); }}
+            />
+          </section>
+          <section id="facts" className={s.section}>
+            <Heading level={2} className={s.h2}>{/* PROPOSAL copy */}Amit tudunk</Heading>
+            <FormMessage message={lead.message} />
+            <LeadQualificationPanel
+              leadId={lead.id}
+              questions={questions}
+              qualification={qualification}
+              answerSources={answerSources}
+              campaign={lead.campaign}
+              receivedDate={lead.receivedDate}
+              sets={questionSets}
+            />
+          </section>
+          <section id="tasks" className={s.section}>
+            <Heading level={2} className={s.h2}>{/* PROPOSAL copy */}Nyitott feladatok</Heading>
+            <OpenTasks openTasks={openTasks} />
+          </section>
+          <section id="offers" className={s.section}>
+            <Heading level={2} className={s.h2}>{/* PROPOSAL copy */}Ajánlatok és dokumentumok</Heading>
+            {/* Wrapped: a server-built node as a direct sibling here trips a dev key warning. */}
+            <div>{offersPanel}</div>
+          </section>
+          <section id="calls" className={s.section}>
+            <Heading level={2} className={s.h2}>{interactions.length > 0 ? `Hívások · ${interactions.length}` : "Hívások"}</Heading>
+            <CallsTab
+              leadId={lead.id}
+              interactions={interactions}
+              callTypeCounts={callTypeCounts}
+              closed={closed}
+              onCorrect={(id) => { setCorrecting(id); setPadOutcome(undefined); setLogging(true); }}
+            />
+          </section>
+          <section id="history" className={s.section}>
+            <Heading level={2} className={s.h2}>Előzmények</Heading>
+            <HistoryTab
+              sourceApp={lead.sourceApp}
+              source={lead.source}
+              campaign={lead.campaign}
+              outcome={outcome}
+              lostReason={lead.lostReason}
+              customFields={lead.customFields}
+              auditEntries={auditEntries}
+            />
+          </section>
+        </div>
+        <aside className={s.side}>{bookingPanel}</aside>
       </div>
 
       <CallOutcomeModal
         open={logging}
-        onClose={() => { setLogging(false); setCorrecting(null); }}
+        onClose={() => { setLogging(false); setCorrecting(null); setPadOutcome(undefined); }}
         leadId={lead.id}
         title={[personName, lead.company?.name].filter(Boolean).join(" · ") || null}
         stageDescription={statuses.find((s) => s.key === status)?.description ?? null}
         onLogged={() => { setCorrecting(null); router.refresh(); }}
         scriptVariants={scriptVariants}
         correctsInteractionId={correcting}
+        initialOutcome={padOutcome}
       />
 
       <LeadEditModal
