@@ -67,8 +67,8 @@ export function CrmSideNav({
             <Kbd keys="mod+k" />
           </button>
           <HStack gap={2}>
-            <Button label="Feladat" size="sm" variant="primary" icon={<Plus size={14} />} onClick={onNewTask} />
-            <Button label="Deal" size="sm" icon={<Plus size={14} />} onClick={onNewDeal} />
+            <Button label="Feladat" aria-label="Új feladat" size="sm" variant="primary" icon={<Plus size={14} />} onClick={onNewTask} />
+            <Button label="Deal" aria-label="Új deal" size="sm" icon={<Plus size={14} />} onClick={onNewDeal} />
           </HStack>
         </div>
       }

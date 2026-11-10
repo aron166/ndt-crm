@@ -37,9 +37,9 @@ export default async function AppLayout({
       },
     }),
     db.lead.count({
-      // Same set as the Mai hívólista queue: open, not converted, not parked in recall.
+      // Same set as the Mai hívólista queue, which opens on "my leads": open, not converted, not parked in recall.
       where: {
-        tenantId: 1, outcome: "open", convertedDealId: null, nextDue: { lt: new Date() },
+        tenantId: 1, assignedToId: userId, outcome: "open", convertedDealId: null, nextDue: { lt: new Date() },
         OR: [{ status: null }, { status: { notIn: [...SIDE_STAGES] } }],
       },
     }),
