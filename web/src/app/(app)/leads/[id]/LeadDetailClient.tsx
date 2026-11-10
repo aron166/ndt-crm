@@ -5,16 +5,19 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { LeadMoveDialog } from "@/components/LeadMoveDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Button as AButton } from "@astryxdesign/core/Button";
+import { useToast } from "@astryxdesign/core/Toast";
+import { useDeferredCall, DEFER_MS } from "./v2/useDeferredCall";
 import { DEFAULT_TRANSITIONS } from "@/lib/leads/lifecycle";
 import { SendEmailModal } from "@/components/SendEmailModal";
-import { moveLead, setLeadOutcomeAction, deleteLead, assignLeadAction } from "@/app/actions/leads";
+import { moveLead, setLeadOutcomeAction, deleteLead, assignLeadAction, logLeadCall } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/leads/qualification";
 import type { ScriptVariant } from "@/lib/leads/scripts";
-import type { CallOutcomeKey, LeadOutcome } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, type CallOutcomeKey, type LeadOutcome } from "@/lib/leads/outcomes";
 import type { BookingKind } from "@/lib/booking/priority";
 import { suggestNextSteps, type Suggestion } from "@/lib/leads/suggestions";
 import { buildTimeline } from "@/lib/leads/timeline";
@@ -222,7 +225,29 @@ export function LeadDetailClient({
     else if (x.to) runMove(x.to, x.event);
   }
 
+  // One click logs these two; the write is deferred so Undo can cancel it (interactions are append-only).
+  const toast = useToast();
+  const quickCall = useDeferredCall<{ outcome: CallOutcomeKey; note: string }>((item) => {
+    logLeadCall(lead.id, item).then((res) => {
+      if ("error" in res) { setActionError(res.error); return; }
+      setCallNote("");
+      router.refresh();
+    }).catch(() => setActionError("Mentés sikertelen: próbáld újra"));
+  });
+
+  function quickLog(k: "no_answer" | "wrong_number") {
+    setActionError(null);
+    const label = CALL_OUTCOMES.find((o) => o.key === k)?.label ?? k;
+    if (!quickCall.schedule(k, { outcome: k, note: callNote.trim() || label })) return;
+    // PROPOSAL copy
+    const dismiss = toast({
+      body: `Logged: ${label}`, autoHideDuration: DEFER_MS,
+      endContent: <AButton variant="ghost" size="sm" label="Undo" onClick={() => { quickCall.cancel(); dismiss(); }} />,
+    });
+  }
+
   function pickOutcome(k: CallOutcomeKey) {
+    if (k === "no_answer" || k === "wrong_number") { quickLog(k); return; }
     // IF never books on its own: it opens the drawer.
     if (k === "meeting_booked") { setBooking({ kind: bookingSuggestion?.bookingKind ?? "single_machine_demo", event: bookingSuggestion?.event, to: bookingSuggestion?.to }); return; }
     setPadOutcome(k);
