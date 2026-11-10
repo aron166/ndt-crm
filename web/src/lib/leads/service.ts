@@ -552,6 +552,19 @@ export async function logLeadCallOutcome(
     }
   }
 
+  // Booked in the drawer: the call is logged against that meeting task (this lead, this tenant), and its host
+  // owns the lead; no second task is created (plan.bookingAt stays empty).
+  let existingBookingHostId: number | null = null;
+  if (input.existingBookingTaskId != null) {
+    if (input.outcome !== "meeting_booked" || input.bookingAt) return { error: "A meglévő foglalás csak időpont nélküli foglalt meetinggel adható meg", issues: {} };
+    const booked = await db.task.findFirst({
+      where: { id: input.existingBookingTaskId, tenantId: ctx.tenantId, leadId, type: "meeting" },
+      select: { assignedToId: true },
+    });
+    if (!booked) return { error: "A foglalás nem ehhez a leadhez tartozik" };
+    existingBookingHostId = booked.assignedToId;
+  }
+
   // The demo lands on the HOST's calendar (finding 3), not the logger's.
   let bookingHostId: number | null = null;
   if (input.bookingAt) {
@@ -570,7 +583,9 @@ export async function logLeadCallOutcome(
   const personId = lead.contact?.personId ?? null;
   const who = leadWho(lead, leadId);
   // meeting_booked: whoever holds the meeting owns the lead (was demo_aron / demo_peter).
-  if (input.outcome === "meeting_booked" && input.demoWith) {
+  if (input.outcome === "meeting_booked" && existingBookingHostId != null) {
+    callPlan.input.ownerId = existingBookingHostId;
+  } else if (input.outcome === "meeting_booked" && input.demoWith) {
     callPlan.input.ownerId = bookingHostId ?? await resolveDemoHost(ctx.tenantId, input.demoWith);
   }
   let transitionPlan: TransitionPlan | null = null;

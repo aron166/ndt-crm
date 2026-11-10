@@ -130,6 +130,8 @@ export async function logLeadCall(leadId: number, input: {
   bookingAt?: string | null; bookingKind?: string | null;
   lostReason?: string | null; scriptVariant?: string | null; technologyWord?: string | null;
   callType?: string | null;
+  /** The meeting task the booking drawer created (call mode): log against it, no second task. */
+  existingBookingTaskId?: number | null;
 }) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
@@ -146,6 +148,7 @@ export async function logLeadCall(leadId: number, input: {
       ...(input.scriptVariant ? { scriptVariant: input.scriptVariant } : {}),
       ...(input.technologyWord ? { technologyWord: input.technologyWord } : {}),
       ...(input.callType ? { callType: input.callType } : {}),
+      ...(input.existingBookingTaskId ? { existingBookingTaskId: input.existingBookingTaskId } : {}),
     },
     ctx,
   );
