@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { serializeDates } from "@/lib/serialize";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { countPendingForReviewer } from "@/lib/content/queries";
+import { SIDE_STAGES } from "@/lib/leads/lifecycle";
 
 export default async function AppLayout({
   children,
@@ -36,7 +37,11 @@ export default async function AppLayout({
       },
     }),
     db.lead.count({
-      where: { tenantId: 1, outcome: "open", convertedDealId: null, nextDue: { lt: new Date() } },
+      // Same set as the Mai hívólista queue: open, not converted, not parked in recall.
+      where: {
+        tenantId: 1, outcome: "open", convertedDealId: null, nextDue: { lt: new Date() },
+        OR: [{ status: null }, { status: { notIn: [...SIDE_STAGES] } }],
+      },
     }),
     db.pipeline.findFirst({
       where: { tenantId: 1, isArchived: false },
