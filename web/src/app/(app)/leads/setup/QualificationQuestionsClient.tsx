@@ -126,7 +126,7 @@ export function QualificationQuestionsClient({
                   <button type="button" aria-label="Lejjebb" onClick={() => moveInSet(i, 1)} disabled={pos === visible.length - 1} className={`${k.btn} ${k.btnIcon}`}>
                     <ArrowDown style={{ width: 13, height: 13 }} />
                   </button>
-                  <button type="button" aria-label="Kérdés törlése" onClick={() => removeQuestion(i)} className={`${k.btn} ${k.btnIcon}`}>
+                  <button type="button" aria-label="Kérdés törlése" onClick={() => removeQuestion(i)} className={`${k.btn} ${k.btnIcon} ${m.danger}`}>
                     <Trash2 style={{ width: 13, height: 13 }} />
                   </button>
                 </div>

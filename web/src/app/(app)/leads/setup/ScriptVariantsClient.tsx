@@ -44,7 +44,7 @@ export function ScriptVariantsClient({
       <p className={m.errorLine}>
         <AlertTriangle size={13} aria-hidden="true" /> A gyári szkriptek helykitöltők, amíg Péter és Áron meg nem írja a valódi szöveget.
       </p>
-      <textarea rows={10} value={text} onChange={(e) => setText(e.target.value)} className={`${m.field} ${m.textarea} font-mono-ndt`} />
+      <textarea rows={10} value={text} onChange={(e) => setText(e.target.value)} className={`${m.field} ${m.textarea} ${m.scriptArea} font-mono-ndt`} />
 
       {error && <p className={m.error}>{error}</p>}
       <div>

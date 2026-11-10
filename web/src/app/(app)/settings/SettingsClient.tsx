@@ -319,6 +319,7 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
                     {appKey.label ? `${appKey.label} · ` : ""}{appKey.lastUsedAt ? `utoljára ${formatRelativeTime(appKey.lastUsedAt)}` : "még nem használt"}
                   </div>
                 </div>
+                {/* PROPOSAL copy */}
                 {appKey.isActive && (
                   <button onClick={() => handleRevoke(appKey.id)} disabled={isPending} title="Visszavonás" aria-label="Visszavonás" className={`${k.btn} ${k.btnIcon}`}>
                     <Trash2 style={{ width: 13, height: 13 }} />
@@ -340,16 +341,16 @@ export function SettingsClient({ tenant, connectedIntegrations, appKeys }: Setti
 
   const tabs = (
     <div className={s.tabs}>
-      <button className={`${s.tab} ${tab === "general" ? s.tabOn : ""}`} onClick={() => setTab("general")}>
+      <button type="button" aria-pressed={tab === "general"} className={`${s.tab} ${tab === "general" ? s.tabOn : ""}`} onClick={() => setTab("general")}>
         Általános
       </button>
-      <button className={`${s.tab} ${tab === "integrations" ? s.tabOn : ""}`} onClick={() => setTab("integrations")}>
+      <button type="button" aria-pressed={tab === "integrations"} className={`${s.tab} ${tab === "integrations" ? s.tabOn : ""}`} onClick={() => setTab("integrations")}>
         Integrációk
         {connectedIntegrations.length > 0 && (
           <span className={s.count}>{connectedIntegrations.length}</span>
         )}
       </button>
-      <button className={`${s.tab} ${tab === "apikeys" ? s.tabOn : ""}`} onClick={() => setTab("apikeys")}>
+      <button type="button" aria-pressed={tab === "apikeys"} className={`${s.tab} ${tab === "apikeys" ? s.tabOn : ""}`} onClick={() => setTab("apikeys")}>
         API kulcsok
         {appKeys.filter((ak) => ak.isActive).length > 0 && (
           <span className={s.count}>{appKeys.filter((ak) => ak.isActive).length}</span>

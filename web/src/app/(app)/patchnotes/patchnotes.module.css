@@ -20,7 +20,7 @@
 .step { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .stepText { flex: 1 1 240px; font-size: 14px; color: var(--color-text-primary); overflow-wrap: anywhere; }
 .stepBtns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.stepOn { border-color: var(--color-accent); }
+button.stepOn[aria-pressed="true"] { border-color: var(--color-accent); font-weight: 700; }
 .stepOff { opacity: 0.7; }
 .openIssue { align-self: center; font-size: 14px; }
 .error { font-size: 14px; color: var(--color-text-error); }

@@ -96,7 +96,7 @@ function StatusRow({
           )}
         </div>
         <button aria-label={`Törlés: ${status.label}`} onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-          className={`${k.btn} ${k.btnIcon}`}
+          className={`${k.btn} ${k.btnIcon} ${m.danger}`}
         >
           <Trash2 style={{ width: 13, height: 13 }} />
         </button>

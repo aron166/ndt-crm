@@ -7,7 +7,7 @@
 .title { margin: 0; font-size: 20px; font-weight: 600; color: var(--color-text-primary); }
 .sub { margin: 0; font-size: 12px; font-family: var(--font-mono-ndt); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-secondary); }
 .card { width: 100%; max-width: 400px; box-sizing: border-box; }
-.heading { margin: 0; font-size: 16px; font-weight: 600; color: var(--color-text-primary); }
+.heading { margin: 0; margin-block-end: 8px; font-size: 16px; font-weight: 600; color: var(--color-text-primary); }
 .form { display: flex; flex-direction: column; gap: 12px; }
 .label { display: block; margin-block-end: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-secondary); }
 .field { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 12px; font: inherit; font-size: 14px; border: 1px solid var(--color-border-emphasized); border-radius: var(--radius-element); background: var(--color-background-card); color: var(--color-text-primary); }
