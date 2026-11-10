@@ -6,6 +6,9 @@ import { Plus, Trash2, Pencil, Zap, X } from "lucide-react";
 import {
   createAutomation, updateAutomation, toggleAutomation, deleteAutomation,
 } from "@/app/actions/automations";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "./automations.module.css";
 
 // ── Static option sets (Hungarian labels) ──────────────────────────
 
@@ -136,14 +139,6 @@ const EMPTY: FormState = {
   assignedToId: "",
   webhookUrl: "",
   leadIdleStatus: "",
-};
-
-// ── Shared input styles ─────────────────────────────────────────────
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 10px", fontSize: 14,
-  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-  borderRadius: 6, color: "var(--fg)", outline: "none",
 };
 
 function fromRule(r: RuleRow): FormState {
@@ -312,24 +307,18 @@ export function AutomationsClient({
 
   return (
     <div className="space-y-5">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Automatizálások</h1>
-          <p className="page-sub">
-            Szabályok: ha egy esemény bekövetkezik, automatikusan létrejön egy feladat.
-          </p>
-        </div>
-        <div className="page-actions">
-          {!showForm && (
-            <button onClick={openCreate} className="btn primary" style={{ gap: 6 }}>
-              <Plus style={{ width: 14, height: 14 }} /> Új szabály
-            </button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Automatizálások"
+        eyebrow="Szabályok: ha egy esemény bekövetkezik, automatikusan létrejön egy feladat."
+        actions={showForm ? undefined : (
+          <button type="button" onClick={openCreate} className={`${k.btn} ${k.btnPrimary}`}>
+            <Plus style={{ width: 14, height: 14 }} /> Új szabály
+          </button>
+        )}
+      />
 
       {error && !showForm && (
-        <div className="panel"><div className="panel-pad" style={{ fontSize: 14, color: "var(--coral)" }}>{error}</div></div>
+        <div className={k.card} style={{ fontSize: 14, color: "var(--coral)" }}>{error}</div>
       )}
 
       {showForm && (
@@ -345,11 +334,11 @@ export function AutomationsClient({
 
       {/* Rule list */}
       {rules.length === 0 ? (
-        <div className="panel"><div className="panel-pad" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
+        <div className={`${k.card} ${k.muted}`}>
           Még nincs automatizálási szabály. Hozz létre egyet a fenti gombbal.
-        </div></div>
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className={s.list}>
           {rules.map((r) => (
             <RuleCard
               key={r.id} rule={r} leadStatuses={leadStatuses} stages={stages}
@@ -398,30 +387,29 @@ function RuleCard({
     : `feladat: „${(ac.titleTemplate as string | undefined) ?? "-"}”`;
   const condCount = Array.isArray(rule.conditions) ? rule.conditions.length : 0;
   return (
-    <div className="panel" style={{ opacity: rule.isActive ? 1 : 0.6 }}>
-      <div className="panel-pad flex items-center justify-between" style={{ gap: 12 }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div className="flex items-center gap-2" style={{ marginBottom: 3 }}>
-            <Zap style={{ width: 14, height: 14, color: rule.isActive ? "var(--indigo)" : "var(--fg-faint)" }} />
-            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{rule.name}</span>
-            {!rule.isActive && <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>inaktív</span>}
+    <div className={k.card} style={{ opacity: rule.isActive ? 1 : 0.6 }}>
+      <div className={s.ruleRow}>
+        <div className={s.ruleMain}>
+          <div className={s.ruleName}>
+            <Zap style={{ width: 14, height: 14, color: rule.isActive ? "var(--color-accent)" : "var(--color-text-secondary)" }} />
+            <span className={s.name}>{rule.name}</span>
+            {!rule.isActive && <span className={k.muted}>inaktív</span>}
           </div>
-          <div style={{ fontSize: 14, color: "var(--fg-mute)" }}>
+          <div className={k.muted}>
             {describeTrigger(rule, leadStatuses, stages)}
-            {condCount > 0 && <span style={{ color: "var(--fg-faint)" }}> · {condCount} feltétel</span>}
-            <span style={{ color: "var(--fg-faint)" }}> → {actionSummary}</span>
+            {condCount > 0 && <span> · {condCount} feltétel</span>}
+            <span> → {actionSummary}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
-          <label className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--fg-mute)", cursor: "pointer" }}>
+        <div className={s.ruleActions}>
+          <label className={s.toggle}>
             <input type="checkbox" checked={rule.isActive} onChange={onToggle} disabled={pending} />
             aktív
           </label>
-          <button onClick={onEdit} disabled={pending} title="Szerkesztés" className="btn" style={{ padding: "4px 8px" }}>
+          <button type="button" onClick={onEdit} disabled={pending} title="Szerkesztés" aria-label="Szerkesztés" className={`${k.btn} ${k.btnIcon}`}>
             <Pencil style={{ width: 13, height: 13 }} />
           </button>
-          <button onClick={onDelete} disabled={pending} title="Törlés"
-            style={{ background: "transparent", border: "1px solid var(--line-soft)", borderRadius: 5, padding: "4px 8px", color: "var(--coral)", cursor: "pointer", display: "flex" }}>
+          <button type="button" onClick={onDelete} disabled={pending} title="Törlés" aria-label="Törlés" className={`${k.btn} ${k.btnIcon} ${s.danger}`}>
             <Trash2 style={{ width: 13, height: 13 }} />
           </button>
         </div>
@@ -447,21 +435,22 @@ function RuleForm({
 }) {
   const condFields = fieldsForTrigger(form.triggerType);
   return (
-    <form onSubmit={onSubmit} className="panel">
-      <div className="panel-head"><div className="panel-title">{editing ? "Szabály szerkesztése" : "Új szabály"}</div></div>
-      <div className="panel-pad space-y-4">
+    <form onSubmit={onSubmit} className={s.form}>
+      <h2 className={k.h2}>{editing ? "Szabály szerkesztése" : "Új szabály"}</h2>
+      <section className={k.card}>
         <div>
           <label className="field-label">Név</label>
-          <input style={inputStyle} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="pl. Új lead → megkeresési feladat" autoFocus />
+          <input className={s.field} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="pl. Új lead → megkeresési feladat" autoFocus />
         </div>
+      </section>
 
-        {/* Trigger */}
-        <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Trigger: amikor…</div>
+      {/* Trigger */}
+      <section className={k.card}>
+          <h3 className={k.h2}>Trigger: amikor…</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="field-label">Esemény</label>
-              <select style={inputStyle} value={form.triggerType} onChange={(e) => { set("triggerType", e.target.value); set("conditions", []); }}>
+              <select className={s.field} value={form.triggerType} onChange={(e) => { set("triggerType", e.target.value); set("conditions", []); }}>
                 {TRIGGERS.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
               </select>
             </div>
@@ -469,7 +458,7 @@ function RuleForm({
             {form.triggerType === "lead_status_changed" && (
               <div>
                 <label className="field-label">Célállapot (üres = bármelyik)</label>
-                <select style={inputStyle} value={form.toStatus} onChange={(e) => set("toStatus", e.target.value)}>
+                <select className={s.field} value={form.toStatus} onChange={(e) => set("toStatus", e.target.value)}>
                   <option value="">Bármelyik státusz</option>
                   {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
@@ -479,7 +468,7 @@ function RuleForm({
             {form.triggerType === "deal_stage_changed" && (
               <div>
                 <label className="field-label">Célfázis (üres = bármelyik)</label>
-                <select style={inputStyle} value={form.toStageId} onChange={(e) => set("toStageId", e.target.value)}>
+                <select className={s.field} value={form.toStageId} onChange={(e) => set("toStageId", e.target.value)}>
                   <option value="">Bármelyik fázis</option>
                   {stages.map((s) => <option key={s.id} value={String(s.id)}>{s.label}</option>)}
                 </select>
@@ -490,14 +479,14 @@ function RuleForm({
               <>
                 <div>
                   <label className="field-label">Fázis (üres = bármelyik)</label>
-                  <select style={inputStyle} value={form.stageId} onChange={(e) => set("stageId", e.target.value)}>
+                  <select className={s.field} value={form.stageId} onChange={(e) => set("stageId", e.target.value)}>
                     <option value="">Bármelyik fázis</option>
                     {stages.map((s) => <option key={s.id} value={String(s.id)}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="field-label">Tétlen napok száma</label>
-                  <input type="number" min={1} style={inputStyle} value={form.idleDays} onChange={(e) => set("idleDays", e.target.value)} />
+                  <input type="number" min={1} className={s.field} value={form.idleDays} onChange={(e) => set("idleDays", e.target.value)} />
                 </div>
               </>
             )}
@@ -505,51 +494,50 @@ function RuleForm({
               <>
                 <div>
                   <label className="field-label">Lead státusz (üres = bármelyik nyitott)</label>
-                  <select style={inputStyle} value={form.leadIdleStatus} onChange={(e) => set("leadIdleStatus", e.target.value)}>
+                  <select className={s.field} value={form.leadIdleStatus} onChange={(e) => set("leadIdleStatus", e.target.value)}>
                     <option value="">Bármelyik</option>
                     {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="field-label">Napok az utolsó kapcsolat óta</label>
-                  <input type="number" min={1} style={inputStyle} value={form.idleDays} onChange={(e) => set("idleDays", e.target.value)} />
+                  <input type="number" min={1} className={s.field} value={form.idleDays} onChange={(e) => set("idleDays", e.target.value)} />
                 </div>
               </>
             )}
           </div>
           {(form.triggerType === "deal_idle_in_stage" || form.triggerType === "lead_idle") && (
-            <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 6 }}>
+            <p className={`${k.muted} ${s.hint}`}>
               Az időzített triggert a napi ütemezett futás (07:00 UTC) értékeli ki; egy szabály leadenként / fázisonként egyszer fut le.
             </p>
           )}
-        </div>
+      </section>
 
-        {/* Conditions */}
-        <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-          <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)" }}>Feltételek (opcionális, ÉS kapcsolat)</div>
-            <button type="button" onClick={addCondition} className="btn" style={{ gap: 5, padding: "3px 8px", fontSize: 12 }}>
+      {/* Conditions */}
+      <section className={k.card}>
+          <div className={s.stepHead}>
+            <h3 className={k.h2}>Feltételek (opcionális, ÉS kapcsolat)</h3>
+            <button type="button" onClick={addCondition} className={k.btn}>
               <Plus style={{ width: 12, height: 12 }} /> Feltétel
             </button>
           </div>
           {form.conditions.length === 0 ? (
-            <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>Nincs feltétel: a szabály minden ilyen eseményre lefut.</p>
+            <p className={k.muted}>Nincs feltétel: a szabály minden ilyen eseményre lefut.</p>
           ) : (
             <div className="space-y-2">
               {form.conditions.map((c, i) => {
                 const noValue = c.op === "is_empty" || c.op === "is_not_empty";
                 return (
-                  <div key={i} className="flex items-center gap-2">
-                    <select style={{ ...inputStyle, flex: 1 }} value={c.field} onChange={(e) => updateCondition(i, { field: e.target.value })}>
+                  <div key={i} className={s.condRow}>
+                    <select className={s.field} style={{ flex: 1 }} value={c.field} onChange={(e) => updateCondition(i, { field: e.target.value })}>
                       {condFields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
                     </select>
-                    <select style={{ ...inputStyle, width: 130 }} value={c.op} onChange={(e) => updateCondition(i, { op: e.target.value })}>
+                    <select className={s.field} style={{ width: 130 }} value={c.op} onChange={(e) => updateCondition(i, { op: e.target.value })}>
                       {OPS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
                     </select>
-                    <input style={{ ...inputStyle, flex: 1, opacity: noValue ? 0.4 : 1 }} value={c.value} disabled={noValue}
+                    <input className={s.field} style={{ flex: 1, opacity: noValue ? 0.4 : 1 }} value={c.value} disabled={noValue}
                       onChange={(e) => updateCondition(i, { value: e.target.value })} placeholder={noValue ? "-" : "érték"} />
-                    <button type="button" onClick={() => removeCondition(i)} title="Törlés"
-                      style={{ background: "transparent", border: "none", color: "var(--fg-faint)", cursor: "pointer", display: "flex", flexShrink: 0 }}>
+                    <button type="button" onClick={() => removeCondition(i)} title="Törlés" aria-label="Törlés" className={`${k.btn} ${k.btnIcon}`}>
                       <X style={{ width: 14, height: 14 }} />
                     </button>
                   </div>
@@ -557,15 +545,15 @@ function RuleForm({
               })}
             </div>
           )}
-        </div>
+      </section>
 
-        {/* Action */}
-        <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", marginBottom: 10 }}>Művelet</div>
+      {/* Action */}
+      <section className={k.card}>
+          <h3 className={k.h2}>Művelet</h3>
           <div className="space-y-3">
             <div>
               <label className="field-label">Művelet típusa</label>
-              <select style={inputStyle} value={form.actionType} onChange={(e) => set("actionType", e.target.value)}>
+              <select className={s.field} value={form.actionType} onChange={(e) => set("actionType", e.target.value)}>
                 <option value="create_task">Feladat létrehozása</option>
                 <option value="send_email">Email küldése</option>
                 <option value="change_lead_status">Lead státusz módosítása</option>
@@ -577,17 +565,17 @@ function RuleForm({
             {form.actionType === "change_lead_status" && (
               <div>
                 <label className="field-label">Új státusz</label>
-                <select style={inputStyle} value={form.toStatus2} onChange={(e) => set("toStatus2", e.target.value)}>
+                <select className={s.field} value={form.toStatus2} onChange={(e) => set("toStatus2", e.target.value)}>
                   <option value="">válassz</option>
                   {leadStatuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
-                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Csak lead-triggerekkel működik. Az így beállított státusz nem indít újabb szabályt (nincs láncolás).</p>
+                <p className={`${k.muted} ${s.hint}`}>Csak lead-triggerekkel működik. Az így beállított státusz nem indít újabb szabályt (nincs láncolás).</p>
               </div>
             )}
             {form.actionType === "assign_lead" && (
               <div>
                 <label className="field-label">Felelős</label>
-                <select style={inputStyle} value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
+                <select className={s.field} value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
                   <option value="">válassz</option>
                   {users.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
                 </select>
@@ -596,8 +584,8 @@ function RuleForm({
             {form.actionType === "webhook_out" && (
               <div>
                 <label className="field-label">Webhook URL</label>
-                <input style={inputStyle} value={form.webhookUrl} onChange={(e) => set("webhookUrl", e.target.value)} placeholder="https://n8n.example.com/webhook/…" />
-                <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát. Csak <strong>https://</strong>: nincs auth fejléc, a titkot az URL-be tedd.</p>
+                <input className={s.field} value={form.webhookUrl} onChange={(e) => set("webhookUrl", e.target.value)} placeholder="https://n8n.example.com/webhook/…" />
+                <p className={`${k.muted} ${s.hint}`}>POST JSON: esemény, lead/deal/cég/személy azonosítók, mezők. 5 mp időkorlát. Csak <strong>https://</strong>: nincs auth fejléc, a titkot az URL-be tedd.</p>
               </div>
             )}
 
@@ -605,17 +593,17 @@ function RuleForm({
               <>
                 <div>
                   <label className="field-label">Tárgy</label>
-                  <input style={inputStyle} value={form.subjectTemplate} onChange={(e) => set("subjectTemplate", e.target.value)} placeholder="pl. Ajánlatunk: {company}" />
+                  <input className={s.field} value={form.subjectTemplate} onChange={(e) => set("subjectTemplate", e.target.value)} placeholder="pl. Ajánlatunk: {company}" />
                 </div>
                 <div>
                   <label className="field-label">Üzenet</label>
-                  <textarea style={{ ...inputStyle, minHeight: 120, resize: "vertical" }} value={form.bodyTemplate} onChange={(e) => set("bodyTemplate", e.target.value)} placeholder={"Tisztelt Cím!\n\n..."} />
+                  <textarea className={`${s.field} ${s.textarea}`} value={form.bodyTemplate} onChange={(e) => set("bodyTemplate", e.target.value)} placeholder={"Tisztelt Cím!\n\n..."} />
                 </div>
-                <p style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+                <p className={k.muted}>
                   Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}. A címzettet a lead/cég
                   elsődleges kapcsolattartójának emailje adja. A Resend integrációnak beállítva kell lennie.
                 </p>
-                <label className="flex items-center gap-2" style={{ fontSize: 14, color: "var(--fg-soft)", cursor: "pointer" }}>
+                <label className={s.toggle}>
                   <input type="checkbox" checked={form.sendOnce} onChange={(e) => set("sendOnce", e.target.checked)} />
                   Csak egyszer küldd el címzettenként (ne ismételje)
                 </label>
@@ -624,33 +612,33 @@ function RuleForm({
               <>
                 <div>
                   <label className="field-label">Feladat címe</label>
-                  <input style={inputStyle} value={form.titleTemplate} onChange={(e) => set("titleTemplate", e.target.value)} placeholder="pl. Lead megkeresése: {company}" />
-                  <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 4 }}>Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}</p>
+                  <input className={s.field} value={form.titleTemplate} onChange={(e) => set("titleTemplate", e.target.value)} placeholder="pl. Lead megkeresése: {company}" />
+                  <p className={`${k.muted} ${s.hint}`}>Helyettesíthető: {"{company}"}, {"{message}"}, {"{sourceApp}"}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="field-label">Típus</label>
-                    <select style={inputStyle} value={form.taskType} onChange={(e) => set("taskType", e.target.value)}>
+                    <select className={s.field} value={form.taskType} onChange={(e) => set("taskType", e.target.value)}>
                       {TASK_TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="field-label">Kategória</label>
-                    <select style={inputStyle} value={form.category} onChange={(e) => set("category", e.target.value)}>
+                    <select className={s.field} value={form.category} onChange={(e) => set("category", e.target.value)}>
                       {CATEGORIES.map((c) => <option key={c.v} value={c.v}>{c.l}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="field-label">Határidő (nap múlva)</label>
-                    <input type="number" min={0} style={inputStyle} value={form.dueInDays} onChange={(e) => set("dueInDays", e.target.value)} placeholder="pl. 1" />
+                    <input type="number" min={0} className={s.field} value={form.dueInDays} onChange={(e) => set("dueInDays", e.target.value)} placeholder="pl. 1" />
                   </div>
                   <div>
                     <label className="field-label">Határidő (perc)</label>
-                    <input type="number" min={1} style={inputStyle} value={form.dueInMinutes} onChange={(e) => set("dueInMinutes", e.target.value)} placeholder="pl. 60" />
+                    <input type="number" min={1} className={s.field} value={form.dueInMinutes} onChange={(e) => set("dueInMinutes", e.target.value)} placeholder="pl. 60" />
                   </div>
                   <div>
                     <label className="field-label">Felelős</label>
-                    <select style={inputStyle} value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
+                    <select className={s.field} value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
                       <option value="">Nincs</option>
                       {users.map((u) => <option key={u.id} value={String(u.id)}>{u.name}</option>)}
                     </select>
@@ -658,21 +646,20 @@ function RuleForm({
                 </div>
                 <div>
                   <label className="field-label">Leírás (opcionális)</label>
-                  <input style={inputStyle} value={form.descriptionTemplate} onChange={(e) => set("descriptionTemplate", e.target.value)} placeholder="pl. Új lead a(z) {sourceApp} csatornán." />
+                  <input className={s.field} value={form.descriptionTemplate} onChange={(e) => set("descriptionTemplate", e.target.value)} placeholder="pl. Új lead a(z) {sourceApp} csatornán." />
                 </div>
               </>
             )}
           </div>
-        </div>
+      </section>
 
-        {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
+      {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
 
-        <div className="flex justify-end gap-2" style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 12 }}>
-          <button type="button" onClick={onCancel} disabled={pending} className="btn">Mégse</button>
-          <button type="submit" disabled={pending} className="btn primary">
-            {pending ? "Mentés…" : editing ? "Mentés" : "Létrehozás"}
-          </button>
-        </div>
+      <div className={s.footer}>
+        <button type="button" onClick={onCancel} disabled={pending} className={k.btn}>Mégse</button>
+        <button type="submit" disabled={pending} className={`${k.btn} ${k.btnPrimary}`}>
+          {pending ? "Mentés…" : editing ? "Mentés" : "Létrehozás"}
+        </button>
       </div>
     </form>
   );
