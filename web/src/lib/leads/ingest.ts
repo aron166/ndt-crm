@@ -98,9 +98,12 @@ function splitName(name: string | undefined, emailFallback?: string): {
   return { firstName: local || "Lead", lastName: "-" };
 }
 
-/** The stored form of a thread key that no draft vouched for: `<appSlug>:<key>`, lowercased. */
+/** Reserved prefix for app-namespaced thread keys; callers may not send it (schema). */
+export const APP_THREAD_KEY_PREFIX = "app~";
+
+/** The stored form of a thread key that no draft vouched for: `app~<appSlug>~<key>`, lowercased. */
 export function appThreadKey(appSlug: string, threadKey: string): string {
-  return `${appSlug.trim().toLowerCase()}:${threadKey.trim().toLowerCase()}`;
+  return `${APP_THREAD_KEY_PREFIX}${appSlug.trim().toLowerCase()}~${threadKey.trim().toLowerCase()}`;
 }
 
 export async function ingestLead(
@@ -139,15 +142,30 @@ export async function ingestLead(
   const claimedThreadKey = input.thread_key?.trim() || null;
   const draftKey = input.draft_key?.trim() || null;
   const isColdEmailReply = input.channel === "cold_email";
-  // Without a draft of ours to vouch for it, a thread key is still honoured, but
-  // NAMESPACED by the authenticated app (growth cold-email tool, 2026-11-10): the
-  // app key is the voucher, so one app can dedupe its own threads and can never
-  // claim another app's or a draft-vouched key (keeps the #89 protection).
-  const appKey = claimedThreadKey && isColdEmailReply ? appThreadKey(sourceApp, claimedThreadKey) : null;
+  // The draft is found by the DRAFT key, never by the conversation key, and FIRST:
+  // which key form to match depends on it. Newest sent touch first: once touches 1
+  // and 2 are both out they share one draft key, and an unordered findFirst reported
+  // whichever row Postgres happened to return as "the draft this reply answered". (Vanda, #89.)
+  const draft = draftKey && isColdEmailReply
+    ? await tx.emailDraft.findFirst({
+        where: { tenantId, threadKey: draftKey, ...(ctx.draftId != null ? { id: ctx.draftId } : {}) },
+        orderBy: [{ sentAt: "desc" }, { step: "desc" }],
+        select: { id: true, companyId: true, campaign: true },
+      })
+    : null;
 
-  if (claimedThreadKey && isColdEmailReply) {
+  // Without a draft of ours to vouch for it, a thread key is still honoured, but
+  // NAMESPACED by the authenticated app under a reserved prefix no caller can send
+  // (the schema rejects "app~"): the app key is the voucher, so an app dedupes only
+  // its own threads and never claims another app's or a draft-vouched key. Exactly
+  // one form is matched, so an unvouched caller cannot land on a vouched lead either
+  // (growth cold-email tool, 2026-11-10; Vanda #166-1, #166-2).
+  const matchKey = !claimedThreadKey || !isColdEmailReply ? null
+    : draft ? claimedThreadKey : appThreadKey(sourceApp, claimedThreadKey);
+
+  if (matchKey) {
     const existingLead = await tx.lead.findFirst({
-      where: { tenantId, threadKey: { in: [claimedThreadKey, appKey!] } },
+      where: { tenantId, threadKey: matchKey },
       select: { id: true, companyId: true },
     });
     if (existingLead) {
@@ -164,20 +182,8 @@ export async function ingestLead(
     }
   }
 
-  // The draft is found by the DRAFT key, never by the conversation key.
-  // Newest sent touch first: once touches 1 and 2 are both out they share one
-  // draft key, and an unordered findFirst reported whichever row Postgres
-  // happened to return as "the draft this reply answered". (Vanda, #89.)
-  const draft = draftKey && isColdEmailReply
-    ? await tx.emailDraft.findFirst({
-        where: { tenantId, threadKey: draftKey, ...(ctx.draftId != null ? { id: ctx.draftId } : {}) },
-        orderBy: [{ sentAt: "desc" }, { step: "desc" }],
-        select: { id: true, companyId: true, campaign: true },
-      })
-    : null;
-
   // A draft-vouched key is stored as is; otherwise the app-namespaced key.
-  const threadKey = draft ? claimedThreadKey : appKey;
+  const threadKey = matchKey;
 
   // 1. Dedupe Company by exact name (case-insensitive) within the tenant —
   // unless the thread key already told us the company for certain.

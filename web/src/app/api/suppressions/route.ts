@@ -38,13 +38,22 @@ export async function POST(request: Request) {
   const b = parsed.data;
   const email = normalizeEmail(b.email);
   const requestedAt = b.requested_at ? new Date(`${b.requested_at}T00:00:00Z`) : new Date();
-  if (Number.isNaN(requestedAt.getTime()) || requestedAt.getTime() > Date.now() + 86_400_000) {
+  // A real calendar day (2026-02-31 would silently become 03-03), at most one day ahead (timezones).
+  const realDay = !b.requested_at || (!Number.isNaN(requestedAt.getTime()) && requestedAt.toISOString().slice(0, 10) === b.requested_at);
+  if (!realDay || Number.isNaN(requestedAt.getTime()) || requestedAt.getTime() > Date.now() + 86_400_000) {
     return json({ error: "Validation failed", details: { fieldErrors: { requested_at: ["invalid or in the future"] } } }, 400);
   }
 
   try {
+    const auditOpts = { tenantId: key.tenantId, actor: "agent" as const, actorAgentId: key.appSlug };
+    // Cancelling queued drafts runs on every path and never fails the request: a retry after
+    // a failed cancel repairs it, and sendEmail blocks the address either way (Vanda #166-3).
+    const cancel = async (): Promise<number | null> => {
+      try { return await cancelQueuedDraftsFor(key.tenantId, { email, domain: null }, auditOpts); }
+      catch (err) { reportError("api.suppressions.cancel", err, { sourceApp: key.appSlug }); return null; }
+    };
     const existing = await db.suppression.findFirst({ where: { tenantId: key.tenantId, email }, select: { id: true } });
-    if (existing) return json({ ok: true, created: false, id: existing.id }, 200);
+    if (existing) return json({ ok: true, created: false, id: existing.id, cancelledDrafts: await cancel() }, 200);
     let row: { id: number };
     try {
       row = await db.suppression.create({
@@ -59,14 +68,12 @@ export async function POST(request: Request) {
       // Two posts for one address raced: the unique index keeps one row, both callers succeed.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
         const winner = await db.suppression.findFirst({ where: { tenantId: key.tenantId, email }, select: { id: true } });
-        return json({ ok: true, created: false, id: winner?.id ?? null }, 200);
+        return json({ ok: true, created: false, id: winner?.id ?? null, cancelledDrafts: await cancel() }, 200);
       }
       throw err;
     }
-    const auditOpts = { tenantId: key.tenantId, actor: "agent" as const, actorAgentId: key.appSlug };
     audit("suppression", row.id, "create", null, { email, channel: b.channel, source: b.source ?? null }, auditOpts);
-    const cancelled = await cancelQueuedDraftsFor(key.tenantId, { email, domain: null }, auditOpts);
-    return json({ ok: true, created: true, id: row.id, cancelledDrafts: cancelled }, 201);
+    return json({ ok: true, created: true, id: row.id, cancelledDrafts: await cancel() }, 201);
   } catch (err) {
     reportError("api.suppressions", err, { sourceApp: key.appSlug });
     return json({ error: "Internal error" }, 500);

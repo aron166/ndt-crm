@@ -198,9 +198,10 @@ needs.
 2. **A thread key must be vouched for.** With `channel: cold_email` and a
    `draft_key` that resolves to a real draft of yours, the key is stored as sent.
    Without a draft (2026-11-10, the growth cold-email tool, which has no CRM
-   drafts), the key is stored **namespaced by your app key**: `<app slug>:<key>`.
-   Your app can dedupe its own threads, but it can never claim another app's key
-   or a draft-vouched one, because a different slug never collides. This endpoint is
+   drafts), the key is stored **namespaced by your app key** under a reserved
+   prefix: `app~<app slug>~<key>`. A `thread_key` you send may not start with
+   `app~` (that is a `400`), so nobody can forge another app's key. Dedupe matches
+   exactly one form: the raw key when a draft vouches, otherwise your namespaced key. This endpoint is
    CORS-open and draft keys are enumerable, so an unvouched raw key would let
    anyone with a tenant app key claim a thread, burning it, so the genuine reply
    later returns `deduped: true` and is silently discarded. Other channels never store a thread key.
@@ -419,14 +420,21 @@ curl -X POST $CRM/api/suppressions -H "Authorization: Bearer $KEY" -H "Content-T
 | Field | Rule |
 |---|---|
 | `email` | required, a valid address; stored trimmed and lowercased |
-| `requested_at` | optional `YYYY-MM-DD`, the day the person asked (default today; not in the future) |
+| `requested_at` | optional `YYYY-MM-DD`, a real calendar day the person asked (default today; at most one day ahead) |
 | `channel` | `email` (default), `phone`, `linkedin`, `in_person` |
 | `source` | optional, max 200; stored as `<app slug>: <source>` |
 | `note` | optional, max 1000 |
 
 Unknown fields are a `400`. Idempotent: a new address returns `201 { ok, created: true, id, cancelledDrafts }`,
 an address already on the list (or a race with your own retry) returns `200 { ok, created: false, id }`.
-`401` without a valid key, `429` over 30 requests a minute.
+`cancelledDrafts` is how many queued drafts to that address were cancelled
+(null if that step failed; it runs again on a retry). `401` without a valid key,
+`429` over 30 requests a minute; the bucket is shared with `/api/leads` for the
+same key, so retry on the next run.
+
+Any app key of the tenant can add any address, and only a person can remove one
+(Settings), so treat app keys as secrets: a leaked key could silence real customers.
+Every add is in the audit log with the app slug.
 
 ## Companies & persons
 

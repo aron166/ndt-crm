@@ -16,6 +16,7 @@ vi.mock("@/lib/db", () => ({ db }));
 
 import { POST } from "./route";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
+import { reportError } from "@/lib/report-error";
 import { cancelQueuedDraftsFor } from "@/lib/suppression/cancel";
 
 const KEY = { keyId: 1, tenantId: 1, appSlug: "growth" };
@@ -89,7 +90,25 @@ describe("POST /api/suppressions", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, created: false });
     expect(db.suppression.create).not.toHaveBeenCalled();
-    expect(cancelQueuedDraftsFor).not.toHaveBeenCalled();
+    expect(cancelQueuedDraftsFor).toHaveBeenCalledTimes(1);
+  });
+
+  it("201 with cancelledDrafts null and reportError when cancel throws on a new address", async () => {
+    (cancelQueuedDraftsFor as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("boom"));
+    const res = await POST(req({ email: "foo@bar.hu" }));
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ created: true, cancelledDrafts: null });
+    expect(reportError).toHaveBeenCalled();
+  });
+
+  it("400 on a non-existent calendar day", async () => {
+    expect((await POST(req({ email: "a@b.hu", requested_at: "2026-02-31" }))).status).toBe(400);
+    expect(db.suppression.create).not.toHaveBeenCalled();
+  });
+
+  it("accepts requested_at today", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    expect((await POST(req({ email: "a@b.hu", requested_at: today }))).status).toBe(201);
   });
 
   it("200 created:false when create loses a P2002 race", async () => {
