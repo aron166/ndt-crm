@@ -11,6 +11,7 @@ import { minutesToFirstContact } from "@/lib/leads/first-contact";
 import { INTENT_LABEL, callWindowLabel } from "@/lib/leads/intake-notify";
 import { LeadOffersPanel } from "./LeadOffersPanel";
 import { LeadDetailClient } from "./LeadDetailClient";
+import { BookingPanel } from "./booking/BookingPanel";
 import s from "./detail/lead.module.css";
 
 const TENANT_ID = 1;
@@ -136,6 +137,8 @@ export default async function LeadDetailPage({
         answerSources={answerSourcesFrom(lead.answerSources)}
         scriptVariants={scriptVariants}
         callTypeCounts={callTypeGroups.map((g) => ({ callType: g.callType, count: g._count._all }))}
+        // The booking API refuses a lead that is not open (409), so a closed lead gets the note, not the search.
+        bookingPanel={<BookingPanel leadId={leadId} leadOpen={lead.outcome === "open" && lead.convertedDealId == null} />}
         offersPanel={<LeadOffersPanel leadId={leadId} offers={serializeDates(offers)} documents={serializeDates(documents)} status={lead.status} />}
       />
     </div>

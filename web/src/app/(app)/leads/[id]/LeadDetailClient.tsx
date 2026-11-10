@@ -225,7 +225,8 @@ export function LeadDetailClient({
           </section>
           <section id="offers" className={s.section}>
             <Heading level={2} className={s.h2}>{/* PROPOSAL copy */}Ajánlatok és dokumentumok</Heading>
-            {offersPanel}
+            {/* Wrapped: a server-built node as a direct sibling here trips a dev key warning. */}
+            <div>{offersPanel}</div>
           </section>
           <section id="calls" className={s.section}>
             <Heading level={2} className={s.h2}>{interactions.length > 0 ? `Hívások · ${interactions.length}` : "Hívások"}</Heading>

@@ -59,7 +59,7 @@ export function SlotCard({ slot, rank, selected, onSelect, baseName, machineName
             {i > 0 && (
               <span className={css.leg}>
                 <i />
-                {p.band && <span>{p.band}</span>}
+                {p.band && <span title={p.band}>{p.band.split(" - ").pop()}</span>}
               </span>
             )}
             <span className={css.pt} data-cand={p.cand ? "true" : undefined}>
@@ -81,12 +81,12 @@ export function SlotCard({ slot, rank, selected, onSelect, baseName, machineName
         <dd>{fmtDuration(slot.dayDriveMinutes)}</dd>
       </dl>
 
-      {warns.map((w) => (
-        <div key={w} className={css.warn}><WarnIcon /><span>{w}</span></div>
+      {warns.map((w, i) => (
+        <div key={`${i}-${w}`} className={css.warn}><WarnIcon /><span>{w}</span></div>
       ))}
 
-      {hints.map((b) => (
-        <div key={b.stop.id} className={css.hint} onClick={(e) => e.stopPropagation()}>
+      {hints.map((b, i) => (
+        <div key={`${i}-${b.stop.id}`} className={css.hint} onClick={(e) => e.stopPropagation()}>
           <span>Egy úttal: {stopLabel(b.stop)} {fmtDate(b.stop.startsAt)} ugyanarra. Javasolt: {fmtDate(b.suggestedStart!)}</span>
           {onPickBundle && <Button size="sm" variant="secondary" label="Ezt választom" onClick={() => onPickBundle(b)} />}
         </div>

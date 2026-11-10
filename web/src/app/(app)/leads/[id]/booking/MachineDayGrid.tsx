@@ -58,7 +58,6 @@ export function MachineDayGrid({ rows, slots, probes, selectedKey, keyOf, onSele
         <div className={css.grid} role="group" aria-label="Gép napi terhelése">
           <span />
           <div className={css.hours} aria-hidden="true">{HOURS.map((h) => <span key={h}>{h}</span>)}</div>
-          <span />
           {rows.map((day) => {
             const here = slots.filter((s) => dayKeyOf(s.startsAt) === day.key);
             const first = here[0];
@@ -77,7 +76,7 @@ export function MachineDayGrid({ rows, slots, probes, selectedKey, keyOf, onSele
               <div key={day.key} style={{ display: "contents" }}>
                 <div className={css.lbl}>
                   <span>{fmtRowLabel(day)}</span>
-                  {first && <span className={css.muted}>{rank}. javaslat</span>}
+                  {first ? <span className={css.muted}>{rank}. javaslat</span> : why && <span className={off ? css.whyOff : css.muted}>{why}</span>}
                 </div>
                 <div className={css.track} data-off={off}>
                   {first
@@ -86,7 +85,6 @@ export function MachineDayGrid({ rows, slots, probes, selectedKey, keyOf, onSele
                       ))
                     : pm && <Blocks blocks={dayBlocks(pm, false)} />}
                 </div>
-                <div className={css.why}>{why}</div>
               </div>
             );
           })}

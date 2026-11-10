@@ -4,7 +4,7 @@ import type { CheckResultDto, DriveBandDto, FlagCode, PlacementDto, RouteStopDto
 /** PURE helpers of the booking panel: Budapest formatting, grid geometry, labels. */
 
 const WEEKDAY = ["Vasárnap", "Hétfő", "Kedd", "Szerda", "Csütörtök", "Péntek", "Szombat"];
-const WEEKDAY_SHORT = ["Va", "Hé", "Ke", "Sze", "Cs", "Pé", "Szo"];
+const WEEKDAY_SHORT = ["V", "H", "K", "Sze", "Cs", "P", "Szo"];
 const MONTH = ["jan.", "febr.", "márc.", "ápr.", "máj.", "jún.", "júl.", "aug.", "szept.", "okt.", "nov.", "dec."];
 
 const pad = (n: number) => String(n).padStart(2, "0");
