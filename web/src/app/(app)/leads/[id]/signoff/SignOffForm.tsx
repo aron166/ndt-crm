@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-const fieldClass = "min-h-12 text-lg"; // tablet signer: bigger touch targets
+const fieldClass = "min-h-12 text-lg md:text-lg pointer-coarse:min-h-12"; // tablet signer: bigger touch targets
 const label: React.CSSProperties = { display: "block", fontSize: 16, fontWeight: 600, marginBottom: 6 };
 
 export function SignOffForm({ leadId }: { leadId: number }) {
@@ -108,8 +108,8 @@ export function SignOffForm({ leadId }: { leadId: number }) {
         {/* PROPOSAL copy */}
         <p style={{ fontWeight: 600, margin: "0 0 16px" }}>Kész: {done.number}</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-          <a href={`/leads/${leadId}/documents/${done.id}/pdf`} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", size: "lg" })}>PDF</a>
-          <Link href={`/leads/${leadId}`} className={buttonVariants({ variant: "outline", size: "lg" })}>Vissza a laphoz</Link>
+          <a href={`/leads/${leadId}/documents/${done.id}/pdf`} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", size: "lg" }) + " text-lg"}>PDF</a>
+          <Link href={`/leads/${leadId}`} className={buttonVariants({ variant: "outline", size: "lg" }) + " text-lg"}>Vissza a laphoz</Link>
         </div>
       </div>
     );
@@ -157,11 +157,11 @@ export function SignOffForm({ leadId }: { leadId: number }) {
           style={{ width: "100%", height: 220, background: "#fff", border: "2px solid var(--ui-border-strong)", borderRadius: "var(--ui-radius-control)", touchAction: "none", display: "block" }}
         />
         {/* PROPOSAL copy */}
-        <Button type="button" variant="outline" size="lg" onClick={clear} className="mt-2">Törlés</Button>
+        <Button type="button" variant="outline" size="lg" onClick={clear} className="mt-2 text-lg">Törlés</Button>
       </div>
       {error && <p role="alert" style={{ fontSize: 18, color: "var(--ui-danger-text)", margin: 0 }}>{error}</p>}
       {/* PROPOSAL copy */}
-      <Button type="submit" size="lg" disabled={!canSubmit} className="min-h-14">
+      <Button type="submit" size="lg" disabled={!canSubmit} className="min-h-14 text-lg">
         Aláírás és teljesítésigazolás
       </Button>
     </form>

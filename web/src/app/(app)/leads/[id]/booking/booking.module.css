@@ -4,7 +4,7 @@
 .muted { color: var(--ui-text-muted); font-size: 13px; }
 .warn { color: var(--ui-text); font-size: 13px; display: flex; gap: 6px; align-items: flex-start; }
 .warn svg { color: var(--ui-warning-text); flex-shrink: 0; }
-.err { color: var(--ui-danger); font-size: 13px; }
+.err { color: var(--ui-danger-text); font-size: 13px; }
 .ok { color: var(--ui-text); font-size: 14px; font-weight: 600; }
 .mono { font-variant-numeric: tabular-nums; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ui-text-muted); }

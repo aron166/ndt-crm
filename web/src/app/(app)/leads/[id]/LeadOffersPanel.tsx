@@ -28,7 +28,6 @@ export interface LeadDocumentRow {
   createdAt: string | Date;
 }
 
-const selectClass = "min-h-[var(--ui-control-h)] w-full rounded-[var(--ui-radius-control)] border border-[var(--ui-border-strong)] bg-[var(--ui-surface)] px-3 py-1 text-sm text-[var(--ui-text)]";
 
 export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId: number; offers: LeadOffer[]; documents: LeadDocumentRow[]; status: string | null }) {
   const router = useRouter();
@@ -89,7 +88,7 @@ export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId:
       <form onSubmit={create} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", marginBottom: 12 }}>
         {/* PROPOSAL copy */}
         <FormField label="Sablon">
-          <select className={selectClass} value={template} onChange={(e) => setTemplate(e.target.value as OfferTemplate)}>
+          <select className="input-ds" value={template} onChange={(e) => setTemplate(e.target.value as OfferTemplate)}>
             {OFFER_TEMPLATES.map((t) => <option key={t} value={t}>{OFFER_TEMPLATE_LABEL[t]}</option>)}
           </select>
         </FormField>
@@ -101,7 +100,7 @@ export function LeadOffersPanel({ leadId, offers, documents, status }: { leadId:
             </FormField>
             {/* PROPOSAL copy */}
             <FormField label="Csomag">
-              <select className={selectClass} value={bigPackage} onChange={(e) => setBigPackage(e.target.value as "standard" | "unlimited")}>
+              <select className="input-ds" value={bigPackage} onChange={(e) => setBigPackage(e.target.value as "standard" | "unlimited")}>
                 <option value="standard">Standard</option>
                 <option value="unlimited">Unlimited</option>
               </select>

@@ -131,7 +131,7 @@ function LeadCard({
         aria-label="Lead-kártya törlése"
         draggable={false}
         onClick={(e) => { e.stopPropagation(); onDelete(lead.id); }}
-        className="absolute top-1 right-1 !size-6 text-[var(--ui-text-muted)] hover:text-[var(--ui-danger-text)]"
+        className="absolute top-1 right-1 !size-6 bg-[var(--ui-surface-muted)] text-[var(--ui-text-muted)] hover:text-[var(--ui-danger-text)]"
       >
         <Trash2 style={{ width: 12, height: 12 }} />
       </Button>
@@ -139,7 +139,6 @@ function LeadCard({
       {/* Tier badge */}
       {isTier(lead.tier) && (
         <span
-          
           title={TIER_LABEL[lead.tier]}
           style={{
             display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 3,
@@ -153,7 +152,6 @@ function LeadCard({
 
       {lead.tierFlag && (
         <div
-          
           style={{
             display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 3, marginLeft: 6,
             color: lead.tierFlag === "overdue" ? "var(--ui-surface)" : TIER_COLOR.A,
@@ -166,7 +164,7 @@ function LeadCard({
         </div>
       )}
       {lead.firstContactMin != null && (
-        <div  style={{ fontSize: 12, color: "var(--ui-text-muted)", marginBottom: 3 }}>
+        <div style={{ fontSize: 12, color: "var(--ui-text-muted)", marginBottom: 3 }}>
           Első kontakt: {formatMinutes(lead.firstContactMin)}
         </div>
       )}
@@ -176,7 +174,7 @@ function LeadCard({
         href={`/leads/${lead.id}`}
         onClick={stop}
         style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35, color: "var(--ui-text)", display: "block", marginBottom: 3, paddingRight: 24 }}
-        onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-accent)")}
+        onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-text-link)")}
         onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text)")}
       >
         {personName ?? lead.serviceInterest ?? lead.subject ?? "Névtelen érdeklődő"}
@@ -188,7 +186,7 @@ function LeadCard({
           className="flex items-center gap-1.5"
           style={{ fontSize: 12, color: "var(--ui-text-muted)", marginBottom: 4 }}
           onClick={stop}
-          onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-accent)")}
+          onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-text-link)")}
           onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text-muted)")}
         >
           <Building2 style={{ width: 10, height: 10, flexShrink: 0 }} />
@@ -210,7 +208,6 @@ function LeadCard({
 
       {lead.attempts > 0 && (
         <span
-          
           aria-label={`Próbálkozások: ${lead.attempts} / ${MAX_ATTEMPTS}`}
           style={{ display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 6, marginRight: 6, background: "var(--ui-hover)", color: "var(--ui-text-muted)" }}
         >
@@ -218,7 +215,7 @@ function LeadCard({
         </span>
       )}
       {(lead.nextAction || lead.nextDue) && (
-        <div  style={{ fontSize: 12, color: "var(--ui-text)", marginBottom: 6 }}>
+        <div style={{ fontSize: 12, color: "var(--ui-text)", marginBottom: 6 }}>
           {lead.nextAction}{lead.nextAction && lead.nextDue ? " · " : ""}{lead.nextDue ? shortDate(lead.nextDue) : ""}
         </div>
       )}
@@ -229,7 +226,7 @@ function LeadCard({
         </div>
       )}
       {lead.recallDate && (
-        <div  style={{ fontSize: 12, color: "var(--ui-warning-text)", marginBottom: 6 }}>
+        <div style={{ fontSize: 12, color: "var(--ui-warning-text)", marginBottom: 6 }}>
           {/* PROPOSAL copy */}
           Visszahívás: {shortDate(lead.recallDate)}
         </div>
@@ -269,6 +266,7 @@ function LeadCard({
             aria-label="Hívás eredménye"
             draggable={false}
             onClick={() => onCall(lead.id)}
+            className="h-[22px] min-h-[22px]"
           >
             <PhoneCall style={{ width: 11, height: 11 }} />
             Hívás
@@ -279,7 +277,6 @@ function LeadCard({
             aria-label="Kimenetel"
             draggable={false}
             onChange={(e) => onOutcome(lead.id, e.target.value as LeadOutcome)}
-            
             style={{
               fontSize: 12, height: 22, padding: "0 4px", borderRadius: 4, fontWeight: 700,
               background: "var(--ui-success-surface)", color: "var(--ui-success-text)", border: "1px solid var(--ui-success-text)", outline: "none",
@@ -432,7 +429,7 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
                 <div style={{ fontSize: 12, color: "var(--ui-text)", whiteSpace: "pre-wrap", padding: "0 10px 8px", lineHeight: 1.5 }}>
                   {displayScriptText(status.description)}
                   {isPlaceholderText(status.description) && (
-                    <> <Link href="/leads/setup" style={{ color: "var(--ui-accent)" }}>Beállítás</Link></>
+                    <> <Link href="/leads/setup" style={{ color: "var(--ui-text-link)" }}>Beállítás</Link></>
                   )}
                 </div>
               </details>

@@ -10,6 +10,9 @@ describe("next-step strip due label (Budapest calendar days, Vanda C2)", () => {
   it("same Budapest day is today", () => {
     expect(dueInfo(atBudapest(2026, 11, 9, 23, 59), now)?.rel).toBe("ma");
   });
+  it("today maps to the readable warning text token", () => {
+    expect(dueInfo(atBudapest(2026, 11, 9, 23, 59), now)).toEqual({ rel: "ma", color: "var(--ui-warning-text)" });
+  });
   it("counts calendar days, not 24 h blocks", () => {
     expect(dueInfo(atBudapest(2026, 11, 11, 0, 10), now)?.rel).toBe("2 nap múlva");
   });

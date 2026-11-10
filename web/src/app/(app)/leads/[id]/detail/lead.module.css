@@ -32,7 +32,7 @@
 .facts { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 8px; }
 .fact { display: flex; flex-direction: column; font-size: 13px; color: var(--ui-text); }
 .fact span:first-child { font-size: 12px; color: var(--ui-text-muted); }
-.error { margin-top: 12px; font-size: 14px; color: var(--ui-danger); }
+.error { margin-top: 12px; font-size: 14px; color: var(--ui-danger-text); }
 
 .strip { display: flex; flex-wrap: wrap; align-items: stretch; margin-top: 20px; border-radius: var(--ui-radius-surface); overflow: hidden; background: var(--ui-surface); box-shadow: var(--ui-shadow-raised); }
 .strip > div { padding: 12px 18px; display: flex; flex-direction: column; gap: 2px; }
@@ -82,8 +82,8 @@
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 14px; }
 .row a { color: var(--ui-text); }
 .rowEnd { margin-left: auto; font-size: 12px; color: var(--ui-text-muted); }
-.overdue { color: var(--ui-danger); }
-.soon { color: var(--ui-warning); }
+.overdue { color: var(--ui-danger-text); }
+.soon { color: var(--ui-warning-text); }
 .chip { font-size: 12px; padding: 1px 8px; border-radius: var(--ui-radius-control); background: var(--ui-surface-muted); color: var(--ui-text); }
 .chipAuto { background: var(--ui-accent-surface); color: var(--ui-text-link); font-weight: 600; }
 .linkBtn { background: none; border: 0; padding: 0; min-height: 44px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ui-text-link); }

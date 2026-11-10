@@ -98,7 +98,7 @@ export function LeadEditModal({ open, onClose, onSaved, initial }: LeadEditModal
 
           <FormField label="Elvesztés oka">
             {/* The reason is a code (Péter's list); a legacy free-text value stays selectable as is. */}
-            <select name="lostReason" defaultValue={initial.lostReason ?? ""} className="min-h-[var(--ui-control-h)] w-full rounded-[var(--ui-radius-control)] border border-[var(--ui-border-strong)] bg-[var(--ui-surface)] px-3 py-1 text-sm text-[var(--ui-text)]">
+            <select name="lostReason" defaultValue={initial.lostReason ?? ""} className="input-ds">
               <option value="">-</option>
               {initial.lostReason && !isLostReason(initial.lostReason) && <option value={initial.lostReason}>{initial.lostReason}</option>}
               {LOST_REASONS.map((k) => <option key={k} value={k}>{LOST_REASON_LABEL[k]}</option>)}

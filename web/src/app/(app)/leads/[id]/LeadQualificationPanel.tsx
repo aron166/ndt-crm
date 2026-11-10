@@ -102,7 +102,7 @@ function FormAnswersBlock({
               const q = bySlug.get(slug);
               return (
                 <div key={slug} className="flex justify-between" style={{ fontSize: 13, gap: 10 }}>
-                  <span style={{ color: q ? "var(--ui-text-muted)" : "var(--ui-text-muted)" }}>
+                  <span style={{ color: q ? "var(--ui-text-muted)" : "var(--ui-text-disabled)" }}>
                     {q ? q.label : slug}
                     {!q && <span style={{ fontStyle: "italic" }}> (kérdés törölve)</span>}
                   </span>

@@ -35,7 +35,6 @@ type SlotProposal = SlotProposalsResult["proposals"][number];
 // callback needs date+hour, meeting needs who) is enforced SERVER-side in
 // lib/leads/service.ts; the `required` attributes here are just UX.
 
-const selectClass = "min-h-[var(--ui-control-h)] w-full rounded-[var(--ui-radius-control)] border border-[var(--ui-border-strong)] bg-[var(--ui-surface)] px-3 py-1 text-sm text-[var(--ui-text)]";
 
 export function CallOutcomeModal({
   open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null, initialOutcome,
@@ -147,7 +146,7 @@ export function CallOutcomeModal({
         )}
         {scriptVariants.length > 0 && (
           <FormField label="Szkript">
-            <select className={selectClass} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
+            <select className="input-ds" value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
               <option value="">Nincs szkript</option>
               {scriptVariants.map((v) => <option key={v.key} value={v.key}>{displayScriptLabel(v.label)}</option>)}
             </select>
@@ -181,14 +180,14 @@ export function CallOutcomeModal({
         ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField label="Eredmény" required>
-            <select className={selectClass} value={outcome} onChange={(e) => setOutcome(e.target.value)} autoFocus>
+            <select className="input-ds" value={outcome} onChange={(e) => setOutcome(e.target.value)} autoFocus>
               {CALL_OUTCOMES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
             </select>
           </FormField>
 
           {/* PROPOSAL copy */}
           <FormField label="Hívás típusa">
-            <select aria-label="Hívás típusa" className={selectClass} value={callType} onChange={(e) => setCallType(e.target.value)}>
+            <select aria-label="Hívás típusa" className="input-ds" value={callType} onChange={(e) => setCallType(e.target.value)}>
               <option value="">nincs megadva</option>
               {CALL_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
             </select>
@@ -214,7 +213,7 @@ export function CallOutcomeModal({
               </FormField>
 
               <FormField label="Foglalás típusa" required>
-                <select className={selectClass} value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
+                <select className="input-ds" value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
                   <option value="">Válassz típust</option>
                   {BOOKING_KINDS.map((k) => <option key={k} value={k}>{BOOKING_KIND_LABEL[k]}</option>)}
                 </select>
@@ -243,9 +242,9 @@ export function CallOutcomeModal({
                       return (
                         <Button
                           key={i} type="button" variant="outline" onClick={() => pickSlot(p)}
-                          className="justify-start font-normal"
+                          className="w-full justify-start h-auto min-h-10 whitespace-normal text-left font-normal py-2 block"
                         >
-                          <strong>{dateLabel} {timeLabel}</strong>: {reasonLine}{kmLine}
+                          <strong>{dateLabel} {timeLabel}</strong>{`: ${reasonLine}${kmLine}`}
                         </Button>
                       );
                     })}

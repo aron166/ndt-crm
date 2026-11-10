@@ -206,7 +206,7 @@ export default async function LeadsPage({
       style={{
         minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
         background: active ? (color ? "var(--ui-hover)" : "var(--ui-accent-surface)") : "var(--ui-surface)",
-        color: active ? (color ?? "var(--ui-accent)") : "var(--ui-text-muted)",
+        color: active ? (color ?? "var(--ui-text-link)") : "var(--ui-text-muted)",
         border: `1px solid ${active ? (color ?? "var(--ui-accent)") : "var(--ui-border)"}`,
       }}
     >
