@@ -307,7 +307,7 @@ export function EnrichmentClient({ runs, proposals }: Props) {
     <div>
       <PageHeader
         title="Enrichment Engine"
-        eyebrow="AI-alapú cég és személy adatfeltöltés: emberi jóváhagyással"
+        help="AI-alapú cég és személy adatfeltöltés: emberi jóváhagyással"
         filters={
           <div className={k.seg}>
             <button

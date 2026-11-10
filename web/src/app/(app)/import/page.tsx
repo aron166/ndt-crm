@@ -8,7 +8,7 @@ export default function ImportPage() {
     <div className="max-w-3xl">
       <PageHeader
         title="Importálás"
-        eyebrow="Cégek vagy személyek feltöltése Excel / CSV fájlból. A meglévő rekordokat adószám és név alapján felismeri: nem hoz létre duplikátumot."
+        help="Cégek vagy személyek feltöltése Excel / CSV fájlból. A meglévő rekordokat adószám és név alapján felismeri: nem hoz létre duplikátumot."
       />
       <ImportWizard />
     </div>

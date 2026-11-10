@@ -159,7 +159,7 @@ export default async function AnalyticsPage({
     <div className={`mount ${s.page}`}>
       <PageHeader
         title={<>Analytics<span className={k.muted}> · Controllabor Kft.</span></>}
-        eyebrow="Valós adatok az adatbázisból. Minden szám kattintható."
+        help="Valós adatok az adatbázisból. Minden szám kattintható."
         views={
           <Seg
             label={RANGE_LABEL}
