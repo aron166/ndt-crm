@@ -125,7 +125,9 @@ export function LeadDetailClient({
   const [padOutcome, setPadOutcome] = useState<CallOutcomeKey | undefined>(undefined);
   // Non-null while the modal is open to correct THAT auto-derived interaction.
   const [correcting, setCorrecting] = useState<number | null>(null);
-  const [booking, setBooking] = useState<BookingCtx | null>(null);
+  // ?book=1 (from the board / drive "Foglalt meeting" outcome) opens the drawer on arrival.
+  const [booking, setBooking] = useState<BookingCtx | null>(() =>
+    params.get("book") === "1" ? { kind: "single_machine_demo" } : null);
   // Old ?tab=overview / ?tab=offers deep links land with the details open.
   const [detailsOpen, setDetailsOpen] = useState(tab === "overview" || tab === "offers");
   const [actionError, setActionError] = useState<string | null>(null);

@@ -6,7 +6,6 @@ import { logLeadCall } from "@/app/actions/leads";
 import { queueCallTranscript } from "@/app/actions/calls";
 import { AUTO_OUTCOME_LABELS } from "@/lib/calls/auto-outcome";
 import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
-import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
 import type { ScriptVariant } from "@/lib/leads/scripts";
@@ -16,12 +15,6 @@ import { displayScriptLabel, displayScriptText, isPlaceholderText } from "@/lib/
 import type { BookingConflictInfo } from "@/lib/leads/service";
 import k from "@/components/astryx/page.module.css";
 import m from "./drive.module.css";
-
-// datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
-function toDatetimeLocal(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 // /drive — one column, thumb-reachable, phone-at-arm's-length in a car.
 // Outcome rules (which extra field, min lengths) live server-side in
@@ -56,9 +49,6 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   const [note, setNote] = useState("");
   const [selectedOutcome, setSelectedOutcome] = useState<CallOutcomeKey | null>(null);
   const [callbackAt, setCallbackAt] = useState("");
-  const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
-  const [bookingAt, setBookingAt] = useState("");
-  const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +93,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
 
   function resetFields() {
     setNote(""); setSelectedOutcome(null); setCallbackAt("");
-    setDemoWith("aron"); setBookingAt(""); setBookingKind(""); setLostReason(""); setExpanded(false); setError(null);
+    setLostReason(""); setExpanded(false); setError(null);
     setQueuedMessage(null); setTechnologyWord("");
     // scriptKey is NOT reset here: `lead` still points at the OLD lead in this
     // closure, so defaultScriptKey would be the old lead's default. The
@@ -128,9 +118,8 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           outcome,
           note,
           callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
-          demoWith: outcome === "meeting_booked" ? demoWith : null,
-          bookingAt: outcome === "meeting_booked" && bookingAt ? new Date(bookingAt).toISOString() : null,
-          bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
+          // Booking happens only in the lead page drawer.
+          demoWith: null, bookingAt: null, bookingKind: null,
           lostReason: isLostCallOutcome(outcome) ? lostReason : null,
           scriptVariant: scriptKey || undefined,
           technologyWord: technologyWord.trim() || undefined,
@@ -373,21 +362,8 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
             <input type="datetime-local" className={m.field} value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} />
           )}
           {selectedOutcome === "meeting_booked" && (
-            <>
-              <div style={{ display: "flex", gap: 16, fontSize: 16, color: "var(--ui-text)" }}>
-                {(["aron", "peter"] as const).map((w) => (
-                  <label key={w} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", minHeight: 40 }}>
-                    <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
-                    {w === "aron" ? "Áron" : "Péter"}
-                  </label>
-                ))}
-              </div>
-              <input type="datetime-local" className={m.field} value={bookingAt} min={toDatetimeLocal(new Date())} onChange={(e) => setBookingAt(e.target.value)} />
-              <select className={m.field} value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
-                <option value="">Foglalás típusa…</option>
-                {BOOKING_KINDS.map((bk) => <option key={bk} value={bk}>{BOOKING_KIND_LABEL[bk]}</option>)}
-              </select>
-            </>
+            // PROPOSAL copy
+            <p style={{ margin: 0, fontSize: 16 }}><Link href={`/leads/${lead.id}?book=1`}>Book the time on the lead page</Link></p>
           )}
           {(selectedOutcome === "not_interested" || selectedOutcome === "disqualified") && (
             <input
@@ -398,7 +374,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
               placeholder="Miért veszett el? (kötelező)"
             />
           )}
-          <button disabled={pending || note.trim() === ""} onClick={() => submit(selectedOutcome)} className={k.btn} style={outcomeBtnStyle("green")}>
+          <button disabled={pending || note.trim() === "" || selectedOutcome === "meeting_booked"} onClick={() => submit(selectedOutcome)} className={k.btn} style={outcomeBtnStyle("green")}>
             {pending ? "Mentés…" : "Mentés"}
           </button>
           <button

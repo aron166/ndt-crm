@@ -1,6 +1,7 @@
 "use client";
 
 import { displayScriptLabel, displayScriptText } from "@/lib/leads/placeholder";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,28 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { logLeadCall } from "@/app/actions/leads";
 import { correctCallOutcome } from "@/app/actions/calls";
-import { proposeBookingSlots } from "@/app/actions/bookings";
 import type { BookingConflictInfo } from "@/lib/leads/service";
 import { CALL_OUTCOMES, CALL_TYPES, type CallOutcomeKey, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
-import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { FormField } from "@/components/ui/FormField";
 import { localInputToIso } from "./[id]/booking/booking-view";
 import type { ScriptVariant } from "@/lib/leads/scripts";
-
-// datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
-function toDatetimeLocal(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-const SLOT_REASON_LINE: Record<string, string> = {
-  same_area: "arrafelé leszel aznap",
-  free_day: "szabad nap",
-  next_free: "legközelebbi szabad idő",
-};
-
-type SlotProposalsResult = Extract<Awaited<ReturnType<typeof proposeBookingSlots>>, { success: true }>;
-type SlotProposal = SlotProposalsResult["proposals"][number];
 
 // "Hívás eredménye" — the core lead interaction. Validation (note required,
 // callback needs date+hour, meeting needs who) is enforced SERVER-side in
@@ -53,7 +37,7 @@ export function CallOutcomeModal({
   initialOutcome?: CallOutcomeKey;
   /** Pre-fills the note each time the modal opens (the lead page's calling mode). */
   initialNote?: string;
-  /** The lead page books through its drawer, so the second (date field) booking path is not offered there. */
+  /** The lead page books through its own drawer, so the outcome is not offered there. */
   hideMeetingBooked?: boolean;
   title?: string | null;
   stageDescription?: string | null;
@@ -66,17 +50,11 @@ export function CallOutcomeModal({
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) { setWasOpen(open); if (open && initialOutcome) setOutcome(initialOutcome); if (open && initialNote) setNote(initialNote); }
   const [callbackAt, setCallbackAt] = useState("");
-  const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
-  const [bookingAt, setBookingAt] = useState("");
-  const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
   const [technologyWord, setTechnologyWord] = useState("");
   const [callType, setCallType] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [slotsPending, startSlotsTransition] = useTransition();
-  const [slotError, setSlotError] = useState<string | null>(null);
-  const [slotProposals, setSlotProposals] = useState<SlotProposal[]>([]);
   const [savedConflicts, setSavedConflicts] = useState<BookingConflictInfo[] | null>(null);
   // A/B: deterministic per-lead assignment (leadId % length), not random or
   // "always A" — every variant needs data, and a re-render must not switch
@@ -86,8 +64,8 @@ export function CallOutcomeModal({
   const script = scriptVariants.find((v) => v.key === scriptKey) ?? null;
 
   function reset() {
-    setOutcome("no_answer"); setNote(""); setCallbackAt(""); setDemoWith("aron"); setLostReason(""); setError(null);
-    setBookingAt(""); setBookingKind(""); setSlotProposals([]); setSlotError(null); setSavedConflicts(null);
+    setOutcome("no_answer"); setNote(""); setCallbackAt(""); setLostReason(""); setError(null);
+    setSavedConflicts(null);
     setScriptKey(defaultScriptKey); setTechnologyWord(""); setCallType("");
   }
   // The call is already saved while the conflict notice shows — closing then
@@ -102,9 +80,8 @@ export function CallOutcomeModal({
         outcome, note,
         // datetime-local is Budapest wall-clock time, whatever zone the browser is in.
         callbackAt: outcome === "callback_requested" && callbackAt ? localInputToIso(callbackAt) : null,
-        demoWith: outcome === "meeting_booked" ? demoWith : null,
-        bookingAt: outcome === "meeting_booked" && bookingAt ? localInputToIso(bookingAt) : null,
-        bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
+        // Booking happens only in the lead page drawer.
+        demoWith: null, bookingAt: null, bookingKind: null,
         lostReason: isLostCallOutcome(outcome) ? lostReason : null,
         scriptVariant: scriptKey || undefined,
         technologyWord: technologyWord.trim() || undefined,
@@ -117,19 +94,6 @@ export function CallOutcomeModal({
       if (res.bookingConflicts?.length > 0) { setSavedConflicts(res.bookingConflicts); return; }
       reset(); onClose(); onLogged?.();
     });
-  }
-
-  function suggestSlots() {
-    setSlotError(null);
-    startSlotsTransition(async () => {
-      const res = await proposeBookingSlots(leadId, demoWith);
-      if ("error" in res) { setSlotError(res.error); setSlotProposals([]); return; }
-      setSlotProposals(res.proposals);
-    });
-  }
-
-  function pickSlot(p: SlotProposal) {
-    setBookingAt(toDatetimeLocal(new Date(p.startsAt)));
   }
 
   function acknowledgeConflicts() {
@@ -204,58 +168,8 @@ export function CallOutcomeModal({
           )}
 
           {outcome === "meeting_booked" && (
-            <>
-              <FormField label="Kivel lesz a demó?" required>
-                <div className="flex gap-4" style={{ fontSize: 14 }}>
-                  {(["aron", "peter"] as const).map((w) => (
-                    <label key={w} className="flex items-center gap-1.5" style={{ cursor: "pointer" }}>
-                      <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
-                      {w === "aron" ? "Áron" : "Péter"}
-                    </label>
-                  ))}
-                </div>
-              </FormField>
-
-              <FormField label="Foglalás típusa" required>
-                <select className="input-ds" value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
-                  <option value="">Válassz típust</option>
-                  {BOOKING_KINDS.map((k) => <option key={k} value={k}>{BOOKING_KIND_LABEL[k]}</option>)}
-                </select>
-              </FormField>
-
-              <FormField label="Foglalás időpontja (dátum + óra)" required>
-                <Input
-                  type="datetime-local" value={bookingAt} required
-                  min={toDatetimeLocal(new Date())}
-                  onChange={(e) => setBookingAt(e.target.value)}
-                />
-                <div style={{ marginTop: 6 }}>
-                  <Button type="button" variant="outline" onClick={suggestSlots} disabled={slotsPending}>
-                    {slotsPending ? "Keresés…" : "Javasolj időpontot"}
-                  </Button>
-                </div>
-                {slotError && <p className="text-sm" style={{ color: "var(--ui-danger-text)", marginTop: 6 }}>{slotError}</p>}
-                {slotProposals.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                    {slotProposals.map((p, i) => {
-                      const d = new Date(p.startsAt);
-                      const dateLabel = d.toLocaleDateString("hu-HU", { month: "short", day: "numeric" });
-                      const timeLabel = d.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" });
-                      const reasonLine = SLOT_REASON_LINE[p.reason] ?? "";
-                      const kmLine = p.nearestKm != null ? ` · ${Math.round(p.nearestKm)} km` : "";
-                      return (
-                        <Button
-                          key={i} type="button" variant="outline" onClick={() => pickSlot(p)}
-                          className="w-full justify-start h-auto min-h-10 whitespace-normal text-left font-normal py-2 block"
-                        >
-                          <strong>{dateLabel} {timeLabel}</strong>{`: ${reasonLine}${kmLine}`}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                )}
-              </FormField>
-            </>
+            // PROPOSAL copy
+            <p className="text-sm"><Link href={`/leads/${leadId}?book=1`}>Book the time on the lead page</Link></p>
           )}
 
           {isLostCallOutcome(outcome) && (
@@ -280,7 +194,7 @@ export function CallOutcomeModal({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose} disabled={pending}>Mégse</Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || outcome === "meeting_booked"}>
               {pending ? "Mentés…" : "Rögzítés"}
             </Button>
           </DialogFooter>
