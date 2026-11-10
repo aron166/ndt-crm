@@ -72,7 +72,7 @@ function FilterGroup({
   const selectedCount = options.reduce((n, o) => n + (selected.has(o.value) ? 1 : 0), 0);
 
   return (
-    <div style={{ borderBottom: "1px solid var(--line-soft)" }}>
+    <div style={{ borderBottom: "1px solid var(--color-border)" }}>
       {/* Category header — click to expand/collapse */}
       <button
         type="button"
@@ -80,14 +80,14 @@ function FilterGroup({
         className="flex w-full items-center gap-2 py-2.5 text-left"
       >
         {open
-          ? <ChevronDown className="size-3.5" style={{ color: "var(--fg-faint)", flexShrink: 0 }} />
-          : <ChevronRight className="size-3.5" style={{ color: "var(--fg-faint)", flexShrink: 0 }} />}
-        <span style={{ fontSize: 14, fontWeight: 600, color: selectedCount ? "var(--fg)" : "var(--fg-soft)" }}>
+          ? <ChevronDown className="size-3.5" style={{ color: "var(--color-text-secondary)", flexShrink: 0 }} />
+          : <ChevronRight className="size-3.5" style={{ color: "var(--color-text-secondary)", flexShrink: 0 }} />}
+        <span style={{ fontSize: 14, fontWeight: 600, color: selectedCount ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
           {label}
         </span>
         {selectedCount > 0 && (
           <span className="rounded-full px-1.5 font-mono-ndt"
-            style={{ fontSize: 12, background: "var(--indigo-soft)", color: "var(--indigo)" }}>
+            style={{ fontSize: 12, background: "var(--color-background-muted)", color: "var(--color-accent)" }}>
             {selectedCount}
           </span>
         )}
@@ -97,20 +97,20 @@ function FilterGroup({
 
       {searchable && (
         <div className="relative mb-1.5">
-          <Search className="size-3.5" style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--fg-faint)" }} />
+          <Search className="size-3.5" style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-secondary)" }} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Szűrés név szerint…"
             className="w-full"
-            style={{ padding: "5px 8px 5px 26px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none" }}
+            style={{ padding: "5px 8px 5px 26px", fontSize: 14, background: "var(--color-background-card)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text-primary)", outline: "none" }}
           />
         </div>
       )}
 
       <div style={searchable ? { maxHeight: 168, overflowY: "auto", paddingRight: 2 } : undefined}>
         {visible.length === 0 ? (
-          <div style={{ fontSize: 14, color: "var(--fg-faint)", padding: "4px 2px" }}>Nincs találat</div>
+          <div style={{ fontSize: 14, color: "var(--color-text-secondary)", padding: "4px 2px" }}>Nincs találat</div>
         ) : searchable ? (
           // Long list → row checklist (name leads, hint muted).
           <div className="flex flex-col gap-0.5">
@@ -122,13 +122,13 @@ function FilterGroup({
                   type="button"
                   onClick={() => onToggle(o.value)}
                   className="flex items-center gap-2 rounded-md px-2 py-1 text-left transition-colors"
-                  style={{ background: on ? "var(--indigo-soft)" : "transparent", color: on ? "var(--indigo)" : "var(--fg-soft)" }}
+                  style={{ background: on ? "var(--color-background-muted)" : "transparent", color: on ? "var(--color-accent)" : "var(--color-text-secondary)" }}
                 >
-                  <span className="flex items-center justify-center" style={{ width: 14, height: 14, borderRadius: 4, border: `1px solid ${on ? "var(--indigo)" : "var(--line-soft)"}`, flexShrink: 0 }}>
+                  <span className="flex items-center justify-center" style={{ width: 14, height: 14, borderRadius: 4, border: `1px solid ${on ? "var(--color-accent)" : "var(--color-border)"}`, flexShrink: 0 }}>
                     {on && <Check className="size-3" />}
                   </span>
                   <span style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
-                  {o.hint && <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: "auto", flexShrink: 0 }}>{o.hint}</span>}
+                  {o.hint && <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginLeft: "auto", flexShrink: 0 }}>{o.hint}</span>}
                 </button>
               );
             })}
@@ -144,7 +144,7 @@ function FilterGroup({
                   type="button"
                   onClick={() => onToggle(o.value)}
                   className="flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors"
-                  style={{ border: `1px solid ${on ? "var(--indigo)" : "var(--line-soft)"}`, background: on ? "var(--indigo-soft)" : "transparent", color: on ? "var(--indigo)" : "var(--fg-mute)" }}
+                  style={{ border: `1px solid ${on ? "var(--color-accent)" : "var(--color-border)"}`, background: on ? "var(--color-background-muted)" : "transparent", color: on ? "var(--color-accent)" : "var(--color-text-secondary)" }}
                 >
                   {on && <Check className="size-3" />}
                   {o.label}
@@ -247,9 +247,9 @@ function CompanyFilterBarInner({ facets }: { facets: CompanyFacets }) {
         onClick={() => (open ? setOpen(false) : openPanel())}
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors"
         style={{
-          border: "1px solid var(--line-soft)",
-          color: activeCount ? "var(--indigo)" : "var(--fg-mute)",
-          background: activeCount ? "var(--indigo-soft)" : "transparent",
+          border: "1px solid var(--color-border)",
+          color: activeCount ? "var(--color-accent)" : "var(--color-text-secondary)",
+          background: activeCount ? "var(--color-background-muted)" : "transparent",
         }}
       >
         <SlidersHorizontal className="size-3.5" />
@@ -264,11 +264,11 @@ function CompanyFilterBarInner({ facets }: { facets: CompanyFacets }) {
           {/* click-away */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="absolute right-0 z-50 mt-2 w-[360px] max-h-[74vh] overflow-y-auto rounded-xl p-3"
+            className="absolute left-0 sm:left-auto sm:right-0 z-50 mt-2 w-[min(360px,calc(100vw-32px))] max-h-[74vh] overflow-y-auto rounded-xl p-3"
             style={{
-              background: "var(--bg-panel)",
-              border: "1px solid var(--line-soft)",
-              boxShadow: "0 12px 32px var(--shadow-color)",
+              background: "var(--color-background-card)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--shadow-high)",
             }}
           >
             {GROUPS.map((g) => (
@@ -285,14 +285,14 @@ function CompanyFilterBarInner({ facets }: { facets: CompanyFacets }) {
 
             <div
               className="sticky bottom-0 flex items-center justify-between gap-2 pt-2 mt-1"
-              style={{ borderTop: "1px solid var(--line-soft)", background: "var(--bg-panel)" }}
+              style={{ borderTop: "1px solid var(--color-border)", background: "var(--color-background-card)" }}
             >
               <button
                 type="button"
                 onClick={clearAll}
                 disabled={activeCount === 0 && draftValueCount === 0}
                 className="flex items-center gap-1 text-xs disabled:opacity-40"
-                style={{ color: "var(--fg-faint)" }}
+                style={{ color: "var(--color-text-secondary)" }}
               >
                 <X className="size-3" /> Mind törlése
               </button>
@@ -300,7 +300,7 @@ function CompanyFilterBarInner({ facets }: { facets: CompanyFacets }) {
                 type="button"
                 onClick={apply}
                 className="rounded-lg px-3 py-1.5 text-xs font-medium"
-                style={{ background: "var(--indigo)", color: "white" }}
+                style={{ background: "var(--color-accent)", color: "var(--color-on-accent)" }}
               >
                 Alkalmaz{draftCount > 0 ? ` (${draftCount})` : ""}
               </button>

@@ -4,10 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Phone, UserPlus, X } from "lucide-react";
+import { Badge } from "@astryxdesign/core/Badge";
 import { LogInteractionModal } from "@/components/LogInteractionModal";
 import { AddContactModal } from "./AddContactModal";
 import { closeContact } from "@/app/actions/contacts";
 import { formatDate } from "@/lib/utils";
+import k from "@/components/astryx/page.module.css";
+import s from "../companies.module.css";
 
 interface Contact {
   id: number;
@@ -55,13 +58,13 @@ export function CompanyContactsTable({ contacts, companyId, companyName }: Compa
       )}
       <AddContactModal open={addOpen} onClose={() => setAddOpen(false)} companyId={companyId} />
 
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm text-slate-500">
+      <div className={s.head}>
+        <p className={k.muted}>
           {contacts.filter(c => !c.endedAt).length} aktív · {contacts.filter(c => c.endedAt).length} korábbi
         </p>
         <button
           onClick={() => setAddOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors"
+          className={`${k.btn} ${k.btnPrimary}`}
         >
           <UserPlus className="size-3.5" />
           Kapcsolat hozzáadása
@@ -69,45 +72,45 @@ export function CompanyContactsTable({ contacts, companyId, companyName }: Compa
       </div>
 
       {contacts.length === 0 ? (
-        <p className="text-sm text-slate-400 py-6 text-center">Nincs rögzített kapcsolat.</p>
+        <p className={k.empty}>Nincs rögzített kapcsolat.</p>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-sm">
+        <div className={k.tableWrap}>
+          <table className={k.table}>
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50">
-                <th className="text-left px-4 py-3 font-medium text-slate-500">Személy</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500 hidden md:table-cell">Beosztás</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500 hidden md:table-cell">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500 hidden lg:table-cell">Telefon</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-500">Státusz</th>
-                <th className="px-4 py-3 w-32" />
+              <tr>
+                <th>Személy</th>
+                <th className="hidden md:table-cell">Beosztás</th>
+                <th className="hidden md:table-cell">Email</th>
+                <th className="hidden lg:table-cell">Telefon</th>
+                <th>Státusz</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {contacts.map((c) => (
-                <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <Link href={`/persons/${c.personId}`} className="font-medium text-slate-900 hover:text-indigo-600">
+                <tr key={c.id}>
+                  <td>
+                    <Link href={`/persons/${c.personId}`} className={k.strong}>
                       {c.person.firstName} {c.person.lastName}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{c.role ?? "-"}</td>
-                  <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{c.email ?? c.person.email ?? "-"}</td>
-                  <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">{c.phone ?? c.person.phone ?? "-"}</td>
-                  <td className="px-4 py-3">
+                  <td className="hidden md:table-cell">{c.role ?? "-"}</td>
+                  <td className="hidden md:table-cell">{c.email ?? c.person.email ?? "-"}</td>
+                  <td className="hidden lg:table-cell">{c.phone ?? c.person.phone ?? "-"}</td>
+                  <td>
                     {c.endedAt ? (
-                      <span className="text-xs text-slate-400">Volt ({formatDate(c.endedAt)}-ig)</span>
+                      <span className={k.muted}>Volt ({formatDate(c.endedAt)}-ig)</span>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">Aktív</span>
+                      <Badge variant="success" label="Aktív" />
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 justify-end">
+                  <td>
+                    <div className={s.rowActions}>
                       {!c.endedAt && (
                         <>
                           <button
                             onClick={() => setLogging(c)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-50 hover:bg-green-100 text-green-700 text-xs font-medium"
+                            className={k.btn}
                             title="Interakció naplózása"
                           >
                             <Phone className="size-3" />
@@ -115,7 +118,7 @@ export function CompanyContactsTable({ contacts, companyId, companyName }: Compa
                           </button>
                           <button
                             onClick={() => handleClose(c)}
-                            className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500"
+                            className={k.btn}
                             title="Kapcsolat lezárása"
                           >
                             <X className="size-3.5" />

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { isCrmUserEmail } from "@/lib/crm-user";
+import { sessionClaims } from "@/lib/supabase/claims";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
@@ -79,9 +80,8 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Local JWT check (lib/supabase/claims.ts); refreshes an expired session through setAll above.
+  const user = await sessionClaims(supabase);
 
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth/");
