@@ -129,7 +129,7 @@ function Row({
       <span className={k.bar} />
       <div className={k.cell}>
         <div className={k.nameLine}>
-          <Link href={`/marketing/${item.id}`} className={k.name}>
+          <Link href={`/marketing/${item.id}`} className={`${k.name} ${s.rowLink}`}>
             {item.title}
           </Link>
         </div>
@@ -197,13 +197,15 @@ function Row({
             {UI.restore}
           </button>
         )}
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={() => onToggle(item.id)}
-          aria-label={item.title}
-          className={s.check}
-        />
+        <label className={s.checkHit}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggle(item.id)}
+            aria-label={item.title}
+            className={s.check}
+          />
+        </label>
       </div>
     </div>
   );

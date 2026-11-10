@@ -100,6 +100,7 @@ export default function CampaignDashboard({
           <>
             <select
               className={s.field}
+              // PROPOSAL copy
               aria-label="Kampány"
               value={campaign}
               onChange={(e) => navigate({ campaign: e.target.value })}
@@ -110,6 +111,7 @@ export default function CampaignDashboard({
             </select>
             <select
               className={s.field}
+              // PROPOSAL copy
               aria-label="Küldő"
               value={senderUserId ?? ""}
               onChange={(e) => navigate({ sender: e.target.value ? parseInt(e.target.value, 10) : null })}

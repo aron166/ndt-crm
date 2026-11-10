@@ -77,9 +77,11 @@ export default async function MarketingPage({
       <RefreshOnFocus />
       <MarketingHeader
         active="inbox"
+        // PROPOSAL copy
         title="Anyagok"
         filters={
           <>
+            {/* PROPOSAL copy */}
             <nav className={k.seg} aria-label="Nézet">
               <Link
                 href={hrefWith({ view: "board" })}

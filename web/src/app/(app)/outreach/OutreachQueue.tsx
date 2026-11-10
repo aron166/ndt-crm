@@ -288,6 +288,7 @@ export default function OutreachQueue({
       <div className={s.toolbar}>
         <select
           className={s.field}
+          // PROPOSAL copy
           aria-label="Kampány"
           value={campaignFilter}
           onChange={(e) => {
@@ -303,6 +304,7 @@ export default function OutreachQueue({
         </select>
         <select
           className={s.field}
+          // PROPOSAL copy
           aria-label="Lépés"
           value={stepFilter}
           onChange={(e) => {
@@ -318,6 +320,7 @@ export default function OutreachQueue({
         </select>
         <select
           className={s.field}
+          // PROPOSAL copy
           aria-label="Állapot"
           value={statusFilter}
           onChange={(e) => {
@@ -421,7 +424,7 @@ export default function OutreachQueue({
                 >
                   <span className={k.bar} />
                   <div className={k.cell}>
-                    <span className={k.name}>
+                    <span className={`${k.name} ${s.nameShrink}`}>
                       {row.companyName}
                       {row.personName && <span className={k.muted}> · {row.personName}</span>}
                     </span>
@@ -429,9 +432,11 @@ export default function OutreachQueue({
                       {row.campaign} · {row.step}. lépés · {row.subject}
                     </span>
                   </div>
-                  <span className={k.muted}>
-                    {row.status === "replied" ? REPLY_TYPE_LABEL[(row.replyType as ReplyType) ?? "unknown"] : ""}
-                  </span>
+                  {row.status === "replied" && (
+                    <span className={k.muted}>
+                      {REPLY_TYPE_LABEL[(row.replyType as ReplyType) ?? "unknown"]}
+                    </span>
+                  )}
                   <StatusBadge status={row.status} />
                 </div>
 

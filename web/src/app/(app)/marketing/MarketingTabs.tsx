@@ -12,6 +12,7 @@ const TABS = [
 type Active = "inbox" | "live" | "campaigns" | "decisions";
 
 export function MarketingTabs({ active }: { active: Active }) {
+  // PROPOSAL copy
   return <Seg items={TABS} current={active} label="Marketing" />;
 }
 

@@ -101,6 +101,12 @@
 .review-grid {
   min-width: 0;
 }
+@media (min-width: 1024px) {
+  .review-grid.review-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+@media (min-width: 900px) and (max-width: 1023px) {
+  .review-grid.review-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 32px; }
+}
 
 /* ── Reading pane ───────────────────────────────────────── */
 .review-body {
@@ -143,7 +149,7 @@
   font-size: 14px;
 }
 @media (max-width: 767px) {
-  .review-body { font-size: 15px; }
+  .review-body { font-size: 17px; }
 }
 
 .review-assets {
@@ -456,7 +462,7 @@
   width: 100%;
   min-height: 320px;
   padding: 12px 14px;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.6;
   background: var(--color-background-card);
   border: 1px solid var(--color-border-emphasized);

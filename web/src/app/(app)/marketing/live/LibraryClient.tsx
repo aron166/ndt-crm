@@ -45,7 +45,7 @@ function Card({ row }: { row: LibraryRow }) {
     <div className={k.row} data-u="done" style={{ alignItems: "start" }}>
       <span className={k.bar} />
       <div className={k.cell}>
-        <Link href={`/marketing/${row.id}`} className={k.name}>{row.title}</Link>
+        <Link href={`/marketing/${row.id}`} className={`${k.name} ${s.rowLink}`}>{row.title}</Link>
         <div className={k.meta}>
           {row.campaign && <span className={k.muted}>{row.campaign.name}</span>}
           <span className={`${k.muted} ${k.num}`}>{UI.version(row.versionNumber)}</span>

@@ -32,6 +32,7 @@ export default async function MarketingLivePage({
 
   return (
     <div className="mount">
+      {/* PROPOSAL copy */}
       <MarketingHeader active="live" title="Élő anyagok" />
       <LibraryClient
         rows={library.rows}
