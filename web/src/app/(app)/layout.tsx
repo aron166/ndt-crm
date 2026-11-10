@@ -26,7 +26,7 @@ export default async function AppLayout({
     );
   }
 
-  const [overdueCount, defaultPipeline, marketingReviewCount] = await Promise.all([
+  const [overdueCount, overdueLeadCount, defaultPipeline, marketingReviewCount] = await Promise.all([
     db.task.count({
       where: {
         tenantId: 1,
@@ -34,6 +34,9 @@ export default async function AppLayout({
         dueDate: { lt: new Date(new Date().toDateString()) },
         parentTaskId: null,
       },
+    }),
+    db.lead.count({
+      where: { tenantId: 1, outcome: "open", convertedDealId: null, nextDue: { lt: new Date() } },
     }),
     db.pipeline.findFirst({
       where: { tenantId: 1, isArchived: false },
@@ -47,6 +50,7 @@ export default async function AppLayout({
     <AppShell
       email={user.email ?? ""}
       overdueCount={overdueCount}
+      overdueLeadCount={overdueLeadCount}
       marketingReviewCount={marketingReviewCount}
       defaultPipeline={defaultPipeline ? serializeDates(defaultPipeline) : null}
     >

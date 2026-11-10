@@ -1,11 +1,24 @@
 "use client";
 
-import { useState, useEffect, useSyncExternalStore } from "react";
-import { Sidebar } from "./Sidebar";
-import { Topbar } from "./Topbar";
-import { StatusBar } from "./StatusBar";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { AppShell as AxAppShell } from "@astryxdesign/core/AppShell";
+import { AstryxProviders } from "./AstryxProviders";
+import { CrmSideNav } from "./CrmSideNav";
 import { CommandPalette } from "@/components/CommandPalette";
-import { cn } from "@/lib/utils";
+
+// The modals pull in EntitySearch, Select, the costing lib and two server
+// actions (~520 lines + deps). They load after hydration, never on the
+// critical path (docs/PERF_2026-09-08_INP.md, Vanda PR #86).
+const TaskModal = dynamic(
+  () => import("@/app/(app)/tasks/TaskModal").then((m) => m.TaskModal),
+  { ssr: false },
+);
+const DealModal = dynamic(
+  () => import("@/app/(app)/deals/DealModal").then((m) => m.DealModal),
+  { ssr: false },
+);
 
 interface PipelineStub {
   id: number;
@@ -18,38 +31,24 @@ interface AppShellProps {
   children: React.ReactNode;
   email: string;
   overdueCount?: number;
+  overdueLeadCount?: number;
   marketingReviewCount?: number;
   defaultPipeline?: PipelineStub | null;
 }
 
-const NARROW_QUERY = "(max-width: 767px)";
-function subscribeNarrow(onChange: () => void) {
-  const mq = window.matchMedia(NARROW_QUERY);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
-function isNarrow() {
-  return window.matchMedia(NARROW_QUERY).matches;
-}
-
-export function AppShell({ children, email, overdueCount = 0, marketingReviewCount = 0, defaultPipeline }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(false);
+export function AppShell({
+  children, email, overdueCount = 0, overdueLeadCount = 0, marketingReviewCount = 0, defaultPipeline,
+}: AppShellProps) {
+  const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
-  // Phones (< 768 px): the reading pane gets the full width (content approval
-  // spec §4) — sidebar becomes a drawer, status bar is hidden.
-  const narrow = useSyncExternalStore(subscribeNarrow, isNarrow, () => false);
-  // Phones: no rail at all — the sidebar is an off-canvas drawer (Kai, #100 review).
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  // Layout for phones is pure CSS (max-md: classes) so the first paint is right;
-  // `narrow` only drives drawer behaviour after hydration.
-  const isCollapsed = collapsed;
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [dealOpen, setDealOpen] = useState(false);
+  // Mount both closed modals after hydration so the first open paints in one
+  // frame instead of waiting on the chunk (a closed base-ui Dialog renders nothing).
+  const [modalsMounted, setModalsMounted] = useState(false);
+  useEffect(() => setModalsMounted(true), []);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("sidebar-collapsed");
-    if (stored) setCollapsed(stored === "true");
-  }, []);
-
-  // ⌘K / Ctrl+K global shortcut
+  // Cmd+K / Ctrl+K global shortcut
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -62,46 +61,30 @@ export function AppShell({ children, email, overdueCount = 0, marketingReviewCou
   }, []);
 
   return (
-    <>
-      {narrow && drawerOpen && (
-        <div
-          aria-hidden
-          onClick={() => setDrawerOpen(false)}
-          style={{ position: "fixed", inset: 0, zIndex: 40, background: "var(--overlay)" }}
-        />
-      )}
-      <Sidebar
-        collapsed={isCollapsed}
-        onToggle={setCollapsed}
-        badges={{ "/marketing": marketingReviewCount }}
-        mobile={{ open: narrow && drawerOpen, onClose: () => setDrawerOpen(false), active: narrow }}
-      />
-      <Topbar
-        collapsed={isCollapsed}
-        onMenu={() => setDrawerOpen(true)}
-        email={email}
-        defaultPipeline={defaultPipeline ?? null}
-        onSearchOpen={() => setSearchOpen(true)}
-      />
-
-      <main
-        className={cn(
-          "relative z-10 transition-all duration-200 pb-[26px] max-md:pb-0",
-          isCollapsed ? "pl-14" : "pl-[240px]",
-          "max-md:!pl-0"
-        )}
-        style={{ paddingTop: 60, height: "100dvh", overflowY: "auto" }}
+    <AstryxProviders>
+      <AxAppShell
+        height="fill"
+        variant="section"
+        sideNav={
+          <CrmSideNav
+            email={email}
+            counts={{ overdueTasks: overdueCount, overdueLeads: overdueLeadCount, marketingReview: marketingReviewCount }}
+            onSearch={() => setSearchOpen(true)}
+            onNewTask={() => setTaskOpen(true)}
+            onNewDeal={() => (defaultPipeline ? setDealOpen(true) : router.push("/deals/setup"))}
+          />
+        }
       >
-        <div className="max-w-[1400px] mx-auto px-4 py-4 md:px-6 md:py-6">
-          {children}
-        </div>
-      </main>
+        <div className="crm-page max-w-[1400px] mx-auto px-4 py-4 md:px-8 md:py-6">{children}</div>
+      </AxAppShell>
 
-      <div className="max-md:hidden">
-        <StatusBar collapsed={isCollapsed} overdueCount={overdueCount} />
-      </div>
-
+      {modalsMounted && (
+        <TaskModal open={taskOpen} onClose={() => { setTaskOpen(false); router.refresh(); }} />
+      )}
+      {modalsMounted && defaultPipeline && (
+        <DealModal open={dealOpen} onClose={() => { setDealOpen(false); router.refresh(); }} pipeline={defaultPipeline} />
+      )}
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
-    </>
+    </AstryxProviders>
   );
 }

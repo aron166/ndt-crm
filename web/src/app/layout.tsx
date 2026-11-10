@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Figtree, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Insights } from "@/components/Insights";
-import { getTheme } from "@/lib/theme";
 
-const inter = Inter({
+const figtree = Figtree({
   variable: "--font-sans",
   subsets: ["latin"],
   display: "swap",
@@ -29,21 +28,18 @@ export const metadata: Metadata = {
   description: "Controllabor Kft.: Helm CRM",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Server-rendered into the first byte of the document: the light palette is
-  // an attribute override in globals.css, so there is no window in which the
-  // wrong theme is painted and nothing to re-run on the client.
-  const theme = await getTheme();
-
   return (
     <html
       lang="hu"
-      data-theme={theme}
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      // Light only for now (Kai, 2026-11-10, Astryx redesign). users.settings.theme
+      // is kept but not read until the dark theme is designed again.
+      data-theme="light"
+      className={`${figtree.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="h-full">
         {children}
