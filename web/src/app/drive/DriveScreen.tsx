@@ -363,7 +363,12 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           )}
           {selectedOutcome === "meeting_booked" && (
             // PROPOSAL copy
-            <p style={{ margin: 0, fontSize: 16 }}><Link href={`/leads/${lead.id}?book=1`}>Book the time on the lead page</Link></p>
+            <Link
+              href={`/leads/${lead.id}?mode=call&book=1&from=drive`}
+              className={`${k.btn} ${k.btnPrimary}`}
+              style={{ width: "100%", textDecoration: "none", justifyContent: "center" }}
+              onClick={() => { try { if (note.trim()) sessionStorage.setItem(`callNote:${lead.id}`, note.trim()); } catch { /* storage blocked */ } }}
+            >Book the time on the lead page</Link>
           )}
           {(selectedOutcome === "not_interested" || selectedOutcome === "disqualified") && (
             <input
@@ -374,9 +379,11 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
               placeholder="Miért veszett el? (kötelező)"
             />
           )}
-          <button disabled={pending || note.trim() === "" || selectedOutcome === "meeting_booked"} onClick={() => submit(selectedOutcome)} className={k.btn} style={outcomeBtnStyle("green")}>
-            {pending ? "Mentés…" : "Mentés"}
-          </button>
+          {selectedOutcome !== "meeting_booked" && (
+            <button disabled={pending || note.trim() === ""} onClick={() => submit(selectedOutcome)} className={k.btn} style={outcomeBtnStyle("green")}>
+              {pending ? "Mentés…" : "Mentés"}
+            </button>
+          )}
           <button
             disabled={pending}
             onClick={() => { setSelectedOutcome(null); setError(null); }}

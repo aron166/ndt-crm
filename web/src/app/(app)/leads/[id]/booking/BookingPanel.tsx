@@ -28,7 +28,7 @@ import css from "./booking.module.css";
 const keyOf = (s: { machineId: number; startsAt: string }) => `${s.machineId}@${s.startsAt}`;
 const MAX_PROBES = 7;
 
-export function BookingPanel({ leadId, leadOpen, initialKind = "single_machine_demo", onBooked, embedded = false }: { embedded?: boolean; leadId: number; leadOpen: boolean; initialKind?: BookingKind; onBooked?: (kind: BookingKind) => void }) {
+export function BookingPanel({ leadId, leadOpen, initialKind = "single_machine_demo", onBooked, embedded = false }: { embedded?: boolean; leadId: number; leadOpen: boolean; initialKind?: BookingKind; onBooked?: (kind: BookingKind, taskId: number) => void }) {
   const router = useRouter();
   const [siteLoaded, setSiteLoaded] = useState(false);
   const [siteError, setSiteError] = useState<string | null>(null);
@@ -144,7 +144,7 @@ export function BookingPanel({ leadId, leadOpen, initialKind = "single_machine_d
       setPending(false);
       if (r.ok) {
         setBooked(fmtDate(a.startsAt));
-        onBooked?.(kind);
+        onBooked?.(kind, r.data.taskId);
         router.refresh();
       } else if (r.status === 409 && r.check) {
         setConflict(true);

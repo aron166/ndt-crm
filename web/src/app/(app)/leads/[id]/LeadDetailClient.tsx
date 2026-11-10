@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { LeadMoveDialog } from "@/components/LeadMoveDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -129,8 +130,12 @@ export function LeadDetailClient({
   // Non-null while the modal is open to correct THAT auto-derived interaction.
   const [correcting, setCorrecting] = useState<number | null>(null);
   // ?book=1 (from the board / drive "Foglalt meeting" outcome) opens the drawer on arrival.
-  const [booking, setBooking] = useState<BookingCtx | null>(() =>
-    params.get("book") === "1" ? { kind: "single_machine_demo" } : null);
+  // Same kind / event / stage the outcome pad uses, so the stage move still happens.
+  const [booking, setBooking] = useState<BookingCtx | null>(() => {
+    if (params.get("book") !== "1") return null;
+    const sg = suggestNextSteps(lead.status ?? "new").find((x) => x.kind === "booking");
+    return { kind: sg?.bookingKind ?? "single_machine_demo", event: sg?.event, to: sg?.to };
+  });
   // Old ?tab=overview / ?tab=offers deep links land with the details open.
   const [detailsOpen, setDetailsOpen] = useState(tab === "overview" || tab === "offers");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -227,23 +232,63 @@ export function LeadDetailClient({
 
   // One click logs these two; the write is deferred so Undo can cancel it (interactions are append-only).
   const toast = useToast();
+  const pendingKey = `pendingCall:${lead.id}`;
+  const clearPending = () => { try { sessionStorage.removeItem(pendingKey); } catch { /* storage blocked */ } };
+  // Global toast: still shown if the page was left before the write finished.
+  const failed = (msg: string) => { clearPending(); toast({ body: msg, type: "error", autoHideDuration: 10000 }); };
   const quickCall = useDeferredCall<{ outcome: CallOutcomeKey; note: string }>((item) => {
     logLeadCall(lead.id, item).then((res) => {
-      if ("error" in res) { setActionError(res.error); return; }
-      setCallNote("");
+      if ("error" in res) { failed(res.error); return; }
+      clearPending();
+      // Keep what was typed since the click.
+      setCallNote((cur) => (cur.trim() === item.note ? "" : cur));
       router.refresh();
-    }).catch(() => setActionError("Mentés sikertelen: próbáld újra"));
+    }).catch(() => failed("Mentés sikertelen: próbáld újra"));
   });
+
+  // A log that never got its answer (tab killed mid-write): tell, never replay (append-only).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(pendingKey);
+      if (!raw) return;
+      const p = JSON.parse(raw) as { outcome: string; at: number };
+      if (Date.now() - p.at > 10_000) {
+        sessionStorage.removeItem(pendingKey);
+        toast({ body: `A call log may not have been saved: ${p.outcome}, open the timeline to check`, type: "error", autoHideDuration: 15000 }); // PROPOSAL copy
+      }
+    } catch { /* unreadable: ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Board / drive hand the typed note over once; ?book=1 is consumed here.
+  useEffect(() => {
+    try {
+      const n = sessionStorage.getItem(`callNote:${lead.id}`);
+      if (n) { sessionStorage.removeItem(`callNote:${lead.id}`); setCallNote(n); }
+    } catch { /* storage blocked */ }
+    if (params.get("book") === "1") {
+      const q = new URLSearchParams(params.toString());
+      q.delete("book");
+      router.replace(q.size ? `${pathname}?${q}` : pathname, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function quickLog(k: "no_answer" | "wrong_number") {
     setActionError(null);
     const label = CALL_OUTCOMES.find((o) => o.key === k)?.label ?? k;
-    if (!quickCall.schedule(k, { outcome: k, note: callNote.trim() || label })) return;
+    const item = { outcome: k, note: callNote.trim() || label };
+    if (!quickCall.schedule(k, item)) return;
+    try { sessionStorage.setItem(pendingKey, JSON.stringify({ outcome: label, at: Date.now() })); } catch { /* storage blocked */ }
     // PROPOSAL copy
     const dismiss = toast({
       body: `Logged: ${label}`, autoHideDuration: DEFER_MS,
-      endContent: <AButton variant="ghost" size="sm" label="Undo" onClick={() => { quickCall.cancel(); dismiss(); }} />,
+      endContent: <AButton variant="ghost" size="sm" label="Undo" onClick={() => {
+        if (quickCall.cancel(k)) clearPending(); else toast({ body: "Already saved", autoHideDuration: 3000 });
+        dismiss();
+      }} />,
     });
+    quickCall.bindDismiss(k, dismiss);
   }
 
   function pickOutcome(k: CallOutcomeKey) {
@@ -254,19 +299,24 @@ export function LeadDetailClient({
     setLogging(true);
   }
 
-  function handleBooked(kind: BookingKind) {
+  function handleBooked(kind: BookingKind, taskId: number) {
     if (bookedLock.current) return;
     bookedLock.current = true;
     try {
       const b = booking;
       // Close first so a failed follow-up move shows on the page, not behind the drawer.
       setBooking(null);
-      if (b?.event && b.to) {
+      // Call mode: the call log (against the meeting the drawer just created) moves the stage itself.
+      if (calling) {
+        logLeadCall(lead.id, { outcome: "meeting_booked", note: callNote.trim() || "Foglalt meeting", existingBookingTaskId: taskId }).then((res) => {
+          if ("error" in res) { setActionError(res.error); return; }
+          setCallNote("");
+          router.refresh();
+        }).catch(() => setActionError("Mentés sikertelen: próbáld újra"));
+      } else if (b?.event && b.to) {
         if (kind === b.kind) runMove(b.to, b.event);
         else setActionNote("Lefoglalva; a szakasz nem változott."); // PROPOSAL copy
       }
-      // Call mode: log the call as "meeting booked" with the typed note.
-      if (calling) { setPadOutcome("meeting_booked"); setLogging(true); }
     } finally {
       bookedLock.current = false;
     }
@@ -309,6 +359,7 @@ export function LeadDetailClient({
 
   return (
     <div className={s.page}>
+      {params.get("from") === "drive" && <Link href="/drive" className={s.back}>Back to the queue</Link>}
       <Header
         name={displayName}
         companyId={lead.company?.id ?? null}
@@ -464,7 +515,6 @@ export function LeadDetailClient({
         correctsInteractionId={correcting}
         initialOutcome={padOutcome}
         initialNote={correcting ? undefined : callNote || undefined}
-        hideMeetingBooked={padOutcome !== "meeting_booked"}
       />
 
       <LeadEditModal

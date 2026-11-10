@@ -265,7 +265,7 @@ function LeadCard({
             aria-label="Hívás eredménye"
             draggable={false}
             onClick={() => onCall(lead.id)}
-            className="h-[22px] min-h-[22px]"
+            className="h-[22px] min-h-[22px] touch44"
           >
             <PhoneCall style={{ width: 11, height: 11 }} />
             Hívás

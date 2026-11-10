@@ -9,7 +9,7 @@ export const DEFER_MS = 6000;
  * One pending item at a time: the same key again is ignored, a different key flushes the old one first.
  */
 export function useDeferredCall<T>(commit: (item: T) => void, delay = DEFER_MS) {
-  const pending = useRef<{ key: string; item: T; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const pending = useRef<{ key: string; item: T; timer: ReturnType<typeof setTimeout>; dismiss?: () => void } | null>(null);
   const commitRef = useRef(commit);
   useEffect(() => { commitRef.current = commit; });
 
@@ -18,13 +18,22 @@ export function useDeferredCall<T>(commit: (item: T) => void, delay = DEFER_MS) 
     if (!p) return;
     pending.current = null;
     clearTimeout(p.timer);
+    p.dismiss?.(); // the Undo button never outlives the commit
     commitRef.current(p.item);
   }, []);
 
-  const cancel = useCallback(() => {
-    if (!pending.current) return;
-    clearTimeout(pending.current.timer);
+  /** True only when THAT key was still pending and is now dropped; false = already sent (or another item). */
+  const cancel = useCallback((key: string) => {
+    const p = pending.current;
+    if (!p || p.key !== key) return false;
+    clearTimeout(p.timer);
     pending.current = null;
+    return true;
+  }, []);
+
+  /** Hands the toast's dismiss handle to the pending item for `key`. */
+  const bindDismiss = useCallback((key: string, dismiss: () => void) => {
+    if (pending.current?.key === key) pending.current.dismiss = dismiss;
   }, []);
 
   const schedule = useCallback((key: string, item: T) => {
@@ -45,5 +54,5 @@ export function useDeferredCall<T>(commit: (item: T) => void, delay = DEFER_MS) 
     };
   }, [flush]);
 
-  return { schedule, cancel, flush };
+  return { schedule, cancel, flush, bindDismiss };
 }
