@@ -7,6 +7,9 @@ import { createAppApiKey, revokeAppApiKey, type AppKeyRow } from "@/app/actions/
 import { CheckCircle, Circle, ExternalLink, Zap, KeyRound, Copy, Check, Trash2, Plus, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { formatRelativeTime } from "@/lib/utils";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "./settings.module.css";
 
 interface Integration {
   slug: string;
@@ -121,64 +124,53 @@ function IntegrationCard({
 
   return (
     <div
-      style={{
-        background: "var(--bg-panel)", border: `1px solid ${connected ? "var(--indigo-line)" : "var(--line-soft)"}`,
-        borderRadius: 10, padding: "16px 20px",
-        opacity: integration.available ? 1 : 0.6,
-      }}
+      className={[
+        k.card,
+        s.integration,
+        connected ? s.connected : "",
+        integration.available ? "" : s.unavailable,
+      ].join(" ")}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div style={{ flex: 1 }}>
-          <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
+      <div className={s.head}>
+        <div className={s.grow}>
+          <div className={s.titleLine}>
             {connected
               ? <CheckCircle style={{ width: 14, height: 14, color: "var(--mint)" }} />
-              : <Circle style={{ width: 14, height: 14, color: "var(--fg-faint)" }} />
+              : <Circle style={{ width: 14, height: 14, color: "var(--color-text-secondary)" }} />
             }
-            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{integration.name}</span>
-            <span style={{ fontSize: 12, color: "var(--fg-faint)", background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 20 }}>
-              {integration.category}
-            </span>
+            <span className={s.name}>{integration.name}</span>
+            <span className={s.pill}>{integration.category}</span>
             {!integration.available && (
-              <span style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono)" }}>hamarosan</span>
+              <span className={`${k.muted} font-mono-ndt`}>hamarosan</span>
             )}
           </div>
-          <p style={{ fontSize: 14, color: "var(--fg-mute)", margin: 0, lineHeight: 1.5 }}>
+          <p className={`${k.muted} ${s.desc}`}>
             {integration.description}
           </p>
         </div>
 
         {integration.available && (
-          <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
+          <div className={s.actions}>
             {integration.docsUrl && (
+              // PROPOSAL copy: aria-label "Dokumentáció megnyitása" for the icon-only docs link
               <a href={integration.docsUrl} target="_blank" rel="noopener noreferrer"
-                style={{ color: "var(--fg-faint)", display: "flex" }}>
+                aria-label="Dokumentáció megnyitása" className={`${k.btn} ${k.btnIcon}`}>
                 <ExternalLink style={{ width: 13, height: 13 }} />
               </a>
             )}
             {connected ? (
               <>
                 {integration.testable && (
-                  <button
-                    onClick={handleTest}
-                    disabled={isPending}
-                    style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: "pointer" }}
-                  >
+                  <button onClick={handleTest} disabled={isPending} className={k.btn}>
                     {isPending ? "Küldés..." : "Teszt küldése"}
                   </button>
                 )}
-                <button
-                  onClick={handleDisconnect}
-                  disabled={isPending}
-                  style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "transparent", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", cursor: "pointer" }}
-                >
+                <button onClick={handleDisconnect} disabled={isPending} className={k.btn}>
                   Lecsatlakozás
                 </button>
               </>
             ) : (
-              <button
-                onClick={() => setExpanded((e) => !e)}
-                style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)", color: "var(--indigo)", cursor: "pointer" }}
-              >
+              <button onClick={() => setExpanded((e) => !e)} className={k.btn}>
                 Csatlakozás
               </button>
             )}
@@ -187,38 +179,33 @@ function IntegrationCard({
       </div>
 
       {testMsg && (
-        <p role="status" aria-live="polite" style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 4, fontSize: 14, color: testMsg.ok ? "var(--mint)" : "var(--coral)" }}>
+        <p role="status" aria-live="polite" className={`${s.msg} ${testMsg.ok ? s.ok : s.bad}`}>
           {testMsg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {testMsg.text}
         </p>
       )}
 
       {expanded && integration.fields.length > 0 && (
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className={s.expand}>
           {integration.fields.map((f) => (
             <div key={f.key}>
-              <label style={{ fontSize: 12, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>{f.label}</label>
+              <label className={s.label}>{f.label}</label>
               <input
                 type={f.type ?? "text"}
                 value={values[f.key] ?? ""}
                 onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
                 placeholder={f.placeholder}
-                style={{
-                  width: "100%", padding: "6px 10px", fontSize: 14,
-                  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-                  borderRadius: 5, color: "var(--fg)", outline: "none",
-                  fontFamily: "var(--font-mono)",
-                }}
+                className={`${s.field} ${s.mono}`}
               />
             </div>
           ))}
-          <div className="flex gap-2 justify-end" style={{ marginTop: 4 }}>
-            <button onClick={() => setExpanded(false)} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "transparent", border: "1px solid var(--line-soft)", color: "var(--fg-mute)", cursor: "pointer" }}>
+          <div className={s.footer}>
+            <button onClick={() => setExpanded(false)} className={k.btn}>
               Mégsem
             </button>
             <button
               onClick={handleSave}
               disabled={isPending || !Object.values(values).some(Boolean)}
-              style={{ fontSize: 12, padding: "4px 12px", borderRadius: 5, background: "var(--indigo)", color: "white", border: "none", cursor: "pointer", opacity: Object.values(values).some(Boolean) ? 1 : 0.5 }}
+              className={`${k.btn} ${k.btnPrimary}`}
             >
               Mentés
             </button>
@@ -260,51 +247,51 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
   }
 
   return (
-    <div className="mount space-y-5">
-      <div className="flex items-center gap-3" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
-        <KeyRound style={{ width: 14, height: 14, color: "var(--indigo)" }} />
-        Per-app kulcsok a <code style={{ fontFamily: "var(--font-mono)", color: "var(--sky)" }}>POST /api/leads</code> végponthoz. A kulcs csak hash-elve tárolódik: a teljes érték egyszer jelenik meg, létrehozáskor.
+    <div className={`mount ${s.stack}`}>
+      <div className={`${k.muted} ${s.intro}`}>
+        <KeyRound style={{ width: 14, height: 14, color: "var(--color-accent)" }} />
+        Per-app kulcsok a <code className={s.code}>POST /api/leads</code> végponthoz. A kulcs csak hash-elve tárolódik: a teljes érték egyszer jelenik meg, létrehozáskor.
       </div>
 
       {/* Create */}
-      <div className="panel" style={{ maxWidth: 560 }}>
-        <div className="panel-head"><div className="panel-title">Új kulcs</div></div>
-        <div className="panel-pad space-y-3">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      <section className={`${k.card} ${s.narrow}`}>
+        <h2 className={k.h2}>Új kulcs</h2>
+        <div className={s.form}>
+          <div className={s.fieldGrid}>
             <div>
-              <label style={{ fontSize: 12, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>App azonosító</label>
+              <label className={s.label}>App azonosító</label>
               <input
                 value={appSlug}
                 onChange={(e) => setAppSlug(e.target.value)}
                 placeholder="betonscan_landing"
-                style={{ width: "100%", padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)", outline: "none", fontFamily: "var(--font-mono)" }}
+                className={`${s.field} ${s.mono}`}
               />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: "var(--fg-mute)", display: "block", marginBottom: 4 }}>Címke (opcionális)</label>
+              <label className={s.label}>Címke (opcionális)</label>
               <input
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="BetonRadar landing oldal"
-                style={{ width: "100%", padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg)", outline: "none" }}
+                className={s.field}
               />
             </div>
           </div>
-          <div className="flex justify-end">
-            <button onClick={handleCreate} disabled={isPending || !appSlug.trim()} className="btn primary" style={{ gap: 6, opacity: appSlug.trim() ? 1 : 0.5 }}>
+          <div className={s.footer}>
+            <button onClick={handleCreate} disabled={isPending || !appSlug.trim()} className={`${k.btn} ${k.btnPrimary}`}>
               <Plus style={{ width: 13, height: 13 }} />
               Kulcs létrehozása
             </button>
           </div>
 
           {created && (
-            <div style={{ marginTop: 4, padding: "12px 14px", borderRadius: 8, background: "var(--indigo-soft)", border: "1px solid var(--indigo-line)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--amber)", marginBottom: 6, fontWeight: 500 }}>
+            <div className={s.created}>
+              <div className={s.warnLine}>
                 <AlertTriangle size={13} aria-hidden="true" /> Másold ki most: ez az érték többé nem jelenik meg.
               </div>
-              <div className="flex items-center gap-2">
-                <code style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--fg)", wordBreak: "break-all" }}>{created.plaintext}</code>
-                <button onClick={copyKey} className="btn" style={{ gap: 5, flexShrink: 0 }}>
+              <div className={s.keyLine}>
+                <code className={s.keyValue}>{created.plaintext}</code>
+                <button onClick={copyKey} className={k.btn}>
                   {copied ? <Check style={{ width: 13, height: 13, color: "var(--mint)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                   {copied ? "Másolva" : "Másolás"}
                 </button>
@@ -312,38 +299,36 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
             </div>
           )}
         </div>
-      </div>
+      </section>
 
       {/* Existing keys */}
-      <div className="panel" style={{ maxWidth: 560 }}>
-        <div className="panel-head"><div className="panel-title">Kulcsok</div></div>
-        <div className="panel-pad">
-          {appKeys.length === 0 ? (
-            <div style={{ fontSize: 14, color: "var(--fg-mute)", padding: "8px 0" }}>Még nincs kulcs.</div>
-          ) : (
-            <div className="space-y-2">
-              {appKeys.map((k) => (
-                <div key={k.id} className="flex items-center justify-between" style={{ padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono-ndt" style={{ fontSize: 14, color: k.isActive ? "var(--fg)" : "var(--fg-faint)", textDecoration: k.isActive ? "none" : "line-through" }}>{k.appSlug}</span>
-                      {!k.isActive && <span style={{ fontSize: 12, color: "var(--coral)" }}>visszavonva</span>}
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>
-                      {k.label ? `${k.label} · ` : ""}{k.lastUsedAt ? `utoljára ${formatRelativeTime(k.lastUsedAt)}` : "még nem használt"}
-                    </div>
+      <section className={`${k.card} ${s.narrow}`}>
+        <h2 className={k.h2}>Kulcsok</h2>
+        {appKeys.length === 0 ? (
+          <div className={k.muted}>Még nincs kulcs.</div>
+        ) : (
+          <div>
+            {appKeys.map((appKey) => (
+              <div key={appKey.id} className={s.keyRow}>
+                <div className={s.keyMain}>
+                  <div className={s.titleLine}>
+                    <span className={`font-mono-ndt ${s.keySlug} ${appKey.isActive ? "" : s.revoked}`}>{appKey.appSlug}</span>
+                    {!appKey.isActive && <span className={s.bad}>visszavonva</span>}
                   </div>
-                  {k.isActive && (
-                    <button onClick={() => handleRevoke(k.id)} disabled={isPending} title="Visszavonás" style={{ background: "transparent", border: "1px solid var(--line-soft)", borderRadius: 5, padding: "4px 8px", color: "var(--coral)", cursor: "pointer", display: "flex" }}>
-                      <Trash2 style={{ width: 13, height: 13 }} />
-                    </button>
-                  )}
+                  <div className={k.muted}>
+                    {appKey.label ? `${appKey.label} · ` : ""}{appKey.lastUsedAt ? `utoljára ${formatRelativeTime(appKey.lastUsedAt)}` : "még nem használt"}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+                {appKey.isActive && (
+                  <button onClick={() => handleRevoke(appKey.id)} disabled={isPending} title="Visszavonás" aria-label="Visszavonás" className={`${k.btn} ${k.btnIcon}`}>
+                    <Trash2 style={{ width: 13, height: 13 }} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -353,66 +338,67 @@ export function SettingsClient({ tenant, connectedIntegrations, appKeys }: Setti
 
   const categories = Array.from(new Set(INTEGRATIONS.map((i) => i.category)));
 
-  return (
-    <div className="mount space-y-5">
-      <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)" }}>
-        Beállítások
-      </h1>
-      <Link href="/settings/suppressions" className="text-sm" style={{ color: "var(--fg-mute)" }}>Tiltólista</Link>
+  const tabs = (
+    <div className={s.tabs}>
+      <button className={`${s.tab} ${tab === "general" ? s.tabOn : ""}`} onClick={() => setTab("general")}>
+        Általános
+      </button>
+      <button className={`${s.tab} ${tab === "integrations" ? s.tabOn : ""}`} onClick={() => setTab("integrations")}>
+        Integrációk
+        {connectedIntegrations.length > 0 && (
+          <span className={s.count}>{connectedIntegrations.length}</span>
+        )}
+      </button>
+      <button className={`${s.tab} ${tab === "apikeys" ? s.tabOn : ""}`} onClick={() => setTab("apikeys")}>
+        API kulcsok
+        {appKeys.filter((ak) => ak.isActive).length > 0 && (
+          <span className={s.count}>{appKeys.filter((ak) => ak.isActive).length}</span>
+        )}
+      </button>
+    </div>
+  );
 
-      <div className="tabs-ds">
-        <button className={`tab-ds ${tab === "general" ? "active" : ""}`} onClick={() => setTab("general")}>
-          Általános
-        </button>
-        <button className={`tab-ds ${tab === "integrations" ? "active" : ""}`} onClick={() => setTab("integrations")}>
-          Integrációk
-          {connectedIntegrations.length > 0 && (
-            <span className="tcount">{connectedIntegrations.length}</span>
-          )}
-        </button>
-        <button className={`tab-ds ${tab === "apikeys" ? "active" : ""}`} onClick={() => setTab("apikeys")}>
-          API kulcsok
-          {appKeys.filter((k) => k.isActive).length > 0 && (
-            <span className="tcount">{appKeys.filter((k) => k.isActive).length}</span>
-          )}
-        </button>
-      </div>
+  return (
+    <div className={`mount ${s.stack}`}>
+      <PageHeader
+        title="Beállítások"
+        views={tabs}
+        actions={<Link href="/settings/suppressions" className={k.btn}>Tiltólista</Link>}
+      />
 
       {tab === "general" && (
-        <div className="panel mount" style={{ maxWidth: 480 }}>
-          <div className="panel-head"><div className="panel-title">Bérlő</div></div>
-          <div className="panel-pad space-y-4">
-            <div>
-              <div className="field-label">Cégnév</div>
-              <div className="field-value">{tenant?.name ?? "-"}</div>
-            </div>
-            <div>
-              <div className="field-label">Slug</div>
-              <div className="field-value mono">{tenant?.slug ?? "-"}</div>
-            </div>
-            <div style={{ paddingTop: 12, borderTop: "1px solid var(--line-soft)" }}>
-              <div className="field-label">Helm CRM verzió</div>
-              <div className="field-value mono" style={{ color: "var(--indigo)" }}>dev · Next.js 16 + Supabase</div>
-            </div>
+        <section className={`${k.card} ${s.narrow}`}>
+          <h2 className={k.h2}>Bérlő</h2>
+          <div className={k.kv}>
+            <span>Cégnév</span>
+            <span>{tenant?.name ?? "-"}</span>
           </div>
-        </div>
+          <div className={k.kv}>
+            <span>Slug</span>
+            <span className="font-mono-ndt">{tenant?.slug ?? "-"}</span>
+          </div>
+          <div className={`${k.kv} ${s.divider}`}>
+            <span>Helm CRM verzió</span>
+            <span className={`font-mono-ndt ${s.accent}`}>dev · Next.js 16 + Supabase</span>
+          </div>
+        </section>
       )}
 
       {tab === "apikeys" && <ApiKeysSection appKeys={appKeys} />}
 
       {tab === "integrations" && (
-        <div className="mount space-y-6">
-          <div className="flex items-center gap-3" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
-            <Zap style={{ width: 14, height: 14, color: "var(--indigo)" }} />
-            API kulcsok titkosítva tárolódnak. Integrációk bővíthetők: minden új integrációhoz csak egy <code style={{ fontFamily: "var(--font-mono)", color: "var(--sky)" }}>/lib/integrations/&lt;slug&gt;.ts</code> fájl kell.
+        <div className={`mount ${s.stack}`}>
+          <div className={`${k.muted} ${s.intro}`}>
+            <Zap style={{ width: 14, height: 14, color: "var(--color-accent)" }} />
+            API kulcsok titkosítva tárolódnak. Integrációk bővíthetők: minden új integrációhoz csak egy <code className={s.code}>/lib/integrations/&lt;slug&gt;.ts</code> fájl kell.
           </div>
 
           {categories.map((cat) => (
             <div key={cat}>
-              <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--fg-faint)", marginBottom: 8 }}>
+              <div className={s.catTitle}>
                 {cat}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div className={s.grid}>
                 {INTEGRATIONS.filter((i) => i.category === cat).map((integration) => (
                   <IntegrationCard
                     key={integration.slug}

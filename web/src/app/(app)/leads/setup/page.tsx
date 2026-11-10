@@ -9,6 +9,8 @@ import { getQuestionModel, getRawScriptVariants } from "@/lib/leads/queries";
 import { getIntroMaterialUrl } from "@/lib/leads/intro";
 import { getScriptStats } from "@/lib/leads/script-stats";
 import { getTechnologyWordCounts } from "@/lib/leads/technology-words";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
 
 const TENANT_ID = 1;
 
@@ -32,26 +34,15 @@ export default async function LeadStatusSetupPage() {
 
   return (
     <div className="mount">
-      <div style={{ marginBottom: 16 }}>
-        <Link
-          href="/leads?view=board"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
-          className="row-link"
-        >
-          <ArrowLeft style={{ width: 14, height: 14 }} />
-          Vissza a leadekhez
-        </Link>
-      </div>
+      <Link href="/leads?view=board" className={k.back}>
+        <ArrowLeft style={{ width: 14, height: 14 }} />
+        Vissza a leadekhez
+      </Link>
 
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Lead státuszok</h1>
-          <p className="page-sub">
-            A lead pipeline oszlopai. Húzd át az átrendezéshez; jelöld ki a kezdő oszlopot,
-            ahová a beérkező leadek kerülnek.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Lead státuszok"
+        help="A lead pipeline oszlopai. Húzd át az átrendezéshez; jelöld ki a kezdő oszlopot, ahová a beérkező leadek kerülnek."
+      />
 
       <LeadStatusSetupClient statuses={statuses} />
       <QualificationQuestionsClient questions={questionModel.questions} sets={questionModel.sets} introUrl={introUrl} />

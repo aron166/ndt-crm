@@ -4,8 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { saveScriptVariants } from "@/app/actions/leads";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import k from "@/components/astryx/page.module.css";
+import m from "./setup.module.css";
 import { formatScriptBlocks, type ScriptVariant } from "@/lib/leads/scripts";
 import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
 import type { ScriptStatRow } from "@/lib/leads/script-stats";
@@ -34,65 +34,67 @@ export function ScriptVariantsClient({
   const hasData = stats.some((s) => s.calls > 0);
 
   return (
-    <div className="panel" style={{ marginTop: 16 }}>
-      <div className="panel-head"><div className="panel-title">Hívásszkript változatok (A/B)</div></div>
-      <div className="panel-pad space-y-3">
-        <p style={{ fontSize: 12, color: "var(--fg-mute)" }}>
-          Egy blokk = egy szkript. A blokk első sora: azonosító|név: a többi sor a szkript
-          szövege. A blokkokat egy önálló <code>---</code> sor választja el. Legfeljebb 5
-          változat lehet.
-        </p>
-        <p style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--coral)" }}>
-          <AlertTriangle size={13} aria-hidden="true" /> A gyári szkriptek helykitöltők, amíg Péter és Áron meg nem írja a valódi szöveget.
-        </p>
-        <Textarea rows={10} value={text} onChange={(e) => setText(e.target.value)} className="font-mono-ndt" />
+    <section className={k.section}>
+      <h2 className={k.h2}>Hívásszkript változatok (A/B)</h2>
+      <p className={k.muted}>
+        Egy blokk = egy szkript. A blokk első sora: azonosító|név: a többi sor a szkript
+        szövege. A blokkokat egy önálló <code>---</code> sor választja el. Legfeljebb 5
+        változat lehet.
+      </p>
+      <p className={m.errorLine}>
+        <AlertTriangle size={13} aria-hidden="true" /> A gyári szkriptek helykitöltők, amíg Péter és Áron meg nem írja a valódi szöveget.
+      </p>
+      <textarea rows={10} value={text} onChange={(e) => setText(e.target.value)} className={`${m.field} ${m.textarea} font-mono-ndt`} />
 
-        {error && <p style={{ fontSize: 12, color: "var(--coral)" }}>{error}</p>}
-        <Button className="btn primary" size="sm" onClick={handleSave} disabled={isPending}>
+      {error && <p className={m.error}>{error}</p>}
+      <div>
+        <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={handleSave} disabled={isPending}>
           {isPending ? "Mentés…" : "Mentés"}
-        </Button>
+        </button>
+      </div>
 
-        <div style={{ marginTop: 8 }}>
-          <div className="field-label" style={{ marginBottom: 6 }}>Elmúlt 90 nap eredményei</div>
-          {!hasData ? (
-            <p style={{ fontSize: 12, color: "var(--fg-mute)" }}>Még nincs adat</p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12, minWidth: 480 }}>
+      <div>
+        <div className={m.subtitle}>Elmúlt 90 nap eredményei</div>
+        {!hasData ? (
+          <p className={k.muted}>Még nincs adat</p>
+        ) : (
+          <>
+            <div className={k.tableWrap}>
+              <table className={`${k.table} ${m.numTable}`}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: "left", padding: "4px 8px" }}>Szkript</th>
-                    <th style={{ textAlign: "right", padding: "4px 8px" }}>Hívások</th>
+                    <th>Szkript</th>
+                    <th>Hívások</th>
                     {CALL_OUTCOMES.map((o) => (
-                      <th key={o.key} style={{ textAlign: "right", padding: "4px 8px" }}>{o.label}</th>
+                      <th key={o.key}>{o.label}</th>
                     ))}
-                    <th style={{ textAlign: "right", padding: "4px 8px" }}>Demó arány</th>
+                    <th>Demó arány</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stats.map((row) => (
-                    <tr key={row.key} style={{ borderTop: "1px solid var(--border)" }}>
-                      <td style={{ padding: "4px 8px" }}>{row.label}</td>
-                      <td style={{ textAlign: "right", padding: "4px 8px" }}>{row.calls}</td>
+                    <tr key={row.key}>
+                      <td>{row.label}</td>
+                      <td>{row.calls}</td>
                       {CALL_OUTCOMES.map((o) => (
-                        <td key={o.key} style={{ textAlign: "right", padding: "4px 8px" }}>
+                        <td key={o.key}>
                           {row.byOutcome[o.key] ?? 0}
                         </td>
                       ))}
-                      <td style={{ textAlign: "right", padding: "4px 8px" }}>
+                      <td>
                         {row.reached < 10 ? "-" : `${(row.demoRate * 100).toFixed(1)}%`}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p style={{ fontSize: 11, color: "var(--fg-mute)", marginTop: 4 }}>
-                A demó arány csak legalább 10 elért hívás után jelenik meg: kevesebb adatnál a szám nem mond semmit.
-              </p>
             </div>
-          )}
-        </div>
+            <p className={`${k.muted} ${m.hint}`}>
+              A demó arány csak legalább 10 elért hívás után jelenik meg: kevesebb adatnál a szám nem mond semmit.
+            </p>
+          </>
+        )}
       </div>
-    </div>
+    </section>
   );
 }

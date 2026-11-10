@@ -5,6 +5,7 @@ import { getActor } from "@/lib/actor";
 import { getDriveQueue } from "@/lib/leads/drive";
 import { getScriptVariants } from "@/lib/leads/queries";
 import { DriveScreen } from "./DriveScreen";
+import { AstryxProviders } from "@/components/layout/AstryxProviders";
 
 // /drive — in-car, single-screen lead caller. Deliberately OUTSIDE the
 // (app) route group: no sidebar, no AppShell, own auth check (same pattern
@@ -23,5 +24,9 @@ export default async function DrivePage() {
 
   const [queue, scriptVariants] = await Promise.all([getDriveQueue(1, 25), getScriptVariants(1)]);
 
-  return <DriveScreen initialQueue={queue} scriptVariants={scriptVariants} />;
+  return (
+    <AstryxProviders>
+      <DriveScreen initialQueue={queue} scriptVariants={scriptVariants} />
+    </AstryxProviders>
+  );
 }
