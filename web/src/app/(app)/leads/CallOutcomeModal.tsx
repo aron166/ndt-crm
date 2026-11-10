@@ -21,7 +21,7 @@ import type { ScriptVariant } from "@/lib/leads/scripts";
 
 
 export function CallOutcomeModal({
-  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null, initialOutcome, initialNote, hideMeetingBooked = false,
+  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null, initialOutcome, initialNote, hideMeetingBooked = false, onBook,
 }: {
   open: boolean;
   onClose: () => void;
@@ -39,6 +39,8 @@ export function CallOutcomeModal({
   initialNote?: string;
   /** The lead page books through its own drawer, so the outcome is not offered there. */
   hideMeetingBooked?: boolean;
+  /** On the lead page the drawer is right here: open it instead of linking to the same page. */
+  onBook?: () => void;
   title?: string | null;
   stageDescription?: string | null;
   onLogged?: () => void;
@@ -169,7 +171,9 @@ export function CallOutcomeModal({
 
           {outcome === "meeting_booked" && (
             // PROPOSAL copy
-            <p className="text-sm"><Link href={`/leads/${leadId}?book=1`}>Book the time on the lead page</Link></p>
+            onBook
+              ? <Button type="button" variant="outline" onClick={onBook}>Időpont foglalása</Button>
+              : <p className="text-sm"><Link href={`/leads/${leadId}?mode=call&book=1`}>Book the time on the lead page</Link></p>
           )}
 
           {isLostCallOutcome(outcome) && (

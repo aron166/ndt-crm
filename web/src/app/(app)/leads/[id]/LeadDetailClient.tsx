@@ -515,6 +515,7 @@ export function LeadDetailClient({
         correctsInteractionId={correcting}
         initialOutcome={padOutcome}
         initialNote={correcting ? undefined : callNote || undefined}
+        onBook={() => { setLogging(false); setPadOutcome(undefined); setBooking({ kind: bookingSuggestion?.bookingKind ?? "single_machine_demo", event: bookingSuggestion?.event, to: bookingSuggestion?.to }); }}
       />
 
       <LeadEditModal
