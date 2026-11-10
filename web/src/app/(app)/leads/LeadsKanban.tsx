@@ -15,7 +15,7 @@ import type { LeadStatusDef } from "@/lib/leads/statuses";
 import {
   LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, type LeadOutcome,
 } from "@/lib/leads/outcomes";
-import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { TIER_LABEL, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 // Hungarian copy is PROPOSAL until Áron approves.
@@ -141,7 +141,7 @@ function LeadCard({
           title={TIER_LABEL[lead.tier]}
           style={{
             display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 3,
-            fontWeight: 700, color: TIER_COLOR[lead.tier], border: `1px solid ${TIER_COLOR[lead.tier]}`,
+            fontWeight: 700, color: "var(--ui-text)", border: "1px solid var(--ui-border-strong)",
             background: "var(--ui-hover)",
           }}
         >
@@ -153,7 +153,7 @@ function LeadCard({
         <div
           style={{
             display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 3, marginLeft: 6,
-            color: lead.tierFlag === "overdue" ? "var(--ui-surface)" : "var(--ui-danger)",
+            color: lead.tierFlag === "overdue" ? "var(--ui-on-danger)" : "var(--ui-danger-text)",
             background: lead.tierFlag === "overdue" ? "var(--ui-danger)" : "var(--ui-hover)",
             border: `1px solid ${"var(--ui-danger)"}`,
             fontWeight: lead.tierFlag === "overdue" ? 700 : 500,

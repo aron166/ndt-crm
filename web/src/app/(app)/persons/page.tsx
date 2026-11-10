@@ -13,11 +13,6 @@ import s from "./persons.module.css";
 const PAGE_SIZE = 30;
 const TENANT_ID = 1;
 
-function avatarBg(id: number) {
-  void id; // one neutral avatar style (taste rules)
-  return "var(--ui-surface-muted)";
-}
-
 interface SearchParams {
   search?: string;
   page?: string;
@@ -141,7 +136,7 @@ export default async function PersonsPage({
                   {/* Avatar */}
                   <td>
                     <Link href={`/persons/${p.id}`} tabIndex={-1} aria-hidden="true">
-                      <div className={s.avatar} style={{ background: avatarBg(p.id) }}>
+                      <div className={s.avatar}>
                         {initials}
                       </div>
                     </Link>

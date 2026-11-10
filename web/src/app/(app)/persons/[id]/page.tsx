@@ -12,7 +12,6 @@ import k from "@/components/astryx/page.module.css";
 const TENANT_ID = 1;
 
 // One neutral avatar style (taste rules): no per-name colours.
-const AVATAR_PALETTE = ["var(--ui-surface-muted)"];
 
 export default async function PersonDetailPage({
   params,
@@ -76,7 +75,6 @@ export default async function PersonDetailPage({
   const last90 = interactions.filter((x) => now - new Date(x.occurredAt).getTime() < 90 * 24 * 3600 * 1000).length;
   const signalLevel = last30 >= 3 ? 6 : last30 >= 2 ? 5 : last30 >= 1 ? 4 : last90 >= 2 ? 3 : last90 >= 1 ? 2 : 1;
 
-  const avatarColor = AVATAR_PALETTE[personId % AVATAR_PALETTE.length];
   const initials = [person.firstName?.[0], person.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "?";
 
   return (
@@ -94,7 +92,6 @@ export default async function PersonDetailPage({
         conversations={serializeDates(conversations)}
         engagementSeries={engagementSeries}
         signalLevel={signalLevel}
-        avatarColor={avatarColor}
         initials={initials}
         initialTags={initialTags}
         auditEntries={serializeDates(auditEntries)}

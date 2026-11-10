@@ -14,14 +14,9 @@ import {
 import { Badge } from "@astryxdesign/core/Badge";
 import k from "@/components/astryx/page.module.css";
 import m from "./setup.module.css";
+import { DEFAULT_STAGE_COLORS as STATUS_COLORS, DEFAULT_DATA_COLOR } from "@/lib/data-colors";
 import { isPlaceholderText } from "@/lib/leads/placeholder";
 import { STAGE_DESCRIPTION_PLACEHOLDER, STAGE_DESCRIPTION_MAX } from "@/lib/leads/statuses";
-
-const STATUS_COLORS = [
-  "#64748b", "#6366f1", "#8b5cf6", "#3b82f6", // design-allow: user data colour
-  "#06b6d4", "#22c55e", "#f59e0b", "#f97316", // design-allow: user data colour
-  "#ef4444", "#f43f5e", // design-allow: user data colour
-];
 
 interface LeadStatus {
   id: number;
@@ -171,7 +166,7 @@ export function LeadStatusSetupClient({ statuses }: { statuses: LeadStatus[] }) 
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
-  const [newColor, setNewColor] = useState("#6366f1"); // design-allow: user data colour
+  const [newColor, setNewColor] = useState<string>(DEFAULT_DATA_COLOR);
   const [isPending, startTransition] = useTransition();
 
   // Render-phase sync when the server sends a fresh order/list.
@@ -206,7 +201,7 @@ export function LeadStatusSetupClient({ statuses }: { statuses: LeadStatus[] }) 
     data.set("color", newColor);
     startTransition(async () => {
       await createLeadStatus(data);
-      setNewLabel(""); setNewColor("#6366f1"); setAdding(false); // design-allow: user data colour
+      setNewLabel(""); setNewColor(DEFAULT_DATA_COLOR); setAdding(false);
       router.refresh();
     });
   }

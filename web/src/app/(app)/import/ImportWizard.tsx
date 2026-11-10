@@ -161,10 +161,10 @@ export function ImportWizard() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <Stat label="Új" value={r.created} accent="var(--ui-success)" />
+          <Stat label="Új" value={r.created} accent="var(--ui-success-text)" />
           <Stat label="Meglévő" value={r.matched} accent="var(--ui-text-muted)" />
-          <Stat label="Kihagyva" value={r.skipped} accent="var(--ui-warning)" />
-          <Stat label="Hiba" value={r.errors.length} accent="var(--ui-danger)" />
+          <Stat label="Kihagyva" value={r.skipped} accent="var(--ui-warning-text)" />
+          <Stat label="Hiba" value={r.errors.length} accent="var(--ui-danger-text)" />
         </div>
         {r.notesAppended > 0 && (
           <p className={`${k.muted} mb-3`}>
@@ -356,7 +356,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent: 
 }
 
 function StatusPill({ status, detail }: { status: string; detail?: string }) {
-  const color = status === "új" ? "var(--ui-success)" : status === "hiba" ? "var(--ui-danger)" : status === "kihagyva" ? "var(--ui-warning)" : "var(--ui-text-muted)";
+  const color = status === "új" ? "var(--ui-success-text)" : status === "hiba" ? "var(--ui-danger-text)" : status === "kihagyva" ? "var(--ui-warning-text)" : "var(--ui-text-muted)";
   return (
     <span title={detail} style={{ fontSize: 14, color }}>
       {status}{detail ? ` · ${detail}` : ""}

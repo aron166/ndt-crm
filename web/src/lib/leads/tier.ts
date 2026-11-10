@@ -27,15 +27,6 @@ export const TIER_LABEL: Record<LeadTier, string> = {
   E: "Nurture",
 };
 
-/** Board/card colours. Neutral except A, which doubles as the overdue-flag danger colour (LeadsKanban). */
-export const TIER_COLOR: Record<LeadTier, string> = {
-  A: "var(--ui-text)",
-  B: "var(--ui-text)",
-  C: "var(--ui-text-muted)",
-  D: "var(--ui-text-muted)",
-  E: "var(--ui-text-disabled)",
-};
-
 // ── Answer normalisation ────────────────────────────────────────────
 // The landing form posts canonical tokens; a setter types Hungarian free text
 // into the same slots. Both must tier the same way, so every answer is folded to

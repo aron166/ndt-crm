@@ -22,7 +22,7 @@ export default function AppError({
         Valami hiba történt.
       </p>
       {error.digest && (
-        <p className="ui-code" style={{ fontSize: 12, color: "var(--ui-text-disabled)" }}>
+        <p className="ui-code" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
           {error.digest}
         </p>
       )}

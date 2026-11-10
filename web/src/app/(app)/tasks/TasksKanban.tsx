@@ -61,17 +61,12 @@ function isOverdue(dueDate: Date | null, status: string) {
   return new Date(dueDate) < new Date(new Date().toDateString());
 }
 
-function avatarColor(name: string) {
-  void name; // one neutral avatar style (taste rules)
-  return "var(--ui-surface-muted)";
-}
-
 function PersonAvatar({ name }: { name: string }) {
   const initials = name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
   return (
     <span
       className="inline-flex items-center justify-center rounded-full shrink-0"
-      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name), color: "var(--ui-text-muted)" }}
+      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" }}
     >
       {initials}
     </span>

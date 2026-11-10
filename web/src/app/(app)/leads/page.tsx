@@ -9,7 +9,7 @@ import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact, tierAFlag } from "@/lib/leads/first-contact";
 import { MAIN_STAGES, SIDE_STAGES } from "@/lib/leads/lifecycle";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
-import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { TIERS, TIER_LABEL, isTier } from "@/lib/leads/tier";
 import { getActor } from "@/lib/actor";
 import { LeadsHeader } from "./queue/LeadsHeader";
 import { CallQueue } from "./queue/CallQueue";
@@ -198,16 +198,16 @@ export default async function LeadsPage({
     callbackDueAt: extras.get(l.id)?.callbackDueAt ?? null,
   }));
 
-  const tierPill = (href: string, active: boolean, label: string, color?: string) => (
+  const tierPill = (href: string, active: boolean, label: string) => (
     <Link
       key={href}
       href={href}
       className="rounded-full"
       style={{
         minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
-        background: active ? (color ? "var(--ui-hover)" : "var(--ui-accent-surface)") : "var(--ui-surface)",
-        color: active ? (color ?? "var(--ui-text-link)") : "var(--ui-text-muted)",
-        border: `1px solid ${active ? (color ?? "var(--ui-accent)") : "var(--ui-border)"}`,
+        background: active ? "var(--ui-accent-surface)" : "var(--ui-surface)",
+        color: active ? "var(--ui-text)" : "var(--ui-text-muted)",
+        border: `1px solid ${active ? "var(--ui-border-strong)" : "var(--ui-border)"}`,
       }}
     >
       {label}
@@ -236,7 +236,7 @@ export default async function LeadsPage({
   const TierFilter = (
     <div className="flex flex-wrap items-center gap-2">
       {tierPill(hrefWith("tier", null), tier === null, "Mind")}
-      {TIERS.map((t) => tierPill(hrefWith("tier", t), tier === t, `${t} · ${TIER_LABEL[t]}`, TIER_COLOR[t]))}
+      {TIERS.map((t) => tierPill(hrefWith("tier", t), tier === t, `${t} · ${TIER_LABEL[t]}`))}
     </div>
   );
 

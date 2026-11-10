@@ -77,7 +77,7 @@ export const STATUS_TONES: Record<ContentStatus, StatusTone> = {
   rewrite_requested: { fg: "var(--ui-danger-text)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
   ai_working: { fg: "var(--ui-text-muted)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
   live: { fg: "var(--ui-success-text)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
-  archived: { fg: "var(--ui-text-disabled)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
+  archived: { fg: "var(--ui-text-muted)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
 };
 
 export function statusTone(status: string): StatusTone {

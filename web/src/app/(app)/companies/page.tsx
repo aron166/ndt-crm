@@ -22,16 +22,11 @@ import s from "./companies.module.css";
 const PAGE_SIZE = 30;
 const TENANT_ID = 1;
 
-function avatarBg(id: number) {
-  void id; // one neutral avatar style (taste rules)
-  return "var(--ui-surface-muted)";
-}
-
 const FRESHNESS_COLOR: Record<string, string> = {
-  mint:   "var(--ui-success)",
+  mint:   "var(--ui-success-text)",
   mute:   "var(--ui-text-muted)",
-  amber:  "var(--ui-warning)",
-  coral:  "var(--ui-danger)",
+  amber:  "var(--ui-warning-text)",
+  coral:  "var(--ui-danger-text)",
 };
 
 const PIPELINE_LABELS: Record<string, string> = {
@@ -231,7 +226,7 @@ export default async function CompaniesPage({
                   {/* Avatar */}
                   <td className={s.avatarCell}>
                     <Link href={`/companies/${c.id}`}>
-                      <div className={s.avatarSm} style={{ background: avatarBg(c.id) }}>
+                      <div className={s.avatarSm}>
                         {initials}
                       </div>
                     </Link>

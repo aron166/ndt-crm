@@ -7,14 +7,9 @@ import { upsertCustomField, deleteCustomField } from "@/app/actions/custom-field
 import { Plus, Trash2, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Input } from "@/components/ui/input";
+import { DEFAULT_STAGE_COLORS as STAGE_COLORS, DEFAULT_DATA_COLOR } from "@/lib/data-colors";
 import k from "@/components/astryx/page.module.css";
 import s from "./setup.module.css";
-
-const STAGE_COLORS = [
-  "#64748b", "#6366f1", "#8b5cf6", "#3b82f6", // design-allow: user data colour
-  "#06b6d4", "#22c55e", "#f97316", "#f59e0b", // design-allow: user data colour
-  "#ef4444", "#f43f5e", // design-allow: user data colour
-];
 
 interface Stage {
   id: number; name: string; color: string;
@@ -390,7 +385,7 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
   const [addingField, setAddingField] = useState<number | null>(null);
   const [expandedFields, setExpandedFields] = useState<Set<number>>(new Set());
   const [newStageName, setNewStageName] = useState("");
-  const [newStageColor, setNewStageColor] = useState("#6366f1"); // design-allow: user data colour
+  const [newStageColor, setNewStageColor] = useState<string>(DEFAULT_DATA_COLOR);
   const [isPending, startTransition] = useTransition();
 
   function handleNewPipeline(e: React.FormEvent) {

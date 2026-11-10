@@ -4,7 +4,7 @@
 .topRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-block-end: 16px; }
 .topRow > a { margin-block-end: 0; }
 .metaLine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 14px; color: var(--ui-text-muted); }
-.avatar { position: relative; display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; font-size: 15px; font-weight: 600; color: var(--ui-text-muted); }
+.avatar { background: var(--ui-surface-muted); position: relative; display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; font-size: 15px; font-weight: 600; color: var(--ui-text-muted); }
 .taxNo { font-size: 14px; color: var(--ui-text-muted); overflow-wrap: anywhere; }
 .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 0; border-radius: var(--ui-radius-control); background: var(--ui-surface-muted); color: var(--ui-text-muted); font-family: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .tagRow { margin-block-end: 18px; }
@@ -40,7 +40,7 @@
 .listTable tr { height: 52px; }
 .listTable td { vertical-align: middle; }
 .avatarCell { width: 40px; }
-.avatarSm { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--ui-text-muted); }
+.avatarSm { background: var(--ui-surface-muted); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--ui-text-muted); }
 .nameCell { min-width: 0; }
 .name { font-size: 15px; font-weight: 600; color: var(--ui-text); text-decoration: none; overflow-wrap: anywhere; }
 .name:hover { text-decoration: underline; }

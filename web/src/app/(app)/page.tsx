@@ -13,7 +13,7 @@ import { UI } from "@/lib/content/labels";
 const TENANT_ID = 1;
 
 const FRESHNESS_COLOR: Record<string, string> = {
-  mint: "var(--ui-success)", mute: "var(--ui-text-muted)", amber: "var(--ui-warning)", coral: "var(--ui-danger)",
+  mint: "var(--ui-success-text)", mute: "var(--ui-text-muted)", amber: "var(--ui-warning-text)", coral: "var(--ui-danger-text)",
 };
 const INTERACTION_LABEL: Record<string, string> = {
   call: "Hívás", email: "Email", meeting: "Találkozó", site_visit: "Helyszíni", note: "Megjegyzés",

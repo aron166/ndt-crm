@@ -77,7 +77,6 @@ interface Props {
   conversations: Conversation[];
   engagementSeries: number[];
   signalLevel: number;
-  avatarColor: string;
   initials: string;
   initialTags: { id: number; name: string; color: string }[];
   auditEntries: Parameters<typeof AuditLogEntries>[0]["entries"];
@@ -85,7 +84,7 @@ interface Props {
 
 export function PersonDetailClient({
   person, contacts, interactions, tasks, conversations,
-  engagementSeries, signalLevel, avatarColor, initials, initialTags, auditEntries,
+  engagementSeries, signalLevel, initials, initialTags, auditEntries,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("activity");
@@ -238,7 +237,7 @@ export function PersonDetailClient({
             </button>
             <button
               className={`${k.btn} ${k.btnIcon}`}
-              style={{ color: "var(--ui-danger)" }}
+              style={{ color: "var(--ui-danger-text)" }}
               onClick={handleDelete}
               disabled={deleting}
               title="Személy törlése"
@@ -552,7 +551,7 @@ export function PersonDetailClient({
           <div className={k.card}>
             <div style={{
               width: 48, height: 48, borderRadius: "50%",
-              background: avatarColor, display: "grid", placeItems: "center",
+              background: "var(--ui-surface-muted)", display: "grid", placeItems: "center",
               fontWeight: 600, fontSize: 16, color: "var(--ui-text-muted)",
             }}>
               {initials}
@@ -610,7 +609,7 @@ export function PersonDetailClient({
                 <div style={{
                   width: 42, height: 42, borderRadius: "var(--ui-radius-control)",
                   background: "var(--ui-surface-muted)", display: "grid", placeItems: "center",
-                  fontWeight: 600, fontSize: 14, color: "var(--ui-accent)", flexShrink: 0,
+                  fontWeight: 600, fontSize: 14, color: "var(--ui-text-link)", flexShrink: 0,
                 }}>
                   {currentContact.company.name.slice(0, 2).toUpperCase()}
                 </div>

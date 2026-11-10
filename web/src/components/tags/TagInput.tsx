@@ -3,14 +3,9 @@
 import { useState, useRef, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_STAGE_COLORS as PRESET_COLORS, DEFAULT_DATA_COLOR } from "@/lib/data-colors";
 import { TagChip } from "./TagChip";
 import { addTag, removeTag, type TaggableType } from "@/app/actions/tags";
-
-const PRESET_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", // design-allow: user data colour
-  "#f97316", "#eab308", "#22c55e", "#14b8a6", // design-allow: user data colour
-  "#3b82f6", "#64748b", // design-allow: user data colour
-];
 
 interface Tag { id: number; name: string; color: string; }
 
@@ -25,7 +20,7 @@ export function TagInput({ taggableType, taggableId, initialTags }: TagInputProp
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Tag[]>([]);
   const [open, setOpen] = useState(false);
-  const [pendingColor, setPendingColor] = useState(PRESET_COLORS[0]);
+  const [pendingColor, setPendingColor] = useState<string>(DEFAULT_DATA_COLOR);
   const [isPending, startTransition] = useTransition();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);

@@ -6,7 +6,7 @@ textarea.field { resize: vertical; line-height: 1.6; }
 .stackXs { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .btnRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.late.late { color: var(--ui-danger); }
+.late.late { color: var(--ui-danger-text); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .panelPad { padding: 16px 18px; background: var(--ui-surface); border-radius: var(--ui-radius-surface); box-shadow: var(--ui-shadow-raised); }
 .warn { padding: 12px 16px; background: color-mix(in srgb, var(--ui-danger) 8%, transparent); border: 1px solid var(--ui-danger); border-radius: var(--ui-radius-surface); color: var(--ui-danger-text); font-size: 14px; }

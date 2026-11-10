@@ -16,7 +16,6 @@ import s from "../companies.module.css";
 const TENANT_ID = 1;
 
 // One neutral avatar style (taste rules): no per-name colours.
-const AVATAR_PALETTE = ["var(--ui-surface-muted)"];
 
 export default async function CompanyDetailPage({
   params,
@@ -97,7 +96,6 @@ export default async function CompanyDetailPage({
     { label: "Interakciók",     value: interactions.length },
   ];
 
-  const avatarColor = AVATAR_PALETTE[companyId % AVATAR_PALETTE.length];
   const initials = company.name.slice(0, 3).toUpperCase();
   const mapsConnected = await isConnected();
 
@@ -122,7 +120,6 @@ export default async function CompanyDetailPage({
         revenueSeries={revenueSeries}
         engagementBreakdown={engagementBreakdown}
         kpis={kpis}
-        avatarColor={avatarColor}
         initials={initials}
         initialTags={initialTags}
         auditEntries={serializeDates(auditEntries)}

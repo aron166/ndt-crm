@@ -121,7 +121,7 @@ function DealCard({
           top: 6, right: 6, width: 40, height: 40,
           color: "var(--ui-text-muted)", background: "var(--ui-surface-muted)",
         }}
-        onMouseOver={(e) => { e.currentTarget.style.color = "var(--ui-danger)"; }}
+        onMouseOver={(e) => { e.currentTarget.style.color = "var(--ui-danger-text)"; }}
         onMouseOut={(e) => { e.currentTarget.style.color = "var(--ui-text-muted)"; }}
       >
         <Trash2 style={{ width: 12, height: 12 }} />
@@ -275,8 +275,8 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
               key={stage.id}
               className="kcol mount"
               style={{
-                background: isHover ? `color-mix(in srgb, ${stage.color} 6%, transparent)` : "var(--ui-surface-muted)",
-                border: `1px solid ${isHover ? stage.color : "var(--ui-border)"}`,
+                background: isHover ? "var(--ui-hover)" : "var(--ui-surface-muted)",
+                border: `1px solid ${isHover ? "var(--ui-border-strong)" : "var(--ui-border)"}`,
                 transition: "border-color .15s, background .15s",
               }}
               onDragOver={(e) => { e.preventDefault(); setHoverStage(stage.id); }}

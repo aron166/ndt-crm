@@ -63,7 +63,7 @@ function ConfidenceBar({ value }: { value: number }) {
 
 function SourceBadge({ source }: { source: string }) {
   const color =
-    source === "registry" ? "var(--ui-success)" :
+    source === "registry" ? "var(--ui-success-text)" :
     source === "inference" ? "var(--ui-accent)" :
     "var(--ui-text-muted)";
   return (

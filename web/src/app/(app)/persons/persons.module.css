@@ -1,6 +1,6 @@
 /* Person list, Astryx tokens only. Table, header and pager come from the page kit. */
 .row { height: 52px; }
-.avatar { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 12px; font-weight: 700; color: var(--ui-text-muted); }
+.avatar { background: var(--ui-surface-muted); display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 12px; font-weight: 700; color: var(--ui-text-muted); }
 .name { font-size: 15px; font-weight: 600; color: var(--ui-text); text-decoration: none; overflow-wrap: anywhere; }
 .name:hover { text-decoration: underline; }
 .nowrap { white-space: nowrap; }

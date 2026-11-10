@@ -84,7 +84,6 @@ interface Props {
   revenueSeries: number[];
   engagementBreakdown: { label: string; value: number; color: string }[];
   kpis: { label: string; value: string | number }[];
-  avatarColor: string;
   initials: string;
   initialTags: { id: number; name: string; color: string }[];
   auditEntries: Parameters<typeof AuditLogEntries>[0]["entries"];
@@ -123,7 +122,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export function CompanyDetailClient({
   company, contacts, interactions, tasks, appEvents, mapsConnected,
-  revenueSeries, engagementBreakdown, kpis, avatarColor, initials, initialTags, auditEntries, attributes,
+  revenueSeries, engagementBreakdown, kpis, initials, initialTags, auditEntries, attributes,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState("overview");
@@ -258,7 +257,7 @@ export function CompanyDetailClient({
         title={company.name}
         eyebrow={
           <span className={s.metaLine}>
-            <span className={s.avatar} aria-hidden="true" style={{ background: avatarColor }}>
+            <span className={s.avatar} aria-hidden="true">
               {initials}
               <span style={{ position: "absolute", inset: 0, borderRadius: 10, boxShadow: "var(--ui-shadow-raised)" }} />
             </span>
@@ -842,7 +841,7 @@ export function CompanyDetailClient({
               {company.isPedCompliant !== null && (
                 <div className={k.kv}>
                   <span>PED megfelelőség</span>
-                  <span style={{ color: company.isPedCompliant ? "var(--ui-success)" : "var(--ui-text-muted)" }}>
+                  <span style={{ color: company.isPedCompliant ? "var(--ui-success-text)" : "var(--ui-text-muted)" }}>
                     {company.isPedCompliant ? "Igen" : "Nem"}
                   </span>
                 </div>

@@ -87,7 +87,7 @@ function FilterGroup({
         </span>
         {selectedCount > 0 && (
           <span className="rounded-full px-1.5"
-            style={{ fontSize: 12, background: "var(--ui-surface-muted)", color: "var(--ui-accent)" }}>
+            style={{ fontSize: 12, background: "var(--ui-surface-muted)", color: "var(--ui-text-link)" }}>
             {selectedCount}
           </span>
         )}

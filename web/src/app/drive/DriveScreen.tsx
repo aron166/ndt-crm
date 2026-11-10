@@ -7,7 +7,7 @@ import { queueCallTranscript } from "@/app/actions/calls";
 import { AUTO_OUTCOME_LABELS } from "@/lib/calls/auto-outcome";
 import { CALL_OUTCOMES, CALL_OUTCOMES_NEEDING_DETAIL, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX, type CallOutcomeKey } from "@/lib/leads/outcomes";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
-import { TIER_COLOR, TIER_LABEL, isTier } from "@/lib/leads/tier";
+import { TIER_LABEL, isTier } from "@/lib/leads/tier";
 import type { DriveLead } from "@/lib/leads/drive";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import Link from "next/link";
@@ -41,7 +41,7 @@ function outcomeBtnStyle(tone: "red" | "green" | undefined): React.CSSProperties
     fontSize: 16, fontWeight: 600, borderRadius: 10,
     border: "1px solid " + (tone === "red" ? "var(--ui-danger)" : tone === "green" ? "var(--ui-success)" : "var(--ui-border-strong)"),
     background: tone === "red" ? "var(--ui-danger-surface)" : tone === "green" ? "var(--ui-success-surface)" : "var(--ui-surface)",
-    color: tone === "red" ? "var(--ui-danger)" : tone === "green" ? "var(--ui-success)" : "var(--ui-text)",
+    color: tone === "red" ? "var(--ui-danger-text)" : tone === "green" ? "var(--ui-success-text)" : "var(--ui-text)",
     cursor: "pointer",
   };
 }
@@ -218,7 +218,6 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
     lead.message,
   ].filter((v): v is string => !!v && v.trim().length > 0);
 
-  const tierColor = lead.tier && isTier(lead.tier) ? TIER_COLOR[lead.tier] : "var(--ui-text-muted)";
   const tierLabel = lead.tier && isTier(lead.tier) ? TIER_LABEL[lead.tier] : lead.tier;
 
   return (
@@ -238,7 +237,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, alignItems: "center" }}>
           {lead.city && <span style={{ fontSize: 14, color: "var(--ui-text-muted)" }}>{lead.city}</span>}
           {lead.tier && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: tierColor, border: `1px solid ${tierColor}`, borderRadius: 999, padding: "2px 8px" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ui-text)", border: "1px solid var(--ui-border-strong)", borderRadius: 999, padding: "2px 8px" }}>
               {tierLabel}
             </span>
           )}

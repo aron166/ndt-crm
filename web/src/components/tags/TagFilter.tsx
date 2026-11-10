@@ -6,6 +6,7 @@ import { TagChip } from "./TagChip";
 import { Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DEFAULT_DATA_COLOR } from "@/lib/data-colors";
 
 interface TagOption { id: number; name: string; color: string; }
 interface TagFilterProps { activeTagName?: string; }
@@ -46,7 +47,7 @@ function TagFilterInner({ activeTagName }: TagFilterProps) {
     return (
       <div className="flex items-center gap-2">
         <span className="text-xs" style={{ color: "var(--ui-text-muted)" }}>Szűrés:</span>
-        <TagChip name={activeTagName} color="#6366f1" /* design-allow: user data colour */ onRemove={clearTag} />
+        <TagChip name={activeTagName} color={DEFAULT_DATA_COLOR} onRemove={clearTag} />
       </div>
     );
   }

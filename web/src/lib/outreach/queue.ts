@@ -32,9 +32,9 @@ export interface CallOutcome {
 export const CALL_OUTCOMES: CallOutcome[] = [
   { key: "no_answer",      label: "Nem vették fel", interactionOutcome: "no_answer",      tone: "var(--ui-text-muted)", followupDays: 3 },
   { key: "interested",     label: "Érdeklődik",     interactionOutcome: "interested",     tone: "var(--ui-text-muted)", followupDays: 7 },
-  { key: "wants",          label: "Kéri / akarja",  interactionOutcome: "wants",          tone: "var(--ui-success)",  followupDays: 2 },
-  { key: "not_interested", label: "Nem érdekli",    interactionOutcome: "not_interested", tone: "var(--ui-danger)", followupDays: 0 },
-  { key: "bad_number",     label: "Rossz szám",     interactionOutcome: "bad_number",     tone: "var(--ui-text-disabled)", followupDays: 0 },
+  { key: "wants",          label: "Kéri / akarja",  interactionOutcome: "wants",          tone: "var(--ui-success-text)",  followupDays: 2 },
+  { key: "not_interested", label: "Nem érdekli",    interactionOutcome: "not_interested", tone: "var(--ui-danger-text)", followupDays: 0 },
+  { key: "bad_number",     label: "Rossz szám",     interactionOutcome: "bad_number",     tone: "var(--ui-text-muted)", followupDays: 0 },
   { key: "note_only",      label: "Csak jegyzet",   interactionOutcome: "note",           tone: "var(--ui-text-muted)",  followupDays: 0 },
 ];
 

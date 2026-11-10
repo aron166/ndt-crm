@@ -237,7 +237,7 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
             <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-[var(--ui-text-muted)] flex items-center justify-between">
               <span>Költség / elszámolás</span>
               {liveAmount != null && (
-                <span className="text-[var(--ui-text-muted)]">{formatHUF(liveAmount)}</span>
+                <span className="text-[var(--ui-text-muted)] tabular-nums">{formatHUF(liveAmount)}</span>
               )}
             </summary>
             <div className="px-3 pb-3 space-y-3">
@@ -285,10 +285,10 @@ export function TaskModal({ open, onClose, initial }: TaskModalProps) {
               </div>
               <p className="text-xs text-[var(--ui-text-muted)]">
                 Összeg:{" "}
-                <span className="text-[var(--ui-text)]">
+                <span className="text-[var(--ui-text)] tabular-nums">
                   {liveAmount != null ? formatHUF(liveAmount) : "-"}
                 </span>
-                <span className="text-[var(--ui-text-disabled)]"> · mennyiség × egységár, automatikusan</span>
+                <span className="text-[var(--ui-text-muted)]"> · mennyiség × egységár, automatikusan</span>
               </p>
             </div>
           </details>

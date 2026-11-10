@@ -50,8 +50,8 @@ const STATUS_TONE: Record<DraftStatus, string> = {
   draft: "var(--ui-text-muted)",
   approved: "var(--ui-accent)",
   sending: "var(--ui-accent)",
-  sent: "var(--ui-success)",
-  failed: "var(--ui-danger)",
+  sent: "var(--ui-success-text)",
+  failed: "var(--ui-danger-text)",
   replied: "var(--ui-text-muted)",
   cancelled: "var(--ui-text-muted)",
 };
