@@ -129,6 +129,8 @@ export function LeadDetailClient({
   // Old ?tab=overview / ?tab=offers deep links land with the details open.
   const [detailsOpen, setDetailsOpen] = useState(tab === "overview" || tab === "offers");
   const [actionError, setActionError] = useState<string | null>(null);
+  // An outcome note, not an error: booked, but the stage stays (the kind did not match the suggestion).
+  const [actionNote, setActionNote] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const moveLock = useRef(false);
   const bookedLock = useRef(false);
@@ -234,7 +236,7 @@ export function LeadDetailClient({
       setBooking(null);
       if (b?.event && b.to) {
         if (kind === b.kind) runMove(b.to, b.event);
-        else setActionError("Lefoglalva; a szakasz nem változott."); // PROPOSAL copy
+        else setActionNote("Lefoglalva; a szakasz nem változott."); // PROPOSAL copy
       }
       // Call mode: log the call as "meeting booked" with the typed note.
       if (calling) { setPadOutcome("meeting_booked"); setLogging(true); }
@@ -306,6 +308,7 @@ export function LeadDetailClient({
       />
 
       {actionError && <p className={s.error} role="alert">{actionError}</p>}
+      {actionNote && <p className={s.muted} role="status">{actionNote}</p>}
 
       {calling && (
         <CallMode
