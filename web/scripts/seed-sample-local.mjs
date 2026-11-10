@@ -5,7 +5,8 @@
  * Usage (always override, web/.env points at production):
  *   DATABASE_URL=postgresql://postgres:pg@localhost:55442/ndt_crm node scripts/seed-sample-local.mjs
  *
- * Refuses to run unless DATABASE_URL host is localhost or 127.0.0.1.
+ * Refuses to run unless DATABASE_URL host is localhost or 127.0.0.1 AND the
+ * database is ndt_crm (a tunnel to Supabase arrives as localhost/postgres).
  *
  * Idempotency: every row this script owns has a fixed id >= 9000 (users,
  * persons, companies, contacts, leads, tasks, interactions, history). A run
@@ -19,9 +20,10 @@ import pg from "pg";
 
 const url = process.env.DATABASE_URL ?? "";
 let host = "";
-try { host = new URL(url).hostname; } catch { /* handled below */ }
-if (host !== "localhost" && host !== "127.0.0.1") {
-  console.error(`Refusing to run: DATABASE_URL host must be localhost or 127.0.0.1 (got "${host || "none"}").`);
+let dbName = "";
+try { const u = new URL(url); host = u.hostname; dbName = u.pathname.slice(1); } catch { /* handled below */ }
+if ((host !== "localhost" && host !== "127.0.0.1") || dbName !== "ndt_crm") {
+  console.error(`Refusing to run: DATABASE_URL must be localhost or 127.0.0.1 with database ndt_crm (got "${host || "none"}/${dbName || "none"}").`);
   process.exit(1);
 }
 
