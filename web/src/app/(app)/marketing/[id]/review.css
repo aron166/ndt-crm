@@ -104,8 +104,9 @@
 
 /* ── Reading pane ───────────────────────────────────────── */
 .review-body {
-  max-width: 72ch;
-  font-size: 15px;
+  /* Reading text for the reviewer: kept at the pre-redesign 18px / 68ch. */
+  max-width: 68ch;
+  font-size: 18px;
   line-height: 1.6;
   color: var(--color-text-primary);
   font-family: var(--font-sans, inherit);

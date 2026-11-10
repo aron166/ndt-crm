@@ -17,11 +17,12 @@ export function MarketingTabs({ active }: { active: Active }) {
 
 /** Page title + the four marketing tabs + the pipeline line, shared by every tab page. */
 export function MarketingHeader({
-  active, title, eyebrow, actions, filters,
+  active, title, eyebrow, help, actions, filters,
 }: {
   active: Active;
   title: ReactNode;
   eyebrow?: ReactNode;
+  help?: ReactNode;
   actions?: ReactNode;
   filters?: ReactNode;
 }) {
@@ -29,7 +30,7 @@ export function MarketingHeader({
     <PageHeader
       title={title}
       eyebrow={eyebrow}
-      help={UI.pipeline.join(" → ")}
+      help={help ?? UI.pipeline.join(" → ")}
       views={<MarketingTabs active={active} />}
       actions={actions}
       filters={filters}

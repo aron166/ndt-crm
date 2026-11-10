@@ -21,7 +21,7 @@ export default async function DecisionsPage() {
   if (userId == null || !reviewers.includes(userId)) {
     return (
       <div className="mount">
-        <MarketingHeader active="decisions" title={UI.decisionsTitle} eyebrow={UI.decisionsLead} />
+        <MarketingHeader active="decisions" title={UI.decisionsTitle} help={UI.decisionsLead} />
         <div className={`${k.empty} ${s.emptyC}`}>{UI.notReviewer}</div>
       </div>
     );
@@ -32,7 +32,7 @@ export default async function DecisionsPage() {
   return (
     <div className="mount">
       <RefreshOnFocus />
-      <MarketingHeader active="decisions" title={UI.decisionsTitle} eyebrow={UI.decisionsLead} />
+      <MarketingHeader active="decisions" title={UI.decisionsTitle} help={UI.decisionsLead} />
       <DecisionsClient queue={queue} />
     </div>
   );
