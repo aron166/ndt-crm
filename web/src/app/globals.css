@@ -894,3 +894,10 @@
 .crm-search:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .crm-search span { flex: 1; }
 .crm-nav-email { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Shell overflow guard (Aron's prod report 2026-11-10: nav shifted off the left edge, pages cut on the right).
+   The page itself never scrolls sideways; a screen wider than the content column scrolls inside that column.
+   overflow: hidden backs up Astryx's overflow: clip for browsers without clip. */
+html, body { overflow-x: hidden; }
+.astryx-app-shell { overflow: hidden; }
+.astryx-layout-content { min-width: 0; overflow-x: auto; }

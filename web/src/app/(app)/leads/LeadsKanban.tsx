@@ -41,6 +41,7 @@ interface Lead {
   attempts: number;
   nextAction: string | null;
   nextDue: string | null;
+  owner?: string | null;
   recallDate: string | null;
   company: { id: number; name: string } | null;
   contact: {
@@ -222,6 +223,12 @@ function LeadCard({
       {(lead.nextAction || lead.nextDue) && (
         <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-soft)", marginBottom: 6 }}>
           {lead.nextAction}{lead.nextAction && lead.nextDue ? " · " : ""}{lead.nextDue ? shortDate(lead.nextDue) : ""}
+        </div>
+      )}
+      {lead.owner && (
+        <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>
+          {/* PROPOSAL copy */}
+          Felelős: {lead.owner}
         </div>
       )}
       {lead.recallDate && (

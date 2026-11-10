@@ -11,7 +11,7 @@ import { HStack } from "@astryxdesign/core/HStack";
 import { Text } from "@astryxdesign/core/Text";
 import { Kbd } from "@astryxdesign/core/Kbd";
 import {
-  Phone, Headset, ClipboardList, LayoutDashboard, Building2, Users, KanbanSquare, FileText, Receipt, Mail,
+  Inbox, Headset, ClipboardList, LayoutDashboard, Building2, Users, KanbanSquare, FileText, Receipt, Mail,
   Megaphone, Settings, MoreHorizontal, Zap, BarChart3, CalendarDays, ScrollText, Sparkles, Wallet, Upload,
   Search, Plus, LogOut,
 } from "lucide-react";
@@ -82,7 +82,7 @@ export function CrmSideNav({
     >
       <SideNavSection title="Mai munka">
         <SideNavItem
-          label="Mai hívólista" href="/leads" icon={Phone} isSelected={on("/leads")}
+          label="Leadek" href="/leads" icon={Inbox} isSelected={on("/leads")}
           endContent={counts.overdueLeads > 0 ? <Badge variant="error" label={`${counts.overdueLeads} késik`} /> : undefined}
         />
         <SideNavItem label="Hívás mód" href="/calls" icon={Headset} isSelected={on("/calls")} />
