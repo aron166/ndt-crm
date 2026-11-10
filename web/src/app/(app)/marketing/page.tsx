@@ -3,7 +3,9 @@ import { LayoutGrid, List } from "lucide-react";
 import { getActor } from "@/lib/actor";
 import { getInbox, getFilterOptions } from "@/lib/content/queries";
 import { UI } from "@/lib/content/labels";
-import { MarketingTabs } from "./MarketingTabs";
+import { MarketingHeader } from "./MarketingTabs";
+import k from "@/components/astryx/page.module.css";
+import s from "./marketing.module.css";
 import { InboxClient } from "./InboxClient";
 import { BoardClient } from "./BoardClient";
 import { RefreshOnFocus } from "@/components/RefreshOnFocus";
@@ -33,12 +35,8 @@ export default async function MarketingPage({
   if (userId == null) {
     return (
       <div className="mount">
-        <MarketingTabs active="inbox" />
-        <div className="panel">
-          <div className="panel-pad" style={{ textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }}>
-            {UI.notReviewer}
-          </div>
-        </div>
+        <MarketingHeader active="inbox" title="Anyagok" />
+        <div className={`${k.empty} ${s.emptyC}`}>{UI.notReviewer}</div>
       </div>
     );
   }
@@ -74,47 +72,42 @@ export default async function MarketingPage({
     return `/marketing?${qs.toString()}`;
   }
 
-  const segStyle = (active: boolean): React.CSSProperties => ({
-    display: "flex", alignItems: "center", gap: 6,
-    height: 32, padding: "0 12px", fontSize: 13, fontWeight: 500,
-    borderRadius: 6, textDecoration: "none",
-    color: active ? "var(--fg)" : "var(--fg-mute)",
-    background: active ? "var(--bg-hover)" : "transparent",
-  });
-
   return (
     <div className="mount">
       <RefreshOnFocus />
-      <MarketingTabs active="inbox" />
-
-      <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 16 }}>
-        <div
-          className="flex items-center gap-1"
-          style={{ padding: 3, background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8 }}
-        >
-          <Link href={hrefWith({ view: "board" })} style={segStyle(view === "board")}>
-            <LayoutGrid style={{ width: 14, height: 14 }} />
-            {UI.boardView}
-          </Link>
-          <Link href={hrefWith({ view: "list" })} style={segStyle(view === "list")}>
-            <List style={{ width: 14, height: 14 }} />
-            {UI.listView}
-          </Link>
-        </div>
-
-        <Link
-          href={hrefWith({ mine: onlyMine ? "0" : "1" })}
-          className="badge-ds dot"
-          style={{
-            height: 32, cursor: "pointer", textDecoration: "none",
-            color: onlyMine ? "var(--indigo)" : "var(--fg-mute)",
-            background: onlyMine ? "var(--indigo-soft)" : "var(--bg-raised)",
-            borderColor: onlyMine ? "var(--indigo-line)" : "var(--line-soft)",
-          }}
-        >
-          {UI.onlyMine}
-        </Link>
-      </div>
+      <MarketingHeader
+        active="inbox"
+        title="Anyagok"
+        filters={
+          <>
+            <nav className={k.seg} aria-label="Nézet">
+              <Link
+                href={hrefWith({ view: "board" })}
+                aria-current={view === "board" ? "page" : undefined}
+                className={`${k.segItem} ${view === "board" ? k.segItemOn : ""}`}
+              >
+                <LayoutGrid style={{ width: 14, height: 14, marginRight: 6 }} />
+                {UI.boardView}
+              </Link>
+              <Link
+                href={hrefWith({ view: "list" })}
+                aria-current={view === "list" ? "page" : undefined}
+                className={`${k.segItem} ${view === "list" ? k.segItemOn : ""}`}
+              >
+                <List style={{ width: 14, height: 14, marginRight: 6 }} />
+                {UI.listView}
+              </Link>
+            </nav>
+            <Link
+              href={hrefWith({ mine: onlyMine ? "0" : "1" })}
+              aria-current={onlyMine ? "true" : undefined}
+              className={`${k.btn} ${onlyMine ? s.toggleOn : ""}`}
+            >
+              {UI.onlyMine}
+            </Link>
+          </>
+        }
+      />
 
       {view === "board" ? (
         <BoardClient sections={sections} filterOptions={filterOptions} onlyMine={onlyMine} />

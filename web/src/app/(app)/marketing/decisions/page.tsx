@@ -2,7 +2,9 @@ import { getActor } from "@/lib/actor";
 import { getDecisionQueue } from "@/lib/content/queries";
 import { getContentReviewers } from "@/lib/content/reviewers";
 import { UI } from "@/lib/content/labels";
-import { MarketingTabs } from "../MarketingTabs";
+import { MarketingHeader } from "../MarketingTabs";
+import k from "@/components/astryx/page.module.css";
+import s from "../marketing.module.css";
 import { DecisionsClient } from "./DecisionsClient";
 import { RefreshOnFocus } from "@/components/RefreshOnFocus";
 
@@ -19,12 +21,8 @@ export default async function DecisionsPage() {
   if (userId == null || !reviewers.includes(userId)) {
     return (
       <div className="mount">
-        <MarketingTabs active="decisions" />
-        <div className="panel">
-          <div className="panel-pad" style={{ textAlign: "center", color: "var(--fg-mute)", fontSize: 14 }}>
-            {UI.notReviewer}
-          </div>
-        </div>
+        <MarketingHeader active="decisions" title={UI.decisionsTitle} eyebrow={UI.decisionsLead} />
+        <div className={`${k.empty} ${s.emptyC}`}>{UI.notReviewer}</div>
       </div>
     );
   }
@@ -34,11 +32,7 @@ export default async function DecisionsPage() {
   return (
     <div className="mount">
       <RefreshOnFocus />
-      <MarketingTabs active="decisions" />
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 600, color: "var(--fg)", marginBottom: 4 }}>{UI.decisionsTitle}</h1>
-        <p style={{ fontSize: 13, color: "var(--fg-mute)" }}>{UI.decisionsLead}</p>
-      </div>
+      <MarketingHeader active="decisions" title={UI.decisionsTitle} eyebrow={UI.decisionsLead} />
       <DecisionsClient queue={queue} />
     </div>
   );

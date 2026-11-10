@@ -8,6 +8,7 @@ import type { ContentCategory, Verdict } from "@/lib/content/types";
 import type { InboxSections, InboxRow } from "@/lib/content/queries";
 import { FilterBar, Pager } from "./InboxClient";
 import { BulkBar } from "./BulkBar";
+import s from "./marketing.module.css";
 
 const VERDICT_COLOR: Record<Verdict, string> = {
   approve: "var(--mint)",
@@ -22,12 +23,12 @@ function daysSince(iso: string): number {
 type ColumnKey = "draft" | "in_review" | "changes" | "ai_working" | "live" | "in_campaign";
 
 const COLUMNS: { key: ColumnKey; label: string; color: string; acceptsDrop: boolean }[] = [
-  { key: "draft", label: UI.columnDraft, color: "var(--fg-mute)", acceptsDrop: false },
+  { key: "draft", label: UI.columnDraft, color: "var(--color-text-secondary)", acceptsDrop: false },
   { key: "in_review", label: UI.columnInReview, color: "var(--amber)", acceptsDrop: false },
   { key: "changes", label: UI.columnChanges, color: "var(--coral)", acceptsDrop: true },
   { key: "ai_working", label: UI.columnAiWorking, color: "var(--violet)", acceptsDrop: false },
   { key: "live", label: UI.columnLive, color: "var(--mint)", acceptsDrop: false },
-  { key: "in_campaign", label: UI.columnInCampaign, color: "var(--fg-faint)", acceptsDrop: false },
+  { key: "in_campaign", label: UI.columnInCampaign, color: "var(--color-text-secondary)", acceptsDrop: false },
 ];
 
 /** Null = this status has no board column (archived), so the card is not shown. */
@@ -53,8 +54,8 @@ function Card({
       onDragEnd={onDragEnd}
       className="select-none"
       style={{
-        background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 8,
-        padding: "10px 12px", opacity: dragging ? 0.4 : 1, cursor: "grab",
+        background: "var(--color-background-card)", borderRadius: "var(--radius-container)", boxShadow: "var(--shadow-low)",
+        padding: "12px 14px", opacity: dragging ? 0.4 : 1, cursor: "grab",
       }}
     >
       <div className="flex items-start gap-2">
@@ -67,28 +68,28 @@ function Card({
         />
         <Link href={`/marketing/${item.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none" }}>
           <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 6 }}>
-            <span style={{ fontSize: 11, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            <span style={{ fontSize: 12, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
               {CATEGORY_LABEL[item.category as ContentCategory] ?? item.category}
             </span>
             {item.format && <span className="badge-ds slate">{item.format}</span>}
             {item.bouncedByRule && <span className="badge-ds coral">{UI.bouncedByRule}</span>}
             {item.openChecks > 0 && <span className="badge-ds amber">{UI.checksOpen(item.openChecks)}</span>}
             {item.selfScore !== null && (
-              <span className="badge-ds" style={{ color: "var(--fg-mute)" }}>
+              <span className="badge-ds" style={{ color: "var(--color-text-secondary)" }}>
                 {UI.selfScoreShort(Math.round(item.selfScore * 100))}
               </span>
             )}
           </div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)", marginBottom: 6, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 6, lineHeight: 1.3 }}>
             {item.title}
           </div>
           <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 4 }}>
             {item.verdicts.map((v) => (
-              <span key={v.reviewerId} className="flex items-center gap-1" style={{ fontSize: 11, color: "var(--fg-mute)" }}>
+              <span key={v.reviewerId} className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
                 <span
                   style={{
                     width: 7, height: 7, borderRadius: "50%",
-                    background: v.verdict ? VERDICT_COLOR[v.verdict as Verdict] : "var(--line-soft)",
+                    background: v.verdict ? VERDICT_COLOR[v.verdict as Verdict] : "var(--color-border-emphasized)",
                   }}
                 />
                 {v.reviewerName}: {v.verdict ? VERDICT_LABEL[v.verdict as Verdict] : UI.notYetReviewed}
@@ -96,7 +97,7 @@ function Card({
             ))}
           </div>
           {item.overdue && item.waitingSince && (
-            <span style={{ fontSize: 11, color: "var(--coral)", fontWeight: 500 }}>
+            <span style={{ fontSize: 12, color: "var(--coral)", fontWeight: 500 }}>
               {UI.waitingDays(daysSince(item.waitingSince))}
             </span>
           )}
@@ -173,13 +174,7 @@ export function BoardClient({
   return (
     <div className="mount">
       {sections.reviewers.length < 2 && (
-        <div
-          className="panel-pad"
-          style={{
-            background: "var(--coral-soft)", border: "1px solid var(--coral)",
-            borderRadius: 8, marginBottom: 16, color: "var(--coral)", fontSize: 14, fontWeight: 500,
-          }}
-        >
+        <div className={s.warn}>
           {UI.noReviewers}
         </div>
       )}
@@ -187,13 +182,7 @@ export function BoardClient({
       <FilterBar filterOptions={filterOptions} />
 
       {note && (
-        <div
-          className="panel-pad"
-          style={{
-            background: "var(--coral-soft)", border: "1px solid var(--coral)", borderRadius: 8,
-            marginBottom: 12, color: "var(--coral)", fontSize: 13, fontWeight: 500,
-          }}
-        >
+        <div className={s.warn} style={{ marginBlockEnd: 12 }}>
           {note}
         </div>
       )}
@@ -208,8 +197,8 @@ export function BoardClient({
               key={col.key}
               className="kcol"
               style={{
-                background: isHover && col.acceptsDrop ? `${col.color}10` : "var(--bg-col)",
-                border: `1px solid ${isHover && col.acceptsDrop ? col.color : "var(--line-soft)"}`,
+                background: isHover && col.acceptsDrop ? `color-mix(in srgb, ${col.color} 6%, transparent)` : "var(--color-background-muted)",
+                border: `1px solid ${isHover && col.acceptsDrop ? col.color : "var(--color-border)"}`,
                 width: 280, flexShrink: 0,
                 opacity: isMuted ? 0.55 : 1,
               }}
@@ -228,14 +217,14 @@ export function BoardClient({
                     onClick={() => selectAllIn(col.key)}
                     style={{
                       alignSelf: "flex-start", background: "transparent", border: "none", cursor: "pointer",
-                      fontSize: 11, color: "var(--fg-faint)", padding: "2px 0", minHeight: 22,
+                      fontSize: 12, color: "var(--color-text-secondary)", padding: "2px 0", minHeight: 24,
                     }}
                   >
                     {UI.selectAll}
                   </button>
                 )}
                 {cards.length === 0 ? (
-                  <div style={{ fontSize: 12, color: "var(--fg-faint)", padding: "8px 2px" }}>{UI.emptyColumn}</div>
+                  <div style={{ fontSize: 14, color: "var(--color-text-secondary)", padding: "8px 2px" }}>{UI.emptyColumn}</div>
                 ) : (
                   cards.map((item) => (
                     <Card

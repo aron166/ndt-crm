@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import k from "@/components/astryx/page.module.css";
 import { getActor } from "@/lib/actor";
 import { getReviewPage } from "@/lib/content/queries";
 import { signedViewUrls } from "@/lib/content/storage";
@@ -37,15 +38,9 @@ export default async function ContentReviewPage({
   return (
     <div>
       <RefreshOnFocus />
-      <div style={{ marginBottom: 16 }}>
-        <Link
-          href="/marketing"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
-          className="row-link"
-        >
-          ← Anyagok
-        </Link>
-      </div>
+      <Link href="/marketing" className={k.back}>
+        ← Anyagok
+      </Link>
 
       <ReviewClient
         key={data.item.currentVersionId ?? "none"}

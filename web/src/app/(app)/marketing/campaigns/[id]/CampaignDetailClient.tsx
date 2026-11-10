@@ -7,7 +7,6 @@ import { ArrowLeft, Download, Users, Pencil, Archive, ArchiveRestore } from "luc
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
@@ -17,6 +16,9 @@ import {
   updateCampaign, setCampaignAudience, setCampaignArchived, setCampaignOutreach,
 } from "@/app/actions/campaigns";
 import { FormField } from "@/components/ui/FormField";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "../../marketing.module.css";
 
 interface Campaign {
   id: number;
@@ -90,57 +92,57 @@ export function CampaignDetailClient({
 
   return (
     <div className="mount">
-      <div style={{ marginBottom: 16 }}>
-        <Link href="/marketing/campaigns" className="row-link"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}>
-          <ArrowLeft style={{ width: 14, height: 14 }} />
-          Vissza a kampányokhoz
-        </Link>
-      </div>
+      <Link href="/marketing/campaigns" className={k.back}>
+        <ArrowLeft style={{ width: 14, height: 14 }} />
+        Vissza a kampányokhoz
+      </Link>
 
-      <div className="page-head flex items-start justify-between gap-4">
-        <div style={{ minWidth: 0 }}>
-          <h1 className="page-title flex items-center gap-2">
+      <PageHeader
+        title={
+          <>
             {campaign.name}
             {campaign.isArchived && (
-              <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 20, background: "var(--bg-0)", color: "var(--fg-faint)", fontFamily: "var(--font-mono)" }}>
+              <span className="badge-ds slate" style={{ marginLeft: 12, verticalAlign: "middle" }}>
                 archivált
               </span>
             )}
-          </h1>
-          {campaign.description && <p className="page-sub">{campaign.description}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setEditOpen(true)} disabled={isPending}>
-            <Pencil className="size-3.5" /> Szerkesztés
-          </Button>
-          <Button variant="outline" onClick={toggleArchive} disabled={isPending}>
-            {campaign.isArchived ? <><ArchiveRestore className="size-3.5" /> Visszaállít</> : <><Archive className="size-3.5" /> Archivál</>}
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+        eyebrow={campaign.description ?? undefined}
+        actions={
+          <>
+            <button type="button" className={k.btn} onClick={() => setEditOpen(true)} disabled={isPending}>
+              <Pencil className="size-3.5" /> Szerkesztés
+            </button>
+            <button type="button" className={k.btn} onClick={toggleArchive} disabled={isPending}>
+              {campaign.isArchived ? <><ArchiveRestore className="size-3.5" /> Visszaállít</> : <><Archive className="size-3.5" /> Archivál</>}
+            </button>
+          </>
+        }
+      />
 
-      {error && <p className="text-sm text-red-600" style={{ marginBottom: 12 }}>{error}</p>}
+      {error && <p className={k.error} style={{ marginBottom: 12 }}>{error}</p>}
 
       {/* ── Kiküldés (sender + wave). PROPOSAL (unreviewed HU) ── */}
-      <section style={{ marginBottom: 28 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", marginBottom: 12 }}>
+      <section className={k.section}>
+        <h2 className={k.h2}>
           {/* PROPOSAL (unreviewed HU) */}
           Kiküldés
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <label style={{ fontSize: 14, color: "var(--fg-faint)" }}>Küldő:</label>
+        <div className={s.inlineRow}>
+          <label className={k.muted}>Küldő:</label>
           <select
             value={campaign.senderUserId ?? ""}
             onChange={(e) => pickOutreach({ senderUserId: e.target.value ? Number(e.target.value) : null })}
             disabled={isPending}
-            style={{ padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none", minWidth: 160 }}
+            className={s.field}
+            style={{ minWidth: 160 }}
           >
             {/* PROPOSAL (unreviewed HU) */}
             <option value="">Nincs még küldő</option>
             {senders.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <label style={{ fontSize: 14, color: "var(--fg-faint)" }}>Hullám:</label>
+          <label className={k.muted}>Hullám:</label>
           <Input
             type="number" min={1} max={52}
             defaultValue={campaign.currentWave ?? ""}
@@ -155,23 +157,23 @@ export function CampaignDetailClient({
             style={{ width: 90 }}
           />
         </div>
-        {outreachError && <p className="text-sm text-red-600" style={{ marginTop: 8 }}>{outreachError}</p>}
+        {outreachError && <p className={k.error} style={{ marginTop: 8 }}>{outreachError}</p>}
       </section>
 
       {/* ── Célközönség (audience) ── */}
-      <section style={{ marginBottom: 28 }}>
-        <div className="flex items-center justify-between gap-3" style={{ marginBottom: 12 }}>
-          <h2 className="flex items-center gap-2" style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>
+      <section className={k.section}>
+        <div className={s.sectionHeadRow}>
+          <h2 className={`${k.h2} ${s.iconText}`}>
             <Users className="size-4" /> Célközönség
           </h2>
           {campaign.slug && (
-            <div className="flex items-center gap-3 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+            <div className={k.meta}>
               {/* PROPOSAL (unreviewed HU) */}
-              <Link href={`/outreach/campaigns?campaign=${campaign.slug}`} style={{ color: "var(--indigo)" }}>
+              <Link href={`/outreach/campaigns?campaign=${campaign.slug}`} className={k.link}>
                 Outreach dashboard
               </Link>
               {/* PROPOSAL (unreviewed HU) */}
-              <Link href={`/outreach?campaign=${campaign.slug}`} style={{ color: "var(--indigo)" }}>
+              <Link href={`/outreach?campaign=${campaign.slug}`} className={k.link}>
                 Piszkozat sor
               </Link>
             </div>
@@ -179,8 +181,7 @@ export function CampaignDetailClient({
           {campaign.audienceViewId !== null && audience.count > 0 && (
             <a
               href={`/marketing/campaigns/${campaign.id}/export`}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm"
-              style={{ border: "1px solid var(--line-soft)", color: "var(--fg-soft)", background: "var(--bg-panel)" }}
+              className={k.btn}
             >
               <Download className="size-4" /> Export CSV
             </a>
@@ -191,65 +192,68 @@ export function CampaignDetailClient({
             once a segment is set: with none, every megkereshető company is a
             target and promising otherwise would be wrong on the screen that
             decides who gets cold-emailed. */}
-        <p style={{ fontSize: 14, color: "var(--fg-faint)", marginBottom: 10 }}>
+        <p className={k.muted} style={{ margin: 0 }}>
           {campaign.audienceViewId !== null
             ? "Ez a szegmens egyben a kimenő lista is: csak ezekhez a cégekhez készül piszkozat ebben a kampányban."
             : "Amíg nincs szegmens, minden megkereshető cég célpont ebben a kampányban."}
         </p>
 
-        <div className="flex flex-wrap items-center gap-2" style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 14, color: "var(--fg-faint)" }}>Szegmens:</label>
+        <div className={s.inlineRow}>
+          <label className={k.muted}>Szegmens:</label>
           <select
             value={campaign.audienceViewId ?? ""}
             onChange={(e) => pickAudience(e.target.value ? Number(e.target.value) : null)}
             disabled={isPending}
-            style={{ padding: "6px 10px", fontSize: 14, background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", outline: "none", minWidth: 200 }}
+            className={s.field}
+            style={{ minWidth: 200 }}
           >
             <option value="">Nincs célközönség</option>
             {companyViews.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
           {campaign.audienceViewId !== null && (
-            <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--indigo)" }}>
+            <span className={`${k.strong} ${k.num}`} style={{ color: "var(--color-text-accent)" }}>
               {audience.count.toLocaleString("hu-HU")} cég
             </span>
           )}
         </div>
 
         {companyViews.length === 0 && campaign.audienceViewId === null && (
-          <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>
-            Nincs mentett cégszegmens. A <Link href="/companies" style={{ color: "var(--indigo)" }}>Cégek</Link> oldalon
+          <p className={k.muted} style={{ margin: 0 }}>
+            Nincs mentett cégszegmens. A <Link href="/companies" className={k.link}>Cégek</Link> oldalon
             szűrj, majd mentsd el nézetként: itt választhatóvá válik.
           </p>
         )}
 
         {campaign.audienceViewId !== null && (
           audience.count === 0 ? (
-            <p style={{ fontSize: 14, color: "var(--fg-mute)" }}>Ez a szegmens jelenleg egyetlen céget sem ad vissza.</p>
+            <p className={k.muted} style={{ margin: 0 }}>Ez a szegmens jelenleg egyetlen céget sem ad vissza.</p>
           ) : (
-            <div style={{ border: "1px solid var(--line-soft)", borderRadius: 8, overflow: "hidden" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                <thead>
-                  <tr>
-                    {["Cég", "Adószám", "Város", "Pipeline"].map((h) => (
-                      <th key={h} style={{ textAlign: "left", padding: "8px 12px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--fg-faint)", borderBottom: "1px solid var(--line-soft)" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {audience.preview.map((c, i) => (
-                    <tr key={i}>
-                      <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg)" }}>{c.name}</td>
-                      <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)" }} className="font-mono-ndt">{c.vatNumber ?? "-"}</td>
-                      <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)" }}>
-                        {c.city ?? "-"}{c.county && <span style={{ color: "var(--fg-faint)", marginLeft: 6, fontSize: 12 }}>{c.county}</span>}
-                      </td>
-                      <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--line-soft)" }}><PipelineStatusBadge status={c.pipelineStatus} /></td>
+            <div>
+              <div className={k.tableWrap}>
+                <table className={k.table}>
+                  <thead>
+                    <tr>
+                      {["Cég", "Adószám", "Város", "Pipeline"].map((h) => (
+                        <th key={h}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {audience.preview.map((c, i) => (
+                      <tr key={i}>
+                        <td>{c.name}</td>
+                        <td className={k.num}>{c.vatNumber ?? "-"}</td>
+                        <td>
+                          {c.city ?? "-"}{c.county && <span className={k.muted} style={{ marginLeft: 6 }}>{c.county}</span>}
+                        </td>
+                        <td><PipelineStatusBadge status={c.pipelineStatus} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               {audience.count > audience.preview.length && (
-                <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--fg-faint)", background: "var(--bg-0)" }} className="font-mono-ndt">
+                <div className={`${k.cardMuted} ${k.muted} ${k.num}`}>
                   Első {audience.preview.length} a {audience.count.toLocaleString("hu-HU")} cégből; a teljes lista a CSV exportban.
                 </div>
               )}
@@ -259,24 +263,30 @@ export function CampaignDetailClient({
       </section>
 
       {/* ── Tartalmak (content items) ── */}
-      <section>
-        <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", marginBottom: 12 }}>
-          Tartalmak <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{contentItems.length}</span>
+      <section className={k.section}>
+        <h2 className={k.h2}>
+          Tartalmak <span className={`${k.muted} ${k.num}`}>{contentItems.length}</span>
         </h2>
         {contentItems.length === 0 ? (
-          <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>Ehhez a kampányhoz még nincs tartalom.</p>
+          <p className={k.muted} style={{ margin: 0 }}>Ehhez a kampányhoz még nincs tartalom.</p>
         ) : (
-          <div className="space-y-2">
+          <div>
             {contentItems.map((i) => (
-              <Link key={i.id} href={`/marketing/${i.id}`} className="tbl-row flex items-center justify-between gap-3"
-                style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", textDecoration: "none" }}>
-                <span style={{ fontSize: 14, color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</span>
-                <span className="flex items-center gap-3 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", whiteSpace: "nowrap" }}>
-                  <span>{CHANNEL_LABELS[i.channel as ContentChannel] ?? i.channel}</span>
-                  <span>{STATUS_LABELS[i.status as ContentStatus] ?? i.status}</span>
-                  <span>{formatRelativeTime(new Date(i.updatedAt))}</span>
-                </span>
-              </Link>
+              <div key={i.id} className={k.row}>
+                <span className={k.bar} />
+                <div className={k.cell}>
+                  <Link href={`/marketing/${i.id}`} className={k.name}>{i.title}</Link>
+                </div>
+                <div className={k.cell}>
+                  <span className={k.muted}>{CHANNEL_LABELS[i.channel as ContentChannel] ?? i.channel}</span>
+                </div>
+                <div className={k.cell}>
+                  <span className={k.muted}>{STATUS_LABELS[i.status as ContentStatus] ?? i.status}</span>
+                </div>
+                <div className={k.cellEnd}>
+                  <span className={k.muted}>{formatRelativeTime(new Date(i.updatedAt))}</span>
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -294,12 +304,12 @@ export function CampaignDetailClient({
             <FormField label="Leírás">
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
             </FormField>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className={k.error}>{error}</p>}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={isPending}>Mégse</Button>
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white" disabled={isPending}>
+              <button type="button" className={k.btn} onClick={() => setEditOpen(false)} disabled={isPending}>Mégse</button>
+              <button type="submit" className={`${k.btn} ${k.btnPrimary}`} disabled={isPending}>
                 {isPending ? "Mentés..." : "Mentés"}
-              </Button>
+              </button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -1,5 +1,5 @@
 import { getLibrary, getFilterOptions } from "@/lib/content/queries";
-import { MarketingTabs } from "../MarketingTabs";
+import { MarketingHeader } from "../MarketingTabs";
 import { LibraryClient } from "./LibraryClient";
 
 const TENANT_ID = 1;
@@ -32,7 +32,7 @@ export default async function MarketingLivePage({
 
   return (
     <div className="mount">
-      <MarketingTabs active="live" />
+      <MarketingHeader active="live" title="Élő anyagok" />
       <LibraryClient
         rows={library.rows}
         filterOptions={filterOptions}

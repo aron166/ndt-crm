@@ -1,4 +1,6 @@
 import { listCampaignKeys, listSenders, getCampaignStats, getCampaignStepTemplates } from "@/app/actions/outreach-campaigns";
+import k from "@/components/astryx/page.module.css";
+import s from "../outreach.module.css";
 import CampaignDashboard from "./CampaignDashboard";
 
 // Numbers computed from rows on every request — no cached counter to go stale.
@@ -23,7 +25,7 @@ export default async function CampaignsPage({
 
   if (!campaign) {
     return (
-      <div className="panel panel-pad" style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center" }}>
+      <div className={`${k.empty} ${s.emptyC}`}>
         Nincs adat ehhez a kampányhoz.
       </div>
     );

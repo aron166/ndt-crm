@@ -1,0 +1,26 @@
+/* Marketing screens: layout the Astryx kit lacks. Tokens only. */
+.field { box-sizing: border-box; min-height: 40px; max-width: 100%; padding: 6px 10px; font: inherit; font-size: 14px; background: var(--color-background-card); color: var(--color-text-primary); border: 1px solid var(--color-border-emphasized); border-radius: var(--radius-element); }
+.field:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.filterRow { display: flex; flex-wrap: wrap; gap: 8px; margin-block-end: 20px; }
+.stack { display: flex; flex-direction: column; gap: 20px; }
+.stackLg { display: flex; flex-direction: column; gap: 32px; }
+.stackSm { display: flex; flex-direction: column; gap: 8px; }
+.emptyC { align-items: center; text-align: center; }
+.iconText { display: inline-flex; align-items: center; gap: 6px; }
+.inlineRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sectionHeadRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.sectionHead { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.sectionToggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0 12px; background: transparent; border: 0; cursor: pointer; text-align: left; font: inherit; color: var(--color-text-primary); }
+.sectionHead > .sectionToggle { width: auto; padding: 0; }
+.selectAll { margin-inline-start: auto; }
+.settingsBody { padding: 0 20px 16px; }
+.optionRow { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-element); cursor: pointer; }
+.optionRow[data-checked="true"] { background: var(--color-background-muted); border-color: var(--color-border-emphasized); }
+.labelRow { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.check { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--color-accent); }
+.verdict { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.late { color: var(--color-error); }
+.warn { padding: 12px 16px; margin-block-end: 16px; background: color-mix(in srgb, var(--coral) 8%, transparent); border: 1px solid var(--coral); border-radius: var(--radius-container); color: var(--coral); font-size: 14px; font-weight: 500; }
+.toggleOn { background: var(--color-background-muted); border-color: var(--color-accent); }
+.preview { margin: 0; font-size: 15px; line-height: 1.6; max-width: 72ch; color: var(--color-text-primary); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { getDueTouches, markDraftSentManually, type DueTouch } from "@/app/actions/outreach-campaigns";
 import { canMarkSent } from "@/lib/outreach/campaign";
 import type { DraftStatus } from "@/lib/outreach/drafts";
+import k from "@/components/astryx/page.module.css";
+import s from "./outreach.module.css";
 
 type Sender = { id: number; name: string };
 
@@ -23,20 +25,16 @@ export function MarkSentControl({
 
   if (!open) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+      <div className={s.stackXs}>
         <button
           onClick={() => setOpen(true)}
           disabled={!!disabledReason}
           title={disabledReason ?? undefined}
-          style={{
-            fontSize: 13, fontWeight: 500, color: "var(--mint)", background: "var(--mint-soft)",
-            border: "1px solid var(--mint-line)", borderRadius: 8, padding: "6px 12px",
-            cursor: disabledReason ? "default" : "pointer", opacity: disabledReason ? 0.5 : 1,
-          }}
+          className={k.btn}
         >
           Kézzel elküldve
         </button>
-        {disabledReason && <span style={{ fontSize: 12, color: "var(--amber)" }}>{disabledReason}</span>}
+        {disabledReason && <span className={k.muted} style={{ color: "var(--amber)" }}>{disabledReason}</span>}
       </div>
     );
   }
@@ -56,39 +54,31 @@ export function MarkSentControl({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
+    <div className={s.stackXs}>
       <input
-        className="input-ds"
+        className={s.field}
         value={threadId}
         onChange={(e) => setThreadId(e.target.value)}
         placeholder="Gmail szál azonosító (nem kötelező)"
         disabled={pending}
-        style={{ fontSize: 13, color: "var(--fg)", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 10px" }}
       />
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className={s.btnRow}>
         <button
           onClick={submit}
           disabled={pending}
-          style={{
-            fontSize: 13, fontWeight: 500, color: "var(--mint)", background: "var(--mint-soft)",
-            border: "1px solid var(--mint-line)", borderRadius: 8, padding: "6px 12px",
-            cursor: pending ? "default" : "pointer", opacity: pending ? 0.5 : 1,
-          }}
+          className={`${k.btn} ${k.btnPrimary}`}
         >
           Rögzítés
         </button>
         <button
           onClick={() => setOpen(false)}
           disabled={pending}
-          style={{
-            fontSize: 13, color: "var(--fg-soft)", background: "var(--bg-raised)",
-            border: "1px solid var(--line-soft)", borderRadius: 8, padding: "6px 12px", cursor: "pointer",
-          }}
+          className={k.btn}
         >
           Mégse
         </button>
       </div>
-      {error && <div style={{ fontSize: 13, color: "var(--coral)" }}>{error}</div>}
+      {error && <div className={k.muted} style={{ color: "var(--coral)" }}>{error}</div>}
     </div>
   );
 }
@@ -110,53 +100,44 @@ export default function DueToday({ touches: initialTouches, senders }: { touches
   }
 
   return (
-    <div className="panel panel-pad" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--fg)" }}>Ma esedékes</h2>
+    <div className={k.card}>
+      <h2 className={k.h2}>Ma esedékes</h2>
       {touches.length === 0 ? (
-        <div style={{ fontSize: 14, color: "var(--fg-faint)" }}>Nincs ma esedékes érintés.</div>
+        <div className={k.muted}>Nincs ma esedékes érintés.</div>
       ) : (
         [...groups.entries()].map(([key, rows]) => (
-          <div key={key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-mute)" }}>
-              {key === "none" ? "Nincs kiválasztva" : senderName.get(Number(key)) ?? "Nincs kiválasztva"}
+          <div key={key} className={k.group}>
+            <div className={k.groupHead}>
+              <h3 className={k.groupTitle}>
+                {key === "none" ? "Nincs kiválasztva" : senderName.get(Number(key)) ?? "Nincs kiválasztva"}
+              </h3>
             </div>
             {rows.map((t) => {
               const overdue = new Date(t.dueAt) < new Date();
               return (
-                <div
-                  key={t.draftId}
-                  style={{
-                    display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10,
-                    padding: "8px 0", borderTop: "1px solid var(--line-soft)",
-                  }}
-                >
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>
+                <div key={t.draftId} className={k.row} data-u={overdue ? "overdue" : "today"}>
+                  <span className={k.bar} />
+                  <div className={k.cell}>
+                    <span className={k.name}>
                       {t.companyName}
-                      {t.personName && <span style={{ color: "var(--fg-faint)" }}> · {t.personName}</span>}
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+                      {t.personName && <span className={k.muted}> · {t.personName}</span>}
+                    </span>
+                    <span className={k.muted}>
                       {t.step}. érintés · {t.subject}
-                    </div>
+                    </span>
                   </div>
-                  <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+                  <div className={k.cell}>
+                    {overdue && <span className={`${k.strong} ${s.late}`}>Lejárt</span>}
+                    {!canMarkSent(t.status as DraftStatus) && <span className={k.muted}>Jóváhagyásra vár</span>}
+                  </div>
+                  <span className={`${k.muted} ${k.num}`}>
                     {new Date(t.dueAt).toLocaleString("hu-HU")}
                   </span>
-                  {overdue && (
-                    <span
-                      style={{
-                        fontSize: 12, fontWeight: 500, color: "var(--coral)", padding: "2px 8px", borderRadius: 999,
-                        border: "1px solid var(--coral)", background: "var(--bg-raised)",
-                      }}
-                    >
-                      Lejárt
-                    </span>
-                  )}
-                  {canMarkSent(t.status as DraftStatus) ? (
-                    <MarkSentControl draftId={t.draftId} onSent={reload} disabledReason={t.templateBlockedReason} />
-                  ) : (
-                    <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>Jóváhagyásra vár</span>
-                  )}
+                  <div className={k.cellEnd}>
+                    {canMarkSent(t.status as DraftStatus) && (
+                      <MarkSentControl draftId={t.draftId} onSent={reload} disabledReason={t.templateBlockedReason} />
+                    )}
+                  </div>
                 </div>
               );
             })}
