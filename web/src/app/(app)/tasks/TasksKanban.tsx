@@ -358,7 +358,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
               key={col.key}
               className="flex flex-col rounded-xl transition-all duration-150"
               style={{
-                background: isHover ? `${col.color}10` : "var(--color-background-muted)",
+                background: isHover ? `color-mix(in srgb, ${col.color} 6%, transparent)` : "var(--color-background-muted)",
                 border: `1px solid ${isHover ? col.color : "var(--color-border)"}`,
                 minHeight: 200,
                 maxHeight: "calc(100vh - 215px)",

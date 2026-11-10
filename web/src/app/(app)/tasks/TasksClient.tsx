@@ -38,20 +38,9 @@ interface TasksClientProps {
   tasks: Task[];
 }
 
-function isOverdue(dueDate: Date | null, status: string) {
-  if (!dueDate || status === "done" || status === "cancelled") return false;
-  return new Date(dueDate) < new Date(new Date().toDateString());
-}
-
-function isToday(dueDate: Date | null) {
-  if (!dueDate) return false;
-  const d = new Date(dueDate);
-  const today = new Date();
-  return (
-    d.getFullYear() === today.getFullYear() &&
-    d.getMonth() === today.getMonth() &&
-    d.getDate() === today.getDate()
-  );
+const budapestFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Budapest", year: "numeric", month: "2-digit", day: "2-digit" });
+function budapestDayKey(d: Date): string {
+  return budapestFmt.format(d);
 }
 
 type GroupKey = "overdue" | "today" | "tomorrow" | "later" | "none" | "done";
@@ -66,20 +55,22 @@ const GROUPS: { key: GroupKey; label: string }[] = [
   { key: "done", label: "Kész" },
 ];
 
-function isTomorrow(dueDate: Date) {
-  const d = new Date(dueDate);
-  const t = new Date();
-  t.setDate(t.getDate() + 1);
-  return d.toDateString() === t.toDateString();
-}
-
 function groupOf(t: Task): GroupKey {
   if (t.status === "done" || t.status === "cancelled") return "done";
   if (!t.dueDate) return "none";
-  if (isOverdue(t.dueDate, t.status)) return "overdue";
-  if (isToday(t.dueDate)) return "today";
-  if (isTomorrow(t.dueDate)) return "tomorrow";
+  const now = Date.now();
+  const key = budapestDayKey(new Date(t.dueDate));
+  const todayKey = budapestDayKey(new Date(now));
+  if (key < todayKey) return "overdue";
+  if (key === todayKey) return "today";
+  if (key === budapestDayKey(new Date(now + 86400000))) return "tomorrow";
   return "later";
+}
+
+// Date-only values are stored as UTC midnight
+function dateOnly(d: Date) {
+  const x = new Date(d);
+  return x.getUTCHours() === 0 && x.getUTCMinutes() === 0;
 }
 
 const REL: Partial<Record<GroupKey, string>> = { overdue: "lejárt", today: "ma", tomorrow: "holnap" };
@@ -172,7 +163,7 @@ export function TasksClient({ tasks }: TasksClientProps) {
               <span className={k.muted}>{rows.length}</span>
             </div>
             {rows.map((t) => {
-              const done = t.status === "done";
+              const done = t.status === "done" || t.status === "cancelled";
               const timed = g.key === "today" || g.key === "tomorrow";
               return (
                 <div key={t.id} className={k.row} data-u={g.key === "overdue" || g.key === "today" || g.key === "done" ? g.key : undefined}>
@@ -198,8 +189,8 @@ export function TasksClient({ tasks }: TasksClientProps) {
                     {t.dueDate ? (
                       <>
                         <span className={k.time}>
-                          {timed
-                            ? new Intl.DateTimeFormat("hu-HU", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t.dueDate))
+                          {timed && !dateOnly(t.dueDate)
+                            ? new Intl.DateTimeFormat("hu-HU", { timeZone: "Europe/Budapest", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t.dueDate))
                             : formatDate(t.dueDate)}
                         </span>
                         {REL[g.key] && <span className={k.muted}>{REL[g.key]}</span>}
@@ -213,17 +204,17 @@ export function TasksClient({ tasks }: TasksClientProps) {
                         Kész
                       </button>
                     )}
-                    <button type="button" className={k.btn} style={{ minWidth: 40, padding: 0 }} aria-label="Szerkesztés" title="Szerkesztés"
+                    <button type="button" className={`${k.btn} ${k.btnIcon}`} aria-label="Szerkesztés" title="Szerkesztés"
                       onClick={() => { setEditTask(t); setModalOpen(true); }}>
                       <Pencil className="size-4" />
                     </button>
                     {done && (
-                      <button type="button" className={k.btn} style={{ minWidth: 40, padding: 0 }} aria-label="Újranyitás" title="Újranyitás"
+                      <button type="button" className={`${k.btn} ${k.btnIcon}`} aria-label="Újranyitás" title="Újranyitás"
                         onClick={() => handleReopen(t.id)}>
                         <RotateCcw className="size-4" />
                       </button>
                     )}
-                    <button type="button" className={k.btn} style={{ minWidth: 40, padding: 0 }} aria-label="Törlés" title="Törlés"
+                    <button type="button" className={`${k.btn} ${k.btnIcon}`} style={{ marginLeft: 8 }} aria-label="Törlés" title="Törlés"
                       onClick={() => handleDelete(t.id)}>
                       <Trash2 className="size-4" />
                     </button>
@@ -234,6 +225,10 @@ export function TasksClient({ tasks }: TasksClientProps) {
           </section>
         );
       })}
+      {/* PROPOSAL copy */}
+      {tasks.length >= 200 && (
+        <p className={k.muted}>Az első 200 feladat látszik, szűkíts a szűrőkkel.</p>
+      )}
     </>
   );
 }

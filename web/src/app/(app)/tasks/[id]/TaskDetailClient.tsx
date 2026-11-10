@@ -136,7 +136,7 @@ export function TaskDetailClient({ task }: { task: Task }) {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
-        <div className={k.kv}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
           <h2 className={k.h2}>Alfeladatok ({task.subTasks.length})</h2>
           <button type="button" className={k.btn} onClick={() => setSubTaskOpen(true)}>
             <Plus className="size-4" />
@@ -147,7 +147,7 @@ export function TaskDetailClient({ task }: { task: Task }) {
           <span className={k.muted}>Nincsenek alfeladatok.</span>
         ) : (
           task.subTasks.map((s) => (
-            <div key={s.id} className={k.row} style={{ gridTemplateColumns: "6px minmax(0, 1fr) auto auto" }} data-u={s.status === "done" ? "done" : undefined}>
+            <div key={s.id} className={k.rowCompact} data-u={s.status === "done" ? "done" : undefined}>
               <span className={k.bar} />
               <div className={k.nameLine}>
                 <Link href={`/tasks/${s.id}`} className={k.name}>{s.title}</Link>

@@ -97,7 +97,7 @@ export default async function TasksPage({
     <div>
       <PageHeader
         title="Feladatok"
-        eyebrow={`${openCount} nyitott` + (overdueCount > 0 ? `, ${overdueCount} lejárt` : "")}
+        eyebrow={<>{openCount} nyitott{overdueCount > 0 && <span style={{ color: "var(--color-text-error)" }}> · {overdueCount} lejárt</span>}</>}
         views={<ViewToggle view={view} statusFilter={statusFilter} dueFilter={dueFilter} />}
         actions={<NewTaskButton />}
         filters={

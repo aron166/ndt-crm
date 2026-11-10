@@ -293,6 +293,7 @@
   --fg: var(--color-text-primary);
   --fg-soft: var(--color-text-secondary);
   --fg-mute: var(--color-text-secondary);
+  --fg-faint: var(--color-text-secondary);
   --indigo: var(--color-accent);
   --indigo-dim: var(--color-accent);
   --indigo-soft: var(--color-background-muted);

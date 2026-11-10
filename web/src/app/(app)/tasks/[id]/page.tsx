@@ -123,20 +123,20 @@ export default async function TaskDetailPage({
           </section>
         </div>
 
-        <aside className={k.card}>
-          <div className={k.kv}><span>Státusz</span><TaskStatusBadge status={task.status} /></div>
+        <aside className={`${k.card} ${k.asideFirst}`}>
+          <div className={k.kv}><span>Státusz</span> {/* PROPOSAL copy */}<TaskStatusBadge status={task.status} /></div>
           <div className={k.kv}><span>Típus</span><span>{(task.type ?? "internal").replace("_", " ")}</span></div>
           <div className={k.kv}><span>Kategória</span><span>{task.category ?? "-"}</span></div>
           {task.dueDate && <div className={k.kv}><span>Határidő</span><span>{formatDate(task.dueDate)}</span></div>}
           {task.company && (
             <div className={k.kv}>
-              <span>Cég</span>
+              <span>Cég</span> {/* PROPOSAL copy */}
               <Link href={`/companies/${task.company.id}`} className={k.link}>{task.company.name}</Link>
             </div>
           )}
           {task.person && (
             <div className={k.kv}>
-              <span>Személy</span>
+              <span>Személy</span> {/* PROPOSAL copy */}
               <Link href={`/persons/${task.person.id}`} className={k.link}>{task.person.lastName} {task.person.firstName}</Link>
             </div>
           )}
@@ -150,7 +150,6 @@ export default async function TaskDetailPage({
             </div>
           )}
           {task.completedAt && <div className={k.kv}><span>Befejezve</span><span>{formatDateTime(task.completedAt)}</span></div>}
-          {costRollup.total > 0 && <div className={k.kv}><span>Költség</span><span className={k.num}>{formatHUF(costRollup.total)}</span></div>}
         </aside>
       </div>
     </div>
