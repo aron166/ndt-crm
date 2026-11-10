@@ -4,17 +4,21 @@ import { serializeDates } from "@/lib/serialize";
 import { getLeadStatuses, getScriptVariants } from "@/lib/leads/queries";
 import { LeadsKanban } from "./LeadsKanban";
 import { Settings2 } from "lucide-react";
-import { fullName, formatRelativeTime } from "@/lib/utils";
 import { getLeadExtras } from "@/lib/leads/board";
 import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact, tierAFlag } from "@/lib/leads/first-contact";
-import { LEAD_OUTCOME_LABEL, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/outcomes";
-import { MAIN_STAGES, lostReasonLabel } from "@/lib/leads/lifecycle";
+import { MAIN_STAGES } from "@/lib/leads/lifecycle";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { getActor } from "@/lib/actor";
+import { LeadsHeader } from "./queue/LeadsHeader";
+import { CallQueue } from "./queue/CallQueue";
+import { TripsAside } from "./queue/TripsAside";
+import { groupQueue, getQueueRows, getFooterCounts } from "./queue/queue-data";
+import { ClosedList } from "./closed/ClosedList";
+import qcss from "./queue/queue.module.css";
 
 const TENANT_ID = 1;
-const PAGE_SIZE = 30;
 // ponytail: per-column cap (newest first) + "N / total" badge — a kanban has no
 // natural page; add per-column "load more" when a column actually exceeds this.
 const COLUMN_LIMIT = 50;
@@ -22,10 +26,12 @@ const COLUMN_LIMIT = 50;
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string; tier?: string }>;
+  searchParams: Promise<{ view?: string; page?: string; tier?: string; owner?: string }>;
 }) {
-  const { view, page: rawPage, tier: rawTier } = await searchParams;
+  const { view, page: rawPage, tier: rawTier, owner: rawOwner } = await searchParams;
   const showConverted = view === "closed" || view === "converted";
+  // No view = the call queue; tier=X alone opens the board (only the board filters by tier).
+  const isQueue = !showConverted && !["board", "recall", "lost"].includes(view ?? "") && !isTier(rawTier);
   const sideView = view === "recall" || view === "lost" ? view : null;
   const parsedPage = Number.parseInt(rawPage ?? "1", 10);
   const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
@@ -40,129 +46,46 @@ export default async function LeadsPage({
     db.lead.count({ where: CLOSED_WHERE }),
   ]);
 
-  const Toggle = (
-    <div className="flex flex-wrap items-center gap-2">
-      <Link
-        href="/leads"
-        className="rounded-full font-mono-ndt"
-        style={{
-          minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
-          background: showConverted ? "var(--bg-panel)" : "var(--indigo-soft)",
-          color: showConverted ? "var(--fg-mute)" : "var(--indigo)",
-          border: `1px solid ${showConverted ? "var(--line-soft)" : "var(--indigo-line)"}`,
-        }}
-      >
-        Aktív · {activeCount}
-      </Link>
-      <Link
-        href="/leads?view=closed"
-        className="rounded-full font-mono-ndt"
-        style={{
-          minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
-          background: showConverted ? "var(--mint-soft)" : "var(--bg-panel)",
-          color: showConverted ? "var(--mint)" : "var(--fg-mute)",
-          border: `1px solid ${showConverted ? "var(--mint-line)" : "var(--line-soft)"}`,
-        }}
-      >
-        Lezárt · {convertedCount}
-      </Link>
-    </div>
-  );
+  const header = (
+    props: Pick<React.ComponentProps<typeof LeadsHeader>, "view" | "title" | "help" | "owner" | "actions">,
+  ) => <LeadsHeader {...props} openCount={activeCount} closedCount={convertedCount} />;
 
   if (showConverted) {
-    const converted = await db.lead.findMany({
-      where: CLOSED_WHERE,
-      include: {
-        company: { select: { id: true, name: true } },
-        contact: { select: { person: { select: { firstName: true, lastName: true } } } },
-      },
-      orderBy: [{ closedAt: { sort: "desc", nulls: "last" } }, { convertedAt: "desc" }],
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    });
-    const totalPages = Math.ceil(convertedCount / PAGE_SIZE);
-    const pageHref = (p: number) => `/leads?view=closed&page=${p}`;
-
     return (
       <div className="mount">
-        <div className="page-head">
-          <div>
-            <h1 className="page-title">Leadek</h1>
-            <p className="page-sub">Nyert (deallé alakított) és vesztett leadek.</p>
-          </div>
-          <div className="page-actions">{Toggle}</div>
-        </div>
+        {header({ view: "closed", title: "Lezárt leadek" /* PROPOSAL copy */ })}
+        <ClosedList page={page} total={convertedCount} />
+      </div>
+    );
+  }
 
-        <div className="panel">
-          {converted.length === 0 ? (
-            <div className="panel-pad" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
-              Még nincs lezárt lead.
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {converted.map((l) => {
-                const personName = l.contact?.person
-                  ? fullName(l.contact.person.firstName, l.contact.person.lastName)
-                  : (l.customFields as Record<string, unknown> | null)?.contact_name as string | undefined;
-                return (
-                  <div
-                    key={l.id}
-                    className="flex items-center gap-3"
-                    style={{ padding: "12px 16px", borderBottom: "1px solid var(--line-soft)", fontSize: 14 }}
-                  >
-                    <Link href={`/leads/${l.id}`} className="row-link" style={{ flex: 1, color: "var(--fg)" }}>
-                      {l.serviceInterest || l.subject || "Érdeklődés"}
-                    </Link>
-                    {l.company && (
-                      <Link href={`/companies/${l.company.id}`} className="row-link truncate" style={{ width: 180, color: "var(--fg-mute)" }}>
-                        {l.company.name}
-                      </Link>
-                    )}
-                    <span className="truncate" style={{ width: 150, color: "var(--fg-faint)" }}>{personName || "-"}</span>
-                    <span className="font-mono-ndt" style={{ width: 90, color: "var(--fg-faint)", fontSize: 12 }}>
-                      {formatRelativeTime(l.closedAt ?? l.convertedAt)}
-                    </span>
-                    {l.convertedDealId ? (
-                      <Link href="/deals" className="font-mono-ndt" style={{ color: "var(--mint)", fontSize: 12, width: 150 }}>
-                        Nyert → Deal #{l.convertedDealId}
-                      </Link>
-                    ) : (
-                      <span className="font-mono-ndt truncate" style={{ color: "var(--coral)", fontSize: 12, width: 150 }}>
-                        {LEAD_OUTCOME_LABEL[l.outcome as LeadOutcome] ?? l.outcome}
-                        {l.lostReason ? ` · ${lostReasonLabel(l.lostReason)}` : ""}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+  if (isQueue) {
+    const now = new Date();
+    const [actor, users, statuses] = await Promise.all([
+      getActor(TENANT_ID),
+      db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      getLeadStatuses(TENANT_ID),
+    ]);
+    const ownerParam = rawOwner === "all" || users.some((u) => String(u.id) === rawOwner) ? rawOwner! : "me";
+    const assignedToId = ownerParam === "all" ? null : ownerParam === "me" ? (actor.userId ?? null) : Number(ownerParam);
+    const [rows, counts] = await Promise.all([getQueueRows(assignedToId), getFooterCounts()]);
+    const groups = groupQueue(rows, now);
+    const n = (k: string) => groups.find((g) => g.key === k)?.rows.length ?? 0;
+    const late = n("overdue");
+    const today = n("today");
+    // PROPOSAL copy
+    const title = late + today === 0 ? "Ma nincs esedékes hívás" : `${late} késésben, ${today} ma esedékes`;
+    return (
+      <div className="mount">
+        {header({
+          view: "queue", title,
+          help: "Felülről lefelé haladj. A Hívás gomb tárcsáz és megnyitja a lead lapját.",
+          owner: { current: ownerParam, users },
+        })}
+        <div className={qcss.split}>
+          <CallQueue groups={groups} statuses={statuses} now={now} recall={counts.recall} lost={counts.lost} />
+          <TripsAside now={now} />
         </div>
-
-        {/* Pagination — same pattern as /companies */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
-            <span>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, convertedCount)} / {convertedCount.toLocaleString("hu-HU")}</span>
-            <div className="flex gap-2">
-              {page > 1 && (
-                <Link
-                  href={pageHref(page - 1)}
-                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
-                >
-                  ← Előző
-                </Link>
-              )}
-              {page < totalPages && (
-                <Link
-                  href={pageHref(page + 1)}
-                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
-                >
-                  Következő →
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -246,7 +169,6 @@ export default async function LeadsPage({
     lastContactAt: extras.get(l.id)?.lastContactAt ?? null,
     callbackDueAt: extras.get(l.id)?.callbackDueAt ?? null,
   }));
-  const fresh = columnTotals[initialKey] ?? 0;
 
   const tierPill = (href: string, active: boolean, label: string, color?: string) => (
     <Link
@@ -268,10 +190,10 @@ export default async function LeadsPage({
   const hrefWith = (key: "tier" | "view", value: string | null) => {
     const q = new URLSearchParams();
     if (tier) q.set("tier", tier);
-    if (sideView) q.set("view", sideView);
+    q.set("view", sideView ?? "board");
     if (value) q.set(key, value); else q.delete(key);
-    const str = q.toString();
-    return str ? `/leads?${str}` : "/leads";
+    if (key === "view" && !value) q.set("view", "board");
+    return `/leads?${q.toString()}`;
   };
 
   const SideFilter = (
@@ -291,30 +213,20 @@ export default async function LeadsPage({
 
   return (
     <div className="mount">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title" style={{ gap: 12 }}>
-            Leadek
-            {fresh > 0 && (
-              <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--indigo)", fontWeight: 500 }}>
-                · {fresh} új
-              </span>
-            )}
-          </h1>
-          <p className="page-sub">
-            Beérkező érdeklődések a landing oldalakról és automatizációkból.
-          </p>
-        </div>
-        <div className="page-actions" style={{ gap: 8 }}>
-          {TierFilter}
-          {SideFilter}
-          {Toggle}
-          <Link href="/leads/setup" className="btn sm" style={{ gap: 6 }}>
-            <Settings2 style={{ width: 13, height: 13 }} />
-            Státuszok
-          </Link>
-        </div>
-      </div>
+      {header({
+        view: "board",
+        title: "Szakaszok", // PROPOSAL copy
+        actions: (
+          <div className="flex flex-wrap items-center gap-2">
+            {TierFilter}
+            {SideFilter}
+            <Link href="/leads/setup" className="btn sm" style={{ gap: 6 }}>
+              <Settings2 style={{ width: 13, height: 13 }} />
+              Státuszok
+            </Link>
+          </div>
+        ),
+      })}
 
       <LeadsKanban
         statuses={boardStatuses}
