@@ -22,11 +22,11 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         position: "fixed", left: "50%", transform: "translateX(-50%)",
         bottom: "max(16px, env(safe-area-inset-bottom))",
         zIndex: 60, flexDirection: "row", alignItems: "center", gap: 12,
-        padding: "10px 14px", boxShadow: "var(--shadow-high)",
+        padding: "10px 14px", boxShadow: "var(--ui-shadow-overlay)",
         maxWidth: "calc(100vw - 32px)",
       }}
     >
-      <span style={{ fontSize: 14, color: "var(--color-text-primary)" }}>{toast.text}</span>
+      <span style={{ fontSize: 14, color: "var(--ui-text)" }}>{toast.text}</span>
       {toast.undo && (
         <button
           onClick={toast.undo}
@@ -140,7 +140,7 @@ export function BulkBar({
             padding: "10px 16px",
           }}
         >
-          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)" }}>{UI.selectedCount(selectedIds.length)}</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ui-text)" }}>{UI.selectedCount(selectedIds.length)}</span>
           <button onClick={onClear} className={k.btn}>
             <X style={{ width: 14, height: 14 }} />
             {UI.clearSelection}

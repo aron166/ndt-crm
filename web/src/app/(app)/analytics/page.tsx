@@ -14,14 +14,14 @@ import { AnalyticsClient } from "./AnalyticsClient";
 const TENANT_ID = 1;
 
 const PIPELINE_COLORS: Record<number, string> = {
-  0: "var(--color-text-secondary)",
+  0: "var(--ui-text-muted)",
   1: "var(--sky)",
   2: "var(--amber)",
   3: "var(--mint)",
   4: "var(--coral)",
   5: "var(--violet)",
-  6: "var(--color-accent)",
-  7: "var(--color-text-secondary)",
+  6: "var(--ui-accent)",
+  7: "var(--ui-text-muted)",
   8: "var(--mint)",
 };
 
@@ -152,7 +152,7 @@ export default async function AnalyticsPage({
   const pipelineItems = pipelineDistribution.map((row) => ({
     status: row.status ?? "",
     count: Number(row.count),
-    color: PIPELINE_COLORS[parseInt(row.status ?? "1")] ?? "var(--color-text-secondary)",
+    color: PIPELINE_COLORS[parseInt(row.status ?? "1")] ?? "var(--ui-text-muted)",
   }));
 
   return (
@@ -183,7 +183,7 @@ export default async function AnalyticsPage({
             </Link>
           </span>
           <div className={s.spark}>
-            <Sparkline data={pipelineItems.map((p) => p.count)} width={80} height={28} color="var(--color-accent)" />
+            <Sparkline data={pipelineItems.map((p) => p.count)} width={80} height={28} color="var(--ui-accent)" />
           </div>
         </div>
 
@@ -252,7 +252,7 @@ export default async function AnalyticsPage({
             {(totalRevenue / 1_000_000).toFixed(1)}M HUF összesen
           </span>
         </div>
-        <AreaChart data={revenueSeries} height={200} color="var(--color-accent)" />
+        <AreaChart data={revenueSeries} height={200} color="var(--ui-accent)" />
         <div className={s.years}>
           {revenueByYear.map((r) => (
             <Link
@@ -292,7 +292,7 @@ export default async function AnalyticsPage({
                           {row.company_name ?? "-"}
                         </Link>
                       ) : (
-                        <span style={{ color: "var(--color-text-primary)" }}>{row.company_name ?? "-"}</span>
+                        <span style={{ color: "var(--ui-text)" }}>{row.company_name ?? "-"}</span>
                       )}
                     </td>
                     <td className={`${s.right} ${k.num}`} style={{ color: "var(--mint)" }}>

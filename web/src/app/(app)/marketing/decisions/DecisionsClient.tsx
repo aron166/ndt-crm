@@ -116,7 +116,7 @@ function Group({ title, rows }: { title: string; rows: DecisionRow[] }) {
     <section className={k.group}>
       <div className={k.groupHead}>
         <h2 className={k.groupTitle}>{title}</h2>
-        <span className="badge-ds" style={{ color: "var(--color-text-secondary)" }}>{UI.decisionsOpenCount(rows.length)}</span>
+        <span className="badge-ds" style={{ color: "var(--ui-text-muted)" }}>{UI.decisionsOpenCount(rows.length)}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {rows.map((row) => (

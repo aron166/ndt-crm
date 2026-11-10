@@ -50,7 +50,7 @@ function TargetRow({ label, met }: { label: string; met: boolean }) {
     <Row
       label={label}
       value={met ? "teljesítve" : "még nem"}
-      valueColor={met ? "var(--mint)" : "var(--color-text-secondary)"}
+      valueColor={met ? "var(--mint)" : "var(--ui-text-muted)"}
     />
   );
 }
@@ -163,7 +163,7 @@ export default function CampaignDashboard({
               </div>
               <div className={k.cell}>
                 {st.template && (
-                  <span className={k.strong} style={{ color: st.template.live ? "var(--mint)" : "var(--color-text-secondary)" }}>
+                  <span className={k.strong} style={{ color: st.template.live ? "var(--mint)" : "var(--ui-text-muted)" }}>
                     {st.template.live ? "Élő" : "Nem élő"}
                   </span>
                 )}

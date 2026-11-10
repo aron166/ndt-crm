@@ -211,7 +211,7 @@ export function CampaignDetailClient({
             {companyViews.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
           {campaign.audienceViewId !== null && (
-            <span className={`${k.strong} ${k.num}`} style={{ color: "var(--color-text-accent)" }}>
+            <span className={`${k.strong} ${k.num}`} style={{ color: "var(--ui-text-link)" }}>
               {audience.count.toLocaleString("hu-HU")} cég
             </span>
           )}

@@ -13,14 +13,14 @@ import { UI } from "@/lib/content/labels";
 const TENANT_ID = 1;
 
 const FRESHNESS_COLOR: Record<string, string> = {
-  mint: "var(--mint)", mute: "var(--color-text-secondary)", amber: "var(--amber)", coral: "var(--coral)",
+  mint: "var(--mint)", mute: "var(--ui-text-muted)", amber: "var(--amber)", coral: "var(--coral)",
 };
 const INTERACTION_LABEL: Record<string, string> = {
   call: "Hívás", email: "Email", meeting: "Találkozó", site_visit: "Helyszíni", note: "Megjegyzés",
 };
 const INTERACTION_COLOR: Record<string, string> = {
   call: "var(--mint)", email: "var(--sky)", meeting: "var(--violet)",
-  site_visit: "var(--amber)", note: "var(--color-text-secondary)",
+  site_visit: "var(--amber)", note: "var(--ui-text-muted)",
 };
 
 export default async function DashboardPage() {
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
 
   const stats = [
     { label: "Aktív cég",        value: statCompanies.toLocaleString("hu-HU"),    href: "/companies", color: "var(--sky)" },
-    { label: "Nyitott deal",     value: statOpenDeals.toLocaleString("hu-HU"),     href: "/deals",     color: "var(--color-accent)" },
+    { label: "Nyitott deal",     value: statOpenDeals.toLocaleString("hu-HU"),     href: "/deals",     color: "var(--ui-accent)" },
     { label: "Nyitott feladat",  value: statOpenTasks.toLocaleString("hu-HU"),     href: "/tasks",     color: overdueTasks.length > 0 ? "var(--coral)" : "var(--mint)" },
     { label: "Interakció / hét", value: statInteractionsWeek.toLocaleString("hu-HU"), href: "/companies", color: "var(--amber)" },
     { label: UI.inboxTitle,      value: contentPending.toLocaleString("hu-HU"),    href: "/marketing", color: contentPending > 0 ? "var(--coral)" : "var(--mint)", sub: UI.mine },
@@ -160,7 +160,7 @@ export default async function DashboardPage() {
             <div className={k.empty}>Nincs esedékes feladat</div>
           ) : (
             <div>
-              {[...overdueTasks.map((t) => ({ t, color: "var(--color-error)" })), ...todayTasks.map((t) => ({ t, color: "var(--color-accent)" }))].map(({ t, color }) => (
+              {[...overdueTasks.map((t) => ({ t, color: "var(--ui-danger)" })), ...todayTasks.map((t) => ({ t, color: "var(--ui-accent)" }))].map(({ t, color }) => (
                 <Link key={t.id} href={`/tasks/${t.id}`} className={h.line}>
                   <span className={h.lineMain}>
                     <span className={h.dot} style={{ background: color }} />
@@ -211,7 +211,7 @@ export default async function DashboardPage() {
           ) : (
             <div>
               {recentInteractions.map((r) => {
-                const color = INTERACTION_COLOR[r.type ?? "note"] ?? "var(--color-text-secondary)";
+                const color = INTERACTION_COLOR[r.type ?? "note"] ?? "var(--ui-text-muted)";
                 const label = INTERACTION_LABEL[r.type ?? "note"] ?? r.type;
                 return (
                   <div key={r.id} className={h.line}>

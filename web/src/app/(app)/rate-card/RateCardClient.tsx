@@ -79,7 +79,7 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
           {pending ? "Mentés…" : "Mentés"}
         </button>
         {msg && (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--color-text-success)" : "var(--color-text-error)" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--ui-success-text)" : "var(--ui-danger-text)" }}>
             {msg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {msg.text}
           </span>
         )}

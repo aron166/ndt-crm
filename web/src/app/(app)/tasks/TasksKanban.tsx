@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 import { BOOKING_KIND_LABEL, isBookingKind } from "@/lib/booking/priority";
 
 const COLUMNS = [
-  { key: "created",     label: "Kiírva",      color: "var(--color-text-secondary)",  glow: "var(--mute-glow)" },
-  { key: "in_progress", label: "Folyamatban", color: "var(--color-accent)",   glow: "var(--color-accent)"  },
+  { key: "created",     label: "Kiírva",      color: "var(--ui-text-muted)",  glow: "var(--mute-glow)" },
+  { key: "in_progress", label: "Folyamatban", color: "var(--ui-accent)",   glow: "var(--ui-accent)"  },
   { key: "done",        label: "Elvégezve",   color: "var(--mint)",     glow: "var(--mint-glow)"  },
   { key: "cancelled",   label: "Törölve",     color: "var(--coral)",    glow: "var(--coral-glow)"   },
 ] as const;
@@ -22,11 +22,11 @@ type Status = (typeof COLUMNS)[number]["key"];
 
 const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
   call:        { bg: "var(--mint-soft)",   color: "var(--mint)"   },
-  email:       { bg: "var(--color-background-muted)", color: "var(--color-accent)" },
+  email:       { bg: "var(--ui-surface-muted)", color: "var(--ui-accent)" },
   meeting:     { bg: "var(--sky-soft)",    color: "var(--sky)"    },
   document:    { bg: "var(--amber-soft)",  color: "var(--amber)"  },
   field_visit: { bg: "var(--coral-soft)",  color: "var(--coral)"  },
-  internal:    { bg: "var(--color-background-muted)",   color: "var(--color-text-secondary)"},
+  internal:    { bg: "var(--ui-surface-muted)",   color: "var(--ui-text-muted)"},
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -63,7 +63,7 @@ function isOverdue(dueDate: Date | null, status: string) {
 
 function avatarColor(name: string) {
   const colors = [
-    "var(--color-accent)", "var(--mint)", "var(--amber)",
+    "var(--ui-accent)", "var(--mint)", "var(--amber)",
     "var(--sky)", "var(--violet)", "var(--coral)",
   ];
   let h = 0;
@@ -76,7 +76,7 @@ function PersonAvatar({ name }: { name: string }) {
   return (
     <span
       className="inline-flex items-center justify-center rounded-full font-mono-ndt shrink-0"
-      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name), color: "var(--color-on-accent)" }}
+      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name), color: "var(--ui-on-accent)" }}
     >
       {initials}
     </span>
@@ -107,21 +107,21 @@ function KanbanCard({
       onDragEnd={onDragEnd}
       className={cn("group select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
-        background: "var(--color-background-card)",
-        border: "1px solid var(--color-border)",
-        padding: "10px 12px", borderRadius: "var(--radius-container)", boxShadow: "var(--shadow-low)",
+        background: "var(--ui-surface)",
+        border: "1px solid var(--ui-border)",
+        padding: "10px 12px", borderRadius: "var(--ui-radius-surface)", boxShadow: "var(--ui-shadow-raised)",
         cursor: "grab",
         transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
         willChange: "transform",
       }}
       onMouseOver={(e) => {
-        e.currentTarget.style.borderColor = "var(--color-border-emphasized)";
-        e.currentTarget.style.boxShadow = "var(--shadow-high)";
+        e.currentTarget.style.borderColor = "var(--ui-border-strong)";
+        e.currentTarget.style.boxShadow = "var(--ui-shadow-overlay)";
         e.currentTarget.style.transform = "translateY(-2px) rotate(-0.2deg)";
       }}
       onMouseOut={(e) => {
-        e.currentTarget.style.borderColor = "var(--color-border)";
-        e.currentTarget.style.boxShadow = "var(--shadow-low)";
+        e.currentTarget.style.borderColor = "var(--ui-border)";
+        e.currentTarget.style.boxShadow = "var(--ui-shadow-raised)";
         e.currentTarget.style.transform = "none";
       }}
       onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.99)"; e.currentTarget.style.transition = "transform 80ms ease"; }}
@@ -129,7 +129,7 @@ function KanbanCard({
     >
       {/* Top row: ID + type badge */}
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
           #{task.id}
         </span>
         {task.type && (
@@ -153,13 +153,13 @@ function KanbanCard({
         style={{
           display: "block",
           fontSize: 14, fontWeight: 500, lineHeight: 1.35,
-          color: task.status === "done" ? "var(--color-text-secondary)" : "var(--color-text-primary)",
+          color: task.status === "done" ? "var(--ui-text-muted)" : "var(--ui-text)",
           textDecoration: task.status === "done" ? "line-through" : "none",
           marginBottom: 8,
         }}
         onClick={(e) => e.stopPropagation()}
-        onMouseOver={(e) => { if (task.status !== "done") e.currentTarget.style.color = "var(--color-accent)"; }}
-        onMouseOut={(e) => { e.currentTarget.style.color = task.status === "done" ? "var(--color-text-secondary)" : "var(--color-text-primary)"; }}
+        onMouseOver={(e) => { if (task.status !== "done") e.currentTarget.style.color = "var(--ui-accent)"; }}
+        onMouseOut={(e) => { e.currentTarget.style.color = task.status === "done" ? "var(--ui-text-muted)" : "var(--ui-text)"; }}
       >
         {task.title}
       </Link>
@@ -186,7 +186,7 @@ function KanbanCard({
       {(personName || task.company) && (
         <div
           className="flex items-center gap-2 pb-2 mb-2"
-          style={{ borderBottom: "1px dashed var(--color-border)" }}
+          style={{ borderBottom: "1px dashed var(--ui-border)" }}
         >
           {personName && (
             <div className="flex items-center gap-1.5 min-w-0">
@@ -194,10 +194,10 @@ function KanbanCard({
               <Link
                 href={`/persons/${task.personId}`}
                 className="truncate"
-                style={{ fontSize: 12, color: "var(--color-text-primary)" }}
+                style={{ fontSize: 12, color: "var(--ui-text)" }}
                 onClick={(e) => e.stopPropagation()}
-                onMouseOver={(e) => (e.currentTarget.style.color = "var(--color-accent)")}
-                onMouseOut={(e) => (e.currentTarget.style.color = "var(--color-text-primary)")}
+                onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-accent)")}
+                onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text)")}
               >
                 {personName}
               </Link>
@@ -207,10 +207,10 @@ function KanbanCard({
             <Link
               href={`/companies/${task.company.id}`}
               className="truncate shrink-0 ml-auto"
-              style={{ fontSize: 12, color: "var(--color-text-secondary)" }}
+              style={{ fontSize: 12, color: "var(--ui-text-muted)" }}
               onClick={(e) => e.stopPropagation()}
-              onMouseOver={(e) => (e.currentTarget.style.color = "var(--color-accent)")}
-              onMouseOut={(e) => (e.currentTarget.style.color = "var(--color-text-secondary)")}
+              onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-accent)")}
+              onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text-muted)")}
             >
               {task.company.name.length > 18 ? task.company.name.slice(0, 16) + "…" : task.company.name}
             </Link>
@@ -225,7 +225,7 @@ function KanbanCard({
             className="flex items-center gap-1"
             style={{
               fontSize: 12,
-              color: overdue ? "var(--coral)" : "var(--color-text-secondary)",
+              color: overdue ? "var(--coral)" : "var(--ui-text-muted)",
               fontWeight: overdue ? 600 : 400,
             }}
           >
@@ -235,12 +235,12 @@ function KanbanCard({
           </span>
         )}
         {task._count.subTasks > 0 && (
-          <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+          <span style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
             ↳ {task._count.subTasks}
           </span>
         )}
         {task.estimatedMinutes && (
-          <span style={{ fontSize: 12, color: "var(--color-text-secondary)", marginLeft: "auto" }}>
+          <span style={{ fontSize: 12, color: "var(--ui-text-muted)", marginLeft: "auto" }}>
             {task.estimatedMinutes}m
           </span>
         )}
@@ -325,16 +325,16 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
             className="rounded-full font-mono-ndt transition-colors"
             style={{
               height: 26, padding: "0 10px", fontSize: 12,
-              background: filter === key ? "var(--color-background-muted)" : "var(--color-background-card)",
-              color: filter === key ? "var(--color-accent)" : "var(--color-text-secondary)",
-              border: `1px solid ${filter === key ? "var(--color-border-emphasized)" : "var(--color-border)"}`,
+              background: filter === key ? "var(--ui-surface-muted)" : "var(--ui-surface)",
+              color: filter === key ? "var(--ui-accent)" : "var(--ui-text-muted)",
+              border: `1px solid ${filter === key ? "var(--ui-border-strong)" : "var(--ui-border)"}`,
             }}
           >
             {label}
           </button>
         ))}
 
-        <div className="ml-auto flex items-center gap-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+        <div className="ml-auto flex items-center gap-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
           {COLUMNS.map((col) => (
             <span key={col.key} className="flex items-center gap-1">
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: col.color }} />
@@ -358,8 +358,8 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
               key={col.key}
               className="flex flex-col rounded-xl transition-all duration-150"
               style={{
-                background: isHover ? `color-mix(in srgb, ${col.color} 6%, transparent)` : "var(--color-background-muted)",
-                border: `1px solid ${isHover ? col.color : "var(--color-border)"}`,
+                background: isHover ? `color-mix(in srgb, ${col.color} 6%, transparent)` : "var(--ui-surface-muted)",
+                border: `1px solid ${isHover ? col.color : "var(--ui-border)"}`,
                 minHeight: 200,
                 maxHeight: "calc(100vh - 215px)",
               }}
@@ -370,7 +370,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
               {/* Column header */}
               <div
                 className="flex items-center gap-2 shrink-0"
-                style={{ padding: "10px 14px 10px", borderBottom: "1px solid var(--color-border)" }}
+                style={{ padding: "10px 14px 10px", borderBottom: "1px solid var(--ui-border)" }}
               >
                 <span
                   className="rounded-full shrink-0"
@@ -380,17 +380,17 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
                     boxShadow: `0 0 8px ${col.glow}`,
                   }}
                 />
-                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", letterSpacing: "0.02em" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ui-text)", letterSpacing: "0.02em" }}>
                   {col.label}
                 </span>
                 <span
                   className="font-mono-ndt rounded"
-                  style={{ marginLeft: "auto", fontSize: 12, background: "var(--color-background-muted)", color: "var(--color-text-secondary)", padding: "1px 6px" }}
+                  style={{ marginLeft: "auto", fontSize: 12, background: "var(--ui-surface-muted)", color: "var(--ui-text-muted)", padding: "1px 6px" }}
                 >
                   {cards.length}
                 </span>
                 {mins > 0 && (
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
                     {h > 0 ? `${h}h` : ""}{m > 0 ? ` ${m}m` : ""}
                   </span>
                 )}
@@ -413,12 +413,12 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
                   className="flex items-center gap-1.5 w-full rounded-lg transition-colors"
                   style={{
                     height: 30, padding: "0 8px",
-                    fontSize: 14, color: "var(--color-text-secondary)",
+                    fontSize: 14, color: "var(--ui-text-muted)",
                     background: "transparent",
-                    border: "1px dashed var(--color-border)",
+                    border: "1px dashed var(--ui-border)",
                   }}
-                  onMouseOver={(e) => { e.currentTarget.style.color = "var(--color-text-primary)"; e.currentTarget.style.borderColor = "var(--color-border-emphasized)"; }}
-                  onMouseOut={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; e.currentTarget.style.borderColor = "var(--color-border)"; }}
+                  onMouseOver={(e) => { e.currentTarget.style.color = "var(--ui-text)"; e.currentTarget.style.borderColor = "var(--ui-border-strong)"; }}
+                  onMouseOut={(e) => { e.currentTarget.style.color = "var(--ui-text-muted)"; e.currentTarget.style.borderColor = "var(--ui-border)"; }}
                 >
                   <Plus style={{ width: 11, height: 11 }} />
                   Feladat hozzáadása

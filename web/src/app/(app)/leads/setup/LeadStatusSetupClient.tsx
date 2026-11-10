@@ -243,7 +243,7 @@ export function LeadStatusSetupClient({ statuses }: { statuses: LeadStatus[] }) 
               onDrop={handleDrop}
               style={{
                 opacity: dragIndex === i ? 0.4 : 1,
-                borderTop: `2px solid ${showIndicator ? "var(--color-accent)" : "transparent"}`,
+                borderTop: `2px solid ${showIndicator ? "var(--ui-accent)" : "transparent"}`,
                 borderRadius: 2,
                 transition: "opacity .15s",
               }}

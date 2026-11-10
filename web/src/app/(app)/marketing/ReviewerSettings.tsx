@@ -79,7 +79,7 @@ export function ReviewerSettings() {
         onClick={toggleOpen}
         className={s.sectionToggle}
       >
-        {open ? <ChevronDown className="size-4" style={{ color: "var(--color-text-secondary)" }} /> : <ChevronRight className="size-4" style={{ color: "var(--color-text-secondary)" }} />}
+        {open ? <ChevronDown className="size-4" style={{ color: "var(--ui-text-muted)" }} /> : <ChevronRight className="size-4" style={{ color: "var(--ui-text-muted)" }} />}
         <span className={k.strong}>{UI.reviewers}</span>
       </button>
       {open && (
@@ -121,7 +121,7 @@ export function ReviewerSettings() {
                 {UI.saveReviewers}
               </button>
               {approvals && (
-                <div style={{ marginTop: 18, borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
+                <div style={{ marginTop: 18, borderTop: "1px solid var(--ui-border)", paddingTop: 14 }}>
                   <div className={k.strong}>{UI.approvalsSettings}</div>
                   <p className={k.muted} style={{ margin: "6px 0 10px", maxWidth: "60ch" }}>
                     {UI.approvalsWarning}

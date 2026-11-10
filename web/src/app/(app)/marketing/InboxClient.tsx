@@ -150,7 +150,7 @@ function Row({
             <span className="badge-ds amber">{UI.checksOpen(item.openChecks)}</span>
           )}
           {item.selfScore !== null && (
-            <span className="badge-ds" style={{ color: "var(--color-text-secondary)" }}>
+            <span className="badge-ds" style={{ color: "var(--ui-text-muted)" }}>
               {UI.selfScoreShort(Math.round(item.selfScore * 100))}
             </span>
           )}
@@ -166,7 +166,7 @@ function Row({
               <span
                 className={s.dot}
                 style={{
-                  background: v.verdict ? VERDICT_COLOR[v.verdict as Verdict] : "var(--color-border-emphasized)",
+                  background: v.verdict ? VERDICT_COLOR[v.verdict as Verdict] : "var(--ui-border-strong)",
                 }}
               />
               {v.reviewerName}: {v.verdict ? VERDICT_LABEL[v.verdict as Verdict] : UI.notYetReviewed}
@@ -262,7 +262,7 @@ function SectionHeader({
         onClick={() => setOpen(!open)}
         className={s.sectionToggle}
       >
-        {open ? <ChevronDown className="size-4" style={{ color: "var(--color-text-secondary)" }} /> : <ChevronRight className="size-4" style={{ color: "var(--color-text-secondary)" }} />}
+        {open ? <ChevronDown className="size-4" style={{ color: "var(--ui-text-muted)" }} /> : <ChevronRight className="size-4" style={{ color: "var(--ui-text-muted)" }} />}
         <h2 className={k.groupTitle}>{title}</h2>
         <span className={`${k.muted} ${k.num}`}>{count}</span>
       </button>

@@ -81,7 +81,7 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
               {companyId ? (
                 <div className={`flex items-center justify-between gap-2 mt-1 ${q.input}`}>
                   <span>{companyLabel}</span>
-                  <button type="button" style={{ color: "var(--color-text-secondary)", fontSize: 14 }}
+                  <button type="button" style={{ color: "var(--ui-text-muted)", fontSize: 14 }}
                     onClick={() => { setCompanyId(null); setCompanyLabel(""); setQuery(""); }}>módosít</button>
                 </div>
               ) : (
@@ -90,13 +90,13 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
                     onChange={(e) => setQuery(e.target.value)} placeholder="Cég keresése…" />
                   {results.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full overflow-hidden"
-                      style={{ background: "var(--color-background-card)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-element)", boxShadow: "var(--shadow-high)" }}>
+                      style={{ background: "var(--ui-surface)", border: "1px solid var(--ui-border)", borderRadius: "var(--ui-radius-control)", boxShadow: "var(--ui-shadow-overlay)" }}>
                       {results.map((c) => (
                         <button key={c.id} type="button"
-                          className="block w-full text-left px-3 py-2 hover:bg-[var(--color-overlay-hover)]"
+                          className="block w-full text-left px-3 py-2 hover:bg-[var(--ui-hover)]"
                           style={{ fontSize: 14, minHeight: 40 }}
                           onClick={() => { setCompanyId(c.id); setCompanyLabel(c.name); setResults([]); }}>
-                          {c.name}{c.city ? <span style={{ color: "var(--color-text-secondary)" }}> · {c.city}</span> : null}
+                          {c.name}{c.city ? <span style={{ color: "var(--ui-text-muted)" }}> · {c.city}</span> : null}
                         </button>
                       ))}
                     </div>
@@ -113,7 +113,7 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
           </FormField>
 
           {error && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: "var(--color-text-error)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: "var(--ui-danger-text)" }}>
               <AlertTriangle size={14} aria-hidden="true" /> {error}
             </span>
           )}

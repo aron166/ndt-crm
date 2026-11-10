@@ -128,8 +128,8 @@ export function ImportWizard() {
         <label
           className={`mt-5 flex flex-col items-center justify-center gap-2 cursor-pointer rounded-lg py-10 transition-colors ${s.drop}`}
         >
-          {loading ? <Loader2 className="size-6 animate-spin" style={{ color: "var(--color-accent)" }} />
-            : <Upload className="size-6" style={{ color: "var(--color-text-secondary)" }} />}
+          {loading ? <Loader2 className="size-6 animate-spin" style={{ color: "var(--ui-accent)" }} />
+            : <Upload className="size-6" style={{ color: "var(--ui-text-muted)" }} />}
           <span className={s.dropText}>
             {loading ? "Feldolgozás…" : "Kattints a fájl kiválasztásához (.xlsx vagy .csv)"}
           </span>
@@ -162,7 +162,7 @@ export function ImportWizard() {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <Stat label="Új" value={r.created} accent="var(--mint)" />
-          <Stat label="Meglévő" value={r.matched} accent="var(--color-text-secondary)" />
+          <Stat label="Meglévő" value={r.matched} accent="var(--ui-text-muted)" />
           <Stat label="Kihagyva" value={r.skipped} accent="var(--amber)" />
           <Stat label="Hiba" value={r.errors.length} accent="var(--coral)" />
         </div>
@@ -356,7 +356,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent: 
 }
 
 function StatusPill({ status, detail }: { status: string; detail?: string }) {
-  const color = status === "új" ? "var(--mint)" : status === "hiba" ? "var(--coral)" : status === "kihagyva" ? "var(--amber)" : "var(--color-text-secondary)";
+  const color = status === "új" ? "var(--mint)" : status === "hiba" ? "var(--coral)" : status === "kihagyva" ? "var(--amber)" : "var(--ui-text-muted)";
   return (
     <span title={detail} style={{ fontSize: 14, color }}>
       {status}{detail ? ` · ${detail}` : ""}

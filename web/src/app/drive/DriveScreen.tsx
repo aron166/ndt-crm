@@ -39,9 +39,9 @@ function outcomeBtnStyle(tone: "red" | "green" | undefined): React.CSSProperties
   return {
     width: "100%", minHeight: 56, padding: "10px 16px",
     fontSize: 16, fontWeight: 600, borderRadius: 10,
-    border: "1px solid " + (tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--color-border-emphasized)"),
-    background: tone === "red" ? "var(--coral-soft)" : tone === "green" ? "var(--mint-soft)" : "var(--color-background-card)",
-    color: tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--color-text-primary)",
+    border: "1px solid " + (tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--ui-border-strong)"),
+    background: tone === "red" ? "var(--coral-soft)" : tone === "green" ? "var(--mint-soft)" : "var(--ui-surface)",
+    color: tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--ui-text)",
     cursor: "pointer",
   };
 }
@@ -204,9 +204,9 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
 
   if (!lead) {
     return (
-      <div style={{ maxWidth: 480, margin: "0 auto", padding: 24, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center", background: "var(--color-background-body)", color: "var(--color-text-primary)" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: 24, minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, textAlign: "center", background: "var(--ui-page)", color: "var(--ui-text)" }}>
         {notice}
-        <p style={{ fontSize: 16, color: "var(--color-text-primary)" }}>Nincs több lead a sorban.</p>
+        <p style={{ fontSize: 16, color: "var(--ui-text)" }}>Nincs több lead a sorban.</p>
         <button style={outcomeBtnStyle(undefined)} onClick={() => router.refresh()}>Frissítés</button>
       </div>
     );
@@ -218,12 +218,12 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
     lead.message,
   ].filter((v): v is string => !!v && v.trim().length > 0);
 
-  const tierColor = lead.tier && isTier(lead.tier) ? TIER_COLOR[lead.tier] : "var(--color-text-secondary)";
+  const tierColor = lead.tier && isTier(lead.tier) ? TIER_COLOR[lead.tier] : "var(--ui-text-muted)";
   const tierLabel = lead.tier && isTier(lead.tier) ? TIER_LABEL[lead.tier] : lead.tier;
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px 16px 32px", minHeight: "100dvh", display: "flex", flexDirection: "column", gap: 16, background: "var(--color-background-body)", color: "var(--color-text-primary)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 14, color: "var(--color-text-secondary)" }}>
+    <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px 16px 32px", minHeight: "100dvh", display: "flex", flexDirection: "column", gap: 16, background: "var(--ui-page)", color: "var(--ui-text)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 14, color: "var(--ui-text-muted)" }}>
         <span>{remaining} / {queue.length}</span>
         <button onClick={skip} disabled={pending} className={k.btn}>
           Kihagyom
@@ -233,10 +233,10 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
       {notice}
 
       <div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--color-text-primary)", margin: 0, lineHeight: 1.25 }}>{lead.companyName}</h1>
-        {lead.personName && <div style={{ fontSize: 16, color: "var(--color-text-primary)", marginTop: 2 }}>{lead.personName}</div>}
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--ui-text)", margin: 0, lineHeight: 1.25 }}>{lead.companyName}</h1>
+        {lead.personName && <div style={{ fontSize: 16, color: "var(--ui-text)", marginTop: 2 }}>{lead.personName}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, alignItems: "center" }}>
-          {lead.city && <span style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>{lead.city}</span>}
+          {lead.city && <span style={{ fontSize: 14, color: "var(--ui-text-muted)" }}>{lead.city}</span>}
           {lead.tier && (
             <span style={{ fontSize: 12, fontWeight: 600, color: tierColor, border: `1px solid ${tierColor}`, borderRadius: 999, padding: "2px 8px" }}>
               {tierLabel}
@@ -263,18 +263,18 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           {lead.phone}
         </a>
       ) : (
-        <div style={{ width: "100%", boxSizing: "border-box", textAlign: "center", padding: "18px 16px", fontSize: 18, fontWeight: 600, borderRadius: 12, background: "var(--color-background-card)", color: "var(--color-text-secondary)", border: "1px solid var(--color-border)" }}>
+        <div style={{ width: "100%", boxSizing: "border-box", textAlign: "center", padding: "18px 16px", fontSize: 18, fontWeight: 600, borderRadius: 12, background: "var(--ui-surface)", color: "var(--ui-text-muted)", border: "1px solid var(--ui-border)" }}>
           Nincs telefonszám
         </div>
       )}
 
       {(contextLines.length > 0 || lead.lastNote) && (
-        <div className={m.panel} style={{ fontSize: 14, color: "var(--color-text-primary)" }}>
+        <div className={m.panel} style={{ fontSize: 14, color: "var(--ui-text)" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, ...(expanded ? {} : { maxHeight: 88, overflow: "hidden" }) }}>
             {contextLines.map((line, i) => <p key={i} style={{ margin: 0, lineHeight: 1.5 }}>{line}</p>)}
             {lead.lastNote && (
               <div>
-                <div style={{ fontSize: 14, color: "var(--color-text-secondary)", marginBottom: 2 }}>Utolsó jegyzet</div>
+                <div style={{ fontSize: 14, color: "var(--ui-text-muted)", marginBottom: 2 }}>Utolsó jegyzet</div>
                 <p style={{ margin: 0, lineHeight: 1.5 }}>{lead.lastNote}</p>
               </div>
             )}
@@ -301,7 +301,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
             )}
           </div>
           {scriptOpen && script && (script.body || script.liveMissing) && (
-            <p style={{ margin: "8px 0 0", fontSize: 14, color: "var(--color-text-primary)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+            <p style={{ margin: "8px 0 0", fontSize: 14, color: "var(--ui-text)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
               {script.liveMissing ? "Nincs élő változat: a szkript még jóváhagyásra vár." : displayScriptText(script.body)}
               {!script.liveMissing && isPlaceholderText(script.body) && (
                 <> <Link href="/leads/setup" className={k.link}>Beállítás</Link></>
@@ -312,7 +312,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
       )}
 
       <div>
-        <div style={{ fontSize: 14, color: "var(--color-text-secondary)", marginBottom: 4 }}>Ügyfél szava a technológiára</div>
+        <div style={{ fontSize: 14, color: "var(--ui-text-muted)", marginBottom: 4 }}>Ügyfél szava a technológiára</div>
         <input
           className={m.field}
           value={technologyWord}
@@ -320,7 +320,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           maxLength={TECHNOLOGY_WORD_MAX}
           placeholder="pl. anyagvizsgálat"
         />
-        <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--color-text-secondary)" }}>
+        <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--ui-text-muted)" }}>
           Amit az ügyfél mondott, szó szerint. Opcionális.
         </p>
       </div>
@@ -334,8 +334,8 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
         style={{ fontFamily: "inherit" }}
       />
 
-      {error && <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-error)" }}>{error}</p>}
-      {queuedMessage && <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-success)" }}>{queuedMessage}</p>}
+      {error && <p style={{ margin: 0, fontSize: 14, color: "var(--ui-danger-text)" }}>{error}</p>}
+      {queuedMessage && <p style={{ margin: 0, fontSize: 14, color: "var(--ui-success-text)" }}>{queuedMessage}</p>}
 
       {/* Once an outcome needs a detail, the other five buttons go away: in a
           car the screen must hold one decision at a time, not seven. */}
@@ -359,7 +359,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
           >
             {AUTO_OUTCOME_LABELS.analyze}
           </button>
-          <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-secondary)", textAlign: "center" }}>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--ui-text-muted)", textAlign: "center" }}>
             {AUTO_OUTCOME_LABELS.analyzeHint}
           </p>
         </div>
@@ -368,14 +368,14 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
       {selectedOutcome && (NEEDS_FIELD.has(selectedOutcome) || note.trim() === "") && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {note.trim() === "" && (
-            <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-error)" }}>A jegyzet kötelező</p>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--ui-danger-text)" }}>A jegyzet kötelező</p>
           )}
           {selectedOutcome === "callback_requested" && (
             <input type="datetime-local" className={m.field} value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} />
           )}
           {selectedOutcome === "meeting_booked" && (
             <>
-              <div style={{ display: "flex", gap: 16, fontSize: 16, color: "var(--color-text-primary)" }}>
+              <div style={{ display: "flex", gap: 16, fontSize: 16, color: "var(--ui-text)" }}>
                 {(["aron", "peter"] as const).map((w) => (
                   <label key={w} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", minHeight: 40 }}>
                     <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />

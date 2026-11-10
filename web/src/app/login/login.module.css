@@ -1,16 +1,16 @@
 /* Login (Astryx direction A). A centered card; Astryx tokens only. */
 
-.page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; background: var(--color-background-body); }
+.page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; background: var(--ui-page); }
 .wrap { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 24px; }
 .brand { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.mark { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--radius-container); background: var(--color-accent); color: var(--color-on-accent); }
-.title { margin: 0; font-size: 20px; font-weight: 600; color: var(--color-text-primary); }
-.sub { margin: 0; font-size: 12px; font-family: var(--font-mono-ndt); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-secondary); }
+.mark { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--ui-radius-surface); background: var(--ui-accent); color: var(--ui-on-accent); }
+.title { margin: 0; font-size: 20px; font-weight: 600; color: var(--ui-text); }
+.sub { margin: 0; font-size: 12px; font-family: var(--font-mono-ndt); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ui-text-muted); }
 .card { width: 100%; max-width: 400px; box-sizing: border-box; }
-.heading { margin: 0; margin-block-end: 8px; font-size: 16px; font-weight: 600; color: var(--color-text-primary); }
+.heading { margin: 0; margin-block-end: 8px; font-size: 16px; font-weight: 600; color: var(--ui-text); }
 .form { display: flex; flex-direction: column; gap: 12px; }
-.label { display: block; margin-block-end: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-secondary); }
-.field { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 12px; font: inherit; font-size: 14px; border: 1px solid var(--color-border-emphasized); border-radius: var(--radius-element); background: var(--color-background-card); color: var(--color-text-primary); }
-.field:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
-.error { margin: 0; font-size: 14px; color: var(--color-text-error); }
+.label { display: block; margin-block-end: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-text-muted); }
+.field { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 12px; font: inherit; font-size: 14px; border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); background: var(--ui-surface); color: var(--ui-text); }
+.field:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.error { margin: 0; font-size: 14px; color: var(--ui-danger-text); }
 .submit { width: 100%; margin-block-start: 4px; }

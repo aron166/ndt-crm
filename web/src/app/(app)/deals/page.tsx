@@ -91,9 +91,9 @@ export default async function DealsPage({
         eyebrow={
           <>
             {openDeals} aktív
-            {staleDeals > 0 && <span style={{ color: "var(--color-text-error)" }}> · {staleDeals} lejárt</span>}
+            {staleDeals > 0 && <span style={{ color: "var(--ui-danger-text)" }}> · {staleDeals} lejárt</span>}
             {" · "}Várható forgalom:{" "}
-            <span className={k.num} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+            <span className={k.num} style={{ color: "var(--ui-text)", fontWeight: 600 }}>
               {Math.round(forecast).toLocaleString("hu-HU")} HUF
             </span>
           </>

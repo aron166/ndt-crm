@@ -103,7 +103,7 @@ export default async function InvoicesPage({
           <tbody>
             {invoices.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ padding: "48px 14px", textAlign: "center", color: "var(--color-text-secondary)" }}>
+                <td colSpan={4} style={{ padding: "48px 14px", textAlign: "center", color: "var(--ui-text-muted)" }}>
                   Nincs találat
                 </td>
               </tr>

@@ -76,7 +76,7 @@ export function QuotesClient({ quotes }: { quotes: QuoteListItem[] }) {
                   <td><StatusBadge status={qt.status} /></td>
                   <td className={q.numCell}>{formatHUF(qt.grossAmount)}</td>
                   <td className={k.num}>{qt.validUntil ? formatDate(qt.validUntil) : "-"}</td>
-                  <td style={{ color: "var(--color-text-secondary)" }}>{formatRelativeTime(qt.createdAt)}</td>
+                  <td style={{ color: "var(--ui-text-muted)" }}>{formatRelativeTime(qt.createdAt)}</td>
                 </tr>
               ))}
             </tbody>

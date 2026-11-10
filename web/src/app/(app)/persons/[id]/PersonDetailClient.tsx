@@ -62,7 +62,7 @@ interface Person {
 
 const TYPE_COLOR: Record<string, string> = {
   call: "var(--mint)", email: "var(--sky)", meeting: "var(--violet)",
-  site_visit: "var(--amber)", note: "var(--color-text-secondary)",
+  site_visit: "var(--amber)", note: "var(--ui-text-muted)",
 };
 const TYPE_LABEL: Record<string, string> = {
   call: "Hívás", email: "Email", meeting: "Találkozó",
@@ -184,11 +184,11 @@ export function PersonDetailClient({
         <div
           style={{
             display: "flex", alignItems: "center", gap: 12, marginBottom: 14,
-            padding: "10px 16px", borderRadius: "var(--radius-container)",
+            padding: "10px 16px", borderRadius: "var(--ui-radius-surface)",
             background: "var(--coral-soft)", border: "1px solid var(--coral)",
           }}
         >
-          <span style={{ fontSize: 14, color: "var(--color-text-primary)", flex: 1 }}>
+          <span style={{ fontSize: 14, color: "var(--ui-text)", flex: 1 }}>
             Ez a személy törölve van: nem jelenik meg a keresésben, és az adatai nem
             menthetők, amíg vissza nem állítod.
           </span>
@@ -238,7 +238,7 @@ export function PersonDetailClient({
             </button>
             <button
               className={`${k.btn} ${k.btnIcon}`}
-              style={{ color: "var(--color-error)" }}
+              style={{ color: "var(--ui-danger)" }}
               onClick={handleDelete}
               disabled={deleting}
               title="Személy törlése"
@@ -272,7 +272,7 @@ export function PersonDetailClient({
                 <span className={k.statK}>munkahely</span>
               </div>
               <div style={{ flex: "1 1 200px", minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
-                <Sparkline data={engagementSeries} width={240} height={48} color="var(--color-accent)" />
+                <Sparkline data={engagementSeries} width={240} height={48} color="var(--ui-accent)" />
               </div>
             </div>
           </div>
@@ -311,7 +311,7 @@ export function PersonDetailClient({
                 ) : (
                   <div className={k.list}>
                     {interactions.map((r) => {
-                      const accent = TYPE_COLOR[r.type ?? "note"] ?? "var(--color-text-secondary)";
+                      const accent = TYPE_COLOR[r.type ?? "note"] ?? "var(--ui-text-muted)";
                       return (
                         <div key={r.id} className={k.rowCompact}>
                           <span className={k.bar} style={{ background: accent }} />
@@ -369,7 +369,7 @@ export function PersonDetailClient({
                 <div className={k.list}>
                   {contacts.map((c) => (
                     <div key={c.id} className={k.row}>
-                      <span className={k.bar} style={{ background: c.endedAt ? "var(--color-border-emphasized)" : "var(--color-accent)" }} />
+                      <span className={k.bar} style={{ background: c.endedAt ? "var(--ui-border-strong)" : "var(--ui-accent)" }} />
                       <div className={k.cell}>
                         <span className={k.nameLine}>
                           <span className={k.strong}>{c.role ?? "Munkatárs"}</span>
@@ -432,13 +432,13 @@ export function PersonDetailClient({
                           key={msg.id}
                           style={{
                             padding: "8px 12px",
-                            borderRadius: "var(--radius-element)",
+                            borderRadius: "var(--ui-radius-control)",
                             fontSize: 14,
                             lineHeight: 1.5,
-                            background: msg.role === "user" ? "var(--color-background-muted)" : "var(--violet-surface)",
-                            color: msg.role === "user" ? "var(--color-text-secondary)" : "var(--color-text-primary)",
+                            background: msg.role === "user" ? "var(--ui-surface-muted)" : "var(--violet-surface)",
+                            color: msg.role === "user" ? "var(--ui-text-muted)" : "var(--ui-text)",
                             marginLeft: msg.role === "user" ? 0 : 16,
-                            border: "1px solid var(--color-border)",
+                            border: "1px solid var(--ui-border)",
                           }}
                         >
                           <span className={k.muted} style={{ display: "block", fontSize: 12, marginBottom: 4 }}>
@@ -473,8 +473,8 @@ export function PersonDetailClient({
                       onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                       style={{
                         width: "100%", fontSize: 14, padding: "8px 10px", boxSizing: "border-box",
-                        background: "var(--color-background-card)", border: "1px solid var(--color-border)",
-                        borderRadius: "var(--radius-element)", color: "var(--color-text-primary)",
+                        background: "var(--ui-surface)", border: "1px solid var(--ui-border)",
+                        borderRadius: "var(--ui-radius-control)", color: "var(--ui-text)",
                       }}
                     />
                   </div>
@@ -487,8 +487,8 @@ export function PersonDetailClient({
                     rows={4}
                     style={{
                       width: "100%", fontSize: 14, padding: "8px 10px", boxSizing: "border-box",
-                      background: "var(--color-background-card)", border: "1px solid var(--color-border)",
-                      borderRadius: "var(--radius-element)", color: "var(--color-text-primary)", resize: "vertical",
+                      background: "var(--ui-surface)", border: "1px solid var(--ui-border)",
+                      borderRadius: "var(--ui-radius-control)", color: "var(--ui-text)", resize: "vertical",
                     }}
                   />
                 </div>
@@ -553,7 +553,7 @@ export function PersonDetailClient({
             <div style={{
               width: 48, height: 48, borderRadius: "50%",
               background: avatarColor, display: "grid", placeItems: "center",
-              fontWeight: 600, fontSize: 16, color: "var(--color-on-accent)",
+              fontWeight: 600, fontSize: 16, color: "var(--ui-on-accent)",
             }}>
               {initials}
             </div>
@@ -608,9 +608,9 @@ export function PersonDetailClient({
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{
-                  width: 42, height: 42, borderRadius: "var(--radius-element)",
-                  background: "var(--color-background-muted)", display: "grid", placeItems: "center",
-                  fontWeight: 600, fontSize: 14, color: "var(--color-accent)", flexShrink: 0,
+                  width: 42, height: 42, borderRadius: "var(--ui-radius-control)",
+                  background: "var(--ui-surface-muted)", display: "grid", placeItems: "center",
+                  fontWeight: 600, fontSize: 14, color: "var(--ui-accent)", flexShrink: 0,
                 }}>
                   {currentContact.company.name.slice(0, 2).toUpperCase()}
                 </div>

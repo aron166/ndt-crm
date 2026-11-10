@@ -15,7 +15,7 @@ const TENANT_ID = 1;
 
 function avatarBg(id: number) {
   const palette = [
-    "var(--color-accent)", "var(--mint)", "var(--amber)",
+    "var(--ui-accent)", "var(--mint)", "var(--amber)",
     "var(--sky)", "var(--violet)", "var(--coral)",
   ];
   return palette[id % palette.length];

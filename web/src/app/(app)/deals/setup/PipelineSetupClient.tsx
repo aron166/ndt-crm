@@ -93,11 +93,11 @@ function StageRow({
           title="Húzd az átrendezéshez"
           style={{ display: "flex", flexShrink: 0, cursor: dragHandle ? "grab" : "default", touchAction: "none" }}
         >
-          <GripVertical style={{ width: 14, height: 14, color: "var(--color-text-secondary)" }} />
+          <GripVertical style={{ width: 14, height: 14, color: "var(--ui-text-muted)" }} />
         </span>
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: stage.color, flexShrink: 0 }} />
-        <span className={s.rowLabel} style={{ fontSize: 14, color: "var(--color-text-primary)" }}>{stage.name}</span>
-        <span style={{ fontSize: 14, color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums" }}>{stage.probability}%</span>
+        <span className={s.rowLabel} style={{ fontSize: 14, color: "var(--ui-text)" }}>{stage.name}</span>
+        <span style={{ fontSize: 14, color: "var(--ui-text-muted)", fontVariantNumeric: "tabular-nums" }}>{stage.probability}%</span>
         {stage.isTerminalWon && <Badge variant="success" label="Nyert" />}
         {stage.isTerminalLost && <Badge variant="error" label="Veszített" />}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
@@ -146,7 +146,7 @@ function StageRow({
         </div>
       </div>
 
-      <div className="flex gap-4 text-sm" style={{ color: "var(--color-text-primary)" }}>
+      <div className="flex gap-4 text-sm" style={{ color: "var(--ui-text)" }}>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={isTerminalWon} onChange={(e) => { setIsTerminalWon(e.target.checked); if (e.target.checked) setIsTerminalLost(false); setProbability(e.target.checked ? 100 : probability); }} />
           Nyert (lezárt)
@@ -212,7 +212,7 @@ function StagesList({ stages, pipelineId }: { stages: Stage[]; pipelineId: numbe
             onDrop={handleDrop}
             style={{
               opacity: dragIndex === i ? 0.4 : 1,
-              borderTop: `2px solid ${showIndicator ? "var(--color-accent)" : "transparent"}`,
+              borderTop: `2px solid ${showIndicator ? "var(--ui-accent)" : "transparent"}`,
               borderRadius: 2,
               transition: "opacity .15s",
             }}
@@ -272,7 +272,7 @@ function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId:
         <span className={s.code}>
           {field.type}
         </span>
-        <span className={s.rowLabel} style={{ fontSize: 14, color: "var(--color-text-primary)" }}>{field.label}</span>
+        <span className={s.rowLabel} style={{ fontSize: 14, color: "var(--ui-text)" }}>{field.label}</span>
         <span className={s.code}>{field.key}</span>
         {field.required && <Badge variant="error" label="kötelező" />}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
@@ -316,7 +316,7 @@ function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId:
           />
         </div>
       )}
-      <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 14, color: "var(--color-text-primary)" }}>
+      <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 14, color: "var(--ui-text)" }}>
         <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
         Kötelező mező
       </label>
@@ -464,14 +464,14 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
             )}
 
             {pipeline.stages.length === 0 && addingStage !== pipeline.id && (
-              <p style={{ fontSize: 14, color: "var(--color-text-secondary)", textAlign: "center", padding: "24px 0" }}>
+              <p style={{ fontSize: 14, color: "var(--ui-text-muted)", textAlign: "center", padding: "24px 0" }}>
                 Nincs fázis. Adj hozzá egyet a pipeline működéséhez.
               </p>
             )}
           </div>
 
           {/* Custom fields section */}
-          <div style={{ borderTop: "1px solid var(--color-border)" }}>
+          <div style={{ borderTop: "1px solid var(--ui-border)" }}>
             <button
               className={s.toggleBtn}
               onClick={() => setExpandedFields((prev) => {
@@ -485,7 +485,7 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
                 : <ChevronRight style={{ width: 14, height: 14 }} />
               }
               Egyéni mezők
-              <span style={{ fontSize: 14, color: "var(--color-text-secondary)", marginLeft: 4, fontVariantNumeric: "tabular-nums" }}>
+              <span style={{ fontSize: 14, color: "var(--ui-text-muted)", marginLeft: 4, fontVariantNumeric: "tabular-nums" }}>
                 {pipeline.customFields.length}
               </span>
             </button>

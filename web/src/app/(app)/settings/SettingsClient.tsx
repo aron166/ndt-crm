@@ -136,7 +136,7 @@ function IntegrationCard({
           <div className={s.titleLine}>
             {connected
               ? <CheckCircle style={{ width: 14, height: 14, color: "var(--mint)" }} />
-              : <Circle style={{ width: 14, height: 14, color: "var(--color-text-secondary)" }} />
+              : <Circle style={{ width: 14, height: 14, color: "var(--ui-text-muted)" }} />
             }
             <span className={s.name}>{integration.name}</span>
             <span className={s.pill}>{integration.category}</span>
@@ -249,7 +249,7 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
   return (
     <div className={`mount ${s.stack}`}>
       <div className={`${k.muted} ${s.intro}`}>
-        <KeyRound style={{ width: 14, height: 14, color: "var(--color-accent)" }} />
+        <KeyRound style={{ width: 14, height: 14, color: "var(--ui-accent)" }} />
         Per-app kulcsok a <code className={s.code}>POST /api/leads</code> végponthoz. A kulcs csak hash-elve tárolódik: a teljes érték egyszer jelenik meg, létrehozáskor.
       </div>
 
@@ -390,7 +390,7 @@ export function SettingsClient({ tenant, connectedIntegrations, appKeys }: Setti
       {tab === "integrations" && (
         <div className={`mount ${s.stack}`}>
           <div className={`${k.muted} ${s.intro}`}>
-            <Zap style={{ width: 14, height: 14, color: "var(--color-accent)" }} />
+            <Zap style={{ width: 14, height: 14, color: "var(--ui-accent)" }} />
             API kulcsok titkosítva tárolódnak. Integrációk bővíthetők: minden új integrációhoz csak egy <code className={s.code}>/lib/integrations/&lt;slug&gt;.ts</code> fájl kell.
           </div>
 

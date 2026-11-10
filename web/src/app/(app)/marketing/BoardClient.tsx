@@ -23,12 +23,12 @@ function daysSince(iso: string): number {
 type ColumnKey = "draft" | "in_review" | "changes" | "ai_working" | "live" | "in_campaign";
 
 const COLUMNS: { key: ColumnKey; label: string; color: string; acceptsDrop: boolean }[] = [
-  { key: "draft", label: UI.columnDraft, color: "var(--color-text-secondary)", acceptsDrop: false },
+  { key: "draft", label: UI.columnDraft, color: "var(--ui-text-muted)", acceptsDrop: false },
   { key: "in_review", label: UI.columnInReview, color: "var(--amber)", acceptsDrop: false },
   { key: "changes", label: UI.columnChanges, color: "var(--coral)", acceptsDrop: true },
   { key: "ai_working", label: UI.columnAiWorking, color: "var(--violet)", acceptsDrop: false },
   { key: "live", label: UI.columnLive, color: "var(--mint)", acceptsDrop: false },
-  { key: "in_campaign", label: UI.columnInCampaign, color: "var(--color-text-secondary)", acceptsDrop: false },
+  { key: "in_campaign", label: UI.columnInCampaign, color: "var(--ui-text-muted)", acceptsDrop: false },
 ];
 
 /** Null = this status has no board column (archived), so the card is not shown. */
@@ -54,7 +54,7 @@ function Card({
       onDragEnd={onDragEnd}
       className="select-none"
       style={{
-        background: "var(--color-background-card)", borderRadius: "var(--radius-container)", boxShadow: "var(--shadow-low)",
+        background: "var(--ui-surface)", borderRadius: "var(--ui-radius-surface)", boxShadow: "var(--ui-shadow-raised)",
         padding: "12px 14px", opacity: dragging ? 0.4 : 1, cursor: "grab",
       }}
     >
@@ -68,28 +68,28 @@ function Card({
         />
         <Link href={`/marketing/${item.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none" }}>
           <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            <span style={{ fontSize: 12, color: "var(--ui-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
               {CATEGORY_LABEL[item.category as ContentCategory] ?? item.category}
             </span>
             {item.format && <span className="badge-ds slate">{item.format}</span>}
             {item.bouncedByRule && <span className="badge-ds coral">{UI.bouncedByRule}</span>}
             {item.openChecks > 0 && <span className="badge-ds amber">{UI.checksOpen(item.openChecks)}</span>}
             {item.selfScore !== null && (
-              <span className="badge-ds" style={{ color: "var(--color-text-secondary)" }}>
+              <span className="badge-ds" style={{ color: "var(--ui-text-muted)" }}>
                 {UI.selfScoreShort(Math.round(item.selfScore * 100))}
               </span>
             )}
           </div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 6, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ui-text)", marginBottom: 6, lineHeight: 1.3 }}>
             {item.title}
           </div>
           <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 4 }}>
             {item.verdicts.map((v) => (
-              <span key={v.reviewerId} className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+              <span key={v.reviewerId} className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
                 <span
                   style={{
                     width: 7, height: 7, borderRadius: "50%",
-                    background: v.verdict ? VERDICT_COLOR[v.verdict as Verdict] : "var(--color-border-emphasized)",
+                    background: v.verdict ? VERDICT_COLOR[v.verdict as Verdict] : "var(--ui-border-strong)",
                   }}
                 />
                 {v.reviewerName}: {v.verdict ? VERDICT_LABEL[v.verdict as Verdict] : UI.notYetReviewed}
@@ -197,8 +197,8 @@ export function BoardClient({
               key={col.key}
               className="kcol"
               style={{
-                background: isHover && col.acceptsDrop ? `color-mix(in srgb, ${col.color} 6%, transparent)` : "var(--color-background-muted)",
-                border: `1px solid ${isHover && col.acceptsDrop ? col.color : "var(--color-border)"}`,
+                background: isHover && col.acceptsDrop ? `color-mix(in srgb, ${col.color} 6%, transparent)` : "var(--ui-surface-muted)",
+                border: `1px solid ${isHover && col.acceptsDrop ? col.color : "var(--ui-border)"}`,
                 width: 280, flexShrink: 0,
                 opacity: isMuted ? 0.55 : 1,
               }}
@@ -217,14 +217,14 @@ export function BoardClient({
                     onClick={() => selectAllIn(col.key)}
                     style={{
                       alignSelf: "flex-start", background: "transparent", border: "none", cursor: "pointer",
-                      fontSize: 12, color: "var(--color-text-secondary)", padding: "2px 0", minHeight: 24,
+                      fontSize: 12, color: "var(--ui-text-muted)", padding: "2px 0", minHeight: 24,
                     }}
                   >
                     {UI.selectAll}
                   </button>
                 )}
                 {cards.length === 0 ? (
-                  <div style={{ fontSize: 14, color: "var(--color-text-secondary)", padding: "8px 2px" }}>{UI.emptyColumn}</div>
+                  <div style={{ fontSize: 14, color: "var(--ui-text-muted)", padding: "8px 2px" }}>{UI.emptyColumn}</div>
                 ) : (
                   cards.map((item) => (
                     <Card

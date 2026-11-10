@@ -16,7 +16,7 @@ import s from "../companies.module.css";
 const TENANT_ID = 1;
 
 const AVATAR_PALETTE = [
-  "var(--color-accent)", "var(--mint)", "var(--amber)",
+  "var(--ui-accent)", "var(--mint)", "var(--amber)",
   "var(--sky)", "var(--violet)", "var(--coral)",
 ];
 
@@ -87,7 +87,7 @@ export default async function CompanyDetailPage({
     { label: "Helyszíni látogatás",value: typeCounts.site_visit ?? 0, color: "var(--amber)"  },
   ].filter((e) => e.value > 0);
   if (!engagementBreakdown.length) {
-    engagementBreakdown.push({ label: "Nincs adat", value: 1, color: "var(--color-background-muted)" });
+    engagementBreakdown.push({ label: "Nincs adat", value: 1, color: "var(--ui-surface-muted)" });
   }
 
   // KPI strip

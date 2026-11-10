@@ -78,7 +78,7 @@ export function AnalyticsClient({
               <div className={s.years}>
                 {revenueByMonth.map((r, i) => (
                   <div key={i} style={{ textAlign: "center", flexShrink: 0, minWidth: 36 }}>
-                    <div className={k.num} style={{ fontSize: 14, color: r.total > 0 ? "var(--mint)" : "var(--color-text-secondary)" }}>
+                    <div className={k.num} style={{ fontSize: 14, color: r.total > 0 ? "var(--mint)" : "var(--ui-text-muted)" }}>
                       {r.total > 0 ? (r.total / 1_000_000).toFixed(0) : "-"}
                     </div>
                     <div className={s.axis}>{monthLabels[i]}</div>
@@ -101,7 +101,7 @@ export function AnalyticsClient({
             {entityLinks.map(({ label, href, count, accent }) => (
               <a key={label} href={href} className={s.linkTile}>
                 <span>{label}</span>
-                <span className={k.num} style={{ fontSize: 14, color: accent ?? "var(--color-accent)" }}>{count}</span>
+                <span className={k.num} style={{ fontSize: 14, color: accent ?? "var(--ui-accent)" }}>{count}</span>
               </a>
             ))}
           </div>

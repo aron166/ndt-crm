@@ -24,7 +24,7 @@ const TENANT_ID = 1;
 
 function avatarBg(id: number) {
   const palette = [
-    "var(--color-accent)", "var(--mint)", "var(--amber)",
+    "var(--ui-accent)", "var(--mint)", "var(--amber)",
     "var(--sky)", "var(--violet)", "var(--coral)",
   ];
   return palette[id % palette.length];
@@ -32,7 +32,7 @@ function avatarBg(id: number) {
 
 const FRESHNESS_COLOR: Record<string, string> = {
   mint:   "var(--mint)",
-  mute:   "var(--color-text-secondary)",
+  mute:   "var(--ui-text-muted)",
   amber:  "var(--amber)",
   coral:  "var(--coral)",
 };

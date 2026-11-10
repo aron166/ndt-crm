@@ -141,7 +141,7 @@ export function QuoteBuilderClient({
 
   const meta = QUOTE_STATUS_META[quote.status];
 
-  const labelStyle: React.CSSProperties = { fontSize: 12, color: "var(--color-text-secondary)" };
+  const labelStyle: React.CSSProperties = { fontSize: 12, color: "var(--ui-text-muted)" };
   const boxCls = `${q.box} mb-4`;
 
   return (
@@ -247,7 +247,7 @@ export function QuoteBuilderClient({
                 </tr>
               ))}
               {lines.length === 0 && (
-                <tr><td colSpan={7} style={{ padding: "16px 6px", textAlign: "center", color: "var(--color-text-secondary)" }}>Nincs tétel: adj hozzá sort.</td></tr>
+                <tr><td colSpan={7} style={{ padding: "16px 6px", textAlign: "center", color: "var(--ui-text-muted)" }}>Nincs tétel: adj hozzá sort.</td></tr>
               )}
             </tbody>
           </table>
@@ -256,10 +256,10 @@ export function QuoteBuilderClient({
         {/* Totals */}
         <div className="flex justify-end mt-4">
           <div style={{ width: 280, fontVariantNumeric: "tabular-nums" }}>
-            <div className="flex justify-between py-1" style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>
+            <div className="flex justify-between py-1" style={{ fontSize: 14, color: "var(--ui-text-muted)" }}>
               <span>Nettó összesen</span><span>{formatHUF(totals.net)}</span>
             </div>
-            <div className="flex items-center justify-between py-1" style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>
+            <div className="flex items-center justify-between py-1" style={{ fontSize: 14, color: "var(--ui-text-muted)" }}>
               <span className="inline-flex items-center gap-1">
                 ÁFA
                 <input type="number" inputMode="decimal" step="any" min={0}
@@ -270,7 +270,7 @@ export function QuoteBuilderClient({
               </span>
               <span>{formatHUF(totals.vat)}</span>
             </div>
-            <div className="flex justify-between py-2 mt-1" style={{ fontSize: 16, fontWeight: 600, color: "var(--color-text-primary)", borderTop: "1px solid var(--color-border)" }}>
+            <div className="flex justify-between py-2 mt-1" style={{ fontSize: 16, fontWeight: 600, color: "var(--ui-text)", borderTop: "1px solid var(--ui-border)" }}>
               <span>Bruttó összesen</span><span>{formatHUF(totals.gross)}</span>
             </div>
           </div>
@@ -285,16 +285,16 @@ export function QuoteBuilderClient({
 
       {/* Action bar */}
       <div className="flex items-center justify-between">
-        <button className={k.btn} disabled={pending} onClick={handleDelete} style={{ color: "var(--color-text-error)" }}>
+        <button className={k.btn} disabled={pending} onClick={handleDelete} style={{ color: "var(--ui-danger-text)" }}>
           Törlés
         </button>
         <div className="flex items-center gap-3">
           {msg && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--color-text-success)" : "var(--color-text-error)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--ui-success-text)" : "var(--ui-danger-text)" }}>
               {msg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {msg.text}
             </span>
           )}
-          {quote.sentAt && <span style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>Elküldve: {formatDate(quote.sentAt)}</span>}
+          {quote.sentAt && <span style={{ fontSize: 14, color: "var(--ui-text-muted)" }}>Elküldve: {formatDate(quote.sentAt)}</span>}
           <button className={`${k.btn} ${k.btnPrimary}`} disabled={pending} onClick={handleSave}>{pending ? "Mentés…" : "Mentés"}</button>
         </div>
       </div>

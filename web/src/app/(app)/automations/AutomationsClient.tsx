@@ -391,7 +391,7 @@ function RuleCard({
       <div className={s.ruleRow}>
         <div className={s.ruleMain}>
           <div className={s.ruleName}>
-            <Zap style={{ width: 14, height: 14, color: rule.isActive ? "var(--color-accent)" : "var(--color-text-secondary)" }} />
+            <Zap style={{ width: 14, height: 14, color: rule.isActive ? "var(--ui-accent)" : "var(--ui-text-muted)" }} />
             <span className={s.name}>{rule.name}</span>
             {!rule.isActive && <span className={k.muted}>inaktív</span>}
           </div>

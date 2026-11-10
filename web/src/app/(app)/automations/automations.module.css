@@ -10,18 +10,18 @@
 .ruleRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ruleMain { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
 .ruleName { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.name { font-size: 16px; font-weight: 600; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.name { font-size: 16px; font-weight: 600; color: var(--ui-text); overflow-wrap: anywhere; }
 .ruleActions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 14px; color: var(--color-text-secondary); cursor: pointer; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 14px; color: var(--ui-text-muted); cursor: pointer; }
 button.danger { color: var(--coral); }
 
 /* Form field labels */
-.label { display: block; font-size: 14px; color: var(--color-text-secondary); margin-block-end: 4px; }
+.label { display: block; font-size: 14px; color: var(--ui-text-muted); margin-block-end: 4px; }
 
 /* Condition row */
 .condRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* Inputs, selects and textareas */
-.field { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 12px; font: inherit; font-size: 14px; border: 1px solid var(--color-border-emphasized); border-radius: var(--radius-element); background: var(--color-background-card); color: var(--color-text-primary); }
-.field:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.field { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 12px; font: inherit; font-size: 14px; border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); background: var(--ui-surface); color: var(--ui-text); }
+.field:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 .textarea { min-height: 120px; resize: vertical; }

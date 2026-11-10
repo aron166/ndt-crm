@@ -91,22 +91,22 @@ function DealCard({
       }}
       className={cn("relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
-        background: "var(--color-background-card)",
-        borderRadius: "var(--radius-container)",
+        background: "var(--ui-surface)",
+        borderRadius: "var(--ui-radius-surface)",
         border: `1px solid ${isStale ? "var(--coral)" : "transparent"}`,
         padding: "12px 14px", cursor: "grab",
-        boxShadow: "var(--shadow-low)",
+        boxShadow: "var(--ui-shadow-raised)",
         transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
         willChange: "transform",
       }}
       onMouseOver={(e) => {
-        e.currentTarget.style.borderColor = isStale ? "var(--coral)" : "var(--color-border-emphasized)";
-        e.currentTarget.style.boxShadow = "var(--shadow-high)";
+        e.currentTarget.style.borderColor = isStale ? "var(--coral)" : "var(--ui-border-strong)";
+        e.currentTarget.style.boxShadow = "var(--ui-shadow-overlay)";
         e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseOut={(e) => {
         e.currentTarget.style.borderColor = isStale ? "var(--coral)" : "transparent";
-        e.currentTarget.style.boxShadow = "var(--shadow-low)";
+        e.currentTarget.style.boxShadow = "var(--ui-shadow-raised)";
         e.currentTarget.style.transform = "none";
       }}
     >
@@ -119,10 +119,10 @@ function DealCard({
         className={`absolute ${k.btn} ${k.btnIcon}`}
         style={{
           top: 6, right: 6, width: 40, height: 40,
-          color: "var(--color-text-secondary)", background: "var(--color-background-muted)",
+          color: "var(--ui-text-muted)", background: "var(--ui-surface-muted)",
         }}
         onMouseOver={(e) => { e.currentTarget.style.color = "var(--coral)"; }}
-        onMouseOut={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
+        onMouseOut={(e) => { e.currentTarget.style.color = "var(--ui-text-muted)"; }}
       >
         <Trash2 style={{ width: 12, height: 12 }} />
       </button>
@@ -137,27 +137,27 @@ function DealCard({
 
       {/* Title — presentational only; the parent card handles click + hover */}
       <p
-        style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: "var(--color-text-primary)", marginBottom: 6, paddingRight: 20 }}
+        style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: "var(--ui-text)", marginBottom: 6, paddingRight: 20 }}
       >
         {deal.title}
       </p>
 
       {/* Value */}
       {formattedValue && (
-        <div className="mb-2" style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+        <div className="mb-2" style={{ fontSize: 14, fontWeight: 600, color: "var(--ui-text)", fontVariantNumeric: "tabular-nums" }}>
           {formattedValue}
         </div>
       )}
 
       {/* Company + person */}
-      <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 8, marginTop: 4, display: "flex", flexDirection: "column", gap: 3 }}>
+      <div style={{ borderTop: "1px solid var(--ui-border)", paddingTop: 8, marginTop: 4, display: "flex", flexDirection: "column", gap: 3 }}>
         <Link
           href={`/companies/${deal.company.id}`}
           className="flex items-center gap-1.5"
-          style={{ fontSize: 14, color: "var(--color-text-secondary)" }}
+          style={{ fontSize: 14, color: "var(--ui-text-muted)" }}
           onClick={(e) => e.stopPropagation()}
-          onMouseOver={(e) => (e.currentTarget.style.color = "var(--color-text-primary)")}
-          onMouseOut={(e) => (e.currentTarget.style.color = "var(--color-text-secondary)")}
+          onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-text)")}
+          onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text-muted)")}
         >
           <Building2 style={{ width: 10, height: 10, flexShrink: 0 }} />
           <span className="truncate">{deal.company.name}</span>
@@ -166,17 +166,17 @@ function DealCard({
           <Link
             href={`/persons/${deal.person!.id}`}
             className="flex items-center gap-1.5"
-            style={{ fontSize: 14, color: "var(--color-text-secondary)" }}
+            style={{ fontSize: 14, color: "var(--ui-text-muted)" }}
             onClick={(e) => e.stopPropagation()}
-            onMouseOver={(e) => (e.currentTarget.style.color = "var(--color-text-primary)")}
-            onMouseOut={(e) => (e.currentTarget.style.color = "var(--color-text-secondary)")}
+            onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-text)")}
+            onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text-muted)")}
           >
             <User style={{ width: 10, height: 10, flexShrink: 0 }} />
             <span className="truncate">{personName}</span>
           </Link>
         )}
         {deal.expectedCloseDate && (
-          <div className="flex items-center gap-1.5" style={{ fontSize: 14, color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+          <div className="flex items-center gap-1.5" style={{ fontSize: 14, color: "var(--ui-text-muted)", fontVariantNumeric: "tabular-nums" }}>
             <Calendar style={{ width: 10, height: 10 }} />
             {formatDate(deal.expectedCloseDate)}
           </div>
@@ -275,8 +275,8 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
               key={stage.id}
               className="kcol mount"
               style={{
-                background: isHover ? `color-mix(in srgb, ${stage.color} 6%, transparent)` : "var(--color-background-muted)",
-                border: `1px solid ${isHover ? stage.color : "var(--color-border)"}`,
+                background: isHover ? `color-mix(in srgb, ${stage.color} 6%, transparent)` : "var(--ui-surface-muted)",
+                border: `1px solid ${isHover ? stage.color : "var(--ui-border)"}`,
                 transition: "border-color .15s, background .15s",
               }}
               onDragOver={(e) => { e.preventDefault(); setHoverStage(stage.id); }}
@@ -285,10 +285,10 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
             >
               <div className="kcol-head">
                 <span className="kcol-dot" style={{ background: stage.color, }} />
-                <span className="kcol-title" style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)" }}>{stage.name}</span>
-                <span className="kcol-count" style={{ background: "transparent", color: "var(--color-text-secondary)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{cards.length}</span>
+                <span className="kcol-title" style={{ fontSize: 15, fontWeight: 600, color: "var(--ui-text)" }}>{stage.name}</span>
+                <span className="kcol-count" style={{ background: "transparent", color: "var(--ui-text-muted)", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{cards.length}</span>
                 {colValue > 0 && (
-                  <span style={{ fontSize: 14, color: "var(--color-text-secondary)", marginLeft: 4, fontVariantNumeric: "tabular-nums" }}>
+                  <span style={{ fontSize: 14, color: "var(--ui-text-muted)", marginLeft: 4, fontVariantNumeric: "tabular-nums" }}>
                     {Math.round(colValue).toLocaleString("hu-HU")}
                   </span>
                 )}
@@ -311,7 +311,7 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
                   <button
                     onClick={() => { setNewStageId(stage.id); setEditDeal(null); setModalOpen(true); }}
                     className={k.btn}
-                    style={{ background: "transparent", borderColor: "transparent", justifyContent: "flex-start", width: "100%", minHeight: 40, fontSize: 14, color: "var(--color-text-secondary)" }}
+                    style={{ background: "transparent", borderColor: "transparent", justifyContent: "flex-start", width: "100%", minHeight: 40, fontSize: 14, color: "var(--ui-text-muted)" }}
                   >
                     <Plus style={{ width: 11, height: 11 }} />
                     Deal hozzáadása

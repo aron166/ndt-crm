@@ -64,8 +64,8 @@ function ConfidenceBar({ value }: { value: number }) {
 function SourceBadge({ source }: { source: string }) {
   const color =
     source === "registry" ? "var(--mint)" :
-    source === "inference" ? "var(--color-accent)" :
-    "var(--color-text-secondary)";
+    source === "inference" ? "var(--ui-accent)" :
+    "var(--ui-text-muted)";
   return (
     <span className={s.source} style={{ borderColor: color, color }}>
       {source}
@@ -78,14 +78,14 @@ function SourceBadge({ source }: { source: string }) {
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string }> = {
     pending:  { label: "Várakozik", color: "var(--amber)" },
-    running:  { label: "Fut",       color: "var(--color-accent)" },
+    running:  { label: "Fut",       color: "var(--ui-accent)" },
     done:     { label: "Kész",      color: "var(--mint)" },
     failed:   { label: "Hiba",      color: "var(--coral)" },
     approved: { label: "Jóváhagyta", color: "var(--mint)" },
-    rejected: { label: "Elutasítva", color: "var(--color-text-secondary)" },
+    rejected: { label: "Elutasítva", color: "var(--ui-text-muted)" },
     partial:  { label: "Részleges",  color: "var(--amber)" },
   };
-  const { label, color } = map[status] ?? { label: status, color: "var(--color-text-secondary)" };
+  const { label, color } = map[status] ?? { label: status, color: "var(--ui-text-muted)" };
   return (
     <span className={s.status} style={{ color }}>
       {label}
@@ -393,7 +393,7 @@ export function EnrichmentClient({ runs, proposals }: Props) {
 
 function SparkleIcon() {
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block" }}>
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--ui-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block" }}>
       <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/>
       <path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75z"/>
       <path d="M5 3l.5 1.5L7 5l-1.5.5L5 7l-.5-1.5L3 5l1.5-.5z"/>

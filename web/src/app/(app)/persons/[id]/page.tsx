@@ -12,7 +12,7 @@ import k from "@/components/astryx/page.module.css";
 const TENANT_ID = 1;
 
 const AVATAR_PALETTE = [
-  "var(--color-accent)", "var(--mint)", "var(--amber)",
+  "var(--ui-accent)", "var(--mint)", "var(--amber)",
   "var(--sky)", "var(--violet)", "var(--coral)",
 ];
 

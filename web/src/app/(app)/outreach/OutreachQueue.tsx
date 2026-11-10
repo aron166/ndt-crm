@@ -47,13 +47,13 @@ const STATUS_LABEL: Record<DraftStatus, string> = {
 };
 
 const STATUS_TONE: Record<DraftStatus, string> = {
-  draft: "var(--color-text-secondary)",
-  approved: "var(--color-accent)",
-  sending: "var(--color-accent)",
+  draft: "var(--ui-text-muted)",
+  approved: "var(--ui-accent)",
+  sending: "var(--ui-accent)",
   sent: "var(--mint)",
   failed: "var(--coral)",
   replied: "var(--sky)",
-  cancelled: "var(--color-text-secondary)",
+  cancelled: "var(--ui-text-muted)",
 };
 
 function StatusBadge({ status }: { status: DraftStatus }) {
@@ -62,7 +62,7 @@ function StatusBadge({ status }: { status: DraftStatus }) {
     <span
       style={{
         fontSize: 12, fontWeight: 500, color, padding: "2px 8px", borderRadius: 999,
-        border: `1px solid ${color}`, background: "var(--color-background-card)", whiteSpace: "nowrap",
+        border: `1px solid ${color}`, background: "var(--ui-surface)", whiteSpace: "nowrap",
       }}
     >
       {STATUS_LABEL[status]}
