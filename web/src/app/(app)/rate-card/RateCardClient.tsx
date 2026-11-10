@@ -50,7 +50,7 @@ export function RateCardClient({ initialRates }: { initialRates: CostRateEntry[]
   return (
     <div className={q.box}>
       <div className={k.tableWrap}>
-        <table className={k.table}>
+        <table className={k.table} style={{ minWidth: 0 }}>
           <thead>
             <tr>
               {["Költségkód", "Egység", "Egységár (Ft)"].map((h) => (

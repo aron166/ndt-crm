@@ -240,7 +240,7 @@ export function QuoteBuilderClient({
                     {formatHUF(lineAmount({ quantity: numOrNull(l.quantity), unitRate: numOrNull(l.unitRate) }))}
                   </td>
                   <td style={{ width: 48 }}>
-                    <button type="button" onClick={() => removeLine(idx)} className={`${k.btn} ${k.btnIcon}`} title="Sor törlése" aria-label="Sor törlése">
+                    <button type="button" onClick={() => removeLine(idx)} className={`${k.btn} ${k.btnIcon}`} title="Sor törlése" aria-label="Sor törlése" /* PROPOSAL copy */>
                       <Trash2 className="size-3.5" />
                     </button>
                   </td>

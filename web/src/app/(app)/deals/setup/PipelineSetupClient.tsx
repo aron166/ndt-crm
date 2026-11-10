@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { upsertStage, deleteStage, createPipeline, reorderStages } from "@/app/actions/deals";
 import { upsertCustomField, deleteCustomField } from "@/app/actions/custom-fields";
 import { Plus, Trash2, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
+import { Badge } from "@astryxdesign/core/Badge";
 import { Input } from "@/components/ui/input";
 import k from "@/components/astryx/page.module.css";
 import s from "./setup.module.css";
@@ -95,10 +96,10 @@ function StageRow({
           <GripVertical style={{ width: 14, height: 14, color: "var(--color-text-secondary)" }} />
         </span>
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: stage.color, flexShrink: 0 }} />
-        <span style={{ flex: 1, fontSize: 14, color: "var(--color-text-primary)" }}>{stage.name}</span>
+        <span className={s.rowLabel} style={{ fontSize: 14, color: "var(--color-text-primary)" }}>{stage.name}</span>
         <span style={{ fontSize: 14, color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums" }}>{stage.probability}%</span>
-        {stage.isTerminalWon && <span className="badge-ds mint" style={{ fontSize: 12 }}>Nyert</span>}
-        {stage.isTerminalLost && <span className="badge-ds coral" style={{ fontSize: 12 }}>Veszített</span>}
+        {stage.isTerminalWon && <Badge variant="success" label="Nyert" />}
+        {stage.isTerminalLost && <Badge variant="error" label="Veszített" />}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           className={`${k.btn} ${k.btnIcon}`}
           aria-label="Fázis törlése" // PROPOSAL copy
@@ -131,15 +132,16 @@ function StageRow({
               key={c}
               type="button"
               className={s.swatch}
-              aria-label={c}
+              aria-label={`Szín: ${c}`} // PROPOSAL copy
               onClick={() => setColor(c)}
-              style={{
-                width: 24, height: 24, borderRadius: "50%", background: c, cursor: "pointer",
+            >
+              <span style={{
+                width: 24, height: 24, borderRadius: "50%", background: c,
                 outline: color === c ? `2px solid ${c}` : "none", outlineOffset: 2,
                 // affordance, not decoration — keep a literal radius in both themes so the selected swatch stays visible
                 boxShadow: color === c ? `0 0 8px ${c}` : "none",
-              }}
-            />
+              }} />
+            </button>
           ))}
         </div>
       </div>
@@ -270,9 +272,9 @@ function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId:
         <span className={s.code}>
           {field.type}
         </span>
-        <span style={{ flex: 1, fontSize: 14, color: "var(--color-text-primary)" }}>{field.label}</span>
+        <span className={s.rowLabel} style={{ fontSize: 14, color: "var(--color-text-primary)" }}>{field.label}</span>
         <span className={s.code}>{field.key}</span>
-        {field.required && <span className="badge-ds coral" style={{ fontSize: 12 }}>kötelező</span>}
+        {field.required && <Badge variant="error" label="kötelező" />}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
           className={`${k.btn} ${k.btnIcon}`}
           aria-label="Mező törlése" // PROPOSAL copy
@@ -445,9 +447,9 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
                     <label className={s.label}>Szín</label>
                     <div className="flex gap-2 flex-wrap pt-1">
                       {STAGE_COLORS.slice(0, 6).map((c) => (
-                        <button key={c} type="button" className={s.swatch} aria-label={c} onClick={() => setNewStageColor(c)}
-                          style={{ width: 20, height: 20, borderRadius: "50%", background: c, cursor: "pointer", outline: newStageColor === c ? `2px solid ${c}` : "none", outlineOffset: 2 }}
-                        />
+                        <button key={c} type="button" className={s.swatch} aria-label={`Szín: ${c}`} /* PROPOSAL copy */ onClick={() => setNewStageColor(c)}>
+                          <span style={{ width: 20, height: 20, borderRadius: "50%", background: c, outline: newStageColor === c ? `2px solid ${c}` : "none", outlineOffset: 2 }} />
+                        </button>
                       ))}
                     </div>
                   </div>

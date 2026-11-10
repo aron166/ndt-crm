@@ -7,6 +7,7 @@ import { Plus, AlertTriangle, Building2, User, Calendar, Trash2 } from "lucide-r
 import { moveDeal, deleteDeal } from "@/app/actions/deals";
 import { DealModal } from "./DealModal";
 import { DeleteCardDialog, type DeleteCascade } from "@/components/DeleteCardDialog";
+import k from "@/components/astryx/page.module.css";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -115,11 +116,10 @@ function DealCard({
         aria-label="Deal törlése"
         draggable={false}
         onClick={(e) => { e.stopPropagation(); onDelete(deal.id); }}
-        className="absolute"
+        className={`absolute ${k.btn} ${k.btnIcon}`}
         style={{
-          top: 6, right: 6, width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
-          borderRadius: 5, color: "var(--color-text-secondary)", background: "var(--color-background-muted)",
-          border: "1px solid var(--color-border)",
+          top: 6, right: 6, width: 40, height: 40,
+          color: "var(--color-text-secondary)", background: "var(--color-background-muted)",
         }}
         onMouseOver={(e) => { e.currentTarget.style.color = "var(--coral)"; }}
         onMouseOut={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
@@ -310,8 +310,8 @@ export function DealsKanban({ pipeline, deals: initialDeals }: DealsKanbanProps)
                 {!stage.isTerminalWon && !stage.isTerminalLost && (
                   <button
                     onClick={() => { setNewStageId(stage.id); setEditDeal(null); setModalOpen(true); }}
-                    className="btn ghost"
-                    style={{ justifyContent: "flex-start", width: "100%", minHeight: 40, fontSize: 14, color: "var(--color-text-secondary)" }}
+                    className={k.btn}
+                    style={{ background: "transparent", borderColor: "transparent", justifyContent: "flex-start", width: "100%", minHeight: 40, fontSize: 14, color: "var(--color-text-secondary)" }}
                   >
                     <Plus style={{ width: 11, height: 11 }} />
                     Deal hozzáadása

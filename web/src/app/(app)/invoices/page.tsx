@@ -59,7 +59,7 @@ export default async function InvoicesPage({
         eyebrow={
           <>
             {total.toLocaleString("hu-HU")}
-            {totalAmount > 0 && <span className={k.num}> · {(totalAmount / 1_000_000).toFixed(1)}M HUF</span>}
+            {totalAmount > 0 && <span className={k.num}> · {(totalAmount / 1e6).toLocaleString("hu-HU", { maximumFractionDigits: 1 })}M HUF</span>}
           </>
         }
         views={
@@ -69,7 +69,7 @@ export default async function InvoicesPage({
               name="search"
               defaultValue={search}
               placeholder="Cég neve…"
-              aria-label="Cég neve"
+              aria-label="Cég neve" /* PROPOSAL copy */
               className={q.input}
               style={{ width: 200 }}
             />
@@ -77,14 +77,14 @@ export default async function InvoicesPage({
         }
         filters={
           <Seg
-            label="Év"
+            label="Év" /* PROPOSAL copy */
             current={yearFilter ? String(yearFilter) : "all"}
             items={[
-              { key: "all", label: "Mind", href: search ? `/invoices?search=${search}` : "/invoices" },
+              { key: "all", label: "Mind", href: search ? `/invoices?search=${encodeURIComponent(search)}` : "/invoices" },
               ...availableYears.map((y) => ({
                 key: String(y),
                 label: String(y),
-                href: search ? `/invoices?year=${y}&search=${search}` : `/invoices?year=${y}`,
+                href: search ? `/invoices?year=${y}&search=${encodeURIComponent(search)}` : `/invoices?year=${y}`,
               })),
             ]}
           />
@@ -137,13 +137,13 @@ export default async function InvoicesPage({
           <span className={`${k.muted} ${k.num}`}>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString("hu-HU")}</span>
           <div className="flex gap-2">
             {page > 1 && (
-              <Link href={`/invoices?${yearFilter ? `year=${yearFilter}&` : ""}${search ? `search=${search}&` : ""}page=${page - 1}`}
+              <Link href={`/invoices?${yearFilter ? `year=${yearFilter}&` : ""}${search ? `search=${encodeURIComponent(search)}&` : ""}page=${page - 1}`}
                 className={k.btn}>
                 ← Előző
               </Link>
             )}
             {page < totalPages && (
-              <Link href={`/invoices?${yearFilter ? `year=${yearFilter}&` : ""}${search ? `search=${search}&` : ""}page=${page + 1}`}
+              <Link href={`/invoices?${yearFilter ? `year=${yearFilter}&` : ""}${search ? `search=${encodeURIComponent(search)}&` : ""}page=${page + 1}`}
                 className={k.btn}>
                 Következő →
               </Link>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { QuoteListItem } from "@/app/actions/quotes";
 import { QUOTE_STATUS_META } from "@/lib/quotes/status";
 import { NewQuoteDialog } from "./NewQuoteDialog";
@@ -33,9 +34,9 @@ export function QuotesClient({ quotes }: { quotes: QuoteListItem[] }) {
   const shown = filter === "all" ? quotes : quotes.filter((q) => q.status === filter);
 
   const filters = (
-    <div className={k.seg} role="tablist" aria-label="Állapot">
+    <div className={k.seg} aria-label="Állapot"> {/* PROPOSAL copy */}
       {FILTERS.map((f) => (
-        <button key={f.key} type="button" role="tab" aria-selected={filter === f.key} onClick={() => setFilter(f.key)}
+        <button key={f.key} type="button" aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}
           className={`${k.segItem} ${q.tab} ${filter === f.key ? k.segItemOn : ""}`}>
           {f.label}
         </button>
@@ -69,7 +70,7 @@ export function QuotesClient({ quotes }: { quotes: QuoteListItem[] }) {
             <tbody>
               {shown.map((qt) => (
                 <tr key={qt.id} onClick={() => router.push(`/quotes/${qt.id}`)} className={q.clickRow}>
-                  <td className={q.mono}>{qt.quoteNumber}</td>
+                  <td className={q.mono}><Link href={`/quotes/${qt.id}`}>{qt.quoteNumber}</Link></td>
                   <td>{qt.companyName}</td>
                   <td>{qt.title}</td>
                   <td><StatusBadge status={qt.status} /></td>
