@@ -34,7 +34,7 @@ export default async function LeadStatusSetupPage() {
     <div className="mount">
       <div style={{ marginBottom: 16 }}>
         <Link
-          href="/leads"
+          href="/leads?view=board"
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
           className="row-link"
         >

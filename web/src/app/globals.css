@@ -1,6 +1,22 @@
+/* Astryx beside Tailwind 4 (PICK.md, astryx docs styling-libraries/tailwind):
+   this layer order MUST come before the Tailwind import, or the Astryx reset
+   silently outranks every utility class. */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+
+/* Astryx type: Figtree (theme-neutral's face) loaded by next/font, not the
+   theme's render-blocking Google @import. */
+[data-astryx-theme="neutral"] {
+  --font-family-body: var(--font-sans), -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-family-heading: var(--font-sans), -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-family-code: var(--font-geist-mono), ui-monospace, monospace;
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -807,3 +823,16 @@
 @media (prefers-reduced-motion: reduce) {
   .strip-moved { animation: none; }
 }
+
+/* ── Astryx shell (CrmSideNav) ───────────────────────────────── */
+.crm-nav-top { display: flex; flex-direction: column; gap: 8px; padding: 4px 8px 8px; }
+.crm-search {
+  display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px;
+  border-radius: var(--radius-element); background: var(--color-background-muted);
+  color: var(--color-text-secondary); font-size: 14px; cursor: pointer; text-align: left;
+  transition: box-shadow 150ms ease-out;
+}
+.crm-search:hover { box-shadow: inset 0 0 0 1px var(--color-border-emphasized); }
+.crm-search:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.crm-search span { flex: 1; }
+.crm-nav-email { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

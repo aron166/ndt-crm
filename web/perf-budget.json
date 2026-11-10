@@ -1,56 +1,56 @@
 {
-  "_comment": "Regression gate for scripts/check-bundle.mjs, not a target to design down to. Seeded from an actual `next build` on 2026-09-17 (feat/content-board) with ~10% headroom over the measured KB. Bump a number deliberately (with a reason in the PR) when a route legitimately grows; see docs/ci.md.",
+  "_comment": "Regression gate for scripts/check-bundle.mjs, not a target to design down to. Seeded from an actual `next build` on 2026-09-17 (feat/content-board) with ~10% headroom over the measured KB. Bump a number deliberately (with a reason in the PR) when a route legitimately grows; see docs/ci.md. 2026-11-10 (Astryx shell, PR #astryx-shell): every app route +255 to +390 KB raw, the Astryx AppShell + SideNav runtime (~115 KB gzip); re-seeded at actual +10%.",
   "shared": {
     "maxKB": 612
   },
   "routes": {
     "/marketing": {
-      "maxKB": 624
+      "maxKB": 984
     },
     "/marketing/[id]": {
-      "maxKB": 631
+      "maxKB": 991
     },
     "/marketing/live": {
-      "maxKB": 606
+      "maxKB": 961
     },
     "/outreach": {
-      "maxKB": 926
+      "maxKB": 1270
     },
     "/drive": {
       "maxKB": 387
     },
     "/leads": {
-      "maxKB": 947
+      "maxKB": 1409
     },
     "/marketing/decisions": {
-      "maxKB": 606
+      "maxKB": 960
     },
     "/marketing/campaigns": {
-      "maxKB": 642
+      "maxKB": 1102
     },
     "/marketing/campaigns/[id]": {
-      "maxKB": 648
+      "maxKB": 1109
     },
     "/outreach/campaigns": {
-      "maxKB": 605
+      "maxKB": 948
     },
     "/persons": {
-      "maxKB": 647
+      "maxKB": 1099
     },
     "/persons/[id]": {
-      "maxKB": 1055
+      "maxKB": 1557
     },
     "/tasks": {
-      "maxKB": 716
+      "maxKB": 1219
     },
     "/tasks/[id]": {
-      "maxKB": 703
+      "maxKB": 1205
     },
     "/leads/setup": {
-      "maxKB": 953
+      "maxKB": 1346
     },
     "/patchnotes": {
-      "maxKB": 601
+      "maxKB": 943
     }
   }
 }

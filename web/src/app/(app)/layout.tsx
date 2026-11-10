@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { serializeDates } from "@/lib/serialize";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { countPendingForReviewer } from "@/lib/content/queries";
+import { SIDE_STAGES } from "@/lib/leads/lifecycle";
 
 export default async function AppLayout({
   children,
@@ -26,13 +27,20 @@ export default async function AppLayout({
     );
   }
 
-  const [overdueCount, defaultPipeline, marketingReviewCount] = await Promise.all([
+  const [overdueCount, overdueLeadCount, defaultPipeline, marketingReviewCount] = await Promise.all([
     db.task.count({
       where: {
         tenantId: 1,
         status: { in: ["created", "not_started", "in_progress"] },
         dueDate: { lt: new Date(new Date().toDateString()) },
         parentTaskId: null,
+      },
+    }),
+    db.lead.count({
+      // Same set as the Mai hívólista queue, which opens on "my leads": open, not converted, not parked in recall.
+      where: {
+        tenantId: 1, assignedToId: userId, outcome: "open", convertedDealId: null, nextDue: { lt: new Date() },
+        OR: [{ status: null }, { status: { notIn: [...SIDE_STAGES] } }],
       },
     }),
     db.pipeline.findFirst({
@@ -47,6 +55,7 @@ export default async function AppLayout({
     <AppShell
       email={user.email ?? ""}
       overdueCount={overdueCount}
+      overdueLeadCount={overdueLeadCount}
       marketingReviewCount={marketingReviewCount}
       defaultPipeline={defaultPipeline ? serializeDates(defaultPipeline) : null}
     >

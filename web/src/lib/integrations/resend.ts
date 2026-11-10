@@ -158,7 +158,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       });
     }
   } catch (err) {
-    // The email was sent, so this is not a failure — but a hole in the
+    // The email was sent, so this is not a failure, but a hole in the
     // append-only trail must be observable, never silent.
     reportError("resend.log", err, { companyId, personId, resendId: id });
     return { ok: true, id, warning: "Az email elment, de az utólagos CRM-naplózás nem sikerült." };

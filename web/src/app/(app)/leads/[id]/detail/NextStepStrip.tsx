@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import { MAX_ATTEMPTS } from "@/lib/leads/lifecycle";
+import s from "./lead.module.css";
 
 // Signature element: stage, next action and due time on one band, coloured by urgency.
 /** Calendar day in Budapest as a day number, so "ma" / "holnap" match the clock on the wall, not the server's timezone (Vanda C2). */
@@ -41,30 +41,21 @@ export function NextStepStrip({
   const [initial] = useState(status);
   const moved = status !== initial;
   const due = dueInfo(nextDue);
+  const urgency = !due ? "later" : due.color === "var(--coral)" ? "overdue" : due.color === "var(--amber)" ? "today" : "later";
   return (
-    <div
-      className="panel"
-      style={{ borderLeft: `3px solid ${due ? due.color : "var(--indigo)"}`, overflow: "hidden" }}
-    >
-      <div key={status} className={`panel-pad space-y-1 ${moved ? "strip-moved" : ""}`}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="font-mono-ndt" style={{ fontSize: 12, fontWeight: 700, color: "var(--indigo)" }}>{stageLabel}</span>
-          {attempts > 0 && (
-            <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }} title="Hívási kísérletek">{attempts}/{MAX_ATTEMPTS}</span>
-          )}
-        </div>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg)" }}>
-          {/* PROPOSAL copy */}
-          {nextAction || "Nincs megadott következő lépés"}
-        </div>
-        {due && nextDue && (
-          <div className="flex items-center gap-1.5 font-mono-ndt" style={{ fontSize: 12, color: due.color }}>
-            <CalendarClock style={{ width: 12, height: 12 }} />
-            {due.rel} · {formatDateTime(nextDue)}
-          </div>
-        )}
-        {ownerName && <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>{ownerName}</div>}
+    <div key={status} data-u={urgency} className={`${s.strip} ${moved ? "strip-moved" : ""}`}>
+      <div className={s.lead}>
+        {/* PROPOSAL copy */}
+        <span className={s.k}>Következő lépés</span>
+        <span className={s.v}>{nextAction || "Nincs megadott következő lépés"}</span>
       </div>
+      <div>
+        <span className={s.k}>Határidő</span>
+        <span className={s.v}>{due && nextDue ? `${due.rel} · ${formatDateTime(nextDue)}` : "-"}</span>
+      </div>
+      <div><span className={s.k}>Szakasz</span><span className={s.v}>{stageLabel}</span></div>
+      <div><span className={s.k}>Kísérlet</span><span className={s.v}>{attempts}/{MAX_ATTEMPTS}</span></div>
+      <div><span className={s.k}>Felelős</span><span className={s.v}>{ownerName ?? "-"}</span></div>
     </div>
   );
 }
