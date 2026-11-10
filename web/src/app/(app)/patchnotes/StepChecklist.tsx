@@ -5,18 +5,20 @@ import { setPatchStepState } from "@/app/actions/patchnotes";
 import { bugIssueUrl } from "@/lib/patchnotes/parse";
 import { PATCH_UI } from "@/lib/patchnotes/labels";
 import type { PatchState } from "@/lib/patchnotes/repos";
+import k from "@/components/astryx/page.module.css";
+import m from "./patchnotes.module.css";
 
 type Props = { repo: string; prNumber: number; prTitle: string; steps: string[]; initial: Record<number, PatchState> };
 
-const seg = (active: boolean) => ({ fontWeight: active ? 700 : 400, opacity: active ? 1 : 0.7 }) as const;
+const seg = (active: boolean) => (active ? m.stepOn : m.stepOff);
 
 function StepText({ text }: { text: string }) {
-  const m = /^(https?:\/\/\S+)(.*)$/.exec(text);
-  if (!m) return <>{text}</>;
+  const match = /^(https?:\/\/\S+)(.*)$/.exec(text);
+  if (!match) return <>{text}</>;
   return (
     <>
-      <a href={m[1]} target="_blank" rel="noopener noreferrer" className="tbl-link">{m[1]}</a>
-      {m[2]}
+      <a href={match[1]} target="_blank" rel="noopener noreferrer" className={k.link}>{match[1]}</a>
+      {match[2]}
     </>
   );
 }
@@ -31,8 +33,8 @@ export function StepChecklist({ repo, prNumber, prTitle, steps, initial }: Props
   const seq = useRef<Record<number, number>>({});
 
   function apply(i: number, state: PatchState | null | undefined) {
-    setMarks((m) => {
-      const n = { ...m };
+    setMarks((cur) => {
+      const n = { ...cur };
       if (state == null) delete n[i];
       else n[i] = state;
       return n;
@@ -66,33 +68,32 @@ export function StepChecklist({ repo, prNumber, prTitle, steps, initial }: Props
   const bug = vals.filter((v) => v === "bug").length;
 
   return (
-    <div style={{ display: "grid", gap: 8 }}>
-      <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{PATCH_UI.progress(ok, steps.length, bug)}</div>
+    <div className={m.checklist}>
+      <div className={k.muted}>{PATCH_UI.progress(ok, steps.length, bug)}</div>
       {steps.map((s, i) => (
-        <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ flex: "1 1 240px", fontSize: 13, overflowWrap: "anywhere" }}>
-            <span className="font-mono-ndt" style={{ color: "var(--fg-faint)" }}>{i + 1}. </span>
+        <div key={i} className={m.step}>
+          <div className={m.stepText}>
+            <span className="font-mono-ndt">{i + 1}. </span>
             <StepText text={s} />
           </div>
-          <div style={{ display: "flex", gap: 4 }}>
-            <button type="button" className="btn sm" aria-pressed={marks[i] === "ok"} style={seg(marks[i] === "ok")} onClick={() => set(i, "ok")}>
+          <div className={m.stepBtns}>
+            <button type="button" className={`${k.btn} ${seg(marks[i] === "ok")}`} aria-pressed={marks[i] === "ok"} onClick={() => set(i, "ok")}>
               {PATCH_UI.testOk}
             </button>
             {marks[i] === "bug" ? (
               <>
-                <button type="button" className="btn sm" aria-pressed style={seg(true)}>
+                <button type="button" className={`${k.btn} ${seg(true)}`} aria-pressed>
                   {PATCH_UI.bug}
                 </button>
-                <a className="tbl-link" style={{ fontSize: 12, alignSelf: "center" }} href={bugIssueUrl(repo, prNumber, prTitle, s)} target="_blank" rel="noopener noreferrer">
+                <a className={`${k.link} ${m.openIssue}`} href={bugIssueUrl(repo, prNumber, prTitle, s)} target="_blank" rel="noopener noreferrer">
                   {PATCH_UI.openIssue}
                 </a>
               </>
             ) : (
               <a
-                className="btn sm"
+                className={`${k.btn} ${seg(false)}`}
                 role="button"
                 aria-pressed={false}
-                style={seg(false)}
                 href={bugIssueUrl(repo, prNumber, prTitle, s)}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -104,13 +105,13 @@ export function StepChecklist({ repo, prNumber, prTitle, steps, initial }: Props
                 {PATCH_UI.bug}
               </a>
             )}
-            <button type="button" className="btn sm" aria-pressed={marks[i] === undefined} style={seg(marks[i] === undefined)} onClick={() => set(i, null)}>
+            <button type="button" className={`${k.btn} ${seg(marks[i] === undefined)}`} aria-pressed={marks[i] === undefined} onClick={() => set(i, null)}>
               {PATCH_UI.notYet}
             </button>
           </div>
         </div>
       ))}
-      {error && <div role="alert" style={{ fontSize: 12, color: "var(--destructive)" }}>{error}</div>}
+      {error && <div role="alert" className={m.error}>{error}</div>}
     </div>
   );
 }

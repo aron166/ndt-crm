@@ -13,14 +13,14 @@ import { UI } from "@/lib/content/labels";
 const TENANT_ID = 1;
 
 const FRESHNESS_COLOR: Record<string, string> = {
-  mint: "var(--mint)", mute: "var(--color-text-secondary)", amber: "var(--amber)", coral: "var(--coral)",
+  mint: "var(--ui-success-text)", mute: "var(--ui-text-muted)", amber: "var(--ui-warning-text)", coral: "var(--ui-danger-text)",
 };
 const INTERACTION_LABEL: Record<string, string> = {
   call: "Hívás", email: "Email", meeting: "Találkozó", site_visit: "Helyszíni", note: "Megjegyzés",
 };
 const INTERACTION_COLOR: Record<string, string> = {
-  call: "var(--mint)", email: "var(--sky)", meeting: "var(--violet)",
-  site_visit: "var(--amber)", note: "var(--color-text-secondary)",
+  call: "var(--ui-text-muted)", email: "var(--ui-text-muted)", meeting: "var(--ui-text-muted)",
+  site_visit: "var(--ui-text-muted)", note: "var(--ui-text-muted)",
 };
 
 export default async function DashboardPage() {
@@ -99,11 +99,11 @@ export default async function DashboardPage() {
   const dateStr = now.toLocaleDateString("hu-HU", { year: "numeric", month: "long", day: "numeric" });
 
   const stats = [
-    { label: "Aktív cég",        value: statCompanies.toLocaleString("hu-HU"),    href: "/companies", color: "var(--sky)" },
-    { label: "Nyitott deal",     value: statOpenDeals.toLocaleString("hu-HU"),     href: "/deals",     color: "var(--color-accent)" },
-    { label: "Nyitott feladat",  value: statOpenTasks.toLocaleString("hu-HU"),     href: "/tasks",     color: overdueTasks.length > 0 ? "var(--coral)" : "var(--mint)" },
-    { label: "Interakció / hét", value: statInteractionsWeek.toLocaleString("hu-HU"), href: "/companies", color: "var(--amber)" },
-    { label: UI.inboxTitle,      value: contentPending.toLocaleString("hu-HU"),    href: "/marketing", color: contentPending > 0 ? "var(--coral)" : "var(--mint)", sub: UI.mine },
+    { label: "Aktív cég",        value: statCompanies.toLocaleString("hu-HU"),    href: "/companies", color: "var(--ui-text)" },
+    { label: "Nyitott deal",     value: statOpenDeals.toLocaleString("hu-HU"),     href: "/deals",     color: "var(--ui-text)" },
+    { label: "Nyitott feladat",  value: statOpenTasks.toLocaleString("hu-HU"),     href: "/tasks",     color: overdueTasks.length > 0 ? "var(--ui-danger-text)" : "var(--ui-text)" },
+    { label: "Interakció / hét", value: statInteractionsWeek.toLocaleString("hu-HU"), href: "/companies", color: "var(--ui-text)" },
+    { label: UI.inboxTitle,      value: contentPending.toLocaleString("hu-HU"),    href: "/marketing", color: contentPending > 0 ? "var(--ui-danger-text)" : "var(--ui-text)", sub: UI.mine },
   ];
 
   const pipeline = pipelineStats as { stage_name: string; color: string; cnt: bigint; total_value: number }[];
@@ -117,12 +117,12 @@ export default async function DashboardPage() {
         actions={
           <div className={h.chips}>
             {overdueTasks.length > 0 && (
-              <Link href="/tasks" className={h.pill} style={{ color: "var(--coral)" }}>
+              <Link href="/tasks" className={h.pill} style={{ color: "var(--ui-danger-text)" }}>
                 {overdueTasks.length} lejárt feladat
               </Link>
             )}
             {weekTasks > 0 && (
-              <Link href="/tasks" className={h.pill} style={{ color: "var(--amber)" }}>
+              <Link href="/tasks" className={h.pill} style={{ color: "var(--ui-warning-text)" }}>
                 {weekTasks} a héten esedékes
               </Link>
             )}
@@ -149,7 +149,7 @@ export default async function DashboardPage() {
             <h2 className={k.h2}>
               Feladatok
               {todayTasks.length > 0 && (
-                <span className={k.muted} style={{ marginLeft: 8, color: "var(--amber)" }}>
+                <span className={k.muted} style={{ marginLeft: 8, color: "var(--ui-warning-text)" }}>
                   {todayTasks.length} ma
                 </span>
               )}
@@ -160,7 +160,7 @@ export default async function DashboardPage() {
             <div className={k.empty}>Nincs esedékes feladat</div>
           ) : (
             <div>
-              {[...overdueTasks.map((t) => ({ t, color: "var(--color-error)" })), ...todayTasks.map((t) => ({ t, color: "var(--color-accent)" }))].map(({ t, color }) => (
+              {[...overdueTasks.map((t) => ({ t, color: "var(--ui-danger)" })), ...todayTasks.map((t) => ({ t, color: "var(--ui-accent)" }))].map(({ t, color }) => (
                 <Link key={t.id} href={`/tasks/${t.id}`} className={h.line}>
                   <span className={h.lineMain}>
                     <span className={h.dot} style={{ background: color }} />
@@ -211,7 +211,7 @@ export default async function DashboardPage() {
           ) : (
             <div>
               {recentInteractions.map((r) => {
-                const color = INTERACTION_COLOR[r.type ?? "note"] ?? "var(--color-text-secondary)";
+                const color = INTERACTION_COLOR[r.type ?? "note"] ?? "var(--ui-text-muted)";
                 const label = INTERACTION_LABEL[r.type ?? "note"] ?? r.type;
                 return (
                   <div key={r.id} className={h.line}>

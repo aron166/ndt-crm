@@ -98,7 +98,7 @@ export function LeadEditModal({ open, onClose, onSaved, initial }: LeadEditModal
 
           <FormField label="Elvesztés oka">
             {/* The reason is a code (Péter's list); a legacy free-text value stays selectable as is. */}
-            <select name="lostReason" defaultValue={initial.lostReason ?? ""} className="font-mono-ndt" style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--line-soft)", background: "var(--bg-1)", color: "var(--fg)" }}>
+            <select name="lostReason" defaultValue={initial.lostReason ?? ""} className="input-ds">
               <option value="">-</option>
               {initial.lostReason && !isLostReason(initial.lostReason) && <option value={initial.lostReason}>{initial.lostReason}</option>}
               {LOST_REASONS.map((k) => <option key={k} value={k}>{LOST_REASON_LABEL[k]}</option>)}
@@ -109,11 +109,11 @@ export function LeadEditModal({ open, onClose, onSaved, initial }: LeadEditModal
             <Input name="campaign" defaultValue={initial.campaign ?? ""} placeholder="pl. BirdsView Q3" />
           </FormField>
 
-          {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
+          {error && <p className="text-sm" style={{ color: "var(--ui-danger-text)" }}>{error}</p>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>Mégse</Button>
-            <Button type="submit" className="btn primary" disabled={isPending}>
+            <Button type="submit" disabled={isPending}>
               {isPending ? "Mentés..." : "Mentés"}
             </Button>
           </DialogFooter>

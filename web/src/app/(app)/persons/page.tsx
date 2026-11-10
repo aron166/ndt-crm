@@ -13,14 +13,6 @@ import s from "./persons.module.css";
 const PAGE_SIZE = 30;
 const TENANT_ID = 1;
 
-function avatarBg(id: number) {
-  const palette = [
-    "var(--color-accent)", "var(--mint)", "var(--amber)",
-    "var(--sky)", "var(--violet)", "var(--coral)",
-  ];
-  return palette[id % palette.length];
-}
-
 interface SearchParams {
   search?: string;
   page?: string;
@@ -144,7 +136,7 @@ export default async function PersonsPage({
                   {/* Avatar */}
                   <td>
                     <Link href={`/persons/${p.id}`} tabIndex={-1} aria-hidden="true">
-                      <div className={s.avatar} style={{ background: avatarBg(p.id) }}>
+                      <div className={s.avatar}>
                         {initials}
                       </div>
                     </Link>

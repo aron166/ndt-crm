@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Archive, Trash2, X } from "lucide-react";
 import { UI } from "@/lib/content/labels";
+import k from "@/components/astryx/page.module.css";
 import { archiveContentBulk, checkContentDeletable, deleteContent, restoreContentBulk } from "@/app/actions/content";
 
 const UNDO_MS = 5000;
@@ -16,21 +17,20 @@ interface Toast {
 function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
   return (
     <div
-      className="panel"
+      className={k.card}
       style={{
         position: "fixed", left: "50%", transform: "translateX(-50%)",
         bottom: "max(16px, env(safe-area-inset-bottom))",
-        zIndex: 60, display: "flex", alignItems: "center", gap: 12,
-        padding: "10px 14px", boxShadow: "0 8px 24px -8px var(--shadow-strong)",
+        zIndex: 60, flexDirection: "row", alignItems: "center", gap: 12,
+        padding: "10px 14px", boxShadow: "var(--ui-shadow-overlay)",
         maxWidth: "calc(100vw - 32px)",
       }}
     >
-      <span style={{ fontSize: 13, color: "var(--fg)" }}>{toast.text}</span>
+      <span style={{ fontSize: 14, color: "var(--ui-text)" }}>{toast.text}</span>
       {toast.undo && (
         <button
           onClick={toast.undo}
-          className="btn sm"
-          style={{ color: "var(--indigo)", borderColor: "var(--indigo-line)" }}
+          className={k.btn}
         >
           {UI.undo}
         </button>
@@ -38,7 +38,8 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       <button
         onClick={onDismiss}
         aria-label={UI.cancel}
-        style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--fg-faint)", display: "flex" }}
+        className={`${k.btn} ${k.btnIcon}`}
+        style={{ border: "none", background: "transparent" }}
       >
         <X style={{ width: 16, height: 16 }} />
       </button>
@@ -132,26 +133,26 @@ export function BulkBar({
       {toast && <ToastView toast={toast} onDismiss={() => { clearTimer(); setToast(null); }} />}
       {selectedIds.length > 0 && (
         <div
-          className="panel"
+          className={k.card}
           style={{
             position: "sticky", bottom: 0, zIndex: 40,
-            marginTop: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+            marginTop: 16, flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap",
             padding: "10px 16px",
           }}
         >
-          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>{UI.selectedCount(selectedIds.length)}</span>
-          <button onClick={onClear} className="btn ghost sm">
+          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ui-text)" }}>{UI.selectedCount(selectedIds.length)}</span>
+          <button onClick={onClear} className={k.btn}>
             <X style={{ width: 14, height: 14 }} />
             {UI.clearSelection}
           </button>
           <div className="flex items-center gap-2" style={{ marginLeft: "auto" }}>
-            <button onClick={handleArchive} disabled={busy} className="btn sm">
+            <button onClick={handleArchive} disabled={busy} className={k.btn}>
               <Archive style={{ width: 14, height: 14 }} />
               {UI.archiveSelected}
             </button>
             <button
-              onClick={handleDelete} disabled={busy} className="btn sm"
-              style={{ color: "var(--coral)", borderColor: "var(--coral-soft)" }}
+              onClick={handleDelete} disabled={busy} className={k.btn}
+              style={{ color: "var(--ui-danger-text)" }}
             >
               <Trash2 style={{ width: 14, height: 14 }} />
               {UI.deleteSelected}

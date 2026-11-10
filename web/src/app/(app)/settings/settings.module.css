@@ -1,0 +1,60 @@
+/* Beállítások and Tiltólista screens (Astryx direction A). Layout the page kit lacks. Astryx tokens only. */
+
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.narrow { max-width: 560px; }
+.intro { display: flex; align-items: center; gap: 12px; }
+.code { font-family: var(--font-mono); font-size: 14px; color: var(--ui-text-link); }
+.count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--ui-surface-muted); color: var(--ui-text-muted); font-size: 12px; font-weight: 600; }
+.accent { color: var(--ui-text-link); }
+.divider { margin-block-start: 8px; border-top: 1px solid var(--ui-border); }
+.alert { font-size: 14px; color: var(--ui-danger-text); }
+.msg { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 14px; }
+.ok { color: var(--ui-success-text); }
+.bad { color: var(--ui-danger-text); }
+.warnLine { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--ui-warning-text); }
+
+/* Tabs (local state, not links) */
+.tabs { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--ui-surface-muted); border-radius: var(--ui-radius-control); }
+.tab { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 0; border-radius: var(--ui-radius-control); background: transparent; color: var(--ui-text-muted); font: inherit; font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.tab:hover { color: var(--ui-text); }
+.tabOn { background: var(--ui-surface); color: var(--ui-text); box-shadow: var(--ui-shadow-raised); }
+.tab:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+@media (pointer: coarse) { .tab { min-height: 44px; } }
+
+/* Fields */
+.label { display: block; margin-block-end: 4px; font-size: 12px; color: var(--ui-text-muted); }
+.field { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 12px; font: inherit; font-size: 14px; border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); background: var(--ui-surface); color: var(--ui-text); }
+.field:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.mono { font-family: var(--font-mono); }
+.form { display: flex; flex-direction: column; gap: 12px; }
+.grid2 { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.grid3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+.fieldGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.footer { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .grid2, .grid3 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Integrations */
+.catTitle { margin: 0 0 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ui-text-muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.integration { min-width: 0; }
+.connected { box-shadow: inset 0 0 0 1px var(--ui-accent), var(--ui-shadow-raised); }
+.unavailable { opacity: 0.6; }
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.grow { flex: 1 1 180px; min-width: 0; }
+.titleLine { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-block-end: 4px; }
+.name { font-size: 16px; font-weight: 600; color: var(--ui-text); }
+.pill { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--ui-surface-muted); color: var(--ui-text-muted); }
+.desc { margin: 0; line-height: 1.5; }
+.actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+.expand { display: flex; flex-direction: column; gap: 12px; margin-block-start: 4px; padding-block-start: 12px; border-top: 1px solid var(--ui-border); }
+
+/* API keys */
+.keyRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ui-border); }
+.keyMain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.keySlug { font-size: 14px; color: var(--ui-text); overflow-wrap: anywhere; }
+.revoked { color: var(--ui-text-muted); text-decoration: line-through; }
+.created { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: var(--ui-radius-control); background: var(--ui-surface-muted); border: 1px solid var(--ui-border-strong); }
+.keyLine { display: flex; align-items: center; gap: 8px; }
+.keyValue { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 14px; color: var(--ui-text); word-break: break-all; }

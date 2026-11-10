@@ -1,0 +1,26 @@
+/* Patchnotes screen (Astryx direction A). Layout the page kit lacks. Astryx tokens only. */
+
+.stack { display: flex; flex-direction: column; gap: 32px; }
+.section { display: flex; flex-direction: column; gap: 16px; }
+.repoGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.repo { display: flex; flex-direction: column; gap: 8px; }
+.repoBlock { display: flex; flex-direction: column; gap: 16px; padding: 16px 18px; background: var(--ui-surface); border-radius: var(--ui-radius-surface); box-shadow: var(--ui-shadow-raised); }
+.summary { cursor: pointer; }
+.list { display: flex; flex-direction: column; gap: 16px; }
+.pr { display: flex; flex-direction: column; gap: 8px; }
+.prTitle { font-size: 14px; overflow-wrap: anywhere; }
+.issues { margin: 4px 0 0; padding-left: 18px; font-size: 14px; }
+.issue { overflow-wrap: anywhere; }
+.issueBlock { font-size: 14px; }
+.details { font-size: 14px; }
+.details > summary { cursor: pointer; }
+
+/* Step checklist */
+.checklist { display: grid; gap: 8px; }
+.step { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.stepText { flex: 1 1 240px; font-size: 14px; color: var(--ui-text); overflow-wrap: anywhere; }
+.stepBtns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+button.stepOn[aria-pressed="true"] { border-color: var(--ui-accent); font-weight: 700; }
+.stepOff { opacity: 0.7; }
+.openIssue { align-self: center; font-size: 14px; }
+.error { font-size: 14px; color: var(--ui-danger-text); }

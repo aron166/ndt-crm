@@ -56,7 +56,7 @@ export function SendEmailModal({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Email küldése</DialogTitle>
-          {contextLabel && <p className="text-sm text-slate-500">{contextLabel}</p>}
+          {contextLabel && <p className="text-sm text-[var(--ui-text-muted)]">{contextLabel}</p>}
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
@@ -70,11 +70,11 @@ export function SendEmailModal({
             <Textarea name="text" rows={8} placeholder="Írd meg az üzenetet..." required />
           </FormField>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-[var(--ui-danger-text)]">{error}</p>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>Mégse</Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white" disabled={isPending}>
+            <Button type="submit" disabled={isPending}>
               {isPending ? "Küldés..." : "Küldés"}
             </Button>
           </DialogFooter>

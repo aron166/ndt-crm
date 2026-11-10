@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "check:design": "node scripts/check-design.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -2,15 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { QuoteListItem } from "@/app/actions/quotes";
 import { QUOTE_STATUS_META } from "@/lib/quotes/status";
 import { NewQuoteDialog } from "./NewQuoteDialog";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import q from "./quotes.module.css";
 import { formatHUF, formatDate, formatRelativeTime } from "@/lib/utils";
 
 function StatusBadge({ status }: { status: keyof typeof QUOTE_STATUS_META }) {
   const m = QUOTE_STATUS_META[status];
   return (
-    <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 6, color: m.color, background: m.bg }}>
+    <span className={q.badge} style={{ color: m.color, background: m.bg }}>
       {m.label}
     </span>
   );
@@ -29,62 +33,50 @@ export function QuotesClient({ quotes }: { quotes: QuoteListItem[] }) {
 
   const shown = filter === "all" ? quotes : quotes.filter((q) => q.status === filter);
 
+  const filters = (
+    <div className={k.seg} aria-label="Állapot"> {/* PROPOSAL copy */}
+      {FILTERS.map((f) => (
+        <button key={f.key} type="button" aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}
+          className={`${k.segItem} ${q.tab} ${filter === f.key ? k.segItemOn : ""}`}>
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)" }}>
-            Árajánlatok
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            NDT árajánlatok a költségkódok és a díjszabás alapján: küldhető PDF-ként.
-          </p>
-        </div>
-        <NewQuoteDialog />
-      </div>
-
-      <div className="flex items-center gap-1.5 mb-3">
-        {FILTERS.map((f) => (
-          <button key={f.key} onClick={() => setFilter(f.key)}
-            className="rounded-md px-2.5 py-1"
-            style={{
-              fontSize: 14, fontWeight: 500,
-              color: filter === f.key ? "var(--fg)" : "var(--fg-soft)",
-              background: filter === f.key ? "var(--bg-panel)" : "transparent",
-              border: `1px solid ${filter === f.key ? "var(--line-soft)" : "transparent"}`,
-            }}>
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <PageHeader
+        title="Árajánlatok"
+        help="NDT árajánlatok a költségkódok és a díjszabás alapján: küldhető PDF-ként."
+        actions={<NewQuoteDialog />}
+        filters={filters}
+      />
 
       {shown.length === 0 ? (
-        <div className="text-sm text-slate-500 py-16 text-center"
-          style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12 }}>
+        <div className={k.empty}>
           Még nincs árajánlat. Hozz létre egyet a „+ Új árajánlat" gombbal.
         </div>
       ) : (
-        <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12, overflow: "hidden" }}>
-          <table className="w-full text-sm">
+        <div className={k.tableWrap}>
+          <table className={k.table}>
             <thead>
-              <tr style={{ borderBottom: "1px solid var(--line-soft)" }}>
+              <tr>
                 {["Sorszám", "Cég", "Tárgy", "Állapot", "Bruttó", "Érvényes", "Létrehozva"].map((h, i) => (
-                  <th key={h} style={{ textAlign: i === 4 ? "right" : "left", padding: "10px 12px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)" }}>{h}</th>
+                  <th key={h} style={i === 4 ? { textAlign: "right" } : undefined}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {shown.map((q) => (
-                <tr key={q.id} onClick={() => router.push(`/quotes/${q.id}`)}
-                  className="cursor-pointer hover:bg-[var(--bg-0)]"
-                  style={{ borderBottom: "1px solid var(--line-soft)" }}>
-                  <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono-ndt)", color: "var(--fg-soft)" }}>{q.quoteNumber}</td>
-                  <td style={{ padding: "10px 12px", color: "var(--fg)" }}>{q.companyName}</td>
-                  <td style={{ padding: "10px 12px", color: "var(--fg-soft)" }}>{q.title}</td>
-                  <td style={{ padding: "10px 12px" }}><StatusBadge status={q.status} /></td>
-                  <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--fg)" }}>{formatHUF(q.grossAmount)}</td>
-                  <td style={{ padding: "10px 12px", color: "var(--fg-soft)" }}>{q.validUntil ? formatDate(q.validUntil) : "-"}</td>
-                  <td style={{ padding: "10px 12px", color: "var(--fg-faint)" }}>{formatRelativeTime(q.createdAt)}</td>
+              {shown.map((qt) => (
+                <tr key={qt.id} onClick={() => router.push(`/quotes/${qt.id}`)} className={q.clickRow}>
+                  <td className={q.mono}><Link href={`/quotes/${qt.id}`}>{qt.quoteNumber}</Link></td>
+                  <td>{qt.companyName}</td>
+                  <td>{qt.title}</td>
+                  <td><StatusBadge status={qt.status} /></td>
+                  <td className={q.numCell}>{formatHUF(qt.grossAmount)}</td>
+                  <td className={k.num}>{qt.validUntil ? formatDate(qt.validUntil) : "-"}</td>
+                  <td style={{ color: "var(--ui-text-muted)" }}>{formatRelativeTime(qt.createdAt)}</td>
                 </tr>
               ))}
             </tbody>

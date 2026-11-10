@@ -76,7 +76,7 @@ export default async function TaskDetailPage({
           {task.description && (
             <section className={k.section}>
               <h2 className={k.h2}>Leírás</h2> {/* PROPOSAL copy */}
-              <p style={{ margin: 0, whiteSpace: "pre-line", color: "var(--color-text-primary)" }}>{task.description}</p>
+              <p style={{ margin: 0, whiteSpace: "pre-line", color: "var(--ui-text)" }}>{task.description}</p>
             </section>
           )}
 

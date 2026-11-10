@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Building2, Phone, Clock, CalendarClock, Trash2, PhoneCall } from "lucide-react";
 import { moveLead, deleteLead, setLeadOutcomeAction } from "@/app/actions/leads";
 import { DeleteCardDialog, type DeleteCascade } from "@/components/DeleteCardDialog";
@@ -14,9 +15,8 @@ import type { LeadStatusDef } from "@/lib/leads/statuses";
 import {
   LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callbackTone, daysSince, type LeadOutcome,
 } from "@/lib/leads/outcomes";
-import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { TIER_LABEL, isTier } from "@/lib/leads/tier";
 import { formatMinutes } from "@/lib/leads/first-contact";
-import { dataInk } from "@/lib/data-color";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 // Hungarian copy is PROPOSAL until Áron approves.
 import { displayScriptText, isPlaceholderText } from "@/lib/leads/placeholder";
@@ -104,50 +104,45 @@ function LeadCard({
         if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/leads/${lead.id}`); }
       }}
-      className={cn("relative rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
+      className={cn("relative select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
-        background: "var(--bg-panel)",
-        border: `1px solid ${cbTone === "overdue" ? "var(--coral)" : "var(--line-soft)"}`,
+        background: "var(--ui-surface)", borderRadius: "var(--ui-radius-surface)",
+        border: `1px solid ${cbTone === "overdue" ? "var(--ui-danger-text)" : "var(--ui-border)"}`,
         padding: "10px 12px", cursor: "grab",
-        boxShadow: "inset 0 1px 0 var(--panel-edge)",
+        boxShadow: "var(--ui-shadow-raised)",
         transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
         willChange: "transform",
       }}
       onMouseOver={(e) => {
-        e.currentTarget.style.boxShadow = "var(--glow-indigo)";
+        e.currentTarget.style.boxShadow = "var(--ui-shadow-overlay)";
         e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseOut={(e) => {
-        e.currentTarget.style.boxShadow = "inset 0 1px 0 var(--panel-edge)";
+        e.currentTarget.style.boxShadow = "var(--ui-shadow-raised)";
         e.currentTarget.style.transform = "none";
       }}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-xs"
         title="Lead-kártya törlése a pipeline-ból"
         aria-label="Lead-kártya törlése"
         draggable={false}
         onClick={(e) => { e.stopPropagation(); onDelete(lead.id); }}
-        className="absolute"
-        style={{
-          top: 6, right: 6, width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
-          borderRadius: 5, color: "var(--fg-faint)", background: "var(--bg-hover)", border: "1px solid var(--line-soft)",
-        }}
-        onMouseOver={(e) => { e.currentTarget.style.color = "var(--coral)"; }}
-        onMouseOut={(e) => { e.currentTarget.style.color = "var(--fg-faint)"; }}
+        className="absolute top-1 right-1 !size-6 bg-[var(--ui-surface-muted)] text-[var(--ui-text-muted)] hover:text-[var(--ui-danger-text)]"
       >
         <Trash2 style={{ width: 12, height: 12 }} />
-      </button>
+      </Button>
 
       {/* Tier badge */}
       {isTier(lead.tier) && (
         <span
-          className="font-mono-ndt"
           title={TIER_LABEL[lead.tier]}
           style={{
             display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 3,
-            fontWeight: 700, color: TIER_COLOR[lead.tier], border: `1px solid ${TIER_COLOR[lead.tier]}`,
-            background: "var(--bg-hover)",
+            fontWeight: 700, color: "var(--ui-text)", border: "1px solid var(--ui-border-strong)",
+            background: "var(--ui-hover)",
           }}
         >
           {lead.tier}
@@ -156,12 +151,11 @@ function LeadCard({
 
       {lead.tierFlag && (
         <div
-          className="font-mono-ndt"
           style={{
             display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 3, marginLeft: 6,
-            color: lead.tierFlag === "overdue" ? "var(--bg-panel)" : TIER_COLOR.A,
-            background: lead.tierFlag === "overdue" ? TIER_COLOR.A : "var(--bg-hover)",
-            border: `1px solid ${TIER_COLOR.A}`,
+            color: lead.tierFlag === "overdue" ? "var(--ui-on-danger)" : "var(--ui-danger-text)",
+            background: lead.tierFlag === "overdue" ? "var(--ui-danger)" : "var(--ui-hover)",
+            border: `1px solid ${"var(--ui-danger)"}`,
             fontWeight: lead.tierFlag === "overdue" ? 700 : 500,
           }}
         >
@@ -169,7 +163,7 @@ function LeadCard({
         </div>
       )}
       {lead.firstContactMin != null && (
-        <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginBottom: 3 }}>
+        <div style={{ fontSize: 12, color: "var(--ui-text-muted)", marginBottom: 3 }}>
           Első kontakt: {formatMinutes(lead.firstContactMin)}
         </div>
       )}
@@ -178,9 +172,9 @@ function LeadCard({
       <Link
         href={`/leads/${lead.id}`}
         onClick={stop}
-        style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35, color: "var(--fg)", display: "block", marginBottom: 3, paddingRight: 24 }}
-        onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-        onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg)")}
+        style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35, color: "var(--ui-text)", display: "block", marginBottom: 3, paddingRight: 24 }}
+        onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-text-link)")}
+        onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text)")}
       >
         {personName ?? lead.serviceInterest ?? lead.subject ?? "Névtelen érdeklődő"}
       </Link>
@@ -189,10 +183,10 @@ function LeadCard({
         <Link
           href={`/companies/${lead.company.id}`}
           className="flex items-center gap-1.5"
-          style={{ fontSize: 12, color: "var(--fg-mute)", marginBottom: 4 }}
+          style={{ fontSize: 12, color: "var(--ui-text-muted)", marginBottom: 4 }}
           onClick={stop}
-          onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-          onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}
+          onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-text-link)")}
+          onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text-muted)")}
         >
           <Building2 style={{ width: 10, height: 10, flexShrink: 0 }} />
           <span className="truncate">{lead.company.name}</span>
@@ -202,8 +196,8 @@ function LeadCard({
       {phone && (
         <a
           href={`tel:${phone.replace(/\s+/g, "")}`}
-          className="flex items-center gap-1.5 font-mono-ndt"
-          style={{ fontSize: 12, color: "var(--sky)", marginBottom: 6 }}
+          className="flex items-center gap-1.5"
+          style={{ fontSize: 12, color: "var(--ui-info-text)", marginBottom: 6 }}
           onClick={stop}
         >
           <Phone style={{ width: 11, height: 11, flexShrink: 0 }} />
@@ -213,26 +207,25 @@ function LeadCard({
 
       {lead.attempts > 0 && (
         <span
-          className="font-mono-ndt"
           aria-label={`Próbálkozások: ${lead.attempts} / ${MAX_ATTEMPTS}`}
-          style={{ display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 6, marginRight: 6, background: "var(--bg-hover)", color: "var(--fg-mute)" }}
+          style={{ display: "inline-block", fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 6, marginRight: 6, background: "var(--ui-hover)", color: "var(--ui-text-muted)" }}
         >
           {lead.attempts}/{MAX_ATTEMPTS}
         </span>
       )}
       {(lead.nextAction || lead.nextDue) && (
-        <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-soft)", marginBottom: 6 }}>
+        <div style={{ fontSize: 12, color: "var(--ui-text)", marginBottom: 6 }}>
           {lead.nextAction}{lead.nextAction && lead.nextDue ? " · " : ""}{lead.nextDue ? shortDate(lead.nextDue) : ""}
         </div>
       )}
       {lead.owner && (
-        <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>
+        <div style={{ fontSize: 12, color: "var(--ui-text-muted)", marginBottom: 6 }}>
           {/* PROPOSAL copy */}
           Felelős: {lead.owner}
         </div>
       )}
       {lead.recallDate && (
-        <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--amber)", marginBottom: 6 }}>
+        <div style={{ fontSize: 12, color: "var(--ui-warning-text)", marginBottom: 6 }}>
           {/* PROPOSAL copy */}
           Visszahívás: {shortDate(lead.recallDate)}
         </div>
@@ -240,12 +233,12 @@ function LeadCard({
 
       {cbTone !== null || lead.callbackDueAt ? (
         <div
-          className="flex items-center gap-1 font-mono-ndt"
+          className="flex items-center gap-1"
           title="Visszahívás esedékes"
           style={{
             fontSize: 12, padding: "2px 7px", borderRadius: 4, marginBottom: 6, width: "fit-content",
-            background: cbTone === "overdue" ? "var(--coral)" : cbTone === "soon" ? "var(--coral-soft)" : "var(--bg-hover)",
-            color: cbTone === "overdue" ? "white" : cbTone === "soon" ? "var(--coral)" : "var(--fg-mute)",
+            background: cbTone === "overdue" ? "var(--ui-danger-text)" : cbTone === "soon" ? "var(--ui-danger-surface)" : "var(--ui-hover)",
+            color: cbTone === "overdue" ? "white" : cbTone === "soon" ? "var(--ui-danger-text)" : "var(--ui-text-muted)",
             fontWeight: cbTone ? 700 : 500,
           }}
         >
@@ -254,38 +247,38 @@ function LeadCard({
         </div>
       ) : null}
 
-      <div style={{ borderTop: "1px dashed var(--line-soft)", paddingTop: 7, marginTop: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+      <div style={{ borderTop: "1px dashed var(--ui-border)", paddingTop: 7, marginTop: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
         <span
-          className="flex items-center gap-1 font-mono-ndt"
+          className="flex items-center gap-1"
           title="Utolsó kapcsolatfelvétel óta"
-          style={{ fontSize: 12, color: days === null ? "var(--amber)" : days > 7 ? "var(--coral)" : "var(--fg-faint)" }}
+          style={{ fontSize: 12, color: days === null ? "var(--ui-warning-text)" : days > 7 ? "var(--ui-danger-text)" : "var(--ui-text-muted)" }}
         >
           <Clock style={{ width: 10, height: 10 }} />
           {days === null ? "soha" : days === 0 ? "ma" : `${days} napja`}
         </span>
         <div className="flex items-center gap-1" onClick={stop}>
-          <button
+          <Button
             type="button"
-            className="btn sm"
+            variant="outline"
+            size="xs"
             title="Hívás eredménye"
             aria-label="Hívás eredménye"
             draggable={false}
             onClick={() => onCall(lead.id)}
-            style={{ padding: "2px 7px", gap: 4, fontSize: 12, height: 22 }}
+            className="h-[22px] min-h-[22px]"
           >
             <PhoneCall style={{ width: 11, height: 11 }} />
             Hívás
-          </button>
-          {/* The "green dropdown, bottom-right": outcome is orthogonal to the column. */}
+          </Button>
+          {/* Outcome dropdown, bottom-right: orthogonal to the column; neutral (taste rule 2026-11-10). */}
           <select
             value={lead.outcome}
             aria-label="Kimenetel"
             draggable={false}
             onChange={(e) => onOutcome(lead.id, e.target.value as LeadOutcome)}
-            className="font-mono-ndt"
             style={{
-              fontSize: 12, height: 22, padding: "0 4px", borderRadius: 4, fontWeight: 700,
-              background: "var(--mint-soft)", color: "var(--mint)", border: "1px solid var(--mint)", outline: "none",
+              fontSize: 12, height: 22, padding: "0 4px", borderRadius: 4, fontWeight: 600,
+              background: "var(--ui-surface)", color: "var(--ui-text)", border: "1px solid var(--ui-border-strong)",
             }}
           >
             {LEAD_OUTCOMES.map((o) => <option key={o} value={o}>{LEAD_OUTCOME_LABEL[o]}</option>)}
@@ -379,9 +372,9 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
     />
     {error && (
       <div className="panel" style={{ marginBottom: 12 }}>
-        <div className="panel-pad flex items-center justify-between" style={{ fontSize: 14, color: "var(--coral)" }}>
+        <div className="panel-pad flex items-center justify-between" style={{ fontSize: 14, color: "var(--ui-danger-text)" }}>
           {error}
-          <button className="btn sm" onClick={() => setError(null)}>OK</button>
+          <Button variant="outline" size="sm" onClick={() => setError(null)}>OK</Button>
         </div>
       </div>
     )}
@@ -396,11 +389,9 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
             key={status.key}
             className="kcol mount"
             style={{
-              background: isHover
-                ? `${status.color}10`
-                : status.isCommitment ? `${status.color}0d` : "var(--bg-col)",
-              border: `1px solid ${isHover || status.isCommitment ? status.color : "var(--line-soft)"}`,
-              ...(status.isCommitment ? { boxShadow: `0 0 0 1px ${status.color}55, 0 0 var(--glow-size) ${status.color}22` } : {}),
+              // Stage colour is user data: only the header dot carries it (taste rule, 2026-11-10).
+              background: isHover ? "var(--ui-hover)" : "var(--ui-surface-muted)",
+              border: `1px solid ${isHover ? "var(--ui-border-strong)" : "var(--ui-border)"}`,
               transition: "border-color .15s, background .15s",
             }}
             onDragOver={(e) => { e.preventDefault(); setHoverCol(status.key); }}
@@ -408,35 +399,34 @@ export function LeadsKanban({ statuses, leads: initialLeads, columnTotals, colum
             onDrop={() => handleDrop(status.key)}
           >
             <div className="kcol-head">
-              <span className="kcol-dot" style={{ background: status.color, boxShadow: `0 0 var(--glow-size) ${status.color}` }} />
+              <span className="kcol-dot" style={{ background: status.color }} />
               <span className="kcol-title">{status.label}</span>
               {status.isCommitment && (
                 <span
-                  className="font-mono-ndt"
                   title="Az időpont lefoglalása maga a megrendelés"
                   style={{
-                    fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-                    color: dataInk(status.color), background: `${status.color}1f`,
-                    border: `1px solid ${status.color}55`, borderRadius: 4, padding: "1px 5px",
+                    fontSize: 12, fontWeight: 700,
+                    color: "var(--ui-text-muted)", background: "var(--ui-surface)",
+                    border: "1px solid var(--ui-border)", borderRadius: 4, padding: "1px 5px",
                   }}
                 >
                   Megrendelés
                 </span>
               )}
-              <span className="kcol-count font-mono-ndt" title={total > cards.length ? `A legújabb ${columnLimit} látszik` : undefined}>
+              <span className="kcol-count" title={total > cards.length ? `A legújabb ${columnLimit} látszik` : undefined}>
                 {total > cards.length ? `${cards.length} / ${total}` : total}
               </span>
             </div>
 
             {status.description && (
               <details>
-                <summary style={{ fontSize: 12, color: "var(--fg-mute)", cursor: "pointer", padding: "0 10px 6px", listStyle: "none" }}>
+                <summary style={{ fontSize: 12, color: "var(--ui-text-muted)", cursor: "pointer", padding: "0 10px 6px", listStyle: "none" }}>
                   Mit csinálunk itt?
                 </summary>
-                <div style={{ fontSize: 12, color: "var(--fg-soft)", whiteSpace: "pre-wrap", padding: "0 10px 8px", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12, color: "var(--ui-text)", whiteSpace: "pre-wrap", padding: "0 10px 8px", lineHeight: 1.5 }}>
                   {displayScriptText(status.description)}
                   {isPlaceholderText(status.description) && (
-                    <> <Link href="/leads/setup" style={{ color: "var(--indigo)" }}>Beállítás</Link></>
+                    <> <Link href="/leads/setup" style={{ color: "var(--ui-text-link)" }}>Beállítás</Link></>
                   )}
                 </div>
               </details>

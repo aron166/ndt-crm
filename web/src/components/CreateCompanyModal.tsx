@@ -3,8 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createCompany } from "@/app/actions/companies";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { COMPANY_ATTR_DEFS } from "@/lib/companies/attributes";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/FormField";
 
 interface Props {
@@ -50,13 +52,13 @@ export function CreateCompanyModal({ open, onClose }: Props) {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField label="Cég neve" required full>
-              <input name="name" className="input-ds" placeholder="Pl. ACÉLHIDAK KFT." required autoFocus />
+              <Input name="name" placeholder="Pl. ACÉLHIDAK KFT." required autoFocus />
             </FormField>
             <FormField label="Adószám">
-              <input name="vatNumber" className="input-ds" placeholder="12345678-2-01" />
+              <Input name="vatNumber" placeholder="12345678-2-01" />
             </FormField>
             <FormField label="Website">
-              <input name="website" className="input-ds" placeholder="https://..." type="url" />
+              <Input name="website" placeholder="https://..." type="url" />
             </FormField>
             <FormField label="Státusz">
               <select name="status" className="input-ds">
@@ -70,24 +72,24 @@ export function CreateCompanyModal({ open, onClose }: Props) {
               </select>
             </FormField>
             <FormField label="Város">
-              <input name="city" className="input-ds" placeholder="Budapest" />
+              <Input name="city" placeholder="Budapest" />
             </FormField>
             <FormField label="Megye">
-              <input name="county" className="input-ds" placeholder="Pest vármegye" />
+              <Input name="county" placeholder="Pest vármegye" />
             </FormField>
             <FormField label="Cím" full>
-              <input name="address" className="input-ds" placeholder="Fő utca 1." />
+              <Input name="address" placeholder="Fő utca 1." />
             </FormField>
           </div>
 
-          {error && <div style={{ fontSize: 14, color: "var(--coral)", padding: "6px 10px", background: "var(--coral-soft)", borderRadius: 5 }}>{error}</div>}
+          {error && <div style={{ fontSize: 14, color: "var(--ui-danger-text)", padding: "6px 10px", background: "var(--ui-danger-surface)", borderRadius: "var(--ui-radius-control)" }}>{error}</div>}
 
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
-            <button type="button" className="btn" onClick={onClose} disabled={pending}>Mégse</button>
-            <button type="submit" className="btn primary" disabled={pending}>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={pending}>Mégse</Button>
+            <Button type="submit" disabled={pending}>
               {pending ? "Mentés..." : "Cég létrehozása"}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

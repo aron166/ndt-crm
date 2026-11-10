@@ -23,7 +23,7 @@ export default async function AppLayout({
   if (userId == null) {
     return (
       <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, textAlign: "center" }}>
-        <p style={{ maxWidth: 420, fontSize: 16, color: "var(--fg-mute)" }}>{NOT_A_CRM_USER}</p>
+        <p style={{ maxWidth: 420, fontSize: 16, color: "var(--ui-text-muted)" }}>{NOT_A_CRM_USER}</p>
       </main>
     );
   }

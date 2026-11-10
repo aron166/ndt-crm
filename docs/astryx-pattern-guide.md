@@ -43,3 +43,17 @@ and tenant scoping, routes and search params, props passed between server and cl
 form field names, modals' logic, tests' expectations. No migrations, no new dependencies.
 Hungarian copy: keep the existing strings; any NEW string gets a `// PROPOSAL copy` comment.
 No emojis, no em dashes anywhere.
+
+## Taste rules (Áron, 2026-11-10, binding for every screen and every work order)
+"company page and other pages still have old style popups and colory shit, have some taste; I want a seamless
+easy-to-use UI everywhere, it really is important, Péter is not good with tech."
+1. Calm, restrained palette: neutral greys plus ONE accent for primary actions. Colour only for meaning (error,
+   warning, success), sparingly, and then as a small dot or a short word, not a coloured block. No rainbow initials
+   avatars (company and person initials are neutral or left out). No multi-colour status chips: a status is a quiet
+   neutral chip, at most with a small dot. No monospace chips.
+2. Zero old-style popups: every modal, dialog, drawer and confirm is on the design layer (components/ui Dialog,
+   Button, Input, FormField) and reads only --ui-* tokens from web/src/styles/tokens.css.
+3. Usable by a non-technical person: big clear labels, ONE obvious primary action per screen, plain Hungarian
+   words, fewer choices visible at once (secondary actions behind a "..." menu or a "Részletes adatok" disclosure),
+   and the same button placement on every page (primary action top right of the header; in dialogs: Mégse left
+   of the primary, primary last).

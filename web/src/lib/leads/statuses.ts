@@ -43,17 +43,17 @@ export const STAGE_DESCRIPTION_MAX = 4000;
 // (customizable at /leads/setup); this is the seed for a new tenant + the
 // fallback when a tenant has no rows. Keys must match lifecycle.ALL_STAGES.
 export const DEFAULT_LEAD_STATUSES: LeadStatusDef[] = [
-  { key: "new", label: "Új", color: "#6366f1", position: 0, isInitial: true , isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "contacting", label: "Hívás alatt", color: "#3b82f6", position: 1, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "discovery_booked", label: "Egyeztetés foglalva", color: "#8b5cf6", position: 2, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "qualified", label: "Minősítve", color: "#a855f7", position: 3, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "offer_sent", label: "Ajánlat kiküldve", color: "#f59e0b", position: 4, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "demo_booked", label: "Demó foglalva", color: "#22c55e", position: 5, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "demo_done", label: "Demó kész", color: "#16a34a", position: 6, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "ordered", label: "Megrendelve", color: "#0ea5e9", position: 7, isInitial: false, isTerminal: false, isCommitment: true , description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "won", label: "Megnyert", color: "#15803d", position: 8, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "recall", label: "Visszahívás", color: "#f97316", position: 9, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
-  { key: "lost", label: "Elveszett", color: "#6b7280", position: 10, isInitial: false, isTerminal: true , isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER },
+  { key: "new", label: "Új", color: "#6366f1", position: 0, isInitial: true , isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "contacting", label: "Hívás alatt", color: "#3b82f6", position: 1, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "discovery_booked", label: "Egyeztetés foglalva", color: "#8b5cf6", position: 2, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "qualified", label: "Minősítve", color: "#a855f7", position: 3, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "offer_sent", label: "Ajánlat kiküldve", color: "#f59e0b", position: 4, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "demo_booked", label: "Demó foglalva", color: "#22c55e", position: 5, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "demo_done", label: "Demó kész", color: "#16a34a", position: 6, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "ordered", label: "Megrendelve", color: "#0ea5e9", position: 7, isInitial: false, isTerminal: false, isCommitment: true , description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "won", label: "Megnyert", color: "#15803d", position: 8, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "recall", label: "Visszahívás", color: "#f97316", position: 9, isInitial: false, isTerminal: false, isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
+  { key: "lost", label: "Elveszett", color: "#6b7280", position: 10, isInitial: false, isTerminal: true , isCommitment: false, description: STAGE_DESCRIPTION_PLACEHOLDER }, // design-allow: user data colour
 ];
 
 export function leadStatusLabel(key: string | null, statuses: LeadStatusDef[]): string {

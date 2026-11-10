@@ -141,9 +141,9 @@ function AttrSection({ companyId, type, attributes }: { companyId: number; type:
       {def.multi && (secondaries.length > 0 || adding) && (
         <div className={s.secChips}>
           {secondaries.map((sec) => (
-            <span key={sec.id} className={s.inline} style={{ gap: 6, padding: "2px 6px 2px 10px", background: "var(--color-background-card)", border: "1px solid var(--color-border)", borderRadius: 14, fontSize: 14 }}>
+            <span key={sec.id} className={s.inline} style={{ gap: 6, padding: "2px 6px 2px 10px", background: "var(--ui-surface)", border: "1px solid var(--ui-border)", borderRadius: 14, fontSize: 14 }}>
               {attrValueLabel(type, sec.value, sec.label)}
-              <button onClick={() => removeSecondary(sec.id)} disabled={pending} title="Lezárás (előzménybe kerül)" style={{ display: "grid", placeItems: "center", color: "var(--color-text-secondary)", background: "none", border: 0, padding: 0, cursor: "pointer" }}>
+              <button onClick={() => removeSecondary(sec.id)} disabled={pending} title="Lezárás (előzménybe kerül)" style={{ display: "grid", placeItems: "center", color: "var(--ui-text-muted)", background: "none", border: 0, padding: 0, cursor: "pointer" }}>
                 <X style={{ width: 12, height: 12 }} />
               </button>
             </span>
@@ -168,7 +168,7 @@ function AttrSection({ companyId, type, attributes }: { companyId: number; type:
         )
       )}
 
-      {error && <div style={{ fontSize: 14, color: "var(--coral)" }}>{error}</div>}
+      {error && <div style={{ fontSize: 14, color: "var(--ui-danger-text)" }}>{error}</div>}
 
       {/* History */}
       {history.length > 0 && (
@@ -180,7 +180,7 @@ function AttrSection({ companyId, type, attributes }: { companyId: number; type:
             <div className={s.stack} style={{ gap: 4, marginTop: 6 }}>
               {history.map((h) => (
                 <div key={h.id} className={s.histRow}>
-                  <span style={{ color: "var(--color-text-primary)" }}>{attrValueLabel(type, h.value, h.label)}</span>
+                  <span style={{ color: "var(--ui-text)" }}>{attrValueLabel(type, h.value, h.label)}</span>
                   <span>
                     {formatDate(h.validFrom)} → {h.validTo ? formatDate(h.validTo) : "?"}
                   </span>

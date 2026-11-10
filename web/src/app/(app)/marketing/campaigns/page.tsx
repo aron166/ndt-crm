@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { MarketingTabs } from "../MarketingTabs";
 import { CampaignsClient } from "./CampaignsClient";
 import { listSenders } from "@/app/actions/outreach-campaigns";
 
@@ -24,7 +23,6 @@ export default async function CampaignsPage() {
 
   return (
     <div className="mount">
-      <MarketingTabs active="campaigns" />
       <CampaignsClient
         campaigns={campaigns.map((c) => ({
           id: c.id,

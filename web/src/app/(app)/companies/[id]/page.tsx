@@ -15,10 +15,7 @@ import s from "../companies.module.css";
 
 const TENANT_ID = 1;
 
-const AVATAR_PALETTE = [
-  "var(--color-accent)", "var(--mint)", "var(--amber)",
-  "var(--sky)", "var(--violet)", "var(--coral)",
-];
+// One neutral avatar style (taste rules): no per-name colours.
 
 export default async function CompanyDetailPage({
   params,
@@ -81,13 +78,13 @@ export default async function CompanyDetailPage({
     typeCounts[t] = (typeCounts[t] ?? 0) + 1;
   }
   const engagementBreakdown = [
-    { label: "Hívás",              value: typeCounts.call       ?? 0, color: "var(--mint)"   },
-    { label: "Email",              value: typeCounts.email      ?? 0, color: "var(--sky)"    },
-    { label: "Találkozó",         value: typeCounts.meeting    ?? 0, color: "var(--violet)" },
-    { label: "Helyszíni látogatás",value: typeCounts.site_visit ?? 0, color: "var(--amber)"  },
+    { label: "Hívás",              value: typeCounts.call       ?? 0, color: "var(--ui-chart-1)"   },
+    { label: "Email",              value: typeCounts.email      ?? 0, color: "var(--ui-chart-2)"    },
+    { label: "Találkozó",         value: typeCounts.meeting    ?? 0, color: "var(--ui-chart-3)" },
+    { label: "Helyszíni látogatás",value: typeCounts.site_visit ?? 0, color: "var(--ui-chart-4)"  },
   ].filter((e) => e.value > 0);
   if (!engagementBreakdown.length) {
-    engagementBreakdown.push({ label: "Nincs adat", value: 1, color: "var(--color-background-muted)" });
+    engagementBreakdown.push({ label: "Nincs adat", value: 1, color: "var(--ui-surface-muted)" });
   }
 
   // KPI strip
@@ -99,7 +96,6 @@ export default async function CompanyDetailPage({
     { label: "Interakciók",     value: interactions.length },
   ];
 
-  const avatarColor = AVATAR_PALETTE[companyId % AVATAR_PALETTE.length];
   const initials = company.name.slice(0, 3).toUpperCase();
   const mapsConnected = await isConnected();
 
@@ -124,7 +120,6 @@ export default async function CompanyDetailPage({
         revenueSeries={revenueSeries}
         engagementBreakdown={engagementBreakdown}
         kpis={kpis}
-        avatarColor={avatarColor}
         initials={initials}
         initialTags={initialTags}
         auditEntries={serializeDates(auditEntries)}
