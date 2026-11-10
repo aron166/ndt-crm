@@ -126,7 +126,7 @@ export default async function LeadsPage({
   const mainStatuses = allStatuses.filter((s) => (MAIN_STAGES as readonly string[]).includes(s.key));
   const sideDef: LeadStatusDef | null = sideView
     ? allStatuses.find((s) => s.key === sideView) ?? {
-        key: sideView, label: sideView === "recall" ? "Visszahívás" : "Elveszett", color: "#8b8b9a", position: 99,
+        key: sideView, label: sideView === "recall" ? "Visszahívás" : "Elveszett", color: "#8b8b9a", position: 99, // design-allow: user data colour (stage fallback)
         isInitial: false, isTerminal: sideView === "lost", isCommitment: false, description: null,
       } // PROPOSAL copy
     : null;

@@ -135,7 +135,7 @@ function IntegrationCard({
         <div className={s.grow}>
           <div className={s.titleLine}>
             {connected
-              ? <CheckCircle style={{ width: 14, height: 14, color: "var(--mint)" }} />
+              ? <CheckCircle style={{ width: 14, height: 14, color: "var(--ui-success-text)" }} />
               : <Circle style={{ width: 14, height: 14, color: "var(--ui-text-muted)" }} />
             }
             <span className={s.name}>{integration.name}</span>
@@ -292,7 +292,7 @@ function ApiKeysSection({ appKeys }: { appKeys: AppKeyRow[] }) {
               <div className={s.keyLine}>
                 <code className={s.keyValue}>{created.plaintext}</code>
                 <button onClick={copyKey} className={k.btn}>
-                  {copied ? <Check style={{ width: 13, height: 13, color: "var(--mint)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
+                  {copied ? <Check style={{ width: 13, height: 13, color: "var(--ui-success-text)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                   {copied ? "Másolva" : "Másolás"}
                 </button>
               </div>

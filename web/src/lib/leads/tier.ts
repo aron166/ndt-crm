@@ -27,13 +27,13 @@ export const TIER_LABEL: Record<LeadTier, string> = {
   E: "Nurture",
 };
 
-/** Board/card colours. Keyed to the existing CSS vars so themes stay in one place. */
+/** Board/card colours. Neutral except A, which doubles as the overdue-flag danger colour (LeadsKanban). */
 export const TIER_COLOR: Record<LeadTier, string> = {
-  A: "var(--coral)",
-  B: "var(--indigo)",
-  C: "var(--sky)",
-  D: "var(--amber)",
-  E: "var(--fg-faint)",
+  A: "var(--ui-danger)",
+  B: "var(--ui-text)",
+  C: "var(--ui-text-muted)",
+  D: "var(--ui-text-muted)",
+  E: "var(--ui-text-disabled)",
 };
 
 // ── Answer normalisation ────────────────────────────────────────────

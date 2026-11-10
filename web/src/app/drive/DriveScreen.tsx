@@ -39,9 +39,9 @@ function outcomeBtnStyle(tone: "red" | "green" | undefined): React.CSSProperties
   return {
     width: "100%", minHeight: 56, padding: "10px 16px",
     fontSize: 16, fontWeight: 600, borderRadius: 10,
-    border: "1px solid " + (tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--ui-border-strong)"),
-    background: tone === "red" ? "var(--coral-soft)" : tone === "green" ? "var(--mint-soft)" : "var(--ui-surface)",
-    color: tone === "red" ? "var(--coral)" : tone === "green" ? "var(--mint)" : "var(--ui-text)",
+    border: "1px solid " + (tone === "red" ? "var(--ui-danger)" : tone === "green" ? "var(--ui-success)" : "var(--ui-border-strong)"),
+    background: tone === "red" ? "var(--ui-danger-surface)" : tone === "green" ? "var(--ui-success-surface)" : "var(--ui-surface)",
+    color: tone === "red" ? "var(--ui-danger)" : tone === "green" ? "var(--ui-success)" : "var(--ui-text)",
     cursor: "pointer",
   };
 }
@@ -186,7 +186,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
   // Rendered on the lead card AND on the empty-queue screen: the last call of a
   // drive can be the one that collides.
   const notice = conflictNotice && (
-        <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 14, padding: "8px 10px", borderRadius: 6 }}>
+        <div style={{ background: "var(--ui-warning-surface)", color: "var(--ui-warning-text)", fontSize: 14, padding: "8px 10px", borderRadius: 6 }}>
           <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve: de ütközik a naptárban:</p>
           {conflictNotice.map((c) => (
             <p key={c.taskId} style={{ margin: 0 }}>
@@ -196,7 +196,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
                 : "ez az új foglalás az alacsonyabb prioritású, ezt lehet áthelyezni."}
             </p>
           ))}
-          <button onClick={() => setConflictNotice(null)} className={k.btn} style={{ marginTop: 6, border: "1px solid var(--amber)", color: "var(--amber)", fontSize: 14 }}>
+          <button onClick={() => setConflictNotice(null)} className={k.btn} style={{ marginTop: 6, border: "1px solid var(--ui-warning)", color: "var(--ui-warning-text)", fontSize: 14 }}>
             Rendben
           </button>
         </div>
@@ -243,7 +243,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
             </span>
           )}
           {lead.callbackAt && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--amber)", background: "var(--amber-soft)", borderRadius: 999, padding: "2px 8px" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ui-warning-text)", background: "var(--ui-warning-surface)", borderRadius: 999, padding: "2px 8px" }}>
               Visszahívás esedékes
             </span>
           )}

@@ -10,5 +10,5 @@
  * so the status is still identifiable by colour.
  */
 export function dataInk(color: string): string {
-  return `color-mix(in oklab, ${color}, var(--fg) var(--data-ink-mix))`;
+  return `color-mix(in oklab, ${color}, var(--ui-text) var(--data-ink-mix))`; // design-allow: --data-ink-mix is a theme-flipping bridge var from globals.css
 }

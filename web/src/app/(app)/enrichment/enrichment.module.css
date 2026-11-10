@@ -21,7 +21,7 @@
 .fieldKey { font-size: 14px; font-weight: 600; color: var(--ui-text); }
 .values { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .oldValue { font-size: 14px; color: var(--ui-text-muted); text-decoration: line-through; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.newValue { font-size: 14px; color: var(--mint); font-weight: 500; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.newValue { font-size: 14px; color: var(--ui-success-text); font-weight: 500; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-block-start: 10px; border-top: 1px solid var(--ui-border); }
 .factRow { padding: 2px 0; border-bottom: 1px solid var(--ui-border); font-size: 14px; color: var(--ui-text-muted); overflow-wrap: anywhere; }
 .checkbox { margin-block-start: 2px; accent-color: var(--ui-accent); cursor: pointer; }

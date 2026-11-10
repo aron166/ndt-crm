@@ -157,14 +157,14 @@ export function ImportWizard() {
           <h2 className={k.h2}>
             {done ? "Importálás kész" : "Előnézet (még nem mentett)"}
           </h2>
-          {done && <CheckCircle2 className="size-5" style={{ color: "var(--mint)" }} />}
+          {done && <CheckCircle2 className="size-5" style={{ color: "var(--ui-success-text)" }} />}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <Stat label="Új" value={r.created} accent="var(--mint)" />
+          <Stat label="Új" value={r.created} accent="var(--ui-success)" />
           <Stat label="Meglévő" value={r.matched} accent="var(--ui-text-muted)" />
-          <Stat label="Kihagyva" value={r.skipped} accent="var(--amber)" />
-          <Stat label="Hiba" value={r.errors.length} accent="var(--coral)" />
+          <Stat label="Kihagyva" value={r.skipped} accent="var(--ui-warning)" />
+          <Stat label="Hiba" value={r.errors.length} accent="var(--ui-danger)" />
         </div>
         {r.notesAppended > 0 && (
           <p className={`${k.muted} mb-3`}>
@@ -266,7 +266,7 @@ export function ImportWizard() {
       )}
 
       {truncated && (
-        <p className="text-sm mb-3 flex items-center gap-1.5" style={{ color: "var(--amber)" }}>
+        <p className="text-sm mb-3 flex items-center gap-1.5" style={{ color: "var(--ui-warning-text)" }}>
           <AlertTriangle size={14} aria-hidden="true" /> A fájl több mint 10 000 sort tartalmaz: csak az első 10 000 lesz importálva.
         </p>
       )}
@@ -303,7 +303,7 @@ export function ImportWizard() {
       </div>
 
       {!requiredOk && (
-        <p className="text-sm mt-3" style={{ color: "var(--amber)" }}>
+        <p className="text-sm mt-3" style={{ color: "var(--ui-warning-text)" }}>
           {entity === "company"
             ? "Állítsd be, melyik oszlop a Cégnév."
             : "Állítsd be a név oszlopo(ka)t (Teljes név, vagy Vezeték- és Keresztnév)."}
@@ -356,7 +356,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent: 
 }
 
 function StatusPill({ status, detail }: { status: string; detail?: string }) {
-  const color = status === "új" ? "var(--mint)" : status === "hiba" ? "var(--coral)" : status === "kihagyva" ? "var(--amber)" : "var(--ui-text-muted)";
+  const color = status === "új" ? "var(--ui-success)" : status === "hiba" ? "var(--ui-danger)" : status === "kihagyva" ? "var(--ui-warning)" : "var(--ui-text-muted)";
   return (
     <span title={detail} style={{ fontSize: 14, color }}>
       {status}{detail ? ` · ${detail}` : ""}
@@ -366,7 +366,7 @@ function StatusPill({ status, detail }: { status: string; detail?: string }) {
 
 function ErrorLine({ text }: { text: string }) {
   return (
-    <p className="flex items-center gap-1.5 text-sm mt-3" style={{ color: "var(--coral)" }}>
+    <p className="flex items-center gap-1.5 text-sm mt-3" style={{ color: "var(--ui-danger-text)" }}>
       <AlertTriangle className="size-4" /> {text}
     </p>
   );

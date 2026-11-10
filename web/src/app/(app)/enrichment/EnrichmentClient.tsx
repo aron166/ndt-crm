@@ -46,9 +46,9 @@ interface Props {
 function ConfidenceBar({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   const color =
-    pct >= 80 ? "var(--mint)" :
-    pct >= 60 ? "var(--amber)" :
-    "var(--coral)";
+    pct >= 80 ? "var(--ui-success)" :
+    pct >= 60 ? "var(--ui-warning)" :
+    "var(--ui-danger)";
   return (
     <div className={s.confRow}>
       <div className={s.confTrack}>
@@ -63,7 +63,7 @@ function ConfidenceBar({ value }: { value: number }) {
 
 function SourceBadge({ source }: { source: string }) {
   const color =
-    source === "registry" ? "var(--mint)" :
+    source === "registry" ? "var(--ui-success)" :
     source === "inference" ? "var(--ui-accent)" :
     "var(--ui-text-muted)";
   return (
@@ -77,13 +77,13 @@ function SourceBadge({ source }: { source: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string }> = {
-    pending:  { label: "Várakozik", color: "var(--amber)" },
+    pending:  { label: "Várakozik", color: "var(--ui-warning-text)" },
     running:  { label: "Fut",       color: "var(--ui-accent)" },
-    done:     { label: "Kész",      color: "var(--mint)" },
-    failed:   { label: "Hiba",      color: "var(--coral)" },
-    approved: { label: "Jóváhagyta", color: "var(--mint)" },
+    done:     { label: "Kész",      color: "var(--ui-success-text)" },
+    failed:   { label: "Hiba",      color: "var(--ui-danger-text)" },
+    approved: { label: "Jóváhagyta", color: "var(--ui-success-text)" },
     rejected: { label: "Elutasítva", color: "var(--ui-text-muted)" },
-    partial:  { label: "Részleges",  color: "var(--amber)" },
+    partial:  { label: "Részleges",  color: "var(--ui-warning-text)" },
   };
   const { label, color } = map[status] ?? { label: status, color: "var(--ui-text-muted)" };
   return (
@@ -181,7 +181,7 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
           </div>
         )}
         {proposal.rawResponse?.startsWith("ERROR:") && (
-          <div className={k.muted} style={{ color: "var(--coral)" }}>
+          <div className={k.muted} style={{ color: "var(--ui-danger-text)" }}>
             {proposal.rawResponse}
           </div>
         )}
@@ -206,7 +206,7 @@ function ProposalCard({ proposal }: { proposal: ProposalWithRun }) {
             type="button"
             onClick={handleApproveAll}
             className={k.btn}
-            style={{ color: "var(--mint)", borderColor: "var(--mint)" }}
+            style={{ color: "var(--ui-success-text)", borderColor: "var(--ui-success)" }}
           >
             Mind jóváhagy
           </button>
