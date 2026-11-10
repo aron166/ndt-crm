@@ -46,7 +46,7 @@ export default async function NurturePage() {
 
   return (
     <div className="mount">
-      <MarketingTabs active="inbox" />
+      <MarketingTabs active="nurture" />
 
       <div className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-pad">

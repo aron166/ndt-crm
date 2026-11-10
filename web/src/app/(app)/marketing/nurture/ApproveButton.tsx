@@ -22,7 +22,7 @@ export function ApproveButton({ templateId, approved }: { templateId: number; ap
       >
         {approved ? "Jóváhagyás visszavonása" : "Jóváhagyom"}
       </button>
-      {err && <span role="alert" style={{ color: "var(--red, #c0392b)", fontSize: 12, marginLeft: 8 }}>{err}</span>}
+      {err && <span role="alert" style={{ color: "var(--coral)", fontSize: 12, marginLeft: 8 }}>{err}</span>}
     </span>
   );
 }
