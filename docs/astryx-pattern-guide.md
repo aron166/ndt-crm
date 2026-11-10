@@ -57,3 +57,7 @@ easy-to-use UI everywhere, it really is important, Péter is not good with tech.
    words, fewer choices visible at once (secondary actions behind a "..." menu or a "Részletes adatok" disclosure),
    and the same button placement on every page (primary action top right of the header; in dialogs: Mégse left
    of the primary, primary last).
+
+## Theme variants (preview)
+
+Off by default. To preview `glass-light` or `warm-glass`: start the app with `UI_THEME_PREVIEW=1` and set the cookie `ui-theme=glass-light` (or `warm-glass`); delete the cookie to go back. Tokens live in `web/src/styles/themes.css`.

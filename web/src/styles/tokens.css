@@ -50,6 +50,14 @@
   --ui-shadow-raised: var(--shadow-low);
   --ui-shadow-overlay: var(--shadow-high);
 
+  /* theme-variant hooks (neutral defaults = no visual change; themes.css overrides them) */
+  --ui-surface-glass: var(--ui-surface);
+  --ui-surface-glass-overlay: var(--ui-surface-overlay);
+  --ui-backdrop: none;
+  --ui-accent-gradient: none;
+  --ui-page-gradient: none;
+  --ui-border-glass: var(--ui-border);
+
   /* type and size */
   --ui-font: var(--font-family-body);
   --ui-font-mono: var(--font-family-code);

@@ -8,7 +8,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[var(--ui-accent)] text-[var(--ui-on-accent)] hover:bg-[color-mix(in_srgb,var(--ui-accent)_85%,white)]",
+        default: "bg-[image:var(--ui-accent-gradient)] bg-[var(--ui-accent)] text-[var(--ui-on-accent)] hover:bg-[color-mix(in_srgb,var(--ui-accent)_85%,white)]",
         outline:
           "border-[var(--ui-border-strong)] bg-[var(--ui-surface)] text-[var(--ui-text)] hover:bg-[var(--ui-hover)] aria-expanded:bg-[var(--ui-hover)]",
         secondary:

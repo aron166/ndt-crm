@@ -10,7 +10,7 @@ import { join, relative } from "node:path";
 const ROOT = new URL("../src/", import.meta.url).pathname;
 // The token file and the legacy bridge in globals.css are where these values are allowed to live.
 // PDFs render outside the browser theme (react-pdf), so they keep literal colours.
-const ALLOW_FILES = [/^styles\/tokens\.css$/, /^app\/globals\.css$/, /^lib\/.*\/pdf\.tsx$/, /\.test\.tsx?$/];
+const ALLOW_FILES = [/^styles\/tokens\.css$/, /^styles\/themes\.css$/, /^app\/globals\.css$/, /^lib\/.*\/pdf\.tsx$/, /\.test\.tsx?$/];
 // User-chosen data colours (tag colours, stage colours from the DB) are allowed where a line says so,
 // with a reason of 8+ characters. It silences only the colour-literal rules, never vars or palette classes.
 const ALLOW_LINE = /design-allow:\s*\S.{7,}/;
