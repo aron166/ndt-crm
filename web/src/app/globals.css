@@ -503,10 +503,13 @@
 }
 
 /* ── Utilities ───────────────────────────────────────────────── */
+/* 40 files use this for chips, dates and labels as well as ids; Áron read the mono chips as old and hard to scan
+   (2026-11-10). The design layer keeps the body face with tabular figures; real codes use .ui-code. */
 .font-mono-ndt {
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-feature-settings: 'tnum', 'zero';
+  font-family: var(--ui-font);
+  font-variant-numeric: tabular-nums;
 }
+.ui-code { font-family: var(--ui-font-mono); font-feature-settings: 'tnum', 'zero'; }
 .tabular { font-variant-numeric: tabular-nums; }
 
 /* Animations */
