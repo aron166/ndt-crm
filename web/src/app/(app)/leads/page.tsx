@@ -202,7 +202,7 @@ export default async function LeadsPage({
     <Link
       key={href}
       href={href}
-      className="rounded-full"
+      className="rounded-full inline-flex items-center touch44"
       style={{
         minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
         background: active ? "var(--ui-accent-surface)" : "var(--ui-surface)",

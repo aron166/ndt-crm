@@ -703,13 +703,15 @@ textarea.input-ds { padding-block: 8px; min-height: 80px; }
 .kboard {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 320px;
+  grid-auto-columns: min(320px, 85vw);
   gap: 12px;
   align-items: start;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   padding-bottom: 8px;
 }
+/* Small inline controls on the boards and pills: 44px on touch. */
+@media (pointer: coarse) { .touch44 { min-height: 44px; } }
 .kcol.mount { animation: kcol-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) both; }
 @keyframes kcol-in {
   from { opacity: 0; transform: translateY(6px); }
