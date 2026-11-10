@@ -98,6 +98,11 @@ function splitName(name: string | undefined, emailFallback?: string): {
   return { firstName: local || "Lead", lastName: "-" };
 }
 
+/** The stored form of a thread key that no draft vouched for: `<appSlug>:<key>`, lowercased. */
+export function appThreadKey(appSlug: string, threadKey: string): string {
+  return `${appSlug.trim().toLowerCase()}:${threadKey.trim().toLowerCase()}`;
+}
+
 export async function ingestLead(
   input: LeadIntake,
   ctx: IngestCtx,
@@ -134,10 +139,15 @@ export async function ingestLead(
   const claimedThreadKey = input.thread_key?.trim() || null;
   const draftKey = input.draft_key?.trim() || null;
   const isColdEmailReply = input.channel === "cold_email";
+  // Without a draft of ours to vouch for it, a thread key is still honoured, but
+  // NAMESPACED by the authenticated app (growth cold-email tool, 2026-11-10): the
+  // app key is the voucher, so one app can dedupe its own threads and can never
+  // claim another app's or a draft-vouched key (keeps the #89 protection).
+  const appKey = claimedThreadKey && isColdEmailReply ? appThreadKey(sourceApp, claimedThreadKey) : null;
 
   if (claimedThreadKey && isColdEmailReply) {
     const existingLead = await tx.lead.findFirst({
-      where: { tenantId, threadKey: claimedThreadKey },
+      where: { tenantId, threadKey: { in: [claimedThreadKey, appKey!] } },
       select: { id: true, companyId: true },
     });
     if (existingLead) {
@@ -166,8 +176,8 @@ export async function ingestLead(
       })
     : null;
 
-  // The key is only stored once a draft has vouched for it.
-  const threadKey = draft ? claimedThreadKey : null;
+  // A draft-vouched key is stored as is; otherwise the app-namespaced key.
+  const threadKey = draft ? claimedThreadKey : appKey;
 
   // 1. Dedupe Company by exact name (case-insensitive) within the tenant —
   // unless the thread key already told us the company for certain.
