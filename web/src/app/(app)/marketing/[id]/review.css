@@ -46,9 +46,9 @@
 }
 .reviewer-name { color: var(--ui-text); font-weight: 500; }
 .reviewer-status { color: var(--ui-text-muted); }
-.reviewer-status.verdict-approve { color: var(--mint); }
-.reviewer-status.verdict-changes { color: var(--amber); }
-.reviewer-status.verdict-rewrite { color: var(--coral); }
+.reviewer-status.verdict-approve { color: var(--ui-success-text); }
+.reviewer-status.verdict-changes { color: var(--ui-warning-text); }
+.reviewer-status.verdict-rewrite { color: var(--ui-danger-text); }
 
 .pipeline-strip {
   display: flex;
@@ -80,13 +80,13 @@
   margin: 0 0 6px;
 }
 .review-note.amber {
-  color: var(--amber);
+  color: var(--ui-warning-text);
 }
 .review-error {
   font-size: 13px;
-  color: var(--coral);
-  background: var(--coral-soft);
-  border: 1px solid var(--coral-line);
+  color: var(--ui-danger-text);
+  background: var(--ui-danger-surface);
+  border: 1px solid var(--ui-danger);
   border-radius: var(--ui-radius-control);
   padding: 8px 12px;
   margin: 8px 0 0;
@@ -213,8 +213,8 @@
   font-family: var(--font-mono);
 }
 .diff-mark { font-weight: 700; }
-.diff-mark.del { color: var(--coral); }
-.diff-mark.ins { color: var(--mint); }
+.diff-mark.del { color: var(--ui-danger-text); }
+.diff-mark.ins { color: var(--ui-success-text); }
 .diff-body {
   white-space: pre-wrap;
   font-size: 15px;
@@ -223,16 +223,16 @@
   margin: 0;
 }
 .diff-body del {
-  color: var(--coral);
+  color: var(--ui-danger-text);
   text-decoration: line-through;
   text-decoration-thickness: 1.5px;
-  background: var(--coral-soft);
+  background: var(--ui-danger-surface);
 }
 .diff-body ins {
-  color: var(--mint);
+  color: var(--ui-success-text);
   text-decoration: underline;
   text-decoration-thickness: 2px;
-  background: var(--mint-soft);
+  background: var(--ui-success-surface);
 }
 
 /* ── Panels (history, comments, editor, live) ──────────────── */
@@ -267,7 +267,7 @@
 .version-item-head { display: flex; align-items: center; gap: 6px; }
 .version-num { font-size: 13px; font-weight: 600; color: var(--ui-text); }
 .version-flag { color: var(--ui-accent); font-size: 10px; }
-.version-flag.live { font-size: 11px; font-weight: 600; color: var(--mint); }
+.version-flag.live { font-size: 11px; font-weight: 600; color: var(--ui-success-text); }
 .version-meta { font-size: 12px; color: var(--ui-text-muted); margin-top: 2px; }
 .version-note { font-size: 12px; color: var(--ui-text); white-space: pre-wrap; margin-top: 4px; }
 
@@ -279,9 +279,9 @@
 .comment-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
 .comment-author { font-weight: 500; color: var(--ui-text); }
 .comment-verdict { font-weight: 600; }
-.comment-verdict.verdict-approve { color: var(--mint); }
-.comment-verdict.verdict-changes { color: var(--amber); }
-.comment-verdict.verdict-rewrite { color: var(--coral); }
+.comment-verdict.verdict-approve { color: var(--ui-success-text); }
+.comment-verdict.verdict-changes { color: var(--ui-warning-text); }
+.comment-verdict.verdict-rewrite { color: var(--ui-danger-text); }
 .comment-date { color: var(--ui-text-muted); margin-left: auto; }
 .comment-text { font-size: 13px; color: var(--ui-text); white-space: pre-wrap; margin: 4px 0 0; }
 
@@ -297,7 +297,7 @@
 .checks-open-count {
   font-size: 12px;
   font-weight: 600;
-  color: var(--amber);
+  color: var(--ui-warning-text);
   white-space: nowrap;
 }
 .actionbar-note { margin-top: 8px; }
@@ -328,8 +328,8 @@
   padding: 2px 9px;
   border: 1px solid;
 }
-.check-chip.check-open { color: var(--amber); background: color-mix(in oklch, var(--amber) 12%, transparent); border-color: color-mix(in oklch, var(--amber) 35%, transparent); }
-.check-chip.check-resolved { color: var(--mint); background: var(--mint-soft); border-color: color-mix(in oklch, var(--mint) 35%, transparent); }
+.check-chip.check-open { color: var(--ui-warning-text); background: color-mix(in oklch, var(--ui-warning) 12%, transparent); border-color: color-mix(in oklch, var(--ui-warning) 35%, transparent); }
+.check-chip.check-resolved { color: var(--ui-success-text); background: var(--ui-success-surface); border-color: color-mix(in oklch, var(--ui-success) 35%, transparent); }
 .check-chip.check-waived { color: var(--ui-text-muted); background: var(--ui-surface-muted); border-color: var(--ui-border); }
 .check-for, .check-source { font-size: 12px; color: var(--ui-text-muted); }
 .check-answer {
@@ -366,7 +366,7 @@
   cursor: pointer;
   padding: 4px 0;
 }
-.archive-link:hover { color: var(--coral); }
+.archive-link:hover { color: var(--ui-danger-text); }
 
 /* ── Action bar ─────────────────────────────────────────── */
 .review-actionbar-wrap {
@@ -495,7 +495,7 @@
 .editor-file-row button {
   background: none; border: none; color: var(--ui-text-muted); cursor: pointer; margin-left: auto; padding: 2px;
 }
-.editor-file-row button:hover { color: var(--coral); }
+.editor-file-row button:hover { color: var(--ui-danger-text); }
 .editor-file-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; border: 1px solid var(--ui-border); }
 .editor-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .editor-caption-input {
@@ -529,7 +529,7 @@
   padding-top: 14px;
   border-top: 1px solid var(--ui-border);
 }
-.editor-reset-warning { font-size: 12px; color: var(--amber); }
+.editor-reset-warning { font-size: 12px; color: var(--ui-warning-text); }
 
 /* ── Live section ───────────────────────────────────────── */
 .live-publish-row { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }

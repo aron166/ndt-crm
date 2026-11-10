@@ -15,9 +15,9 @@ import k from "@/components/astryx/page.module.css";
 import s from "./marketing.module.css";
 
 const VERDICT_COLOR: Record<Verdict, string> = {
-  approve: "var(--mint)",
-  changes: "var(--amber)",
-  rewrite: "var(--coral)",
+  approve: "var(--ui-success)",
+  changes: "var(--ui-warning)",
+  rewrite: "var(--ui-danger)",
 };
 
 function daysSince(iso: string): number {
@@ -105,7 +105,6 @@ function StatusChip({ status }: { status: string }) {
   const label = STATUS_LABELS[status as keyof typeof STATUS_LABELS] ?? status;
   return (
     <span
-      className="font-mono-ndt"
       style={{
         fontSize: 12, color: tone.fg, background: tone.bg, border: `1px solid ${tone.line}`,
         borderRadius: 4, padding: "1px 6px",

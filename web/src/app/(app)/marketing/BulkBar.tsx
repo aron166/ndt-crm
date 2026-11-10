@@ -152,7 +152,7 @@ export function BulkBar({
             </button>
             <button
               onClick={handleDelete} disabled={busy} className={k.btn}
-              style={{ color: "var(--coral)" }}
+              style={{ color: "var(--ui-danger-text)" }}
             >
               <Trash2 style={{ width: 14, height: 14 }} />
               {UI.deleteSelected}

@@ -8,11 +8,11 @@ export const QUOTE_STATUSES = ["draft", "sent", "accepted", "rejected", "expired
 export type QuoteStatus = (typeof QUOTE_STATUSES)[number];
 
 export const QUOTE_STATUS_META: Record<QuoteStatus, { label: string; color: string; bg: string }> = {
-  draft:    { label: "Piszkozat", color: "#64748b", bg: "rgba(100,116,139,0.12)" },
-  sent:     { label: "Elküldve",  color: "#6366f1", bg: "rgba(99,102,241,0.12)" },
-  accepted: { label: "Elfogadva", color: "#16a34a", bg: "rgba(22,163,74,0.12)" },
-  rejected: { label: "Elutasítva", color: "#dc2626", bg: "rgba(220,38,38,0.12)" },
-  expired:  { label: "Lejárt",    color: "#a16207", bg: "rgba(161,98,7,0.12)" },
+  draft:    { label: "Piszkozat", color: "var(--ui-text-muted)", bg: "var(--ui-surface-muted)" },
+  sent:     { label: "Elküldve",  color: "var(--ui-text-muted)", bg: "var(--ui-surface-muted)" },
+  accepted: { label: "Elfogadva", color: "var(--ui-success-text)", bg: "var(--ui-surface-muted)" },
+  rejected: { label: "Elutasítva", color: "var(--ui-danger-text)", bg: "var(--ui-surface-muted)" },
+  expired:  { label: "Lejárt",    color: "var(--ui-warning-text)", bg: "var(--ui-surface-muted)" },
 };
 
 export function quoteStatusLabel(status: string): string {

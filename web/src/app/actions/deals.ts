@@ -227,7 +227,7 @@ export async function upsertStage(formData: FormData) {
   const pipelineId  = parseInt(formData.get("pipelineId") as string);
   const stageIdStr  = formData.get("stageId") as string | null;
   const name        = (formData.get("name") as string)?.trim();
-  const color       = (formData.get("color") as string) || "#6366f1";
+  const color       = (formData.get("color") as string) || "#6366f1"; // design-allow: user data colour
   const probability = parseInt(formData.get("probability") as string) || 50;
   const position    = parseInt(formData.get("position") as string) || 0;
   const isTerminalWon  = formData.get("isTerminalWon") === "true";

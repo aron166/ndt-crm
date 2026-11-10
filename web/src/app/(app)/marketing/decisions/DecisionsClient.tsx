@@ -72,11 +72,11 @@ function Row({ row }: { row: DecisionRow }) {
           className={s.field}
           style={{ width: "100%", resize: "vertical" }}
         />
-        {error && <p className={k.muted} style={{ color: "var(--coral)", margin: 0 }}>{error}</p>}
+        {error && <p className={k.muted} style={{ color: "var(--ui-danger-text)", margin: 0 }}>{error}</p>}
       </div>
 
       <div className={k.cell}>
-        <span className={k.muted} style={urgent ? { color: "var(--coral)", fontWeight: 500 } : undefined}>
+        <span className={k.muted} style={urgent ? { color: "var(--ui-danger-text)", fontWeight: 500 } : undefined}>
           {UI.decisionsWaited(row.daysWaiting)}
         </span>
       </div>

@@ -71,13 +71,13 @@ export interface StatusTone {
 }
 
 export const STATUS_TONES: Record<ContentStatus, StatusTone> = {
-  draft:             { fg: "var(--fg-mute)",   bg: "var(--bg-raised)",   line: "var(--line-soft)" },
-  in_review:         { fg: "var(--amber-fg)",  bg: "var(--amber-soft)",  line: "var(--amber-line)" },
-  changes_requested: { fg: "var(--orange-fg)", bg: "var(--orange-soft)", line: "var(--orange-line)" },
-  rewrite_requested: { fg: "var(--coral-fg)",  bg: "var(--coral-soft)",  line: "var(--coral-line)" },
-  ai_working:        { fg: "var(--violet-fg)", bg: "var(--violet-soft)", line: "var(--violet-line)" },
-  live:              { fg: "var(--mint-fg)",   bg: "var(--mint-soft)",   line: "var(--mint-line)" },
-  archived:          { fg: "var(--fg-faint)",  bg: "var(--bg-raised)",   line: "var(--line-soft)" },
+  draft: { fg: "var(--ui-text-muted)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
+  in_review: { fg: "var(--ui-text-muted)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
+  changes_requested: { fg: "var(--ui-text-muted)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
+  rewrite_requested: { fg: "var(--ui-danger-text)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
+  ai_working: { fg: "var(--ui-text-muted)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
+  live: { fg: "var(--ui-success-text)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
+  archived: { fg: "var(--ui-text-disabled)", bg: "var(--ui-surface-muted)", line: "var(--ui-border)" },
 };
 
 export function statusTone(status: string): StatusTone {

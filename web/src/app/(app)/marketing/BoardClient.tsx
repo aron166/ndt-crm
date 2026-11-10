@@ -11,9 +11,9 @@ import { BulkBar } from "./BulkBar";
 import s from "./marketing.module.css";
 
 const VERDICT_COLOR: Record<Verdict, string> = {
-  approve: "var(--mint)",
-  changes: "var(--amber)",
-  rewrite: "var(--coral)",
+  approve: "var(--ui-success)",
+  changes: "var(--ui-warning)",
+  rewrite: "var(--ui-danger)",
 };
 
 function daysSince(iso: string): number {
@@ -24,10 +24,10 @@ type ColumnKey = "draft" | "in_review" | "changes" | "ai_working" | "live" | "in
 
 const COLUMNS: { key: ColumnKey; label: string; color: string; acceptsDrop: boolean }[] = [
   { key: "draft", label: UI.columnDraft, color: "var(--ui-text-muted)", acceptsDrop: false },
-  { key: "in_review", label: UI.columnInReview, color: "var(--amber)", acceptsDrop: false },
-  { key: "changes", label: UI.columnChanges, color: "var(--coral)", acceptsDrop: true },
-  { key: "ai_working", label: UI.columnAiWorking, color: "var(--violet)", acceptsDrop: false },
-  { key: "live", label: UI.columnLive, color: "var(--mint)", acceptsDrop: false },
+  { key: "in_review", label: UI.columnInReview, color: "var(--ui-text-muted)", acceptsDrop: false },
+  { key: "changes", label: UI.columnChanges, color: "var(--ui-danger-text)", acceptsDrop: true },
+  { key: "ai_working", label: UI.columnAiWorking, color: "var(--ui-text-muted)", acceptsDrop: false },
+  { key: "live", label: UI.columnLive, color: "var(--ui-success-text)", acceptsDrop: false },
   { key: "in_campaign", label: UI.columnInCampaign, color: "var(--ui-text-muted)", acceptsDrop: false },
 ];
 
@@ -97,7 +97,7 @@ function Card({
             ))}
           </div>
           {item.overdue && item.waitingSince && (
-            <span style={{ fontSize: 12, color: "var(--coral)", fontWeight: 500 }}>
+            <span style={{ fontSize: 12, color: "var(--ui-danger-text)", fontWeight: 500 }}>
               {UI.waitingDays(daysSince(item.waitingSince))}
             </span>
           )}

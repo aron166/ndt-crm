@@ -35,13 +35,10 @@ describe("parseTheme", () => {
 });
 
 describe("statusTone", () => {
-  it("gives every content status its own tone", () => {
-    const fgs = Object.values(STATUS_TONES).map((t) => t.fg);
-    // No two statuses may share a text tone, or the chip stops carrying
-    // meaning on its own — which is the whole reason it is coloured.
-    expect(new Set(fgs).size).toBe(fgs.length);
-    expect(STATUS_TONES.in_review.fg).not.toBe(STATUS_TONES.changes_requested.fg);
-    expect(STATUS_TONES.changes_requested.fg).not.toBe(STATUS_TONES.rewrite_requested.fg);
+  it("keeps a colour only for the meaning states (neutral chips otherwise)", () => {
+    expect(STATUS_TONES.rewrite_requested.fg).not.toBe(STATUS_TONES.draft.fg);
+    expect(STATUS_TONES.live.fg).not.toBe(STATUS_TONES.draft.fg);
+    expect(STATUS_TONES.in_review.fg).toBe(STATUS_TONES.draft.fg);
   });
 
   it("falls back to the draft tone for an unknown status", () => {

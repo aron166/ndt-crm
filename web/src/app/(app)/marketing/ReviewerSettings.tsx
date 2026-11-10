@@ -110,7 +110,7 @@ export function ReviewerSettings() {
                 })}
               </div>
               {error && (
-                <p className={k.muted} style={{ color: "var(--coral)", marginTop: 10 }}>{error}</p>
+                <p className={k.muted} style={{ color: "var(--ui-danger-text)", marginTop: 10 }}>{error}</p>
               )}
               <button
                 onClick={save}
@@ -146,7 +146,7 @@ export function ReviewerSettings() {
                       </label>
                     ))}
                   </div>
-                  {approvalsError && <p className={k.muted} style={{ color: "var(--coral)", marginTop: 8 }}>{approvalsError}</p>}
+                  {approvalsError && <p className={k.muted} style={{ color: "var(--ui-danger-text)", marginTop: 8 }}>{approvalsError}</p>}
                   <button
                     className={k.btn}
                     style={{ marginTop: 12 }}

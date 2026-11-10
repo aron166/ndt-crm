@@ -34,7 +34,7 @@ export function MarkSentControl({
         >
           Kézzel elküldve
         </button>
-        {disabledReason && <span className={k.muted} style={{ color: "var(--amber)" }}>{disabledReason}</span>}
+        {disabledReason && <span className={k.muted} style={{ color: "var(--ui-warning-text)" }}>{disabledReason}</span>}
       </div>
     );
   }
@@ -78,7 +78,7 @@ export function MarkSentControl({
           Mégse
         </button>
       </div>
-      {error && <div className={k.muted} style={{ color: "var(--coral)" }}>{error}</div>}
+      {error && <div className={k.muted} style={{ color: "var(--ui-danger-text)" }}>{error}</div>}
     </div>
   );
 }

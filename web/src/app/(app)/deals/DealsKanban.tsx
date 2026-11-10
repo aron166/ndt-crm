@@ -93,19 +93,19 @@ function DealCard({
       style={{
         background: "var(--ui-surface)",
         borderRadius: "var(--ui-radius-surface)",
-        border: `1px solid ${isStale ? "var(--coral)" : "transparent"}`,
+        border: `1px solid ${isStale ? "var(--ui-danger)" : "transparent"}`,
         padding: "12px 14px", cursor: "grab",
         boxShadow: "var(--ui-shadow-raised)",
         transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
         willChange: "transform",
       }}
       onMouseOver={(e) => {
-        e.currentTarget.style.borderColor = isStale ? "var(--coral)" : "var(--ui-border-strong)";
+        e.currentTarget.style.borderColor = isStale ? "var(--ui-danger)" : "var(--ui-border-strong)";
         e.currentTarget.style.boxShadow = "var(--ui-shadow-overlay)";
         e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseOut={(e) => {
-        e.currentTarget.style.borderColor = isStale ? "var(--coral)" : "transparent";
+        e.currentTarget.style.borderColor = isStale ? "var(--ui-danger)" : "transparent";
         e.currentTarget.style.boxShadow = "var(--ui-shadow-raised)";
         e.currentTarget.style.transform = "none";
       }}
@@ -121,7 +121,7 @@ function DealCard({
           top: 6, right: 6, width: 40, height: 40,
           color: "var(--ui-text-muted)", background: "var(--ui-surface-muted)",
         }}
-        onMouseOver={(e) => { e.currentTarget.style.color = "var(--coral)"; }}
+        onMouseOver={(e) => { e.currentTarget.style.color = "var(--ui-danger)"; }}
         onMouseOut={(e) => { e.currentTarget.style.color = "var(--ui-text-muted)"; }}
       >
         <Trash2 style={{ width: 12, height: 12 }} />
@@ -129,7 +129,7 @@ function DealCard({
 
       {/* Stale warning */}
       {isStale && (
-        <div className="flex items-center gap-1.5 mb-2" style={{ fontSize: 14, color: "var(--coral)" }}>
+        <div className="flex items-center gap-1.5 mb-2" style={{ fontSize: 14, color: "var(--ui-danger-text)" }}>
           <AlertTriangle style={{ width: 11, height: 11 }} />
           <span>Nincs következő lépés</span>
         </div>

@@ -81,7 +81,7 @@ export default async function InvoicesDrillPage({
         eyebrow={
           <>
             {invoiceCount.toLocaleString("hu-HU")} számla ·{" "}
-            <span className={k.num} style={{ color: "var(--mint)" }}>
+            <span className={k.num} style={{ color: "var(--ui-text)" }}>
               {(totalAmount / 1_000_000).toFixed(1)}M HUF
             </span>
             {yearFilter && <span className={k.muted}> · {yearFilter}</span>}
@@ -147,7 +147,7 @@ export default async function InvoicesDrillPage({
                     </span>
                   </td>
                   <td className={s.right}>
-                    <span className={k.num} style={{ color: "var(--mint)", fontWeight: 500 }}>
+                    <span className={k.num} style={{ color: "var(--ui-text)", fontWeight: 500 }}>
                       {inv.netAmount ? formatHUF(Number(inv.netAmount)) : "-"}
                     </span>
                   </td>

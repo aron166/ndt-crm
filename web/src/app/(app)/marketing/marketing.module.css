@@ -26,6 +26,6 @@
 .verdict { display: inline-flex; align-items: center; gap: 6px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .late.late { color: var(--ui-danger); }
-.warn { padding: 12px 16px; margin-block-end: 16px; background: color-mix(in srgb, var(--coral) 8%, transparent); border: 1px solid var(--coral); border-radius: var(--ui-radius-surface); color: var(--coral); font-size: 14px; font-weight: 500; }
+.warn { padding: 12px 16px; margin-block-end: 16px; background: color-mix(in srgb, var(--ui-danger) 8%, transparent); border: 1px solid var(--ui-danger); border-radius: var(--ui-radius-surface); color: var(--ui-danger-text); font-size: 14px; font-weight: 500; }
 .toggleOn.toggleOn { background: var(--ui-surface-muted); border-color: var(--ui-accent); }
 .preview { margin: 0; font-size: 15px; line-height: 1.6; max-width: 72ch; color: var(--ui-text); display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }

@@ -34,11 +34,11 @@ export function AnalyticsClient({
 
   const entityLinks: { label: string; href: string; count: string; accent?: string }[] = [
     { label: "Összes cég",                href: "/companies",                   count: totalCompanies.toLocaleString("hu-HU") },
-    { label: "Soha nem kontaktált",       href: "/companies?never_contacted=1", count: neverContacted.toLocaleString("hu-HU"), accent: "var(--amber)" },
+    { label: "Soha nem kontaktált",       href: "/companies?never_contacted=1", count: neverContacted.toLocaleString("hu-HU"), accent: "var(--ui-text-muted)" },
     { label: "Összes személy",            href: "/persons",                     count: totalPersons.toLocaleString("hu-HU") },
     { label: "Nyitott feladatok",         href: "/tasks?status=open",           count: openTasks > 0 ? openTasks.toLocaleString("hu-HU") : "-" },
     { label: "Aktív dealek",             href: "/deals",                       count: openDeals > 0 ? openDeals.toLocaleString("hu-HU") : "-" },
-    { label: "Összes számla",            href: "/analytics/invoices",          count: "→", accent: "var(--mint)" },
+    { label: "Összes számla",            href: "/analytics/invoices",          count: "→", accent: "var(--ui-text-muted)" },
   ];
 
   return (
@@ -67,18 +67,18 @@ export function AnalyticsClient({
           <div className={s.head}>
             <h2 className={k.h2}>Havi forgalom · elmúlt 24 hónap (M HUF)</h2>
             {monthSeries.length > 0 && (
-              <span className={k.num} style={{ fontSize: 14, color: "var(--mint)" }}>
+              <span className={k.num} style={{ fontSize: 14, color: "var(--ui-text)" }}>
                 {monthSeries.reduce((sum, v) => sum + v, 0).toFixed(1)}M összesen
               </span>
             )}
           </div>
           {monthSeries.length >= 2 ? (
             <>
-              <AreaChart data={monthSeries} height={180} color="var(--mint)" />
+              <AreaChart data={monthSeries} height={180} color="var(--ui-chart-1)" />
               <div className={s.years}>
                 {revenueByMonth.map((r, i) => (
                   <div key={i} style={{ textAlign: "center", flexShrink: 0, minWidth: 36 }}>
-                    <div className={k.num} style={{ fontSize: 14, color: r.total > 0 ? "var(--mint)" : "var(--ui-text-muted)" }}>
+                    <div className={k.num} style={{ fontSize: 14, color: r.total > 0 ? "var(--ui-text)" : "var(--ui-text-muted)" }}>
                       {r.total > 0 ? (r.total / 1_000_000).toFixed(0) : "-"}
                     </div>
                     <div className={s.axis}>{monthLabels[i]}</div>

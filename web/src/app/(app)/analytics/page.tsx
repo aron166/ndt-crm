@@ -15,14 +15,14 @@ const TENANT_ID = 1;
 
 const PIPELINE_COLORS: Record<number, string> = {
   0: "var(--ui-text-muted)",
-  1: "var(--sky)",
-  2: "var(--amber)",
-  3: "var(--mint)",
-  4: "var(--coral)",
-  5: "var(--violet)",
-  6: "var(--ui-accent)",
+  1: "var(--ui-chart-4)",
+  2: "var(--ui-chart-4)",
+  3: "var(--ui-chart-2)",
+  4: "var(--ui-text-muted)",
+  5: "var(--ui-chart-3)",
+  6: "var(--ui-chart-1)",
   7: "var(--ui-text-muted)",
-  8: "var(--mint)",
+  8: "var(--ui-success)",
 };
 
 const RANGE_LABEL = "Időszak"; // PROPOSAL copy
@@ -178,7 +178,7 @@ export default async function AnalyticsPage({
           </Link>
           <span className={k.muted}>
             {contacted.toLocaleString("hu-HU")} érintett ·{" "}
-            <Link href="/companies?never_contacted=1" className={s.plain} style={{ color: "var(--amber)" }}>
+            <Link href="/companies?never_contacted=1" className={s.plain} style={{ color: "var(--ui-warning-text)" }}>
               {neverContacted.toLocaleString("hu-HU")} soha
             </Link>
           </span>
@@ -198,7 +198,7 @@ export default async function AnalyticsPage({
           <span className={k.statV}>{(totalRevenue / 1_000_000).toFixed(1)}M</span>
           <span className={k.muted}>2010–2023 · 2016 számla</span>
           <div className={s.spark}>
-            <Sparkline data={revenueSeries.slice(-12)} width={80} height={28} color="var(--mint)" />
+            <Sparkline data={revenueSeries.slice(-12)} width={80} height={28} color="var(--ui-chart-1)" />
           </div>
         </Link>
 
@@ -248,7 +248,7 @@ export default async function AnalyticsPage({
       <section className={`${k.section} mount mount-3`}>
         <div className={s.head}>
           <h2 className={k.h2}>Forgalom · éves bontás (M HUF)</h2>
-          <span className={k.num} style={{ fontSize: 14, color: "var(--mint)" }}>
+          <span className={k.num} style={{ fontSize: 14, color: "var(--ui-text)" }}>
             {(totalRevenue / 1_000_000).toFixed(1)}M HUF összesen
           </span>
         </div>
@@ -261,7 +261,7 @@ export default async function AnalyticsPage({
               className={s.year}
               title={`Számlák: ${r.year}`}
             >
-              <span className={k.num} style={{ fontSize: 14, color: "var(--mint)", fontWeight: 500 }}>
+              <span className={k.num} style={{ fontSize: 14, color: "var(--ui-text)", fontWeight: 500 }}>
                 {(r.total / 1_000_000).toFixed(0)}M
               </span>
               <span className={k.muted}>{r.year}</span>
@@ -295,7 +295,7 @@ export default async function AnalyticsPage({
                         <span style={{ color: "var(--ui-text)" }}>{row.company_name ?? "-"}</span>
                       )}
                     </td>
-                    <td className={`${s.right} ${k.num}`} style={{ color: "var(--mint)" }}>
+                    <td className={`${s.right} ${k.num}`} style={{ color: "var(--ui-text)" }}>
                       {(row.total / 1_000_000).toFixed(2)}M
                     </td>
                   </tr>
@@ -309,10 +309,10 @@ export default async function AnalyticsPage({
         <section className={`${k.section} mount`}>
           <div className={s.head}>
             <h2 className={k.h2} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--amber)" }} />
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--ui-warning)" }} />
               Hívandók (90+ nap inaktív)
             </h2>
-            <span className={k.num} style={{ fontSize: 14, color: "var(--coral)" }}>
+            <span className={k.num} style={{ fontSize: 14, color: "var(--ui-danger-text)" }}>
               {coldCompanies.length} cég
             </span>
           </div>
@@ -333,11 +333,11 @@ export default async function AnalyticsPage({
                     </td>
                     <td>
                       {c.lastInteractionDate ? (
-                        <span className={k.num} style={{ fontSize: 14, color: "var(--amber)" }}>
+                        <span className={k.num} style={{ fontSize: 14, color: "var(--ui-warning-text)" }}>
                           {formatDate(c.lastInteractionDate)}
                         </span>
                       ) : (
-                        <span className={k.num} style={{ fontSize: 14, color: "var(--coral)" }}>Soha</span>
+                        <span className={k.num} style={{ fontSize: 14, color: "var(--ui-danger-text)" }}>Soha</span>
                       )}
                     </td>
                   </tr>

@@ -318,7 +318,7 @@ export function AutomationsClient({
       />
 
       {error && !showForm && (
-        <div className={k.card} style={{ fontSize: 14, color: "var(--coral)" }}>{error}</div>
+        <div className={k.card} style={{ fontSize: 14, color: "var(--ui-danger-text)" }}>{error}</div>
       )}
 
       {showForm && (
@@ -653,7 +653,7 @@ function RuleForm({
           </div>
       </section>
 
-      {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
+      {error && <p className="text-sm" style={{ color: "var(--ui-danger-text)" }}>{error}</p>}
 
       <div className={s.footer}>
         <button type="button" onClick={onCancel} disabled={pending} className={k.btn}>Mégse</button>

@@ -50,7 +50,7 @@ function TargetRow({ label, met }: { label: string; met: boolean }) {
     <Row
       label={label}
       value={met ? "teljesítve" : "még nem"}
-      valueColor={met ? "var(--mint)" : "var(--ui-text-muted)"}
+      valueColor={met ? "var(--ui-success)" : "var(--ui-text-muted)"}
     />
   );
 }
@@ -163,14 +163,14 @@ export default function CampaignDashboard({
               </div>
               <div className={k.cell}>
                 {st.template && (
-                  <span className={k.strong} style={{ color: st.template.live ? "var(--mint)" : "var(--ui-text-muted)" }}>
+                  <span className={k.strong} style={{ color: st.template.live ? "var(--ui-success)" : "var(--ui-text-muted)" }}>
                     {st.template.live ? "Élő" : "Nem élő"}
                   </span>
                 )}
               </div>
               <div className={k.cellEnd}>
                 {st.template && st.staleCount > 0 && (
-                  <span className={k.muted} style={{ color: "var(--amber)" }}>
+                  <span className={k.muted} style={{ color: "var(--ui-warning-text)" }}>
                     {st.staleCount} piszkozat régebbi sablonváltozatból
                   </span>
                 )}

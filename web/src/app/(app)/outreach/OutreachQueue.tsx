@@ -50,9 +50,9 @@ const STATUS_TONE: Record<DraftStatus, string> = {
   draft: "var(--ui-text-muted)",
   approved: "var(--ui-accent)",
   sending: "var(--ui-accent)",
-  sent: "var(--mint)",
-  failed: "var(--coral)",
-  replied: "var(--sky)",
+  sent: "var(--ui-success)",
+  failed: "var(--ui-danger)",
+  replied: "var(--ui-text-muted)",
   cancelled: "var(--ui-text-muted)",
 };
 
@@ -374,7 +374,7 @@ export default function OutreachQueue({
               placeholder={FOOTER_PLACEHOLDER}
               style={{ width: "100%" }}
             />
-            <p className={k.muted} style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--amber)", marginTop: 4 }}>
+            <p className={k.muted} style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--ui-warning-text)", marginTop: 4 }}>
               <AlertTriangle size={14} aria-hidden="true" /> Ideiglenes szöveg: Áron még nem hagyta jóvá a végleges láblécet.
             </p>
           </FormField>
@@ -386,7 +386,7 @@ export default function OutreachQueue({
             >
               {settingsSaving ? "Mentés…" : "Mentés"}
             </button>
-            {settingsError && <span className={k.muted} style={{ color: "var(--coral)" }}>{settingsError}</span>}
+            {settingsError && <span className={k.muted} style={{ color: "var(--ui-danger-text)" }}>{settingsError}</span>}
           </div>
         </div>
       )}
@@ -497,13 +497,13 @@ export default function OutreachQueue({
                 </div>
 
                 {row.templateBlockedReason && (
-                  <div className={`${s.draftNote} ${k.muted}`} style={{ color: "var(--amber)" }}>
+                  <div className={`${s.draftNote} ${k.muted}`} style={{ color: "var(--ui-warning-text)" }}>
                     {row.templateBlockedReason}
                   </div>
                 )}
 
                 {row.status === "failed" && row.lastError && (
-                  <div className={`${s.draftNote} ${k.muted}`} style={{ color: "var(--coral)" }}>
+                  <div className={`${s.draftNote} ${k.muted}`} style={{ color: "var(--ui-danger-text)" }}>
                     Küldési hiba: {row.lastError}
                   </div>
                 )}
@@ -545,7 +545,7 @@ export default function OutreachQueue({
                     </FormField>
 
                     {rowError[row.id] && (
-                      <div className={k.muted} style={{ color: "var(--coral)" }}>{rowError[row.id]}</div>
+                      <div className={k.muted} style={{ color: "var(--ui-danger-text)" }}>{rowError[row.id]}</div>
                     )}
 
                     <div className={s.btnRow}>
