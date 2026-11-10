@@ -195,12 +195,15 @@ needs.
    A unique index on `(tenant_id, thread_key)` is the guarantee, so two
    concurrent posts cannot both win; the loser also returns the 200. Both keys
    are lowercased on the way in, so a case variant is the same key.
-2. **A thread key must be vouched for.** It is honoured **only** when
-   `channel` is `cold_email` **and** `draft_key` resolves to a real draft of
-   yours. Otherwise it is dropped and the post takes the ordinary intake path.
-   This endpoint is CORS-open and draft keys are enumerable, so an unvouched key
-   would let anyone with a tenant app key claim a thread — burning it, so the
-   genuine reply later returns `deduped: true` and is silently discarded.
+2. **A thread key must be vouched for.** With `channel: cold_email` and a
+   `draft_key` that resolves to a real draft of yours, the key is stored as sent.
+   Without a draft (2026-11-10, the growth cold-email tool, which has no CRM
+   drafts), the key is stored **namespaced by your app key**: `<app slug>:<key>`.
+   Your app can dedupe its own threads, but it can never claim another app's key
+   or a draft-vouched one, because a different slug never collides. This endpoint is
+   CORS-open and draft keys are enumerable, so an unvouched raw key would let
+   anyone with a tenant app key claim a thread, burning it, so the genuine reply
+   later returns `deduped: true` and is silently discarded. Other channels never store a thread key.
 3. **The company comes from the draft**, not from dedupe-by-name on whatever the
    replier typed — sidestepping the weak spot of this intake (exact-name
    matching collapses every `"(magánérdeklődő)"` onto one row).
@@ -397,6 +400,33 @@ see above). Answers are ≤2000 chars each. Every write recomputes `tier`.
 
 The default list is the locked model's `gate` + Branch A seven + Branch B three,
 with the spec's draft Hungarian marked ⚠️ until Áron signs off on the wording.
+
+## Suppressions
+
+### `POST /api/suppressions`: report an opt-out (app key)
+
+For the growth cold-email tool and any other app: adds an address to the **one
+shared suppression list**. Every outbound path checks it in `sendEmail` (cold
+email, nurture, intro material), and any queued outreach draft to that address
+is cancelled at once. Only adds, never removes; removal is a human action in
+Settings.
+
+```bash
+curl -X POST $CRM/api/suppressions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "email": "x@masik.hu", "requested_at": "2026-11-10", "channel": "email", "source": "cv1" }'
+```
+
+| Field | Rule |
+|---|---|
+| `email` | required, a valid address; stored trimmed and lowercased |
+| `requested_at` | optional `YYYY-MM-DD`, the day the person asked (default today; not in the future) |
+| `channel` | `email` (default), `phone`, `linkedin`, `in_person` |
+| `source` | optional, max 200; stored as `<app slug>: <source>` |
+| `note` | optional, max 1000 |
+
+Unknown fields are a `400`. Idempotent: a new address returns `201 { ok, created: true, id, cancelledDrafts }`,
+an address already on the list (or a race with your own retry) returns `200 { ok, created: false, id }`.
+`401` without a valid key, `429` over 30 requests a minute.
 
 ## Companies & persons
 
