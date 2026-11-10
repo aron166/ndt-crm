@@ -233,17 +233,23 @@ export function LeadDetailClient({
   // One click logs these two; the write is deferred so Undo can cancel it (interactions are append-only).
   const toast = useToast();
   const pendingKey = `pendingCall:${lead.id}`;
-  const clearPending = () => { try { sessionStorage.removeItem(pendingKey); } catch { /* storage blocked */ } };
+  // Only deletes the record of the same outcome, so an earlier commit cannot remove a later one's record.
+  const clearPending = (outcome: string) => {
+    try {
+      const raw = sessionStorage.getItem(pendingKey);
+      if (raw && (JSON.parse(raw) as { outcome: string }).outcome === outcome) sessionStorage.removeItem(pendingKey);
+    } catch { /* storage blocked or unreadable */ }
+  };
   // Global toast: still shown if the page was left before the write finished.
-  const failed = (msg: string) => { clearPending(); toast({ body: msg, type: "error", autoHideDuration: 10000 }); };
+  const failed = (msg: string, outcome: string) => { clearPending(outcome); toast({ body: msg, type: "error", autoHideDuration: 10000 }); };
   const quickCall = useDeferredCall<{ outcome: CallOutcomeKey; note: string }>((item) => {
     logLeadCall(lead.id, item).then((res) => {
-      if ("error" in res) { failed(res.error); return; }
-      clearPending();
+      if ("error" in res) { failed(res.error, item.outcome); return; }
+      clearPending(item.outcome);
       // Keep what was typed since the click.
       setCallNote((cur) => (cur.trim() === item.note ? "" : cur));
       router.refresh();
-    }).catch(() => failed("Mentés sikertelen: próbáld újra"));
+    }).catch(() => failed("Mentés sikertelen: próbáld újra", item.outcome));
   });
 
   // A log that never got its answer (tab killed mid-write): tell, never replay (append-only).
@@ -254,7 +260,8 @@ export function LeadDetailClient({
       const p = JSON.parse(raw) as { outcome: string; at: number };
       if (Date.now() - p.at > 10_000) {
         sessionStorage.removeItem(pendingKey);
-        toast({ body: `A call log may not have been saved: ${p.outcome}, open the timeline to check`, type: "error", autoHideDuration: 15000 }); // PROPOSAL copy
+        const label = CALL_OUTCOMES.find((o) => o.key === p.outcome)?.label ?? p.outcome;
+        toast({ body: `A call log may not have been saved: ${label}, open the timeline to check`, type: "error", autoHideDuration: 15000 }); // PROPOSAL copy
       }
     } catch { /* unreadable: ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -263,8 +270,12 @@ export function LeadDetailClient({
   // Board / drive hand the typed note over once; ?book=1 is consumed here.
   useEffect(() => {
     try {
-      const n = sessionStorage.getItem(`callNote:${lead.id}`);
-      if (n) { sessionStorage.removeItem(`callNote:${lead.id}`); setCallNote(n); }
+      const raw = sessionStorage.getItem(`callNote:${lead.id}`);
+      if (raw) {
+        sessionStorage.removeItem(`callNote:${lead.id}`);
+        const v = JSON.parse(raw) as { note?: string; at?: number };
+        if (v.note && typeof v.at === "number" && Date.now() - v.at < 30 * 60_000) setCallNote(v.note);
+      }
     } catch { /* storage blocked */ }
     if (params.get("book") === "1") {
       const q = new URLSearchParams(params.toString());
@@ -279,12 +290,12 @@ export function LeadDetailClient({
     const label = CALL_OUTCOMES.find((o) => o.key === k)?.label ?? k;
     const item = { outcome: k, note: callNote.trim() || label };
     if (!quickCall.schedule(k, item)) return;
-    try { sessionStorage.setItem(pendingKey, JSON.stringify({ outcome: label, at: Date.now() })); } catch { /* storage blocked */ }
+    try { sessionStorage.setItem(pendingKey, JSON.stringify({ outcome: k, at: Date.now() })); } catch { /* storage blocked */ }
     // PROPOSAL copy
     const dismiss = toast({
       body: `Logged: ${label}`, autoHideDuration: DEFER_MS,
       endContent: <AButton variant="ghost" size="sm" label="Undo" onClick={() => {
-        if (quickCall.cancel(k)) clearPending(); else toast({ body: "Already saved", autoHideDuration: 3000 });
+        if (quickCall.cancel(k)) clearPending(k); else toast({ body: "Already saved", autoHideDuration: 3000 });
         dismiss();
       }} />,
     });
@@ -299,6 +310,19 @@ export function LeadDetailClient({
     setLogging(true);
   }
 
+  // The drawer already booked: a failed log is retried with the same task id, never re-booked.
+  function logBookedCall(taskId: number, note: string) {
+    const fail = () => toast({
+      body: "Booked, but the call was not logged", type: "error", autoHideDuration: 15000,
+      endContent: <AButton variant="ghost" size="sm" label="Log it again" onClick={() => logBookedCall(taskId, note)} />,
+    });
+    logLeadCall(lead.id, { outcome: "meeting_booked", note, existingBookingTaskId: taskId }).then((res) => {
+      if ("error" in res) { fail(); return; }
+      setCallNote("");
+      router.refresh();
+    }).catch(fail);
+  }
+
   function handleBooked(kind: BookingKind, taskId: number) {
     if (bookedLock.current) return;
     bookedLock.current = true;
@@ -308,11 +332,8 @@ export function LeadDetailClient({
       setBooking(null);
       // Call mode: the call log (against the meeting the drawer just created) moves the stage itself.
       if (calling) {
-        logLeadCall(lead.id, { outcome: "meeting_booked", note: callNote.trim() || "Foglalt meeting", existingBookingTaskId: taskId }).then((res) => {
-          if ("error" in res) { setActionError(res.error); return; }
-          setCallNote("");
-          router.refresh();
-        }).catch(() => setActionError("Mentés sikertelen: próbáld újra"));
+        const retry = { taskId, note: callNote.trim() || "Foglalt meeting" };
+        logBookedCall(retry.taskId, retry.note);
       } else if (b?.event && b.to) {
         if (kind === b.kind) runMove(b.to, b.event);
         else setActionNote("Lefoglalva; a szakasz nem változott."); // PROPOSAL copy
@@ -515,7 +536,7 @@ export function LeadDetailClient({
         correctsInteractionId={correcting}
         initialOutcome={padOutcome}
         initialNote={correcting ? undefined : callNote || undefined}
-        onBook={() => { setLogging(false); setPadOutcome(undefined); setBooking({ kind: bookingSuggestion?.bookingKind ?? "single_machine_demo", event: bookingSuggestion?.event, to: bookingSuggestion?.to }); }}
+        onBook={(note) => { setCallNote(note); setLogging(false); setPadOutcome(undefined); setBooking({ kind: bookingSuggestion?.bookingKind ?? "single_machine_demo", event: bookingSuggestion?.event, to: bookingSuggestion?.to }); }}
       />
 
       <LeadEditModal

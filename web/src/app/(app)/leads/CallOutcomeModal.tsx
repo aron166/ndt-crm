@@ -40,7 +40,7 @@ export function CallOutcomeModal({
   /** The lead page books through its own drawer, so the outcome is not offered there. */
   hideMeetingBooked?: boolean;
   /** On the lead page the drawer is right here: open it instead of linking to the same page. */
-  onBook?: () => void;
+  onBook?: (note: string) => void;
   title?: string | null;
   stageDescription?: string | null;
   onLogged?: () => void;
@@ -172,8 +172,8 @@ export function CallOutcomeModal({
           {outcome === "meeting_booked" && (
             // PROPOSAL copy
             onBook
-              ? <Button type="button" variant="outline" onClick={onBook}>Időpont foglalása</Button>
-              : <p className="text-sm"><Link href={`/leads/${leadId}?mode=call&book=1`}>Book the time on the lead page</Link></p>
+              ? <Button type="button" variant="outline" onClick={() => onBook(note)}>Időpont foglalása</Button>
+              : <p className="text-sm"><Link href={`/leads/${leadId}?mode=call&book=1`} onClick={() => { try { if (note.trim()) sessionStorage.setItem(`callNote:${leadId}`, JSON.stringify({ note: note.trim(), at: Date.now() })); } catch { /* storage blocked */ } }}>Book the time on the lead page</Link></p>
           )}
 
           {isLostCallOutcome(outcome) && (

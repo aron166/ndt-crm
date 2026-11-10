@@ -367,7 +367,7 @@ export function DriveScreen({ initialQueue, scriptVariants = [] }: { initialQueu
               href={`/leads/${lead.id}?mode=call&book=1&from=drive`}
               className={`${k.btn} ${k.btnPrimary}`}
               style={{ width: "100%", textDecoration: "none", justifyContent: "center" }}
-              onClick={() => { try { if (note.trim()) sessionStorage.setItem(`callNote:${lead.id}`, note.trim()); } catch { /* storage blocked */ } }}
+              onClick={() => { try { if (note.trim()) sessionStorage.setItem(`callNote:${lead.id}`, JSON.stringify({ note: note.trim(), at: Date.now() })); } catch { /* storage blocked */ } }}
             >Book the time on the lead page</Link>
           )}
           {(selectedOutcome === "not_interested" || selectedOutcome === "disqualified") && (
