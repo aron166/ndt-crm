@@ -93,19 +93,19 @@ function DealCard({
       style={{
         background: "var(--ui-surface)",
         borderRadius: "var(--ui-radius-surface)",
-        border: `1px solid ${isStale ? "var(--ui-danger)" : "transparent"}`,
+        border: `1px solid ${"transparent"}`,
         padding: "12px 14px", cursor: "grab",
         boxShadow: "var(--ui-shadow-raised)",
         transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
         willChange: "transform",
       }}
       onMouseOver={(e) => {
-        e.currentTarget.style.borderColor = isStale ? "var(--ui-danger)" : "var(--ui-border-strong)";
+        e.currentTarget.style.borderColor = "var(--ui-border-strong)";
         e.currentTarget.style.boxShadow = "var(--ui-shadow-overlay)";
         e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseOut={(e) => {
-        e.currentTarget.style.borderColor = isStale ? "var(--ui-danger)" : "transparent";
+        e.currentTarget.style.borderColor = "transparent";
         e.currentTarget.style.boxShadow = "var(--ui-shadow-raised)";
         e.currentTarget.style.transform = "none";
       }}

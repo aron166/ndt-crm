@@ -270,15 +270,15 @@ function LeadCard({
             <PhoneCall style={{ width: 11, height: 11 }} />
             Hívás
           </Button>
-          {/* The "green dropdown, bottom-right": outcome is orthogonal to the column. */}
+          {/* Outcome dropdown, bottom-right: orthogonal to the column; neutral (taste rule 2026-11-10). */}
           <select
             value={lead.outcome}
             aria-label="Kimenetel"
             draggable={false}
             onChange={(e) => onOutcome(lead.id, e.target.value as LeadOutcome)}
             style={{
-              fontSize: 12, height: 22, padding: "0 4px", borderRadius: 4, fontWeight: 700,
-              background: "var(--ui-success-surface)", color: "var(--ui-success-text)", border: "1px solid var(--ui-success-text)", outline: "none",
+              fontSize: 12, height: 22, padding: "0 4px", borderRadius: 4, fontWeight: 600,
+              background: "var(--ui-surface)", color: "var(--ui-text)", border: "1px solid var(--ui-border-strong)",
             }}
           >
             {LEAD_OUTCOMES.map((o) => <option key={o} value={o}>{LEAD_OUTCOME_LABEL[o]}</option>)}
