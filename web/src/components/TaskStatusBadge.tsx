@@ -1,7 +1,7 @@
 const STATUS_MAP = {
   created:     { label: "Kiírva",      tone: "slate" },
   not_started: { label: "Kiírva",      tone: "slate" },
-  in_progress: { label: "Folyamatban", tone: "indigo" },
+  in_progress: { label: "Folyamatban", tone: "sky" },
   done:        { label: "Elvégezve",   tone: "mint" },
   cancelled:   { label: "Törölve",     tone: "coral" },
 } as const;

@@ -6,7 +6,7 @@ const STATUS_MAP: Record<number, { label: string; tone: string }> = {
   3: { label: "Érdeklődő",    tone: "sky" },
   4: { label: "Nem érdekelt", tone: "coral" },
   5: { label: "Kéri",         tone: "mint" },
-  6: { label: "Folyamatban",  tone: "indigo" },
+  6: { label: "Folyamatban",  tone: "sky" },
   7: { label: "CL",           tone: "slate" },
   8: { label: "CW",           tone: "mint" },
 };

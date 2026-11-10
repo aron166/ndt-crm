@@ -151,7 +151,7 @@ export function ContextTasksTab({
                           aria-label="Kész"
                         />
                       ) : (
-                        <Button type="button" variant="ghost" size="icon-xs" onClick={() => handleReopen(t.id)} title="Újranyitás" aria-label="Újranyitás">
+                        <Button type="button" variant="ghost" size="icon-xs" className="size-6 min-h-6" onClick={() => handleReopen(t.id)} title="Újranyitás" aria-label="Újranyitás">
                           <CheckCircle2 className="size-4 text-[var(--ui-success-text)]" />
                         </Button>
                       )}
@@ -186,6 +186,7 @@ export function ContextTasksTab({
                         type="button"
                         variant="ghost"
                         size="icon-xs"
+                        className="size-6 min-h-6"
                         onClick={() => { setEditTask(t); setModalOpen(true); }}
                         title="Szerkesztés"
                         aria-label="Szerkesztés"

@@ -29,7 +29,7 @@ function ChangeRow({ field, before, after }: { field: string; before: unknown; a
       <span className="shrink-0 w-28" style={{ color: "var(--ui-text-muted)" }}>{label}</span>
       <span className="line-through" style={{ color: "var(--ui-text-muted)" }}>{fmt(before)}</span>
       <span style={{ color: "var(--ui-text-muted)" }}>→</span>
-      {fmt(after)}
+      <span style={{ color: "var(--ui-text)" }}>{fmt(after)}</span>
     </div>
   );
 }

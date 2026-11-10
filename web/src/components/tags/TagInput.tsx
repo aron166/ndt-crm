@@ -98,6 +98,7 @@ export function TagInput({ taggableType, taggableId, initialTags }: TagInputProp
           onFocus={() => { if (query) fetchSuggestions(query); }}
           placeholder="Tag hozzáadása..."
           disabled={isPending}
+          className="h-8 min-h-8 text-xs"
         />
 
         {open && (
@@ -107,8 +108,9 @@ export function TagInput({ taggableType, taggableId, initialTags }: TagInputProp
                 key={s.id}
                 type="button"
                 variant="ghost"
+                size="sm"
                 onMouseDown={(e) => { e.preventDefault(); applyTag(s); }}
-                className="w-full justify-start"
+                className="w-full justify-start font-normal"
               >
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                 {s.name}

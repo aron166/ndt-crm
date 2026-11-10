@@ -71,7 +71,7 @@ export function DeleteCardDialog({ open, kind, label, company, person, onConfirm
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Mégse</Button>
-            <Button type="button" variant="destructive" onClick={() => onConfirm({ company: delCompany, person: delPerson })}>
+            <Button type="button" variant="destructive" className="bg-[var(--ui-danger)] text-[var(--ui-on-danger)] border-transparent hover:bg-[var(--ui-danger)]" onClick={() => onConfirm({ company: delCompany, person: delPerson })}>
               Törlés
             </Button>
           </DialogFooter>

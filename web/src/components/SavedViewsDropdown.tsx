@@ -117,7 +117,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
                   return (
                     <div
                       key={v.id}
-                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", cursor: "pointer", transition: "background .12s" }}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", cursor: "pointer", transition: "background .12s", ...(active ? { background: "var(--ui-accent-surface)" } : {}) }}
                       onMouseOver={(e) => (e.currentTarget.style.background = "var(--ui-hover)")}
                       onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
                     >
@@ -131,6 +131,7 @@ export function SavedViewsDropdown({ entityType, basePath, currentParams, views 
                         type="button"
                         variant="ghost"
                         size="icon-xs"
+                        className="size-6 min-h-6"
                         aria-label={`Törlés: ${v.name}`} // PROPOSAL copy
                         onClick={() => handleDelete(v.id)}
                       >

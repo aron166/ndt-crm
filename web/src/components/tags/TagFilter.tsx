@@ -78,8 +78,9 @@ function TagFilterInner({ activeTagName }: TagFilterProps) {
                 key={t.id}
                 type="button"
                 variant="ghost"
+                size="sm"
                 onClick={() => applyTag(t.name)}
-                className="w-full justify-start"
+                className="w-full justify-start font-normal"
               >
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
                 {t.name}
