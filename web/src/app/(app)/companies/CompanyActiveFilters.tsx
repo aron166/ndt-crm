@@ -51,7 +51,7 @@ function CompanyActiveFiltersInner({ chips }: { chips: ActiveChip[] }) {
           key={`${chip.param}-${chip.value ?? "flag"}-${i}`}
           type="button"
           onClick={() => removeChip(chip)}
-          className={s.chip}
+          className={`${s.chip} ${s.chipBtn}`}
           title="Eltávolítás"
         >
           {chip.label}

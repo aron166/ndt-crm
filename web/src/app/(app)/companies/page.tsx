@@ -250,7 +250,7 @@ export default async function CompaniesPage({
                     )}
                   </td>
 
-                  {/* Pipeline status + last contact — the actionable column */}
+                  {/* Pipeline status + last contact: the actionable column */}
                   <td className={s.nowrap}>
                     <PipelineStatusBadge status={c.pipelineStatus} />
                     {!isTerminal && (
@@ -261,10 +261,10 @@ export default async function CompaniesPage({
                   </td>
 
                   {/* City */}
-                  <td className={`${s.nowrap} ${k.muted}`}>
+                  <td className={s.nowrap}>
                     {c.city ?? "-"}
                     {c.county && (
-                      <span style={{ marginLeft: 6 }}>{c.county}</span>
+                      <span className={s.county} style={{ marginLeft: 6 }}>{c.county}</span>
                     )}
                   </td>
                 </tr>

@@ -264,7 +264,7 @@ function CompanyFilterBarInner({ facets }: { facets: CompanyFacets }) {
           {/* click-away */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="absolute right-0 z-50 mt-2 w-[360px] max-h-[74vh] overflow-y-auto rounded-xl p-3"
+            className="absolute left-0 sm:left-auto sm:right-0 z-50 mt-2 w-[min(360px,calc(100vw-32px))] max-h-[74vh] overflow-y-auto rounded-xl p-3"
             style={{
               background: "var(--color-background-card)",
               border: "1px solid var(--color-border)",

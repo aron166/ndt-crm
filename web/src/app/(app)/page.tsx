@@ -243,7 +243,7 @@ export default async function DashboardPage() {
 
         {/* Pipeline bar */}
         {pipeline.length > 0 && (
-          <section className={k.section}>
+          <section className={`${k.section} ${h.pipeline}`}>
             <div className={h.sectionHead}>
               <h2 className={k.h2}>Pipeline · {pipelineTotal} nyitott deal</h2>
               <Link href="/deals" className={k.link}>Kanban →</Link>

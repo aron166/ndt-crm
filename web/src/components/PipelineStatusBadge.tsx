@@ -1,13 +1,13 @@
 // Pipeline status: 0=KUKA 1=Nem hívtuk 2=NV 3=Érdeklődő 4=Nem érdekelt 5=Kéri 6=Folyamatban 7=CL 8=CW
 const STATUS_MAP: Record<number, { label: string; color: string; bg: string; border: string }> = {
-  0: { label: "KUKA",        color: "var(--fg-faint)",  bg: "var(--bg-raised)",   border: "var(--line-soft)" },
-  1: { label: "Nem hívtuk",  color: "var(--fg-mute)",   bg: "var(--bg-raised)",   border: "var(--line-soft)" },
+  0: { label: "KUKA",        color: "var(--color-text-secondary)",  bg: "var(--color-background-muted)",   border: "var(--color-border)" },
+  1: { label: "Nem hívtuk",  color: "var(--color-text-secondary)",   bg: "var(--color-background-muted)",   border: "var(--color-border)" },
   2: { label: "NV",          color: "var(--amber-fg)",      bg: "var(--amber-soft)",  border: "var(--amber-line)" },
   3: { label: "Érdeklődő",   color: "var(--sky-fg)",        bg: "var(--sky-soft)",    border: "var(--sky-line)" },
   4: { label: "Nem érdekelt",color: "var(--coral-fg)",      bg: "var(--coral-soft)",  border: "var(--coral-line)" },
   5: { label: "Kéri",        color: "var(--mint-fg)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
   6: { label: "Folyamatban", color: "var(--indigo-fg)",     bg: "var(--indigo-soft)", border: "var(--indigo-line)" },
-  7: { label: "CL",          color: "var(--fg-faint)",   bg: "var(--bg-raised)",   border: "var(--line-soft)" },
+  7: { label: "CL",          color: "var(--color-text-secondary)",   bg: "var(--color-background-muted)",   border: "var(--color-border)" },
   8: { label: "CW",          color: "var(--mint-fg)",       bg: "var(--mint-soft)",   border: "var(--mint-line)" },
 };
 
@@ -20,7 +20,7 @@ export function PipelineStatusBadge({
   const s = STATUS_MAP[isNaN(key) ? 1 : key] ?? STATUS_MAP[1];
   return (
     <span
-      className="inline-flex items-center gap-1.5 font-mono-ndt"
+      className="inline-flex items-center gap-1.5"
       style={{
         height: 20, padding: "0 8px",
         fontSize: 12, fontWeight: 500,

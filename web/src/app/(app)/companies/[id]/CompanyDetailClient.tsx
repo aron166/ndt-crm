@@ -83,7 +83,7 @@ interface Props {
   mapsConnected: boolean;
   revenueSeries: number[];
   engagementBreakdown: { label: string; value: number; color: string }[];
-  kpis: { label: string; value: string | number; accent: string }[];
+  kpis: { label: string; value: string | number }[];
   avatarColor: string;
   initials: string;
   initialTags: { id: number; name: string; color: string }[];
@@ -263,7 +263,7 @@ export function CompanyDetailClient({
         title={company.name}
         eyebrow={
           <span className={s.metaLine}>
-            <span className={s.avatar} style={{ background: avatarColor }}>
+            <span className={s.avatar} aria-hidden="true" style={{ background: avatarColor }}>
               {initials}
               <span style={{ position: "absolute", inset: 0, borderRadius: 10, boxShadow: "var(--shadow-inset-deep)" }} />
             </span>
@@ -299,7 +299,8 @@ export function CompanyDetailClient({
               {enriching ? "Elemzés folyamatban..." : "Adatfrissítés"}
             </button>
             <button
-              className={k.btn}
+              className={`${k.btn} ${k.btnIcon}`}
+              aria-label="Cég törlése" /* PROPOSAL copy */
               style={{ color: "var(--color-text-error)" }}
               onClick={handleDelete}
               disabled={deleting}
@@ -328,10 +329,12 @@ export function CompanyDetailClient({
       </div>
 
       {/* Tabs */}
-      <div className={k.seg} aria-busy={switching}>
+      <div className={k.seg} role="tablist" aria-busy={switching}>
         {TABS.map(({ key, label }) => (
           <button
             key={key}
+            role="tab"
+            aria-selected={tab === key}
             className={`${k.segItem} ${s.tabBtn} ${tab === key ? k.segItemOn : ""}`}
             onClick={() => setTab(key)}
           >
@@ -421,13 +424,14 @@ export function CompanyDetailClient({
                   <div key={key}>
                     <div className={k.muted}>{label}</div>
                     <input
+                      className={s.formInput}
                       type={type}
                       value={form[key]}
                       onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                       style={{
                         width: "100%", fontSize: 14, padding: "5px 8px",
                         background: "var(--color-background-card)", border: "1px solid var(--color-border)",
-                        borderRadius: 5, color: "var(--color-text-primary)", outline: "none",
+                        borderRadius: 5, color: "var(--color-text-primary)",
                       }}
                     />
                   </div>
@@ -435,6 +439,7 @@ export function CompanyDetailClient({
                 <div>
                   <div className={k.muted}>Státusz</div>
                   <select
+                    className={s.formInput}
                     value={form.status}
                     onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
                     style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--color-background-card)", border: "1px solid var(--color-border)", borderRadius: 5, color: "var(--color-text-primary)" }}
@@ -446,6 +451,7 @@ export function CompanyDetailClient({
                 <div>
                   <div className={k.muted}>Fióktípus</div>
                   <select
+                    className={s.formInput}
                     value={form.accountType}
                     onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value }))}
                     style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--color-background-card)", border: "1px solid var(--color-border)", borderRadius: 5, color: "var(--color-text-primary)" }}
@@ -457,6 +463,7 @@ export function CompanyDetailClient({
                 <div>
                   <div className={k.muted}>Pipeline státusz</div>
                   <select
+                    className={s.formInput}
                     value={form.pipelineStatus}
                     onChange={(e) => setForm((f) => ({ ...f, pipelineStatus: e.target.value }))}
                     style={{ width: "100%", fontSize: 14, padding: "5px 8px", background: "var(--color-background-card)", border: "1px solid var(--color-border)", borderRadius: 5, color: "var(--color-text-primary)" }}
@@ -685,7 +692,7 @@ export function CompanyDetailClient({
                               <button className={k.btn} onClick={() => { setLogPerson(c); setLogOpen(true); }}>
                                 <Phone style={{ width: 11, height: 11 }} /> Log
                               </button>
-                              <button className={k.btn} onClick={() => handleCloseContact(c)}>
+                              <button className={`${k.btn} ${k.btnIcon}`} aria-label="Kapcsolat lezárása" /* PROPOSAL copy */ onClick={() => handleCloseContact(c)}>
                                 <X style={{ width: 11, height: 11 }} />
                               </button>
                             </>

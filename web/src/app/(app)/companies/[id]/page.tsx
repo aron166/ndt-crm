@@ -93,10 +93,10 @@ export default async function CompanyDetailPage({
   // KPI strip
   const openTasks = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled").length;
   const kpis = [
-    { label: "Számlák",         value: invoices.length,                   accent: "var(--mint)"   },
-    { label: "Kapcsolatok",     value: contacts.filter(c => !c.endedAt).length, accent: "var(--color-accent)" },
-    { label: "Nyitott feladatok", value: openTasks,                       accent: "var(--amber)"  },
-    { label: "Interakciók",     value: interactions.length,               accent: "var(--sky)"    },
+    { label: "Számlák",         value: invoices.length },
+    { label: "Kapcsolatok",     value: contacts.filter(c => !c.endedAt).length },
+    { label: "Nyitott feladatok", value: openTasks },
+    { label: "Interakciók",     value: interactions.length },
   ];
 
   const avatarColor = AVATAR_PALETTE[companyId % AVATAR_PALETTE.length];

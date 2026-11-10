@@ -44,4 +44,7 @@
   .outcomes { grid-template-columns: repeat(2, 1fr); }
   .side { align-items: flex-start; }
 }
-.segBtn { border: 0; background: transparent; font-family: inherit; cursor: pointer; }
+.segBtn { border: 0; font-family: inherit; cursor: pointer; }
+.segBtn[aria-pressed="false"] { background: transparent; }
+.listRow[data-active="true"] .listBar { background: var(--color-accent); }
+@media (pointer: coarse) { .segBtn, .chip, .select, .date, .skip { min-height: 44px; } }

@@ -179,7 +179,7 @@ export default function CallCockpit({
               onChange={(e) => changeSegment(e.target.value ? Number(e.target.value) : null)}
               disabled={loadingQueue || submitting}
               className={c.select}
-              aria-label="Hívandó-sor"
+              aria-label="Hívandó-sor" /* PROPOSAL copy */
             >
               <option value="">Alapértelmezett hívandó-sor</option>
               {segments.map((s) => (
@@ -389,11 +389,20 @@ function CallList({
         return (
           <div
             key={q.id}
+            role="button"
+            tabIndex={0}
             onClick={() => onPick(i)}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === "Enter" || e.key === " ") {
+                if (e.key === " ") e.preventDefault();
+                onPick(i);
+              }
+            }}
             className={`${k.row} ${c.listRow}`}
             data-active={i === activeIndex}
           >
-            <span className={k.bar} />
+            <span className={`${k.bar} ${c.listBar}`} />
             <div className={k.cell}>
               <span className={k.nameLine}>
                 <span className={k.name}>{q.name}</span>
