@@ -20,7 +20,12 @@ export interface RouteSlotsInput {
   wanted?: Date;
   urgent?: boolean;
   excludeId?: number;
+  /** Bundle suggestions never start before this (the service passes the start of tomorrow). */
+  notBefore?: Date;
 }
+
+/** A "tight" leg is possible but risky: among equal slots prefer the one with slack. */
+const TIGHT_PENALTY = 10;
 
 /** Lowest-cost feasible slot of one day over all machines; bundles are left empty. */
 export function bestOnDay(day: LocalDay, input: RouteSlotsInput): RankedSlot | null {
@@ -53,7 +58,8 @@ export function bestOnDay(day: LocalDay, input: RouteSlotsInput): RankedSlot | n
           (r.addedDriveMinutes +
             waitCost +
             cfg.weightIdlePerMinute * Math.min(idle, cfg.idleCapMinutes) +
-            cfg.weightLatePerMinute * Math.max(0, homeMinute - cfg.lateFrom)) *
+            cfg.weightLatePerMinute * Math.max(0, homeMinute - cfg.lateFrom) +
+            TIGHT_PENALTY * r.flags.filter((f) => f.code === "tight").length) *
             10,
         ) / 10;
       if (best) {
@@ -107,7 +113,10 @@ export function proposeRouteSlots(input: RouteSlotsInput): RankedSlot[] {
       drive: input.drive,
       excludeId: input.excludeId,
       suggest: (d) => {
-        const b = bestOnDay(d, { ...input, from: atLocal(d, 0), days: 1 });
+        // A bundle day may be earlier than `from` (the kind's lead time binds proposals only), never before `notBefore`.
+        const dayStart = atLocal(d, 0);
+        const floor = input.notBefore && input.notBefore > dayStart ? input.notBefore : dayStart;
+        const b = bestOnDay(d, { ...input, from: floor, days: 1 });
         return b && { startsAt: b.startsAt, machineId: b.machineId };
       },
     }),
