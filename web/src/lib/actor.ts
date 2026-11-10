@@ -18,13 +18,14 @@ export { normalizeEmail } from "./email";
 import { normalizeEmail } from "./email";
 
 // cache(): the root layout now resolves the actor (for the theme attribute)
-// and so does (app)/layout, and supabase.auth.getUser() is a round-trip to the
+// and so does (app)/layout, and the session check was a round-trip to the
 // auth endpoint, not a local cookie read. Without this, every app page paid
 // two of them (Vanda, #110).
 export const getActor = cache(async (tenantId: number): Promise<Actor> => {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  const email = normalizeEmail(data.user?.email);
+  // Local JWT check (see proxy.ts), not an Auth server round trip.
+  const { data } = await supabase.auth.getClaims();
+  const email = normalizeEmail(data?.claims?.email as string | undefined);
   if (!email) return { userId: null, email: null };
   // Cached email → users.id (lib/crm-user.ts). The proxy resolved the same
   // email for this request, so this is normally free (2026-09-17 query pass).

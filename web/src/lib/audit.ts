@@ -64,8 +64,8 @@ export async function writeAuditLog(input: WriteAuditInput): Promise<void> {
   // callers run outside a user session and attribute themselves via actorAgentId.
   if (actor === "user") {
     const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    actorUserId = data.user?.id ?? null;
+    const { data } = await supabase.auth.getClaims();
+    actorUserId = data?.claims?.sub ?? null;
   }
 
   await db.auditLog.create({

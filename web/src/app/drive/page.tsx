@@ -13,8 +13,9 @@ export const dynamic = "force-dynamic";
 
 export default async function DrivePage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // Local JWT check, see proxy.ts.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  if (!claimsData?.claims) redirect("/login");
   // getUser() only proves a Supabase session — logLeadCall additionally
   // requires a CRM users row (userLeadCtx), so the read gate should match.
   const { userId } = await getActor(1);

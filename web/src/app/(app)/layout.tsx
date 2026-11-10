@@ -13,8 +13,9 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // Local JWT check, see proxy.ts.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  if (!claimsData?.claims) redirect("/login");
 
   const { userId } = await getActor(1);
   // A Supabase session is not a CRM user: signups are open, and `users` is the
@@ -53,7 +54,7 @@ export default async function AppLayout({
 
   return (
     <AppShell
-      email={user.email ?? ""}
+      email={(claimsData.claims.email as string | undefined) ?? ""}
       overdueCount={overdueCount}
       overdueLeadCount={overdueLeadCount}
       marketingReviewCount={marketingReviewCount}
