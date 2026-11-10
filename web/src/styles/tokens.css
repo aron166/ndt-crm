@@ -27,6 +27,8 @@
   --ui-accent: var(--color-accent);
   --ui-on-accent: var(--color-on-accent);
   --ui-focus: var(--color-accent);
+  --ui-accent-surface: var(--color-accent-muted);
+  --ui-on-danger: var(--color-on-error);
 
   /* meaning (word plus colour, never colour alone) */
   --ui-danger: var(--color-error);
