@@ -53,7 +53,7 @@ export function buildTimeline(input: TimelineInput): TimelineItem[] {
   for (const r of input.interactions) {
     const kind: TimelineKind = r.type === "call" ? "call" : r.type === "email" ? "email" : "note";
     const dir = interactionDirectionLabel(r.direction);
-    const title = [interactionTypeLabel(r.type), r.outcome && kind === "call" ? callOutcomeLabel(r.outcome) : null].filter(Boolean).join(": ");
+    const title = [interactionTypeLabel(r.type), r.outcome && kind === "call" ? (r.outcome === "transcribed" ? "Átirat rögzítve" : callOutcomeLabel(r.outcome)) : null].filter(Boolean).join(": ");
     items.push({ id: `i-${r.id}`, at: iso(r.occurredAt), kind, title, meta: [dir, r.user?.name].filter(Boolean).join(" · ") || undefined, body: r.notes?.trim() || undefined });
   }
 

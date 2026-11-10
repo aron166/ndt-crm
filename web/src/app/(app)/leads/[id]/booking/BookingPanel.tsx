@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@astryxdesign/core/Badge";
 import { Button } from "@astryxdesign/core/Button";
 import { Heading } from "@astryxdesign/core/Heading";
-import { Selector } from "@astryxdesign/core/Selector";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import {
@@ -27,10 +26,9 @@ import { SlotCard } from "./SlotCard";
 import css from "./booking.module.css";
 
 const keyOf = (s: { machineId: number; startsAt: string }) => `${s.machineId}@${s.startsAt}`;
-const KIND_OPTIONS = BOOKING_KINDS.map((k) => ({ value: k, label: BOOKING_KIND_LABEL[k] }));
 const MAX_PROBES = 7;
 
-export function BookingPanel({ leadId, leadOpen }: { leadId: number; leadOpen: boolean }) {
+export function BookingPanel({ leadId, leadOpen, initialKind = "single_machine_demo", onBooked }: { leadId: number; leadOpen: boolean; initialKind?: BookingKind; onBooked?: () => void }) {
   const router = useRouter();
   const [siteLoaded, setSiteLoaded] = useState(false);
   const [siteError, setSiteError] = useState<string | null>(null);
@@ -38,7 +36,7 @@ export function BookingPanel({ leadId, leadOpen }: { leadId: number; leadOpen: b
   const [siteSource, setSiteSource] = useState<SiteSource>("stated");
   const [address, setAddress] = useState("");
   const [changing, setChanging] = useState(false);
-  const [kind, setKind] = useState<BookingKind>("single_machine_demo");
+  const [kind, setKind] = useState<BookingKind>(initialKind);
   const [days, setDays] = useState(21);
 
   const [loading, setLoading] = useState(false);
@@ -146,6 +144,7 @@ export function BookingPanel({ leadId, leadOpen }: { leadId: number; leadOpen: b
       setPending(false);
       if (r.ok) {
         setBooked(fmtDate(a.startsAt));
+        onBooked?.();
         router.refresh();
       } else if (r.status === 409 && r.check) {
         setConflict(true);
@@ -154,7 +153,7 @@ export function BookingPanel({ leadId, leadOpen }: { leadId: number; leadOpen: b
         setSelectedKey(r.check.alternatives[0] ? keyOf(r.check.alternatives[0]) : null);
       } else setBookError({ from, msg: r.error });
     },
-    [leadId, settlement, siteSource, address, kind, router],
+    [leadId, settlement, siteSource, address, kind, router, onBooked],
   );
 
   async function pickBundle(b: BundleHintDto) {
@@ -213,7 +212,17 @@ export function BookingPanel({ leadId, leadOpen }: { leadId: number; leadOpen: b
         <TextInput label="Cím" isOptional value={address} onChange={(v) => setAddress(v.slice(0, 500))} autoComplete="off" />
       )}
 
-      <Selector label="Foglalás típusa" options={KIND_OPTIONS} value={kind} onChange={(v) => { setKind(v as BookingKind); setDays(21); }} width="100%" /> {/* PROPOSAL copy */}
+      {/* PROPOSAL copy. One control: a segmented row on wide screens, a stack of large rows under 640px (CSS only). */}
+      <div className={css.field}>
+        <span id="booking-kind-label">Foglalás típusa</span>
+        <div className={css.kinds} role="radiogroup" aria-labelledby="booking-kind-label">
+          {BOOKING_KINDS.map((k) => (
+            <button key={k} type="button" role="radio" aria-checked={kind === k} className={css.kind} onClick={() => { setKind(k); setDays(21); }}>
+              {BOOKING_KIND_LABEL[k]}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {loading && (
         <div className={css.stack} aria-busy="true" aria-label="Keresés">

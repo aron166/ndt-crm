@@ -11,8 +11,7 @@ import { minutesToFirstContact } from "@/lib/leads/first-contact";
 import { INTENT_LABEL, callWindowLabel } from "@/lib/leads/intake-notify";
 import { LeadOffersPanel } from "./LeadOffersPanel";
 import { LeadDetailClient } from "./LeadDetailClient";
-import { BookingPanel } from "./booking/BookingPanel";
-import s from "./detail/lead.module.css";
+import s from "./v2/lead2.module.css";
 
 const TENANT_ID = 1;
 
@@ -43,7 +42,7 @@ export default async function LeadDetailPage({
 
   const personId = lead.contact?.person?.id ?? null;
 
-  const [interactions, auditEntries, statuses, users, openTasks, questionModel, scriptVariants, callTypeGroups, offers, documents] = await Promise.all([
+  const [interactions, auditEntries, statuses, users, openTasks, questionModel, scriptVariants, callTypeGroups, offers, documents, statusHistory, datedTasks] = await Promise.all([
     // Per-lead touches first-class (leadId), plus the person/company timeline
     // so older/company-level history still shows. Newest first, bounded.
     db.interaction.findMany({
@@ -91,6 +90,19 @@ export default async function LeadDetailPage({
       orderBy: { createdAt: "desc" },
       select: { id: true, kind: true, number: true, createdAt: true },
     }),
+    // Read-only inputs for the single timeline.
+    db.leadStatusHistory.findMany({
+      where: { tenantId: TENANT_ID, leadId },
+      select: { id: true, fromStatus: true, toStatus: true, event: true, at: true, actorUser: { select: { name: true } } },
+      orderBy: { at: "desc" },
+      take: 50,
+    }),
+    db.task.findMany({
+      where: { tenantId: TENANT_ID, leadId, dueDate: { not: null } },
+      select: { id: true, title: true, type: true, status: true, dueDate: true },
+      orderBy: { dueDate: "desc" },
+      take: 30,
+    }),
   ]);
 
   const firstContactMin = minutesToFirstContact(
@@ -116,7 +128,7 @@ export default async function LeadDetailPage({
       <Link href="/leads" className={s.back}>
         <ArrowLeft size={14} />
         {/* PROPOSAL copy */}
-        Vissza a mai hívólistára
+        Vissza a leadekhez
       </Link>
 
       <LeadDetailClient
@@ -139,8 +151,12 @@ export default async function LeadDetailPage({
         answerSources={answerSourcesFrom(lead.answerSources)}
         scriptVariants={scriptVariants}
         callTypeCounts={callTypeGroups.map((g) => ({ callType: g.callType, count: g._count._all }))}
+        statusHistory={serializeDates(statusHistory)}
+        datedTasks={serializeDates(datedTasks)}
+        offers={serializeDates(offers)}
+        documents={serializeDates(documents)}
         // The booking API refuses a lead that is not open (409), so a closed lead gets the note, not the search.
-        bookingPanel={<BookingPanel key={leadId} leadId={leadId} leadOpen={lead.outcome === "open" && lead.convertedDealId == null} />}
+        leadOpen={lead.outcome === "open" && lead.convertedDealId == null}
         offersPanel={<LeadOffersPanel leadId={leadId} offers={serializeDates(offers)} documents={serializeDates(documents)} status={lead.status} />}
       />
     </div>

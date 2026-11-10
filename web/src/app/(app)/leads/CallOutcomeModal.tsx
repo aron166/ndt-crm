@@ -37,7 +37,7 @@ type SlotProposal = SlotProposalsResult["proposals"][number];
 
 
 export function CallOutcomeModal({
-  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null, initialOutcome,
+  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null, initialOutcome, initialNote, hideMeetingBooked = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -51,16 +51,20 @@ export function CallOutcomeModal({
   correctsInteractionId?: number | null;
   /** Pre-selects this outcome each time the modal opens (default no_answer). */
   initialOutcome?: CallOutcomeKey;
+  /** Pre-fills the note each time the modal opens (the lead page's calling mode). */
+  initialNote?: string;
+  /** The lead page books through its drawer, so the second (date field) booking path is not offered there. */
+  hideMeetingBooked?: boolean;
   title?: string | null;
   stageDescription?: string | null;
   onLogged?: () => void;
   scriptVariants?: ScriptVariant[];
 }) {
   const [outcome, setOutcome] = useState<string>("no_answer");
+  const [note, setNote] = useState("");
   // Pre-select on the closed -> open edge (adjust state during render, no effect).
   const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) { setWasOpen(open); if (open && initialOutcome) setOutcome(initialOutcome); }
-  const [note, setNote] = useState("");
+  if (open !== wasOpen) { setWasOpen(open); if (open && initialOutcome) setOutcome(initialOutcome); if (open && initialNote) setNote(initialNote); }
   const [callbackAt, setCallbackAt] = useState("");
   const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
   const [bookingAt, setBookingAt] = useState("");
@@ -181,7 +185,7 @@ export function CallOutcomeModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField label="Eredmény" required>
             <select className="input-ds" value={outcome} onChange={(e) => setOutcome(e.target.value)} autoFocus>
-              {CALL_OUTCOMES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+              {CALL_OUTCOMES.filter((o) => !(hideMeetingBooked && o.key === "meeting_booked")).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
             </select>
           </FormField>
 

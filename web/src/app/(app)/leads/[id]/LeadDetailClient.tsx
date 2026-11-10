@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Heading } from "@astryxdesign/core/Heading";
+import { useState, useTransition } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { LeadMoveDialog } from "@/components/LeadMoveDialog";
-import { setLeadOutcomeAction, deleteLead, assignLeadAction } from "@/app/actions/leads";
+import { SendEmailModal } from "@/components/SendEmailModal";
+import { moveLead, setLeadOutcomeAction, deleteLead, assignLeadAction } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
@@ -12,15 +12,44 @@ import type { LeadStatusDef } from "@/lib/leads/statuses";
 import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/leads/qualification";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 import type { CallOutcomeKey, LeadOutcome } from "@/lib/leads/outcomes";
-import { fullName } from "@/lib/utils";
-import { LeadHeader, type HeaderLead } from "./detail/LeadHeader";
-import { OutcomePad } from "./detail/OutcomePad";
-import { OpenTasks, FormMessage, type OpenTask } from "./detail/OverviewTab";
-import s from "./detail/lead.module.css";
-import { CallsTab, type Interaction } from "./detail/CallsTab";
-import { HistoryTab, type AuditEntry } from "./detail/HistoryTab";
+import type { BookingKind } from "@/lib/booking/priority";
+import { suggestNextSteps, type Suggestion } from "@/lib/leads/suggestions";
+import { buildTimeline } from "@/lib/leads/timeline";
+import { isAutoOutcome } from "@/lib/calls/auto-outcome";
+import { formatRelativeTime, fullName } from "@/lib/utils";
+import { formatMinutes } from "@/lib/leads/first-contact";
+import { OpenTasks, type OpenTask } from "./detail/OverviewTab";
+import { Header } from "./v2/Header";
+import { Situation } from "./v2/Situation";
+import { Suggestions } from "./v2/Suggestions";
+import { Timeline } from "./v2/Timeline";
+import { Details, sourceRows, type Fact } from "./v2/Details";
+import { CallMode } from "./v2/CallMode";
+import { BookingDrawer } from "./v2/BookingDrawer";
+import s from "./v2/lead2.module.css";
 
-interface Lead extends HeaderLead {
+export interface Interaction {
+  id: number;
+  type: string | null;
+  direction: string | null;
+  notes: string | null;
+  outcome: string | null;
+  occurredAt: string | Date;
+  leadId?: number | null;
+  person: { id: number; firstName: string | null; lastName: string | null } | null;
+  user?: { name: string } | null;
+  autoConfidence: number | null;
+  supersedesInteractionId?: number | null;
+}
+
+export interface AuditEntry {
+  id: number;
+  action: string;
+  occurredAt: string | Date;
+  changes: unknown;
+}
+
+interface Lead {
   id: number;
   status: string | null;
   message: string | null;
@@ -29,38 +58,40 @@ interface Lead extends HeaderLead {
   assignedToId: number | null;
   estimatedValue: number | null;
   receivedDate: string | Date | null;
+  createdAt: string | Date;
   convertedDealId: number | null;
   customFields: Record<string, unknown> | null;
   companyId: number | null;
   campaign: string | null;
+  source: string | null;
+  sourceApp: string | null;
+  subject: string | null;
+  serviceInterest: string | null;
+  tier: string | null;
+  nextAction: string | null;
+  nextDue: string | Date | null;
+  attempts: number;
+  company: { id: number; name: string; city: string | null; website: string | null } | null;
   contact: {
     id: number; role: string | null; email: string | null; phone: string | null;
     person: { id: number; firstName: string | null; lastName: string | null; email: string | null; phone: string | null } | null;
   } | null;
 }
 
+type BookingCtx = { kind: BookingKind; event?: string; to?: string };
+
 export function LeadDetailClient({
-  lead,
-  firstContactMin,
-  interactions,
-  auditEntries,
-  statuses,
-  users,
-  openTasks,
-  questions,
-  qualification,
-  answerSources,
-  questionSets,
-  scriptVariants,
-  callTypeCounts,
-  offersPanel,
-  keyFacts,
-  bookingPanel,
+  lead, firstContactMin, interactions, auditEntries, statusHistory, datedTasks, offers, documents, statuses, users, openTasks,
+  questions, qualification, answerSources, questionSets, scriptVariants, callTypeCounts, offersPanel, keyFacts, leadOpen,
 }: {
   lead: Lead;
   firstContactMin: number | null;
   interactions: Interaction[];
   auditEntries: AuditEntry[];
+  statusHistory: { id: number; fromStatus: string | null; toStatus: string; event: string; at: string | Date; actorUser: { name: string } | null }[];
+  datedTasks: { id: number; title: string; type: string | null; status: string; dueDate: string | Date | null }[];
+  offers: { id: number; quoteNumber: string; status: string; createdAt: string | Date; sentAt: string | Date | null; acceptedAt: string | Date | null }[];
+  documents: { id: number; kind: string; number: string; createdAt: string | Date }[];
   statuses: LeadStatusDef[];
   users: { id: number; name: string }[];
   openTasks: OpenTask[];
@@ -71,34 +102,112 @@ export function LeadDetailClient({
   scriptVariants: ScriptVariant[];
   callTypeCounts: { callType: string | null; count: number }[];
   offersPanel: React.ReactNode;
-  keyFacts: { label: string; value: string }[];
-  bookingPanel?: React.ReactNode;
+  keyFacts: Fact[];
+  leadOpen: boolean;
 }) {
   const router = useRouter();
-  const tab = useSearchParams().get("tab");
-  // Old ?tab= deep links now scroll to the matching section.
-  useEffect(() => {
-    const id = tab === "overview" ? "facts" : tab === "calls" || tab === "offers" || tab === "history" ? tab : null;
-    if (id) document.getElementById(id)?.scrollIntoView();
-  }, [tab]);
-  const [status, setStatus] = useState(lead.status ?? "new");
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const calling = params.get("mode") === "call";
+  const tab = params.get("tab");
+  const status = lead.status ?? "new";
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<string>(lead.outcome);
-  const [outcomePending, startOutcome] = useTransition();
-  const [statusPending, startStatus] = useTransition();
+  const [assignedTo, setAssignedTo] = useState(String(lead.assignedToId ?? ""));
   const [converted, setConverted] = useState<number | null>(lead.convertedDealId ?? null);
   const [editing, setEditing] = useState(false);
+  const [emailing, setEmailing] = useState(false);
   const [logging, setLogging] = useState(false);
+  const [callNote, setCallNote] = useState("");
   const [padOutcome, setPadOutcome] = useState<CallOutcomeKey | undefined>(undefined);
   // Non-null while the modal is open to correct THAT auto-derived interaction.
   const [correcting, setCorrecting] = useState<number | null>(null);
-  const [deleting, startDelete] = useTransition();
+  const [booking, setBooking] = useState<BookingCtx | null>(null);
+  // Old ?tab=overview / ?tab=offers deep links land with the details open.
+  const [detailsOpen, setDetailsOpen] = useState(tab === "overview" || tab === "offers");
   const [actionError, setActionError] = useState<string | null>(null);
-  const [assignedTo, setAssignedTo] = useState(String(lead.assignedToId ?? ""));
-  // Resync when a successful assign (or any other refresh) brings new props in.
-  useEffect(() => { setAssignedTo(String(lead.assignedToId ?? "")); }, [lead.assignedToId]);
-  // A lost lead stays workable: call log allowed, status select can reopen it.
+  const [outcomePending, startOutcome] = useTransition();
+  const [assignPending, startAssign] = useTransition();
+  const [movePending, startMove] = useTransition();
+  const [deleting, startDelete] = useTransition();
+  // A lost lead stays workable: call log allowed, it can be reopened.
   const closed = outcome === "won" || converted !== null;
+
+  const person = lead.contact?.person;
+  const personName = person ? fullName(person.firstName, person.lastName) : null;
+  const cf = lead.customFields ?? {};
+  const contactName = personName || (cf.contact_name as string | undefined) || null;
+  const email = lead.contact?.email ?? person?.email ?? (cf.contact_email as string | undefined) ?? null;
+  const phone = lead.contact?.phone ?? person?.phone ?? (cf.contact_phone as string | undefined) ?? null;
+  const displayName = lead.company?.name ?? contactName ?? lead.subject ?? "Névtelen";
+  const stageLabel = statuses.find((x) => x.key === status)?.label ?? status;
+  const ownerName = users.find((u) => String(u.id) === assignedTo)?.name ?? null;
+
+  const stageLabels = Object.fromEntries(statuses.map((x) => [x.key, x.label]));
+  const timeline = buildTimeline({ interactions, auditEntries, statusHistory, tasks: datedTasks, offers, documents, lead, stageLabels });
+  const now = new Date();
+  const last = timeline.find((i) => new Date(i.at) <= now) ?? null;
+  const autoPct: Record<string, number> = {};
+  for (const r of interactions) if (r.leadId === lead.id && isAutoOutcome(r)) autoPct[`i-${r.id}`] = Math.round((r.autoConfidence ?? 0) * 100);
+
+  const suggestions = closed ? [] : suggestNextSteps(status, { hasPhone: !!phone, hasEmail: !!email });
+  const bookingSuggestion = suggestNextSteps(status).find((x) => x.kind === "booking");
+
+  // A form slug ("service_concrete") is already a label in the key facts; only free text belongs here.
+  const rawSubject = lead.serviceInterest || lead.subject;
+  const subject = rawSubject && !/^[a-z0-9]+(_[a-z0-9]+)+$/.test(rawSubject) ? rawSubject : null;
+  const fiveFacts: Fact[] = [
+    { label: "Érkezett", value: formatRelativeTime(lead.receivedDate ?? lead.createdAt) },
+    { label: "Első kontakt", value: firstContactMin != null ? `${formatMinutes(firstContactMin)} a beérkezés után` : "Még nincs kontakt" },
+    ...keyFacts,
+  ].slice(0, 5);
+  const allFacts: Fact[] = [...(subject ? [{ label: "Tárgy", value: subject }] : []), ...fiveFacts, ...keyFacts.slice(3)];
+
+  function setMode(call: boolean) {
+    const q = new URLSearchParams(params.toString());
+    if (call) q.set("mode", "call"); else q.delete("mode");
+    router.replace(q.size ? `${pathname}?${q}` : pathname, { scroll: false });
+  }
+
+  function openDetails(anchor: string) {
+    setDetailsOpen(true);
+    setTimeout(() => {
+      const el = document.getElementById(anchor);
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (el instanceof HTMLSelectElement) el.focus();
+    }, 60);
+  }
+
+  function runMove(to: string, event?: string) {
+    setActionError(null);
+    startMove(async () => {
+      const res = await moveLead(lead.id, to, event ? { event } : {});
+      if (res && "error" in res) setActionError(res.error);
+      router.refresh();
+    });
+  }
+
+  function runSuggestion(x: Suggestion) {
+    setActionError(null);
+    if (x.kind === "call") setMode(true);
+    else if (x.kind === "booking") setBooking({ kind: x.bookingKind ?? "single_machine_demo", event: x.event, to: x.to });
+    else if (x.kind === "offer") openDetails("offers");
+    else if (x.kind === "email") setEmailing(true);
+    else if (x.kind === "signoff") router.push(`/leads/${lead.id}/signoff`);
+    else if (x.to === "lost" || x.to === "recall") setMoveTarget(x.to); // needs a reason: the dialog asks for it
+    else if (x.to) runMove(x.to, x.event);
+  }
+
+  function pickOutcome(k: CallOutcomeKey) {
+    // IF never books on its own: it opens the drawer.
+    if (k === "meeting_booked") { setBooking({ kind: bookingSuggestion?.bookingKind ?? "single_machine_demo", event: bookingSuggestion?.event, to: bookingSuggestion?.to }); return; }
+    setPadOutcome(k);
+    setLogging(true);
+  }
+
+  function handleBooked() {
+    if (booking?.event && booking.to) runMove(booking.to, booking.event);
+  }
 
   function handleDelete() {
     const label = lead.serviceInterest || lead.subject || `Lead #${lead.id}`;
@@ -108,17 +217,6 @@ export function LeadDetailClient({
       if (res?.error) { alert(res.error); return; }
       router.push("/leads");
     });
-  }
-
-  const person = lead.contact?.person;
-  const personName = person ? fullName(person.firstName, person.lastName) : null;
-  const email = lead.contact?.email ?? person?.email ?? (lead.customFields?.contact_email as string | undefined) ?? null;
-  const phone = lead.contact?.phone ?? person?.phone ?? (lead.customFields?.contact_phone as string | undefined) ?? null;
-
-  const cf = lead.customFields ?? {};
-
-  function handleStatusChange(next: string) {
-    if (next !== status) setMoveTarget(next);
   }
 
   function handleOutcome(next: LeadOutcome) {
@@ -135,135 +233,156 @@ export function LeadDetailClient({
     });
   }
 
-  // Controlled so a failed assign visibly reverts — an uncontrolled select keeps
-  // the DOM value the user picked even though the server never took it (same
-  // silent-revert class as the kanban drag fix).
+  // Controlled so a failed assign visibly reverts (an uncontrolled select keeps the DOM value the server never took).
   function handleAssign(v: string) {
     const prev = assignedTo;
     setAssignedTo(v);
-    startStatus(async () => {
+    startAssign(async () => {
       const res = await assignLeadAction(lead.id, v === "" ? null : Number(v));
-      if ("error" in res) {
-        setActionError(res.error);
-        setAssignedTo(prev);
-      }
+      if ("error" in res) { setActionError(res.error); setAssignedTo(prev); }
       router.refresh();
     });
   }
 
-  const displayName = personName || (cf.contact_name as string) || lead.company?.name || lead.subject || "Névtelen";
-
   return (
-    <div>
-      <LeadHeader
-        lead={lead}
-        displayName={displayName}
-        contactName={personName || (cf.contact_name as string | undefined) || null}
-        role={lead.contact?.role ?? null}
+    <div className={s.page}>
+      <Header
+        name={displayName}
+        companyId={lead.company?.id ?? null}
+        contactName={contactName}
         personHref={person ? `/persons/${person.id}` : null}
-        email={email}
+        role={lead.contact?.role ?? null}
+        town={lead.company?.city ?? null}
         phone={phone}
-        keyFacts={keyFacts}
-        firstContactMin={firstContactMin}
-        statuses={statuses}
-        users={users}
-        status={status}
-        outcome={outcome}
-        assignedTo={assignedTo}
-        converted={converted}
-        closed={closed}
-        statusPending={statusPending}
-        outcomePending={outcomePending}
+        email={email}
+        stageLabel={stageLabel}
+        tier={lead.tier}
+        ownerName={ownerName}
+        calling={calling}
+        canClose={status !== "lost" && !closed}
         deleting={deleting}
-        onStatus={handleStatusChange}
-        onOutcome={handleOutcome}
-        onAssign={handleAssign}
+        onCall={() => setMode(true)}
         onEdit={() => setEditing(true)}
+        onOwner={() => openDetails("lead-owner")}
+        onClose={() => setMoveTarget("lost")}
         onDelete={handleDelete}
       />
+
+      {actionError && <p className={s.error} role="alert">{actionError}</p>}
+
+      {calling && (
+        <CallMode
+          closed={closed}
+          note={callNote}
+          onNote={setCallNote}
+          onPick={pickOutcome}
+          onLog={() => { setPadOutcome(undefined); setLogging(true); }}
+          onDone={() => setMode(false)}
+        />
+      )}
+
+      <div className={s.split}>
+        <div className={s.left}>
+          <Situation
+            last={last}
+            strip={{ status, stageLabel, nextAction: lead.nextAction, nextDue: lead.nextDue, ownerName, attempts: lead.attempts }}
+          />
+          <Suggestions items={suggestions} pending={movePending} onRun={runSuggestion} />
+          <Timeline
+            items={timeline}
+            phone={phone}
+            autoPct={autoPct}
+            onCorrect={closed ? undefined : (id) => { setCorrecting(id); setPadOutcome(undefined); setLogging(true); }}
+          />
+        </div>
+        <div className={s.right}>
+          <Details
+            open={detailsOpen}
+            onToggle={setDetailsOpen}
+            facts={allFacts}
+            source={sourceRows({ sourceApp: lead.sourceApp, source: lead.source, campaign: lead.campaign, outcome, lostReason: lead.lostReason, customFields: lead.customFields })}
+            callTypeCounts={callTypeCounts}
+            users={users}
+            assignedTo={assignedTo}
+            assignPending={assignPending}
+            onAssign={handleAssign}
+            outcome={outcome}
+            outcomePending={outcomePending}
+            onOutcome={handleOutcome}
+            converted={converted}
+            website={lead.company?.website ?? null}
+          >
+            <section id="facts" className={s.section}>
+              <h3 className={s.h3}>{/* PROPOSAL copy */}Amit tudunk</h3>
+              <LeadQualificationPanel
+                leadId={lead.id}
+                questions={questions}
+                qualification={qualification}
+                answerSources={answerSources}
+                campaign={lead.campaign}
+                receivedDate={lead.receivedDate}
+                sets={questionSets}
+              />
+            </section>
+            <section id="offers" className={s.section}>
+              <h3 className={s.h3}>{/* PROPOSAL copy */}Ajánlatok és dokumentumok</h3>
+              {/* Wrapped: a server-built node as a direct sibling here trips a dev key warning. */}
+              <div>{offersPanel}</div>
+            </section>
+            <section id="tasks" className={s.section}>
+              <h3 className={s.h3}>{/* PROPOSAL copy */}Nyitott feladatok</h3>
+              <OpenTasks openTasks={openTasks} />
+            </section>
+          </Details>
+          <section className={s.card} aria-label="Röviden">
+            <h2 className={s.h2}>{/* PROPOSAL copy */}Röviden</h2>
+            <div className={s.facts}>
+              {fiveFacts.map((f) => <div key={f.label} className={s.fact}><span>{f.label}</span><span>{f.value}</span></div>)}
+            </div>
+          </section>
+        </div>
+      </div>
 
       {moveTarget && (
         <LeadMoveDialog
           leadId={lead.id}
           target={moveTarget}
-          targetLabel={statuses.find((s) => s.key === moveTarget)?.label ?? moveTarget}
+          targetLabel={statuses.find((x) => x.key === moveTarget)?.label ?? moveTarget}
           onClose={() => setMoveTarget(null)}
-          onMoved={() => { setStatus(moveTarget); if (moveTarget === "lost") setOutcome("lost"); setMoveTarget(null); router.refresh(); }}
+          onMoved={() => { if (moveTarget === "lost") setOutcome("lost"); setMoveTarget(null); router.refresh(); }}
         />
       )}
 
-      {actionError && (
-        <p className={s.error} role="alert">{actionError}</p>
-      )}
+      <BookingDrawer
+        open={booking !== null}
+        kind={booking?.kind ?? "single_machine_demo"}
+        leadId={lead.id}
+        leadOpen={leadOpen}
+        onClose={() => setBooking(null)}
+        onBooked={handleBooked}
+      />
 
-      <div className={s.cols}>
-        <div className={s.main}>
-          <section id="outcome" className={s.section}>
-            <Heading level={2} className={s.h2}>{/* PROPOSAL copy */}Hívás eredménye</Heading>
-            <OutcomePad
-              closed={closed}
-              onPick={(k) => { setPadOutcome(k); setLogging(true); }}
-              onLog={() => { setPadOutcome(undefined); setLogging(true); }}
-            />
-          </section>
-          <section id="facts" className={s.section}>
-            <Heading level={2} className={s.h2}>{/* PROPOSAL copy */}Amit tudunk</Heading>
-            <FormMessage message={lead.message} />
-            <LeadQualificationPanel
-              leadId={lead.id}
-              questions={questions}
-              qualification={qualification}
-              answerSources={answerSources}
-              campaign={lead.campaign}
-              receivedDate={lead.receivedDate}
-              sets={questionSets}
-            />
-          </section>
-          <section id="tasks" className={s.section}>
-            <Heading level={2} className={s.h2}>{/* PROPOSAL copy */}Nyitott feladatok</Heading>
-            <OpenTasks openTasks={openTasks} />
-          </section>
-          <section id="offers" className={s.section}>
-            <Heading level={2} className={s.h2}>{/* PROPOSAL copy */}Ajánlatok és dokumentumok</Heading>
-            {/* Wrapped: a server-built node as a direct sibling here trips a dev key warning. */}
-            <div>{offersPanel}</div>
-          </section>
-          <section id="calls" className={s.section}>
-            <Heading level={2} className={s.h2}>{interactions.length > 0 ? `Hívások · ${interactions.length}` : "Hívások"}</Heading>
-            <CallsTab
-              leadId={lead.id}
-              interactions={interactions}
-              callTypeCounts={callTypeCounts}
-              closed={closed}
-              onCorrect={(id) => { setCorrecting(id); setPadOutcome(undefined); setLogging(true); }}
-            />
-          </section>
-          <section id="history" className={s.section}>
-            <Heading level={2} className={s.h2}>Előzmények</Heading>
-            <HistoryTab
-              sourceApp={lead.sourceApp}
-              source={lead.source}
-              campaign={lead.campaign}
-              outcome={outcome}
-              lostReason={lead.lostReason}
-              customFields={lead.customFields}
-              auditEntries={auditEntries}
-            />
-          </section>
-        </div>
-        <aside className={s.side}>{bookingPanel}</aside>
-      </div>
+      <SendEmailModal
+        open={emailing}
+        onClose={() => setEmailing(false)}
+        companyId={lead.companyId}
+        personId={person?.id ?? null}
+        defaultTo={email ?? undefined}
+        contextLabel={displayName}
+      />
 
       <CallOutcomeModal
         open={logging}
         onClose={() => { setLogging(false); setCorrecting(null); setPadOutcome(undefined); }}
         leadId={lead.id}
         title={[personName, lead.company?.name].filter(Boolean).join(" · ") || null}
-        stageDescription={statuses.find((s) => s.key === status)?.description ?? null}
-        onLogged={() => { setCorrecting(null); router.refresh(); }}
+        stageDescription={statuses.find((x) => x.key === status)?.description ?? null}
+        onLogged={() => { setCorrecting(null); setCallNote(""); router.refresh(); }}
         scriptVariants={scriptVariants}
         correctsInteractionId={correcting}
         initialOutcome={padOutcome}
+        initialNote={correcting ? undefined : callNote || undefined}
+        hideMeetingBooked
       />
 
       <LeadEditModal

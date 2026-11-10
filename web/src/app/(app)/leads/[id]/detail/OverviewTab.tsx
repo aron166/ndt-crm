@@ -34,7 +34,3 @@ export function OpenTasks({ openTasks }: { openTasks: OpenTask[] }) {
     </div>
   );
 }
-
-export function FormMessage({ message }: { message: string | null }) {
-  return message ? <p className={s.quote}>{message}</p> : null;
-}
