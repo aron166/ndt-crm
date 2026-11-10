@@ -9,7 +9,7 @@ import { logLeadCall } from "@/app/actions/leads";
 import { correctCallOutcome } from "@/app/actions/calls";
 import { proposeBookingSlots } from "@/app/actions/bookings";
 import type { BookingConflictInfo } from "@/lib/leads/service";
-import { CALL_OUTCOMES, CALL_TYPES, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, CALL_TYPES, type CallOutcomeKey, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { FormField } from "@/components/ui/FormField";
 import type { ScriptVariant } from "@/lib/leads/scripts";
@@ -40,7 +40,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function CallOutcomeModal({
-  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null,
+  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null, initialOutcome,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,12 +52,17 @@ export function CallOutcomeModal({
    * parsed and corrected outcomes measurable. Null = an ordinary call log.
    */
   correctsInteractionId?: number | null;
+  /** Pre-selects this outcome each time the modal opens (default no_answer). */
+  initialOutcome?: CallOutcomeKey;
   title?: string | null;
   stageDescription?: string | null;
   onLogged?: () => void;
   scriptVariants?: ScriptVariant[];
 }) {
   const [outcome, setOutcome] = useState<string>("no_answer");
+  // Pre-select on the closed -> open edge (adjust state during render, no effect).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) { setWasOpen(open); if (open && initialOutcome) setOutcome(initialOutcome); }
   const [note, setNote] = useState("");
   const [callbackAt, setCallbackAt] = useState("");
   const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");

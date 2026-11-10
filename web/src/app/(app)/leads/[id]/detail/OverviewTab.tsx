@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 import { callbackTone } from "@/lib/leads/outcomes";
 import { formatDateTime } from "@/lib/utils";
+import s from "./lead.module.css";
 
 export interface OpenTask {
   id: number;
@@ -11,41 +12,29 @@ export interface OpenTask {
   assignedTo: { name: string } | null;
 }
 
-// Empty blocks (tasks, message) are not rendered; the qualification panel arrives as children.
-export function OverviewTab({ openTasks, message, children }: { openTasks: OpenTask[]; message: string | null; children: React.ReactNode }) {
+export function OpenTasks({ openTasks }: { openTasks: OpenTask[] }) {
+  if (openTasks.length === 0) {
+    // PROPOSAL copy
+    return <p className={s.closedNote}>Nincs nyitott feladat.</p>;
+  }
   return (
-    <div className="space-y-4">
-      {openTasks.length > 0 && (
-        <div className="panel">
-          <div className="panel-head"><div className="panel-title">Nyitott feladatok · {openTasks.length}</div></div>
-          <div className="panel-pad space-y-2">
-            {openTasks.map((t) => {
-              const tone = callbackTone(t.dueDate);
-              return (
-                <div key={t.id} className="flex items-center gap-2" style={{ fontSize: 12 }}>
-                  <CalendarClock style={{ width: 12, height: 12, color: tone === "overdue" ? "var(--coral)" : tone === "soon" ? "var(--amber)" : "var(--fg-faint)" }} />
-                  <Link href="/tasks" className="row-link" style={{ color: "var(--fg)", flex: 1 }}>{t.title}</Link>
-                  {t.assignedTo && <span style={{ color: "var(--fg-faint)" }}>{t.assignedTo.name}</span>}
-                  <span className="font-mono-ndt" style={{ color: tone === "overdue" ? "var(--coral)" : "var(--fg-mute)", fontSize: 12 }}>
-                    {t.dueDate ? formatDateTime(t.dueDate) : "-"}
-                  </span>
-                </div>
-              );
-            })}
+    <div className={s.list}>
+      {openTasks.map((t) => {
+        const tone = callbackTone(t.dueDate);
+        const toneClass = tone === "overdue" ? s.overdue : tone === "soon" ? s.soon : "";
+        return (
+          <div key={t.id} className={s.row}>
+            <CalendarClock size={14} className={toneClass} />
+            <Link href="/tasks">{t.title}</Link>
+            {t.assignedTo && <span className={s.muted}>{t.assignedTo.name}</span>}
+            <span className={`${s.rowEnd} ${tone === "overdue" ? s.overdue : ""}`}>{t.dueDate ? formatDateTime(t.dueDate) : "-"}</span>
           </div>
-        </div>
-      )}
-
-      {message && (
-        <div className="panel">
-          <div className="panel-head"><div className="panel-title">Üzenet</div></div>
-          <div className="panel-pad">
-            <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-soft)", whiteSpace: "pre-wrap" }}>{message}</p>
-          </div>
-        </div>
-      )}
-
-      {children}
+        );
+      })}
     </div>
   );
+}
+
+export function FormMessage({ message }: { message: string | null }) {
+  return message ? <p className={s.quote}>{message}</p> : null;
 }

@@ -11,6 +11,7 @@ import { minutesToFirstContact } from "@/lib/leads/first-contact";
 import { INTENT_LABEL, callWindowLabel } from "@/lib/leads/intake-notify";
 import { LeadOffersPanel } from "./LeadOffersPanel";
 import { LeadDetailClient } from "./LeadDetailClient";
+import s from "./detail/lead.module.css";
 
 const TENANT_ID = 1;
 
@@ -110,16 +111,11 @@ export default async function LeadDetailPage({
 
   return (
     <div className="mount">
-      <div style={{ marginBottom: 16 }}>
-        <Link
-          href="/leads"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
-          className="row-link"
-        >
-          <ArrowLeft style={{ width: 14, height: 14 }} />
-          Vissza a leadekhez
-        </Link>
-      </div>
+      <Link href="/leads" className={s.back}>
+        <ArrowLeft size={14} />
+        {/* PROPOSAL copy */}
+        Vissza a mai hívólistára
+      </Link>
 
       <LeadDetailClient
         keyFacts={keyFacts}
