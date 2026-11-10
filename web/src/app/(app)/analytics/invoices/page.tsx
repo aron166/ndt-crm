@@ -1,8 +1,12 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
+import { PageHeader, Seg } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "../analytics.module.css";
 
 const TENANT_ID = 1;
+const YEAR_LABEL = "Év"; // PROPOSAL copy
 
 interface SearchParams {
   year?: string;
@@ -57,122 +61,108 @@ export default async function InvoicesDrillPage({
   const totalAmount = Number(summaryAgg._sum.netAmount ?? 0);
   const invoiceCount = summaryAgg._count.id;
 
+  const yearItems = [
+    { key: "all", label: "Mind", href: search ? `/analytics/invoices?search=${search}` : "/analytics/invoices" },
+    ...availableYears.map((y) => ({
+      key: String(y),
+      label: String(y),
+      href: search ? `/analytics/invoices?year=${y}&search=${search}` : `/analytics/invoices?year=${y}`,
+    })),
+  ];
+
   return (
     <div className="mount space-y-6">
-      {/* Header */}
-      <div className="page-head">
-        <div>
-          <div className="flex items-center gap-3">
-            <Link href="/analytics" style={{ fontSize: 14, color: "var(--fg-faint)", textDecoration: "none" }}>
-              ← Analytics
-            </Link>
-            <span style={{ color: "var(--line-soft)" }}>/</span>
-            <h1 className="page-title" style={{ margin: 0 }}>Számlák</h1>
-          </div>
-          <p className="page-sub">
+      <Link href="/analytics" className={k.back}>
+        ← Analytics
+      </Link>
+
+      <PageHeader
+        title="Számlák"
+        eyebrow={
+          <>
             {invoiceCount.toLocaleString("hu-HU")} számla ·{" "}
-            <span className="font-mono-ndt" style={{ color: "var(--mint)" }}>
+            <span className={k.num} style={{ color: "var(--mint)" }}>
               {(totalAmount / 1_000_000).toFixed(1)}M HUF
             </span>
-            {yearFilter && <span style={{ color: "var(--fg-faint)" }}> · {yearFilter}</span>}
-          </p>
-        </div>
+            {yearFilter && <span className={k.muted}> · {yearFilter}</span>}
+          </>
+        }
+        filters={
+          <>
+            {/* Year tabs */}
+            <Seg
+              label={YEAR_LABEL}
+              current={yearFilter ? String(yearFilter) : "all"}
+              items={yearItems}
+            />
 
-        {/* Search */}
-        <form method="GET">
-          {yearFilter && <input type="hidden" name="year" value={yearFilter} />}
-          <input
-            name="search"
-            defaultValue={search}
-            placeholder="Cég neve..."
-            style={{
-              background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6,
-              padding: "6px 12px", fontSize: 14, color: "var(--fg)", outline: "none", width: 200,
-            }}
-          />
-        </form>
-      </div>
-
-      {/* Year tabs */}
-      <div className="flex items-center gap-1 flex-wrap" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: 4, width: "fit-content" }}>
-        <Link
-          href={search ? `/analytics/invoices?search=${search}` : "/analytics/invoices"}
-          className="font-mono-ndt rounded"
-          style={{
-            fontSize: 12, padding: "3px 10px",
-            background: !yearFilter ? "var(--bg-hover)" : "transparent",
-            color: !yearFilter ? "var(--fg)" : "var(--fg-mute)",
-          }}
-        >
-          Mind
-        </Link>
-        {availableYears.map((y) => (
-          <Link
-            key={y}
-            href={search ? `/analytics/invoices?year=${y}&search=${search}` : `/analytics/invoices?year=${y}`}
-            className="font-mono-ndt rounded"
-            style={{
-              fontSize: 12, padding: "3px 10px",
-              background: yearFilter === y ? "var(--bg-hover)" : "transparent",
-              color: yearFilter === y ? "var(--fg)" : "var(--fg-mute)",
-            }}
-          >
-            {y}
-          </Link>
-        ))}
-      </div>
+            {/* Search */}
+            <form method="GET">
+              {yearFilter && <input type="hidden" name="year" value={yearFilter} />}
+              <input
+                name="search"
+                defaultValue={search}
+                placeholder="Cég neve..."
+                className={s.field}
+              />
+            </form>
+          </>
+        }
+      />
 
       {/* Invoice table */}
-      <div className="panel mount">
-        <table className="tbl" style={{ width: "100%" }}>
-          <thead>
-            <tr>
-              <th>Cég</th>
-              <th>Számlaszám</th>
-              <th style={{ textAlign: "right" }}>Nettó összeg</th>
-              <th style={{ textAlign: "right" }}>Kiállítás dátuma</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.length === 0 && (
+      <div>
+        <div className={k.tableWrap}>
+          <table className={k.table}>
+            <thead>
               <tr>
-                <td colSpan={4} style={{ padding: "48px 16px", textAlign: "center", color: "var(--fg-faint)" }}>
-                  Nincs találat.
-                </td>
+                <th>Cég</th>
+                <th>Számlaszám</th>
+                <th className={s.right}>Nettó összeg</th>
+                <th className={s.right}>Kiállítás dátuma</th>
               </tr>
-            )}
-            {invoices.map((inv) => (
-              <tr key={inv.id}>
-                <td className="name">
-                  {inv.company ? (
-                    <Link href={`/companies/${inv.company.id}`} className="row-link">
-                      {inv.company.name}
-                    </Link>
-                  ) : (
-                    <span style={{ color: "var(--fg-soft)" }}>{inv.companyName ?? "-"}</span>
-                  )}
-                </td>
-                <td>
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
-                    {inv.invoiceNumber ?? "-"}
-                  </span>
-                </td>
-                <td style={{ textAlign: "right" }}>
-                  <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--mint)", fontWeight: 500 }}>
-                    {inv.netAmount ? formatHUF(Number(inv.netAmount)) : "-"}
-                  </span>
-                </td>
-                <td style={{ textAlign: "right" }}>
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>
-                    {formatDate(inv.issuedDate)}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {invoices.length === 0 && (
+                <tr>
+                  <td colSpan={4} className={`${s.emptyCell} ${k.muted}`}>
+                    Nincs találat.
+                  </td>
+                </tr>
+              )}
+              {invoices.map((inv) => (
+                <tr key={inv.id}>
+                  <td>
+                    {inv.company ? (
+                      <Link href={`/companies/${inv.company.id}`} className={s.cellName}>
+                        {inv.company.name}
+                      </Link>
+                    ) : (
+                      inv.companyName ?? "-"
+                    )}
+                  </td>
+                  <td>
+                    <span className={k.muted}>
+                      {inv.invoiceNumber ?? "-"}
+                    </span>
+                  </td>
+                  <td className={s.right}>
+                    <span className={k.num} style={{ color: "var(--mint)", fontWeight: 500 }}>
+                      {inv.netAmount ? formatHUF(Number(inv.netAmount)) : "-"}
+                    </span>
+                  </td>
+                  <td className={s.right}>
+                    <span className={`${k.muted} ${k.num}`}>
+                      {formatDate(inv.issuedDate)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {invoiceCount > 200 && (
-          <div style={{ padding: "12px 16px", fontSize: 12, color: "var(--fg-faint)", borderTop: "1px solid var(--line-soft)", textAlign: "center" }}>
+          <div className={`${k.muted} ${s.note}`}>
             Első 200 találat megjelenítve · {invoiceCount.toLocaleString("hu-HU")} összesen
           </div>
         )}
