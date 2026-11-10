@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { triggerBulkEnrichment } from "@/app/actions/enrichment";
+import k from "@/components/astryx/page.module.css";
 
 interface Props {
   companyIds: number[];
@@ -24,20 +25,8 @@ export function RunEnrichmentButton({ companyIds }: Props) {
       onClick={handleClick}
       disabled={isPending || companyIds.length === 0}
       title={`Enrichment futtatása ${Math.min(companyIds.length, 20)} cégre`}
-      style={{
-        display: "flex", alignItems: "center", gap: 6,
-        fontSize: 14, fontWeight: 500,
-        padding: "5px 10px",
-        background: "transparent",
-        border: "1px solid var(--line-soft)",
-        borderRadius: 5,
-        color: isPending ? "var(--fg-faint)" : "var(--fg-soft)",
-        cursor: isPending ? "not-allowed" : "pointer",
-        transition: "all 0.15s",
-        whiteSpace: "nowrap",
-      }}
-      onMouseOver={(e) => { if (!isPending) (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--indigo)"; }}
-      onMouseOut={(e) => { if (!isPending) (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--line-soft)"; }}
+      className={k.btn}
+      style={{ whiteSpace: "nowrap" }}
     >
       <SparkleIcon />
       {isPending ? "Enrichment fut..." : "Enrichment futtatása"}

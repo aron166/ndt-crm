@@ -5,19 +5,22 @@ import { NOT_FA } from "@/lib/companies/filters";
 import { PipelineStatusBadge } from "@/components/PipelineStatusBadge";
 import { getActor } from "@/lib/actor";
 import { countPendingForReviewer } from "@/lib/content/queries";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import h from "./home.module.css";
 import { UI } from "@/lib/content/labels";
 
 const TENANT_ID = 1;
 
 const FRESHNESS_COLOR: Record<string, string> = {
-  mint: "var(--mint)", mute: "var(--fg-mute)", amber: "var(--amber)", coral: "var(--coral)",
+  mint: "var(--mint)", mute: "var(--color-text-secondary)", amber: "var(--amber)", coral: "var(--coral)",
 };
 const INTERACTION_LABEL: Record<string, string> = {
   call: "Hívás", email: "Email", meeting: "Találkozó", site_visit: "Helyszíni", note: "Megjegyzés",
 };
 const INTERACTION_COLOR: Record<string, string> = {
   call: "var(--mint)", email: "var(--sky)", meeting: "var(--violet)",
-  site_visit: "var(--amber)", note: "var(--fg-mute)",
+  site_visit: "var(--amber)", note: "var(--color-text-secondary)",
 };
 
 export default async function DashboardPage() {
@@ -97,7 +100,7 @@ export default async function DashboardPage() {
 
   const stats = [
     { label: "Aktív cég",        value: statCompanies.toLocaleString("hu-HU"),    href: "/companies", color: "var(--sky)" },
-    { label: "Nyitott deal",     value: statOpenDeals.toLocaleString("hu-HU"),     href: "/deals",     color: "var(--indigo)" },
+    { label: "Nyitott deal",     value: statOpenDeals.toLocaleString("hu-HU"),     href: "/deals",     color: "var(--color-accent)" },
     { label: "Nyitott feladat",  value: statOpenTasks.toLocaleString("hu-HU"),     href: "/tasks",     color: overdueTasks.length > 0 ? "var(--coral)" : "var(--mint)" },
     { label: "Interakció / hét", value: statInteractionsWeek.toLocaleString("hu-HU"), href: "/companies", color: "var(--amber)" },
     { label: UI.inboxTitle,      value: contentPending.toLocaleString("hu-HU"),    href: "/marketing", color: contentPending > 0 ? "var(--coral)" : "var(--mint)", sub: UI.mine },
@@ -107,179 +110,145 @@ export default async function DashboardPage() {
   const pipelineTotal = pipeline.reduce((s, r) => s + Number(r.cnt), 0);
 
   return (
-    <div className="mount space-y-5">
-
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg)", margin: 0, textTransform: "capitalize" }}>
-            {weekday}
-          </h1>
-          <p style={{ fontSize: 14, color: "var(--fg-faint)", marginTop: 3, fontFamily: "var(--font-mono-ndt)" }}>
-            {dateStr}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {overdueTasks.length > 0 && (
-            <Link href="/tasks" style={{ fontSize: 12, color: "var(--coral)", background: "var(--coral-soft)", padding: "3px 10px", borderRadius: 20, textDecoration: "none", fontWeight: 500 }}>
-              {overdueTasks.length} lejárt feladat
-            </Link>
-          )}
-          {weekTasks > 0 && (
-            <Link href="/tasks" style={{ fontSize: 12, color: "var(--amber)", background: "var(--amber-soft)", padding: "3px 10px", borderRadius: 20, textDecoration: "none", fontWeight: 500 }}>
-              {weekTasks} a héten esedékes
-            </Link>
-          )}
-        </div>
-      </div>
+    <div className="mount">
+      <PageHeader
+        title={<span style={{ textTransform: "capitalize" }}>{weekday}</span>}
+        eyebrow={dateStr}
+        actions={
+          <div className={h.chips}>
+            {overdueTasks.length > 0 && (
+              <Link href="/tasks" className={h.pill} style={{ color: "var(--coral)" }}>
+                {overdueTasks.length} lejárt feladat
+              </Link>
+            )}
+            {weekTasks > 0 && (
+              <Link href="/tasks" className={h.pill} style={{ color: "var(--amber)" }}>
+                {weekTasks} a héten esedékes
+              </Link>
+            )}
+          </div>
+        }
+      />
 
       {/* Stat strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+      <div className={h.stats}>
         {stats.map((s) => (
-          <Link
-            key={s.label}
-            href={s.href}
-            style={{ textDecoration: "none", display: "block", padding: "14px 18px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 8, boxShadow: "var(--shadow-card)" }}
-            className="tbl-row"
-          >
-            <div className="font-mono-ndt" style={{ fontSize: 24, fontWeight: 600, color: s.color, letterSpacing: "-0.02em", lineHeight: 1 }}>
-              {s.value}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 5, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              {s.label}
-            </div>
-            {"sub" in s && s.sub && (
-              <div style={{ fontSize: 11, color: "var(--fg-faint)", marginTop: 2 }}>{s.sub}</div>
-            )}
+          <Link key={s.label} href={s.href} className={`${k.card} ${k.stat}`}>
+            <span className={k.statV} style={{ color: s.color }}>{s.value}</span>
+            <span className={k.statK}>{s.label}</span>
+            {"sub" in s && s.sub && <span className={h.sub}>{s.sub}</span>}
           </Link>
         ))}
       </div>
 
-      {/* 3-col grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+      <div className={h.grid}>
 
         {/* Tasks */}
-        <div className="panel mount mount-1">
-          <div className="panel-head">
-            <div className="panel-title">
+        <section className={k.section}>
+          <div className={h.sectionHead}>
+            <h2 className={k.h2}>
               Feladatok
               {todayTasks.length > 0 && (
-                <span className="font-mono-ndt" style={{ marginLeft: 6, fontSize: 12, color: "var(--amber)", background: "var(--amber-soft)", padding: "1px 6px", borderRadius: 10 }}>
+                <span className={k.muted} style={{ marginLeft: 8, color: "var(--amber)" }}>
                   {todayTasks.length} ma
                 </span>
               )}
-            </div>
-            <Link href="/tasks" style={{ fontSize: 12, color: "var(--indigo)" }}>Összes →</Link>
+            </h2>
+            <Link href="/tasks" className={k.link}>Összes →</Link>
           </div>
-          <div>
-            {overdueTasks.length === 0 && todayTasks.length === 0 ? (
-              <div style={{ padding: "32px 20px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
-                Nincs esedékes feladat
-              </div>
-            ) : (
-              <>
-                {overdueTasks.map((t) => (
-                  <Link key={t.id} href={`/tasks/${t.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--line-soft)", textDecoration: "none" }} className="tbl-row">
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--coral)", boxShadow: "0 0 8px var(--coral)", flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
-                      {t.company && <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>{t.company.name}</div>}
-                    </div>
-                  </Link>
-                ))}
-                {todayTasks.map((t) => (
-                  <Link key={t.id} href={`/tasks/${t.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--line-soft)", textDecoration: "none" }} className="tbl-row">
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--indigo)", boxShadow: "0 0 6px var(--indigo-glow)", flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
-                      {t.company && <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>{t.company.name}</div>}
-                    </div>
-                  </Link>
-                ))}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Cold companies */}
-        <div className="panel mount mount-2">
-          <div className="panel-head">
-            <div className="panel-title">Hívandók</div>
-            <Link href="/calls" style={{ fontSize: 12, color: "var(--indigo)" }}>Hívás mód →</Link>
-          </div>
-          <div>
-            {coldCompanies.length === 0 ? (
-              <div style={{ padding: "32px 20px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
-                Nincs hívandó cég
-              </div>
-            ) : coldCompanies.map((c) => {
-              const fresh = contactFreshness(c.lastInteractionDate);
-              return (
-                <Link key={c.id} href={`/companies/${c.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 16px", borderBottom: "1px solid var(--line-soft)", textDecoration: "none" }} className="tbl-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
-                    <div style={{ fontSize: 12, marginTop: 1 }}><PipelineStatusBadge status={c.pipelineStatus} /></div>
-                  </div>
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: FRESHNESS_COLOR[fresh], flexShrink: 0 }}>
-                    {formatRelativeTime(c.lastInteractionDate)}
+          {overdueTasks.length === 0 && todayTasks.length === 0 ? (
+            <div className={k.empty}>Nincs esedékes feladat</div>
+          ) : (
+            <div>
+              {[...overdueTasks.map((t) => ({ t, color: "var(--color-error)" })), ...todayTasks.map((t) => ({ t, color: "var(--color-accent)" }))].map(({ t, color }) => (
+                <Link key={t.id} href={`/tasks/${t.id}`} className={h.line}>
+                  <span className={h.lineMain}>
+                    <span className={h.dot} style={{ background: color }} />
+                    <span className={h.lineText}>
+                      <span className={h.ellipsis}>{t.title}</span>
+                      {t.company && <span className={k.muted}>{t.company.name}</span>}
+                    </span>
                   </span>
                 </Link>
-              );
-            })}
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Cold companies */}
+        <section className={k.section}>
+          <div className={h.sectionHead}>
+            <h2 className={k.h2}>Hívandók</h2>
+            <Link href="/calls" className={k.link}>Hívás mód →</Link>
           </div>
-        </div>
+          {coldCompanies.length === 0 ? (
+            <div className={k.empty}>Nincs hívandó cég</div>
+          ) : (
+            <div>
+              {coldCompanies.map((c) => {
+                const fresh = contactFreshness(c.lastInteractionDate);
+                return (
+                  <Link key={c.id} href={`/companies/${c.id}`} className={h.line}>
+                    <span className={h.lineText}>
+                      <span className={h.ellipsis}>{c.name}</span>
+                      <span><PipelineStatusBadge status={c.pipelineStatus} /></span>
+                    </span>
+                    <span className={`${k.muted} ${k.num}`} style={{ color: FRESHNESS_COLOR[fresh], flexShrink: 0 }}>
+                      {formatRelativeTime(c.lastInteractionDate)}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {/* Recent interactions */}
-        <div className="panel mount mount-3">
-          <div className="panel-head">
-            <div className="panel-title">Aktivitás</div>
-          </div>
-          <div>
-            {recentInteractions.length === 0 ? (
-              <div style={{ padding: "32px 20px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
-                Nincs aktivitás
-              </div>
-            ) : recentInteractions.map((r) => {
-              const color = INTERACTION_COLOR[r.type ?? "note"] ?? "var(--fg-mute)";
-              const label = INTERACTION_LABEL[r.type ?? "note"] ?? r.type;
-              return (
-                <div key={r.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--line-soft)" }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, marginTop: 4, flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, color: "var(--fg-soft)", fontWeight: 500 }}>
-                      <span style={{ color }}>{label}</span>
-                      {r.company && (
-                        <Link href={`/companies/${r.company.id}`} style={{ marginLeft: 5, color: "var(--fg-mute)", textDecoration: "none", fontWeight: 400 }}>
-                          {r.company.name}
-                        </Link>
-                      )}
-                      {!r.company && r.person && (
-                        <Link href={`/persons/${r.person.id}`} style={{ marginLeft: 5, color: "var(--fg-mute)", textDecoration: "none", fontWeight: 400 }}>
-                          {r.person.firstName} {r.person.lastName}
-                        </Link>
-                      )}
-                    </div>
-                    <div className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>
-                      {formatRelativeTime(r.occurredAt)}
-                    </div>
+        <section className={k.section}>
+          <h2 className={k.h2}>Aktivitás</h2>
+          {recentInteractions.length === 0 ? (
+            <div className={k.empty}>Nincs aktivitás</div>
+          ) : (
+            <div>
+              {recentInteractions.map((r) => {
+                const color = INTERACTION_COLOR[r.type ?? "note"] ?? "var(--color-text-secondary)";
+                const label = INTERACTION_LABEL[r.type ?? "note"] ?? r.type;
+                return (
+                  <div key={r.id} className={h.line}>
+                    <span className={h.lineMain}>
+                      <span className={h.dot} style={{ background: color }} />
+                      <span className={h.lineText}>
+                        <span className={k.strong}>
+                          <span style={{ color }}>{label}</span>
+                          {r.company && (
+                            <Link href={`/companies/${r.company.id}`} className={k.muted} style={{ marginLeft: 6, textDecoration: "none" }}>
+                              {r.company.name}
+                            </Link>
+                          )}
+                          {!r.company && r.person && (
+                            <Link href={`/persons/${r.person.id}`} className={k.muted} style={{ marginLeft: 6, textDecoration: "none" }}>
+                              {r.person.firstName} {r.person.lastName}
+                            </Link>
+                          )}
+                        </span>
+                      </span>
+                    </span>
+                    <span className={`${k.muted} ${k.num}`}>{formatRelativeTime(r.occurredAt)}</span>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-      {/* Pipeline bar */}
-      {pipeline.length > 0 && (
-        <div className="panel mount mount-4">
-          <div className="panel-head">
-            <div className="panel-title">Pipeline · {pipelineTotal} nyitott deal</div>
-            <Link href="/deals" style={{ fontSize: 12, color: "var(--indigo)" }}>Kanban →</Link>
-          </div>
-          <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-            {/* Progress bar */}
-            <div style={{ display: "flex", height: 6, borderRadius: 4, overflow: "hidden", gap: 2 }}>
+        {/* Pipeline bar */}
+        {pipeline.length > 0 && (
+          <section className={`${k.section} ${h.pipeline}`}>
+            <div className={h.sectionHead}>
+              <h2 className={k.h2}>Pipeline · {pipelineTotal} nyitott deal</h2>
+              <Link href="/deals" className={k.link}>Kanban →</Link>
+            </div>
+            <div className={h.bar}>
               {pipeline.map((s) => (
                 <div
                   key={s.stage_name}
@@ -287,22 +256,21 @@ export default async function DashboardPage() {
                 />
               ))}
             </div>
-            {/* Stage breakdown */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className={h.stages}>
               {pipeline.map((s) => (
-                <div key={s.stage_name} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: `${s.color}12`, border: `1px solid ${s.color}30`, borderRadius: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>{s.stage_name}</span>
-                  <span className="font-mono-ndt" style={{ fontSize: 14, fontWeight: 600, color: s.color }}>{Number(s.cnt)}</span>
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+                <div key={s.stage_name} className={h.stage}>
+                  <span className={h.dot} style={{ background: s.color }} />
+                  <span className={k.muted}>{s.stage_name}</span>
+                  <span className={k.strong}>{Number(s.cnt)}</span>
+                  <span className={`${k.muted} ${k.num}`}>
                     {s.total_value > 0 ? `${(s.total_value / 1_000_000).toFixed(1)}M` : "-"}
                   </span>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      )}
+          </section>
+        )}
+      </div>
     </div>
   );
 }
