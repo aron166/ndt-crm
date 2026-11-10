@@ -273,6 +273,63 @@
   --bg-sidebar-blur:  oklch(0.972 0.005 258 / 0.95);
 }
 
+/* Legacy token bridge (Astryx redesign, 2026-11-10). Every screen not yet rebuilt on the page kit still reads the
+   old --bg-/--fg-/--indigo- vars; inside the Astryx theme they resolve to Astryx tokens, so old and new screens
+   share one palette. Declared on the theme element because Astryx tokens live there, not on :root (a var() in a
+   custom property resolves where it is declared). Aliases (--bg-1, shadcn --card...) are redeclared for the same
+   reason. Status hues (amber, mint, coral, sky) keep their light values: they carry meaning. Remove a line once no
+   screen reads that var. */
+[data-astryx-theme="neutral"] {
+  --bg-page: var(--color-background-body);
+  --bg-panel: var(--color-background-card);
+  --bg-raised: var(--color-background-muted);
+  --bg-hover: color-mix(in srgb, var(--color-text-primary) 7%, var(--color-background-card));
+  --bg-popover: var(--color-background-popover);
+  --bg-col: var(--color-background-muted);
+  --bg-thead: var(--color-background-muted);
+  --line: var(--color-border-emphasized);
+  --line-soft: var(--color-border);
+  --line-strong: var(--color-border-emphasized);
+  --fg: var(--color-text-primary);
+  --fg-soft: var(--color-text-secondary);
+  --fg-mute: var(--color-text-secondary);
+  --indigo: var(--color-accent);
+  --indigo-dim: var(--color-accent);
+  --indigo-soft: var(--color-background-muted);
+  --indigo-line: var(--color-border-emphasized);
+  --indigo-fg: var(--color-text-accent);
+  --row-hover: var(--color-overlay-hover);
+  --tint-faint: var(--color-overlay-hover);
+  --tint-faintest: var(--color-overlay-hover);
+  --fg-on-accent: var(--color-on-accent);
+  --shadow-card: var(--shadow-low);
+  --shadow-primary: none;
+  --shadow-primary-hover: var(--shadow-low);
+  --glow-indigo: 0 0 0 1px var(--color-border-emphasized);
+  --ring-indigo: 0 0 0 2px var(--color-accent-muted);
+  --bg-0: var(--bg-page);
+  --bg-1: var(--bg-panel);
+  --bg-2: var(--bg-raised);
+  --bg-3: var(--bg-hover);
+  --background: var(--bg-page);
+  --foreground: var(--fg);
+  --card: var(--bg-panel);
+  --card-foreground: var(--fg);
+  --popover: var(--bg-popover);
+  --popover-foreground: var(--fg);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-on-accent);
+  --secondary: var(--bg-raised);
+  --secondary-foreground: var(--fg-soft);
+  --muted: var(--bg-raised);
+  --muted-foreground: var(--fg-mute);
+  --accent: var(--bg-hover);
+  --accent-foreground: var(--fg);
+  --border: var(--line-soft);
+  --input: var(--line);
+  --ring: var(--color-accent);
+}
+
 @theme inline {
   /* shadcn token passthrough */
   --color-background:              var(--background);
