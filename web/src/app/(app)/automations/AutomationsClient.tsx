@@ -309,7 +309,7 @@ export function AutomationsClient({
     <div className="space-y-5">
       <PageHeader
         title="Automatizálások"
-        eyebrow="Szabályok: ha egy esemény bekövetkezik, automatikusan létrejön egy feladat."
+        help="Szabályok: ha egy esemény bekövetkezik, automatikusan létrejön egy feladat."
         actions={showForm ? undefined : (
           <button type="button" onClick={openCreate} className={`${k.btn} ${k.btnPrimary}`}>
             <Plus style={{ width: 14, height: 14 }} /> Új szabály
