@@ -18,7 +18,7 @@ vi.mock("@/lib/db", () => ({
     interaction: { findMany: vi.fn() },
     task: { findMany: vi.fn() },
     leadStatusHistory: { findMany: vi.fn() },
-    appEvent: { create: vi.fn() },
+    appEvent: { create: vi.fn(), findFirst: vi.fn().mockResolvedValue(null) },
   },
 }));
 
@@ -74,6 +74,15 @@ describe("runNurture", () => {
     expect(r.skipped).toBe(1);
     const ev = d.appEvent.create.mock.calls.map((c) => c[0].data as { eventType: string; payload: { reason?: string } });
     expect(ev.find((e) => e.eventType === "nurture_skipped")?.payload.reason).toBe("nurture_disabled");
+  });
+
+  it("does not log the same skip again within 6 days", async () => {
+    setup({ nurture_enabled: false });
+    d.appEvent.findFirst.mockResolvedValueOnce({ id: 1 } as never);
+    await runNurture(1, now);
+    expect(send).not.toHaveBeenCalled();
+    const kinds = d.appEvent.create.mock.calls.map((c) => (c[0].data as { eventType: string }).eventType);
+    expect(kinds).not.toContain("nurture_skipped");
   });
 
   it("sends once with unsubscribe headers and html, records the send", async () => {

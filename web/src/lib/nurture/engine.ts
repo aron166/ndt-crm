@@ -26,6 +26,25 @@ async function event(tenantId: number, eventType: string, payload: Record<string
   }
 }
 
+/**
+ * A skip is logged once per enrollment, step and reason per 6 days: while sending is
+ * off or a template waits for Áron, the daily run would otherwise log the same skip every day.
+ */
+async function skipOnce(tenantId: number, payload: { leadId: number; enrollmentId: number; templateKey: string; position: number; reason: string; error?: string }) {
+  const seen = await db.appEvent.findFirst({
+    where: {
+      tenantId, eventType: "nurture_skipped", createdAt: { gte: new Date(Date.now() - 6 * DAY) },
+      AND: [
+        { payload: { path: ["enrollmentId"], equals: payload.enrollmentId } },
+        { payload: { path: ["position"], equals: payload.position } },
+        { payload: { path: ["reason"], equals: payload.reason } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (!seen) await event(tenantId, "nurture_skipped", payload);
+}
+
 const leadEmail = (cf: Record<string, unknown> | null, contactEmail: string | null | undefined) =>
   (typeof cf?.contact_email === "string" && cf.contact_email.trim()) || contactEmail || null;
 
@@ -171,7 +190,7 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
       const block = !enabled ? "nurture_disabled" : templateBlock(template, assets);
       if (block || !template) {
         if (passTo !== en.nextPosition) await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { nextPosition: passTo } });
-        await event(tenantId, "nurture_skipped", { leadId: lead.id, enrollmentId: en.id, templateKey: step.templateKey, position: step.position, reason: block ?? "template_missing" });
+        await skipOnce(tenantId, { leadId: lead.id, enrollmentId: en.id, templateKey: step.templateKey, position: step.position, reason: block ?? "template_missing" });
         out.skipped++;
         continue;
       }

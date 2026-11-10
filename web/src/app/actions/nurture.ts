@@ -12,17 +12,16 @@ import { demoHostsFromSettings } from "@/lib/booking/queries";
 
 const TENANT_ID = 1;
 
-async function aronCtx() {
-  const ctx = await userLeadCtx(TENANT_ID);
-  if ("error" in ctx) return ctx;
+/** Is this CRM user the tenant's Áron (demoHosts.aron)? */
+async function isAron(userId: number | null): Promise<boolean> {
   const tenant = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  if (demoHostsFromSettings(tenant?.settings).aron !== ctx.userId) return { error: "Csak Áron hagyhat jóvá hírlevél-sablont" };
-  return ctx;
+  return userId != null && demoHostsFromSettings(tenant?.settings).aron === userId;
 }
 
 export async function approveNurtureTemplateAction(templateId: number, approve: boolean) {
-  const ctx = await aronCtx();
+  const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
+  if (!(await isAron(ctx.userId))) return { error: "Csak Áron hagyhat jóvá hírlevél-sablont" };
   if (!Number.isInteger(templateId) || templateId <= 0) return { error: "Érvénytelen sablon" };
   const before = await db.nurtureTemplate.findFirst({ where: { id: templateId, tenantId: TENANT_ID }, select: { status: true, approvedByAron: true } });
   if (!before) return { error: "Sablon nem található" };
