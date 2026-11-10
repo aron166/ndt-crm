@@ -9,6 +9,7 @@
 @import "@astryxdesign/core/reset.css";
 @import "@astryxdesign/core/astryx.css";
 @import "@astryxdesign/theme-neutral/theme.css";
+@import "../styles/tokens.css";
 
 /* Astryx type: Figtree (theme-neutral's face) loaded by next/font, not the
    theme's render-blocking Google @import. */
@@ -280,34 +281,34 @@
    reason. Status hues (amber, mint, coral, sky) keep their light values: they carry meaning. Remove a line once no
    screen reads that var. */
 [data-astryx-theme="neutral"] {
-  --bg-page: var(--color-background-body);
-  --bg-panel: var(--color-background-card);
-  --bg-raised: var(--color-background-muted);
-  --bg-hover: color-mix(in srgb, var(--color-text-primary) 7%, var(--color-background-card));
-  --bg-popover: var(--color-background-popover);
-  --bg-col: var(--color-background-muted);
-  --bg-thead: var(--color-background-muted);
-  --line: var(--color-border-emphasized);
-  --line-soft: var(--color-border);
-  --line-strong: var(--color-border-emphasized);
-  --fg: var(--color-text-primary);
-  --fg-soft: var(--color-text-secondary);
-  --fg-mute: var(--color-text-secondary);
-  --fg-faint: var(--color-text-secondary);
-  --indigo: var(--color-accent);
-  --indigo-dim: var(--color-accent);
-  --indigo-soft: var(--color-background-muted);
-  --indigo-line: var(--color-border-emphasized);
-  --indigo-fg: var(--color-text-accent);
-  --row-hover: var(--color-overlay-hover);
-  --tint-faint: var(--color-overlay-hover);
-  --tint-faintest: var(--color-overlay-hover);
-  --fg-on-accent: var(--color-on-accent);
-  --shadow-card: var(--shadow-low);
+  --bg-page: var(--ui-page);
+  --bg-panel: var(--ui-surface);
+  --bg-raised: var(--ui-surface-muted);
+  --bg-hover: color-mix(in srgb, var(--ui-text) 7%, var(--ui-surface));
+  --bg-popover: var(--ui-surface-overlay);
+  --bg-col: var(--ui-surface-muted);
+  --bg-thead: var(--ui-surface-muted);
+  --line: var(--ui-border-strong);
+  --line-soft: var(--ui-border);
+  --line-strong: var(--ui-border-strong);
+  --fg: var(--ui-text);
+  --fg-soft: var(--ui-text-muted);
+  --fg-mute: var(--ui-text-muted);
+  --fg-faint: var(--ui-text-muted);
+  --indigo: var(--ui-accent);
+  --indigo-dim: var(--ui-accent);
+  --indigo-soft: var(--ui-surface-muted);
+  --indigo-line: var(--ui-border-strong);
+  --indigo-fg: var(--ui-text-link);
+  --row-hover: var(--ui-hover);
+  --tint-faint: var(--ui-hover);
+  --tint-faintest: var(--ui-hover);
+  --fg-on-accent: var(--ui-on-accent);
+  --shadow-card: var(--ui-shadow-raised);
   --shadow-primary: none;
-  --shadow-primary-hover: var(--shadow-low);
-  --glow-indigo: 0 0 0 1px var(--color-border-emphasized);
-  --ring-indigo: 0 0 0 2px var(--color-accent-muted);
+  --shadow-primary-hover: var(--ui-shadow-raised);
+  --glow-indigo: 0 0 0 1px var(--ui-border-strong);
+  --ring-indigo: 0 0 0 2px var(--ui-surface-muted);
   --bg-0: var(--bg-page);
   --bg-1: var(--bg-panel);
   --bg-2: var(--bg-raised);
@@ -318,8 +319,8 @@
   --card-foreground: var(--fg);
   --popover: var(--bg-popover);
   --popover-foreground: var(--fg);
-  --primary: var(--color-accent);
-  --primary-foreground: var(--color-on-accent);
+  --primary: var(--ui-accent);
+  --primary-foreground: var(--ui-on-accent);
   --secondary: var(--bg-raised);
   --secondary-foreground: var(--fg-soft);
   --muted: var(--bg-raised);
@@ -328,7 +329,7 @@
   --accent-foreground: var(--fg);
   --border: var(--line-soft);
   --input: var(--line);
-  --ring: var(--color-accent);
+  --ring: var(--ui-accent);
 }
 
 @theme inline {
@@ -556,7 +557,7 @@
 
 /* ── Table / list row hover (server-component safe CSS-only approach) ── */
 .tbl-row { transition: background 0.10s; }
-.tbl-row:hover { background: var(--row-hover) !important; cursor: pointer; }
+.tbl-row:hover { background: var(--ui-hover) !important; cursor: pointer; }
 .tbl-row:hover .tbl-link { color: var(--indigo); }
 
 .tbl-link { color: var(--fg); font-weight: 500; }
@@ -576,11 +577,11 @@
 /* Complete circle button */
 .complete-btn {
   width: 18px; height: 18px; border-radius: 50%;
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--ui-border-strong);
   background: transparent; cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.complete-btn:hover { border-color: var(--mint); background: var(--mint-soft); }
+.complete-btn:hover { border-color: var(--ui-success); background: var(--ui-success-surface); }
 
 /* ── Mockup CSS variable aliases ──────────────────────────── */
 :root {
@@ -600,58 +601,63 @@
 @layer components {
 
 .btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  height: 32px; padding: 0 12px;
-  font-size: 13px; font-weight: 500;
-  border-radius: var(--r);
-  border: 1px solid var(--line);
-  background: var(--bg-1);
-  color: var(--fg);
-  /* Spring-curve easing — no linear/ease-in-out */
-  transition: all 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  box-sizing: border-box; min-height: var(--ui-control-h); padding: 0 16px;
+  font-size: var(--ui-text-md); font-weight: 600;
+  border-radius: var(--ui-radius-control);
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  transition: background var(--ui-dur-fast) var(--ui-ease-out);
   white-space: nowrap;
   cursor: pointer;
-  will-change: transform;
 }
-.btn:hover { background: var(--bg-2); border-color: var(--line-strong); transform: translateY(-1px); }
-/* Tactile feedback: physical push on :active */
-.btn:active { transform: translateY(0) scale(0.98); transition-duration: 80ms; }
-.btn.primary {
-  background: linear-gradient(180deg, var(--indigo), var(--indigo-dim));
-  border-color: var(--indigo-dim);
-  color: var(--primary-foreground);
-  box-shadow: var(--shadow-primary);
-}
-.btn.primary:hover { filter: brightness(1.1); box-shadow: var(--shadow-primary-hover); }
-.btn.ghost { background: transparent; border-color: transparent; color: var(--fg-soft); }
-.btn.ghost:hover { background: var(--bg-1); color: var(--fg); }
-.btn.sm { height: 26px; padding: 0 10px; font-size: 12px; }
+.btn:hover { background: var(--ui-hover); }
+.btn:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.btn.primary { background: var(--ui-accent); border-color: var(--ui-accent); color: var(--ui-on-accent); }
+.btn.primary:hover { background: var(--ui-accent); filter: brightness(0.94); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--ui-text); }
+.btn.ghost:hover { background: var(--ui-hover); }
+.btn.sm { min-height: 36px; padding: 0 12px; font-size: var(--ui-text-sm); }
+@media (pointer: coarse) { .btn { min-height: var(--ui-control-h-touch); } }
 
 .panel {
-  background: var(--bg-1);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-md);
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius-surface);
   position: relative;
-  /* Inner top-edge highlight — simulates physical panel depth */
-  box-shadow: inset 0 1px 0 var(--panel-edge);
+  box-shadow: var(--ui-shadow-raised);
 }
 .panel-pad { padding: 20px; }
 .panel-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--line-soft);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ui-border);
 }
 .panel-title {
-  font-size: 13px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--fg-mute);
+  font-size: var(--ui-text-lg); font-weight: 600;
+  color: var(--ui-text);
   display: flex; align-items: center; gap: 8px;
 }
+
+/* Form controls (FormField wrapper + legacy input classes) */
+.field-group { display: flex; flex-direction: column; gap: 4px; }
+.input-ds {
+  box-sizing: border-box; width: 100%; min-height: var(--ui-control-h); padding: 0 12px;
+  font: inherit; font-size: var(--ui-text-md);
+  background: var(--ui-surface); color: var(--ui-text);
+  border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control);
+}
+.input-ds::placeholder { color: var(--ui-text-muted); }
+.input-ds:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 0; }
+.input-ds[aria-invalid="true"] { border-color: var(--ui-danger); }
+textarea.input-ds { padding-block: 8px; min-height: 80px; }
 
 /* ── Kanban columns (deals + leads boards; mirrors the tasks board) ── */
 .kcol {
   display: flex; flex-direction: column;
-  border-radius: 12px;
+  background: var(--ui-surface-muted);
+  border-radius: var(--ui-radius-surface);
   min-height: 200px;
   max-height: calc(100vh - 215px);
 }
@@ -659,7 +665,7 @@
   display: flex; align-items: center; gap: 8px;
   flex-shrink: 0;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--ui-border);
 }
 .kcol-dot {
   width: 8px; height: 8px;
@@ -667,9 +673,8 @@
   flex-shrink: 0;
 }
 .kcol-title {
-  font-size: 14px; font-weight: 600;
-  color: var(--fg-soft);
-  letter-spacing: 0.02em;
+  font-size: 15px; font-weight: 600;
+  color: var(--ui-text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .kcol-count {
@@ -708,28 +713,25 @@
 
 .badge-ds {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 20px; padding: 0 8px;
-  font-size: 11px; font-weight: 500;
-  border-radius: 999px;
+  min-height: 22px; padding: 0 10px;
+  font-size: 12px; font-weight: 600;
+  border-radius: var(--ui-radius-pill);
   border: 1px solid transparent;
-  font-family: var(--font-mono);
-  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 .badge-ds.dot::before {
   content: '';
-  width: 5px; height: 5px; border-radius: 999px;
+  width: 6px; height: 6px; border-radius: 999px;
   background: currentColor;
-  box-shadow: 0 0 var(--glow-size-sm) currentColor;
   flex-shrink: 0;
 }
-.badge-ds.indigo { color: var(--indigo-fg); background: var(--indigo-soft); border-color: var(--indigo-line); }
-.badge-ds.amber  { color: var(--amber-fg);  background: var(--amber-soft);  border-color: var(--amber-line); }
-.badge-ds.mint   { color: var(--mint-fg);   background: var(--mint-soft);   border-color: var(--mint-line); }
-.badge-ds.coral  { color: var(--coral-fg);  background: var(--coral-soft);  border-color: var(--coral-line); }
-.badge-ds.sky    { color: var(--sky-fg);    background: var(--sky-soft);    border-color: var(--sky-line); }
-.badge-ds.violet { color: var(--violet-fg); background: var(--violet-soft); border-color: var(--violet-line); }
-.badge-ds.slate  { color: var(--fg-mute); background: var(--bg-2); border-color: var(--line-soft); }
+.badge-ds.indigo { color: var(--ui-text); background: var(--ui-surface-muted); }
+.badge-ds.amber  { color: var(--ui-warning-text); background: var(--ui-warning-surface); }
+.badge-ds.mint   { color: var(--ui-success-text); background: var(--ui-success-surface); }
+.badge-ds.coral  { color: var(--ui-danger-text);  background: var(--ui-danger-surface); }
+.badge-ds.sky    { color: var(--ui-info-text);    background: var(--ui-info-surface); }
+.badge-ds.violet { color: var(--ui-info-text);    background: var(--ui-info-surface); }
+.badge-ds.slate  { color: var(--ui-text-muted);   background: var(--ui-surface-muted); }
 
 .kpi {
   padding: 14px;
@@ -833,8 +835,8 @@
 }
 
 .divider { height: 1px; background: var(--line-soft); margin: 16px 0; }
-.field-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-faint); font-weight: 600; margin-bottom: 4px; }
-.field-value { font-size: 14px; color: var(--fg); }
+.field-label { font-size: 13px; color: var(--ui-text-muted); font-weight: 600; margin-bottom: 4px; }
+.field-value { font-size: var(--ui-text-md); color: var(--ui-text); }
 .field-value.mono { font-family: var(--font-mono); font-size: 13px; }
 
 .split-grid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
