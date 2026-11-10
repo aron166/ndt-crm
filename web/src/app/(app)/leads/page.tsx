@@ -7,7 +7,7 @@ import { Settings2 } from "lucide-react";
 import { getLeadExtras } from "@/lib/leads/board";
 import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact, tierAFlag } from "@/lib/leads/first-contact";
-import { MAIN_STAGES } from "@/lib/leads/lifecycle";
+import { MAIN_STAGES, SIDE_STAGES } from "@/lib/leads/lifecycle";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
 import { getActor } from "@/lib/actor";
@@ -19,7 +19,7 @@ import { ClosedList, CLOSED_WHERE } from "./closed/ClosedList";
 import qcss from "./queue/queue.module.css";
 
 const TENANT_ID = 1;
-// ponytail: per-column cap (newest first) + "N / total" badge — a kanban has no
+// ponytail: per-column cap (newest first) + "N / total" badge: a kanban has no
 // natural page; add per-column "load more" when a column actually exceeds this.
 const COLUMN_LIMIT = 50;
 
@@ -35,15 +35,16 @@ export default async function LeadsPage({
   const sideView = view === "recall" || view === "lost" ? view : null;
   const parsedPage = Number.parseInt(rawPage ?? "1", 10);
   const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
-  // Tier filter applies only to the active (kanban) view — closed list ignores it.
+  // Tier filter applies only to the active (kanban) view: closed list ignores it.
   const tier = isTier(rawTier) ? rawTier : null;
 
   // Counts power the toggle. Won (= converted to a deal) and lost leads leave
-  // the active board — the "Lezárt" list keeps them for history.
+  // the active board: the "Lezárt" list keeps them for history.
   const [actor, users, activeCount, convertedCount] = await Promise.all([
     getActor(TENANT_ID),
     db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: null, outcome: "open" } }),
+    // Recall leads sit off the main columns, so the "Tábla · N" count leaves them out too.
+    db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: null, outcome: "open", OR: [{ status: null }, { status: { notIn: [...SIDE_STAGES] } }] } }),
     db.lead.count({ where: CLOSED_WHERE }),
   ]);
 
@@ -121,7 +122,7 @@ export default async function LeadsPage({
     ...(tier ? { tier } : {}),
   };
   const knownKeys = allStatuses.map((s) => s.key);
-  // A lead whose status was deleted at /leads/setup has no column — it lands in
+  // A lead whose status was deleted at /leads/setup has no column: it lands in
   // the entry column instead of vanishing from the board (which would make the
   // "Aktív · N" count disagree with the sum of the columns).
   const colWhere = (key: string) =>
@@ -132,7 +133,7 @@ export default async function LeadsPage({
       : { ...ACTIVE, status: key };
 
   // One bounded query per column (newest first). Never an unbounded findMany.
-  // ponytail: under the cap, rows.length IS the total — the COUNT only fires for a
+  // ponytail: under the cap, rows.length IS the total: the COUNT only fires for a
   // capped column, and pays a serial round trip when it does. Fine at ~2ms (fra1);
   // if several columns ever sit at the cap, pair it back into the findMany's Promise.all.
   const perColumn = await Promise.all(

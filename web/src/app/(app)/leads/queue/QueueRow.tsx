@@ -38,7 +38,7 @@ export function QueueRow({ row, group, now, stageLabel }: { row: Row; group: Gro
         <div className={s.meta}>
           {stageLabel && <span className={s.muted}>{stageLabel}</span>}
           {row.attempts > 0 && (
-            <span className={s.ticks} aria-label={`${row.attempts}. kísérlet a ${MAX_ATTEMPTS}-ból`}>
+            <span className={s.ticks} role="img" aria-label={`${row.attempts}. kísérlet a ${MAX_ATTEMPTS}-ból`}>
               {Array.from({ length: MAX_ATTEMPTS }, (_, i) => <i key={i} className={i < row.attempts ? s.on : ""} />)}
               <span className={s.muted}> {row.attempts}/{MAX_ATTEMPTS}</span>
             </span>
