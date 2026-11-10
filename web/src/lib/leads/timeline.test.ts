@@ -58,4 +58,21 @@ describe("buildTimeline", () => {
     expect(stages.map((x) => x.id)).toEqual(["h-1", "a-12"]);
     expect(stages[0].title).toBe("Szakasz: Minősített → Ajánlat kiküldve");
   });
+
+  it("shows non-stage audit rows as a compact Módosítás row", () => {
+    const t = buildTimeline({
+      ...base,
+      auditEntries: [{ id: 11, occurredAt: "2026-11-04T09:00:00Z", changes: { before: { assignedToId: 1 }, after: { assignedToId: 2 } } }],
+    });
+    expect(t.find((x) => x.id === "a-11")).toMatchObject({ kind: "note", title: "Módosítás" });
+  });
+
+  it("never shows X -> X for a same-stage event", () => {
+    const t = buildTimeline({
+      ...base,
+      stageLabels: { offer_sent: "Ajánlat kiküldve" },
+      statusHistory: [{ id: 2, fromStatus: "offer_sent", toStatus: "offer_sent", event: "offer_silent", at: "2026-11-03T09:00:00Z" }],
+    });
+    expect(t.find((x) => x.id === "h-2")?.title).toBe("Szakasz: Ajánlat kiküldve");
+  });
 });

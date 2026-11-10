@@ -17,7 +17,7 @@ export function Situation({ strip, last }: { strip: Strip; last: TimelineItem | 
       <p className={s.last}>
         {/* PROPOSAL copy */}
         {`Következő lépés: ${strip.nextAction || "nincs megadva"}`}
-        {due && strip.nextDue ? <> · Határidő: <span style={{ color: due.color }}>{`${due.rel} · ${formatDateTime(strip.nextDue)}`}</span></> : null}
+        {due && strip.nextDue ? <> · Határidő: <span className={s.dueDot} style={{ background: due.color }} aria-hidden />{`${due.rel} · ${formatDateTime(strip.nextDue)}`}</> : null}
         {` · Kísérlet ${strip.attempts}/${MAX_ATTEMPTS}`}
       </p>
     </section>

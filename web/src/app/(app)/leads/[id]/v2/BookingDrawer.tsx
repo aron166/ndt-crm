@@ -12,7 +12,7 @@ export function BookingDrawer({ open, kind, leadId, leadOpen, onClose, onBooked 
   leadId: number;
   leadOpen: boolean;
   onClose: () => void;
-  onBooked: () => void;
+  onBooked: (kind: BookingKind) => void;
 }) {
   return (
     <Drawer isOpen={open} onOpenChange={(o) => !o && onClose()} label="Időpont foglalása" width={720} experimental={{ isFullWidthOnMobile: true }}>

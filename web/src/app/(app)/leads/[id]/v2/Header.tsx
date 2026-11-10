@@ -10,26 +10,27 @@ import s from "./lead2.module.css";
 const telOf = (phone: string | null) => (phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : null);
 
 // tel: dials on a phone; a desktop browser only switches to calling mode.
-function CallLink({ tel, onCall, className }: { tel: string | null; onCall: () => void; className: string }) {
+function CallLink({ tel, onCall, outline }: { tel: string | null; onCall: () => void; outline: boolean }) {
+  const cls = `${s.callBtn} ${outline ? s.callOutline : ""}`;
+  const inner = <><Phone size={20} />{/* PROPOSAL copy */}Hívás</>;
+  if (!tel) return <button type="button" className={cls} onClick={onCall}>{inner}</button>;
   return (
     <a
-      href={tel ?? undefined}
-      role={tel ? undefined : "button"}
-      tabIndex={tel ? undefined : 0}
-      className={`${s.callBtn} ${className}`}
+      href={tel}
+      className={cls}
       onClick={(e) => {
         if (!window.matchMedia("(pointer: coarse)").matches) e.preventDefault();
         onCall();
       }}
     >
-      <Phone size={20} />{/* PROPOSAL copy */}Hívás
+      {inner}
     </a>
   );
 }
 
 /** Phone only: sticky full-width call bar, rendered last in the page so sticky bottom holds. */
-export function CallBar({ phone, onCall }: { phone: string | null; onCall: () => void }) {
-  return <div className={s.callBar}><CallLink tel={telOf(phone)} onCall={onCall} className="" /></div>;
+export function CallBar({ phone, onCall, outline }: { phone: string | null; onCall: () => void; outline: boolean }) {
+  return <div className={s.callBar}><CallLink tel={telOf(phone)} onCall={onCall} outline={outline} /></div>;
 }
 
 export function Header(p: {
@@ -45,11 +46,14 @@ export function Header(p: {
   tier: string | null;
   ownerName: string | null;
   calling: boolean;
+  callOutline: boolean;
+  canMove: boolean;
   canClose: boolean;
   deleting: boolean;
   onCall: () => void;
   onEdit: () => void;
   onOwner: () => void;
+  onStage: () => void;
   onClose: () => void;
   onDelete: () => void;
 }) {
@@ -73,6 +77,7 @@ export function Header(p: {
           {/* PROPOSAL copy: menu items */}
           <DropdownMenuItem onClick={p.onEdit}>Szerkesztés</DropdownMenuItem>
           <DropdownMenuItem onClick={p.onOwner}>Felelős módosítása</DropdownMenuItem>
+          {p.canMove && <DropdownMenuItem onClick={p.onStage}>Szakasz váltása</DropdownMenuItem>}
           {p.canClose && <DropdownMenuItem onClick={p.onClose}>Lezárás</DropdownMenuItem>}
           <DropdownMenuSeparator />
           <DropdownMenuItem disabled={p.deleting} onClick={p.onDelete}>{p.deleting ? "Törlés…" : "Törlés"}</DropdownMenuItem>
@@ -90,7 +95,7 @@ export function Header(p: {
         </div>
       </div>
       <div className={s.act}>
-        {!p.calling && <CallLink tel={tel} onCall={p.onCall} className={s.callDesk} />}
+        {!p.calling && <CallLink tel={tel} onCall={p.onCall} outline={p.callOutline} />}
       </div>
     </div>
   );

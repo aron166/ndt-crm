@@ -93,3 +93,6 @@
   .callBtn { transition: none; }
   .callBtn:active { transform: none; }
 }
+
+.dueDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.callOutline { background: transparent; color: var(--ui-accent); box-shadow: inset 0 0 0 1px var(--ui-accent); }

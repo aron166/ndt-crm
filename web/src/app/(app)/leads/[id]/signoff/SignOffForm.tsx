@@ -40,7 +40,7 @@ export function SignOffForm({ leadId }: { leadId: number }) {
       c.height = c.clientHeight * dpr;
       const ctx = c.getContext("2d")!;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#000"; // design-allow: signature canvas must be black on white for the stored PNG
       if (!first && ink.current > 0) setResized(true);
       first = false;
       ink.current = 0;
@@ -154,7 +154,11 @@ export function SignOffForm({ leadId }: { leadId: number }) {
           aria-label="Aláírás" // PROPOSAL copy
           aria-describedby="so-sig-help"
           onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
-          style={{ width: "100%", height: 220, background: "#fff", border: "2px solid var(--ui-border-strong)", borderRadius: "var(--ui-radius-control)", touchAction: "none", display: "block" }}
+          style={{
+            width: "100%", height: 220,
+            background: "#fff", // design-allow: signature canvas must be black on white for the stored PNG
+            border: "2px solid var(--ui-border-strong)", borderRadius: "var(--ui-radius-control)", touchAction: "none", display: "block",
+          }}
         />
         {/* PROPOSAL copy */}
         <Button type="button" variant="outline" size="lg" onClick={clear} className="mt-2 text-lg">Törlés</Button>

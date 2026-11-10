@@ -98,7 +98,7 @@ export default async function LeadDetailPage({
       take: 50,
     }),
     db.task.findMany({
-      where: { tenantId: TENANT_ID, leadId, dueDate: { not: null } },
+      where: { tenantId: TENANT_ID, leadId, dueDate: { not: null }, OR: [{ status: { in: ["created", "in_progress"] } }, { type: "meeting" }] },
       select: { id: true, title: true, type: true, status: true, dueDate: true },
       orderBy: { dueDate: "desc" },
       take: 30,

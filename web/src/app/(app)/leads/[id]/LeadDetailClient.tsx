@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { LeadMoveDialog } from "@/components/LeadMoveDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { DEFAULT_TRANSITIONS } from "@/lib/leads/lifecycle";
 import { SendEmailModal } from "@/components/SendEmailModal";
 import { moveLead, setLeadOutcomeAction, deleteLead, assignLeadAction } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
@@ -126,6 +129,9 @@ export function LeadDetailClient({
   // Old ?tab=overview / ?tab=offers deep links land with the details open.
   const [detailsOpen, setDetailsOpen] = useState(tab === "overview" || tab === "offers");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const moveLock = useRef(false);
+  const bookedLock = useRef(false);
   const [outcomePending, startOutcome] = useTransition();
   const [assignPending, startAssign] = useTransition();
   const [movePending, startMove] = useTransition();
@@ -151,6 +157,12 @@ export function LeadDetailClient({
   for (const r of interactions) if (r.leadId === lead.id && isAutoOutcome(r)) autoPct[`i-${r.id}`] = Math.round((r.autoConfidence ?? 0) * 100);
 
   const suggestions = closed ? [] : suggestNextSteps(status, { hasPhone: !!phone, hasEmail: !!email });
+  // Every stage the rules allow from here; the dialog collects a reason where one is needed.
+  const stageTargets = [...new Set(DEFAULT_TRANSITIONS.filter((x) => x.from === status && x.to !== status).map((x) => x.to))];
+  const headerCall = !calling;
+  const firstIsCall = suggestions[0]?.kind === "call";
+  const firstPrimary = !(headerCall && firstIsCall);
+  const callOutline = headerCall && suggestions.length > 0 && !firstIsCall;
   const bookingSuggestion = suggestNextSteps(status).find((x) => x.kind === "booking");
 
   // A form slug ("service_concrete") is already a label in the key facts; only free text belongs here.
@@ -179,11 +191,19 @@ export function LeadDetailClient({
   }
 
   function runMove(to: string, event?: string) {
+    if (moveLock.current) return;
+    moveLock.current = true;
     setActionError(null);
     startMove(async () => {
-      const res = await moveLead(lead.id, to, event ? { event } : {});
-      if (res && "error" in res) setActionError(res.error);
-      router.refresh();
+      try {
+        const res = await moveLead(lead.id, to, event ? { event } : {});
+        if (res && "error" in res) setActionError(res.error);
+        router.refresh();
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "Nem sikerült a szakaszváltás."); // PROPOSAL copy
+      } finally {
+        moveLock.current = false;
+      }
     });
   }
 
@@ -205,8 +225,22 @@ export function LeadDetailClient({
     setLogging(true);
   }
 
-  function handleBooked() {
-    if (booking?.event && booking.to) runMove(booking.to, booking.event);
+  function handleBooked(kind: BookingKind) {
+    if (bookedLock.current) return;
+    bookedLock.current = true;
+    try {
+      const b = booking;
+      // Close first so a failed follow-up move shows on the page, not behind the drawer.
+      setBooking(null);
+      if (b?.event && b.to) {
+        if (kind === b.kind) runMove(b.to, b.event);
+        else setActionError("Lefoglalva; a szakasz nem változott."); // PROPOSAL copy
+      }
+      // Call mode: log the call as "meeting booked" with the typed note.
+      if (calling) { setPadOutcome("meeting_booked"); setLogging(true); }
+    } finally {
+      bookedLock.current = false;
+    }
   }
 
   function handleDelete() {
@@ -259,6 +293,9 @@ export function LeadDetailClient({
         tier={lead.tier}
         ownerName={ownerName}
         calling={calling}
+        callOutline={callOutline}
+        canMove={!closed && stageTargets.length > 0}
+        onStage={() => setPicking(true)}
         canClose={status !== "lost" && !closed}
         deleting={deleting}
         onCall={() => setMode(true)}
@@ -287,7 +324,7 @@ export function LeadDetailClient({
             last={last}
             strip={{ status, stageLabel, nextAction: lead.nextAction, nextDue: lead.nextDue, ownerName, attempts: lead.attempts }}
           />
-          <Suggestions items={suggestions} pending={movePending} onRun={runSuggestion} />
+          <Suggestions items={suggestions} pending={movePending} firstPrimary={firstPrimary} onRun={runSuggestion} />
           <Timeline
             items={timeline}
             phone={phone}
@@ -343,6 +380,21 @@ export function LeadDetailClient({
         </div>
       </div>
 
+      <Dialog open={picking} onOpenChange={setPicking}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{/* PROPOSAL copy */}Szakasz váltása</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            {stageTargets.map((k) => (
+              <Button key={k} type="button" variant="outline" onClick={() => { setPicking(false); setMoveTarget(k); }}>
+                {statuses.find((x) => x.key === k)?.label ?? k}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {moveTarget && (
         <LeadMoveDialog
           leadId={lead.id}
@@ -382,7 +434,7 @@ export function LeadDetailClient({
         correctsInteractionId={correcting}
         initialOutcome={padOutcome}
         initialNote={correcting ? undefined : callNote || undefined}
-        hideMeetingBooked
+        hideMeetingBooked={padOutcome !== "meeting_booked"}
       />
 
       <LeadEditModal
@@ -403,7 +455,7 @@ export function LeadDetailClient({
         }}
       />
 
-      {!calling && <CallBar phone={phone} onCall={() => setMode(true)} />}
+      {!calling && <CallBar phone={phone} onCall={() => setMode(true)} outline={callOutline} />}
     </div>
   );
 }

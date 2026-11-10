@@ -35,7 +35,7 @@ const SAME_MOVE_MS = 60_000;
 
 function stageTitle(from: string | null, to: string, labels: Record<string, string>): string {
   const l = (k: string) => labels[k] ?? k;
-  return from ? `Szakasz: ${l(from)} → ${l(to)}` : `Szakasz: ${l(to)}`; // PROPOSAL copy
+  return from && from !== to ? `Szakasz: ${l(from)} → ${l(to)}` : `Szakasz: ${l(to)}`; // PROPOSAL copy
 }
 
 function auditStage(changes: unknown): { from: string | null; to: string } | null {
@@ -62,7 +62,12 @@ export function buildTimeline(input: TimelineInput): TimelineItem[] {
   }
   for (const a of input.auditEntries) {
     const st = auditStage(a.changes);
-    if (!st) continue;
+    if (!st) {
+      // Non-stage change (owner, fields): one compact row, unless a status-history row already covers that moment.
+      const covered = input.statusHistory.some((h) => Math.abs(ms(h.at) - ms(a.occurredAt)) <= SAME_MOVE_MS);
+      if (!covered) items.push({ id: `a-${a.id}`, at: iso(a.occurredAt), kind: "note", title: "Módosítás" }); // PROPOSAL copy
+      continue;
+    }
     const dup = input.statusHistory.some((h) => h.toStatus === st.to && Math.abs(ms(h.at) - ms(a.occurredAt)) <= SAME_MOVE_MS);
     if (!dup) items.push({ id: `a-${a.id}`, at: iso(a.occurredAt), kind: "stage", title: stageTitle(st.from, st.to, labels) });
   }
