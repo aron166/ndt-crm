@@ -208,7 +208,7 @@ export function TasksClient({ tasks }: TasksClientProps) {
                   </div>
                   <div className={k.cellEnd}>
                     {!done && (
-                      <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={() => handleComplete(t)} title="Kész">
+                      <button type="button" className={`${k.btn} ${g.key === "overdue" || g.key === "today" ? k.btnPrimary : ""}`} onClick={() => handleComplete(t)} title="Kész">
                         <CheckCircle2 className="size-4" />
                         Kész
                       </button>
