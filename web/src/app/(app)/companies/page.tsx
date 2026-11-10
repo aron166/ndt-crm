@@ -15,13 +15,16 @@ import {
   parseCompanyFilters, serializeCompanyFilters, type CompanyFilters,
 } from "@/lib/companies/filters";
 import { resolveCompanyWhere } from "@/lib/companies/resolve";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "./companies.module.css";
 
 const PAGE_SIZE = 30;
 const TENANT_ID = 1;
 
 function avatarBg(id: number) {
   const palette = [
-    "var(--indigo)", "var(--mint)", "var(--amber)",
+    "var(--color-accent)", "var(--mint)", "var(--amber)",
     "var(--sky)", "var(--violet)", "var(--coral)",
   ];
   return palette[id % palette.length];
@@ -29,7 +32,7 @@ function avatarBg(id: number) {
 
 const FRESHNESS_COLOR: Record<string, string> = {
   mint:   "var(--mint)",
-  mute:   "var(--fg-mute)",
+  mute:   "var(--color-text-secondary)",
   amber:  "var(--amber)",
   coral:  "var(--coral)",
 };
@@ -167,151 +170,122 @@ export default async function CompaniesPage({
       {/* Active filter chips (removable) */}
       <CompanyActiveFilters chips={activeChips} />
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-5">
-        <div className="flex items-center gap-3">
-          <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
-            Cégek
-            <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-faint)", fontWeight: 400 }}>
-              {total.toLocaleString("hu-HU")}
-            </span>
-          </h1>
-          <CreateCompanyButton />
-        </div>
-        <div className="flex items-center gap-2">
-          <CompaniesSearch search={filters.search ?? ""} includeFA={filters.includeFA ?? false} />
-          <CompanyFilterBar facets={facets} />
-          <TagFilter activeTagName={filters.tags?.[0]} />
-          <RunEnrichmentButton companyIds={companies.map((c) => c.id)} />
-          <SavedViewsDropdown
-            entityType="company"
-            basePath="/companies"
-            currentParams={serialized}
-            views={savedViews}
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Cégek"
+        eyebrow={
+          `${total.toLocaleString("hu-HU")} cég` // PROPOSAL copy
+        }
+        actions={
+          <>
+            <CreateCompanyButton />
+            <RunEnrichmentButton companyIds={companies.map((c) => c.id)} />
+            <SavedViewsDropdown
+              entityType="company"
+              basePath="/companies"
+              currentParams={serialized}
+              views={savedViews}
+            />
+          </>
+        }
+        filters={
+          <>
+            <CompaniesSearch search={filters.search ?? ""} includeFA={filters.includeFA ?? false} />
+            <CompanyFilterBar facets={facets} />
+            <TagFilter activeTagName={filters.tags?.[0]} />
+          </>
+        }
+      />
 
-      {/* Table — no outer card, rows float on the page */}
-      <table className="mount mount-1" style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-        <thead>
-          <tr>
-            {["", "Cég", "Pipeline", "Területe"].map((h, i) => (
-              <th
-                key={i}
-                style={{
-                  textAlign: "left",
-                  padding: "0 14px 8px",
-                  fontSize: 12, fontWeight: 600,
-                  textTransform: "uppercase", letterSpacing: "0.12em",
-                  color: "var(--fg-faint)",
-                  borderBottom: "1px solid var(--line-soft)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {companies.length === 0 && (
+      {/* Table: columns compare, so this stays a table. Rows float on the page, no outer card. */}
+      <div className={k.tableWrap}>
+        <table className={`mount mount-1 ${k.table} ${s.listTable}`}>
+          <thead>
             <tr>
-              <td colSpan={4} style={{ padding: "56px 14px", textAlign: "center" }}>
-                <div style={{ color: "var(--fg-faint)", fontSize: 14 }}>Nincs találat</div>
-                {activeChips.length > 0 && (
-                  <div style={{ marginTop: 6, fontSize: 14, color: "var(--fg-faint)" }}>
-                    <Link href="/companies" style={{ color: "var(--indigo)" }}>Szűrő törlése</Link>
-                  </div>
-                )}
-              </td>
+              {["", "Cég", "Pipeline", "Területe"].map((h, i) => (
+                <th key={i}>{h}</th>
+              ))}
             </tr>
-          )}
-          {companies.map((c, idx) => {
-            const initials = c.name.slice(0, 2).toUpperCase();
-            const freshness = contactFreshness(c.lastInteractionDate);
-            const relTime = formatRelativeTime(c.lastInteractionDate);
-            const isTerminal = c.pipelineStatus === "7" || c.pipelineStatus === "8" || c.pipelineStatus === "0";
-
-            return (
-              <tr
-                key={c.id}
-                className="tbl-row mount"
-                style={{ animationDelay: `${Math.min(idx * 15, 300)}ms` }}
-              >
-                {/* Avatar */}
-                <td style={{ padding: "7px 14px", width: 40, borderBottom: "1px solid var(--line-soft)" }}>
-                  <Link href={`/companies/${c.id}`}>
-                    <div
-                      className="font-mono-ndt flex items-center justify-center"
-                      style={{
-                        width: 28, height: 28, borderRadius: 6,
-                        fontSize: 12, fontWeight: 700,
-                        background: avatarBg(c.id), color: "var(--fg-on-accent)",
-                        letterSpacing: "0.02em",
-                      }}
-                    >
-                      {initials}
+          </thead>
+          <tbody>
+            {companies.length === 0 && (
+              <tr>
+                <td colSpan={4} className={s.emptyCell}>
+                  <div className={k.muted}>Nincs találat</div>
+                  {activeChips.length > 0 && (
+                    <div className={s.emptyAction}>
+                      <Link href="/companies" className={k.link}>Szűrő törlése</Link>
                     </div>
-                  </Link>
-                </td>
-
-                {/* Name + VAT */}
-                <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)", maxWidth: 340 }}>
-                  <Link href={`/companies/${c.id}`} className="tbl-link" style={{ fontSize: 14 }}>
-                    {c.name}
-                  </Link>
-                  {c.vatNumber && (
-                    <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: 8 }}>
-                      {c.vatNumber}
-                    </span>
-                  )}
-                </td>
-
-                {/* Pipeline status + last contact — the actionable column */}
-                <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)", width: 200 }}>
-                  <PipelineStatusBadge status={c.pipelineStatus} />
-                  {!isTerminal && (
-                    <span
-                      className="font-mono-ndt"
-                      style={{ fontSize: 12, color: FRESHNESS_COLOR[freshness], marginLeft: 8 }}
-                    >
-                      {relTime}
-                    </span>
-                  )}
-                </td>
-
-                {/* City */}
-                <td style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-soft)", color: "var(--fg-mute)", fontSize: 14, whiteSpace: "nowrap" }}>
-                  {c.city ?? "-"}
-                  {c.county && (
-                    <span style={{ color: "var(--fg-faint)", marginLeft: 6, fontSize: 12 }}>{c.county}</span>
                   )}
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            )}
+            {companies.map((c, idx) => {
+              const initials = c.name.slice(0, 2).toUpperCase();
+              const freshness = contactFreshness(c.lastInteractionDate);
+              const relTime = formatRelativeTime(c.lastInteractionDate);
+              const isTerminal = c.pipelineStatus === "7" || c.pipelineStatus === "8" || c.pipelineStatus === "0";
+
+              return (
+                <tr
+                  key={c.id}
+                  className="tbl-row mount"
+                  style={{ animationDelay: `${Math.min(idx * 15, 300)}ms` }}
+                >
+                  {/* Avatar */}
+                  <td className={s.avatarCell}>
+                    <Link href={`/companies/${c.id}`}>
+                      <div className={s.avatarSm} style={{ background: avatarBg(c.id) }}>
+                        {initials}
+                      </div>
+                    </Link>
+                  </td>
+
+                  {/* Name + VAT */}
+                  <td className={s.nameCell}>
+                    <Link href={`/companies/${c.id}`} className={s.name}>
+                      {c.name}
+                    </Link>
+                    {c.vatNumber && (
+                      <div className={s.taxNo}>{c.vatNumber}</div>
+                    )}
+                  </td>
+
+                  {/* Pipeline status + last contact — the actionable column */}
+                  <td className={s.nowrap}>
+                    <PipelineStatusBadge status={c.pipelineStatus} />
+                    {!isTerminal && (
+                      <span className={s.relTime} style={{ color: FRESHNESS_COLOR[freshness] }}>
+                        {relTime}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* City */}
+                  <td className={`${s.nowrap} ${k.muted}`}>
+                    {c.city ?? "-"}
+                    {c.county && (
+                      <span style={{ marginLeft: 6 }}>{c.county}</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
-          <span>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString("hu-HU")}</span>
+        <div className={k.pager}>
+          <span className={k.muted}>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} / {total.toLocaleString("hu-HU")}</span>
           <div className="flex gap-2">
             {page > 1 && (
-              <Link
-                href={pageHref(page - 1)}
-                style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
-              >
+              <Link href={pageHref(page - 1)} className={k.btn}>
                 ← Előző
               </Link>
             )}
             {page < totalPages && (
-              <Link
-                href={pageHref(page + 1)}
-                style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
-              >
+              <Link href={pageHref(page + 1)} className={k.btn}>
                 Következő →
               </Link>
             )}

@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import k from "@/components/astryx/page.module.css";
 
 interface CompaniesSearchProps {
   search: string;
@@ -52,7 +53,7 @@ function CompaniesSearchInner({ search, includeFA }: CompaniesSearchProps) {
         onChange={handleChange}
         className="max-w-sm"
       />
-      <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+      <label className={`flex items-center gap-2 cursor-pointer ${k.muted}`}>
         <input
           type="checkbox"
           checked={includeFA}
