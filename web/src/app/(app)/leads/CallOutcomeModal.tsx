@@ -9,9 +9,10 @@ import { logLeadCall } from "@/app/actions/leads";
 import { correctCallOutcome } from "@/app/actions/calls";
 import { proposeBookingSlots } from "@/app/actions/bookings";
 import type { BookingConflictInfo } from "@/lib/leads/service";
-import { CALL_OUTCOMES, CALL_TYPES, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, CALL_TYPES, type CallOutcomeKey, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
 import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
 import { FormField } from "@/components/ui/FormField";
+import { localInputToIso } from "./[id]/booking/booking-view";
 import type { ScriptVariant } from "@/lib/leads/scripts";
 
 // datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
@@ -40,7 +41,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function CallOutcomeModal({
-  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null,
+  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null, initialOutcome,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,12 +53,17 @@ export function CallOutcomeModal({
    * parsed and corrected outcomes measurable. Null = an ordinary call log.
    */
   correctsInteractionId?: number | null;
+  /** Pre-selects this outcome each time the modal opens (default no_answer). */
+  initialOutcome?: CallOutcomeKey;
   title?: string | null;
   stageDescription?: string | null;
   onLogged?: () => void;
   scriptVariants?: ScriptVariant[];
 }) {
   const [outcome, setOutcome] = useState<string>("no_answer");
+  // Pre-select on the closed -> open edge (adjust state during render, no effect).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) { setWasOpen(open); if (open && initialOutcome) setOutcome(initialOutcome); }
   const [note, setNote] = useState("");
   const [callbackAt, setCallbackAt] = useState("");
   const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
@@ -94,10 +100,10 @@ export function CallOutcomeModal({
     startTransition(async () => {
       const payload = {
         outcome, note,
-        // datetime-local is wall-clock; Date parses it as local time → ISO for the wire.
-        callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
+        // datetime-local is Budapest wall-clock time, whatever zone the browser is in.
+        callbackAt: outcome === "callback_requested" && callbackAt ? localInputToIso(callbackAt) : null,
         demoWith: outcome === "meeting_booked" ? demoWith : null,
-        bookingAt: outcome === "meeting_booked" && bookingAt ? new Date(bookingAt).toISOString() : null,
+        bookingAt: outcome === "meeting_booked" && bookingAt ? localInputToIso(bookingAt) : null,
         bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
         lostReason: isLostCallOutcome(outcome) ? lostReason : null,
         scriptVariant: scriptKey || undefined,

@@ -2,6 +2,7 @@ import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interacti
 import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
 import { callTypeLabel, callOutcomeLabel } from "@/lib/leads/outcomes";
 import { formatDateTime } from "@/lib/utils";
+import s from "./lead.module.css";
 
 export interface Interaction {
   id: number;
@@ -17,7 +18,7 @@ export interface Interaction {
   supersedesInteractionId?: number | null;
 }
 
-// ⚠️ HU string below is a PROPOSAL, unreviewed by Áron (same convention as
+// HU string below is a PROPOSAL, unreviewed by Áron (same convention as
 // AUTO_OUTCOME_LABELS in lib/calls/auto-outcome.ts). `outcome: "transcribed"`
 // marks a queued dictation, not a real call outcome: it has no entry in
 // CALL_OUTCOMES, so the raw English key must never reach the chip.
@@ -37,21 +38,19 @@ export function CallsTab({
 }) {
   if (interactions.length === 0) {
     // PROPOSAL copy
-    return <div style={{ fontSize: 14, color: "var(--fg-mute)", padding: "8px 0" }}>Még nincs hívás. A Hívás eredménye gombbal rögzítheted az elsőt.</div>;
+    return <p className={s.closedNote}>Még nincs hívás. A fenti eredmény-gombokkal rögzítheted az elsőt.</p>;
   }
   return (
-    <div className="panel">
-      <div className="panel-head"><div className="panel-title">Hívások és interakciók · {interactions.length}</div></div>
-      <div className="panel-pad">
-        {callTypeCounts.length > 0 && (
-          <p className="page-sub" style={{ marginBottom: 12 }}>
-            {/* PROPOSAL copy */}
-            {callTypeCounts.map((c) => `${c.callType ? callTypeLabel(c.callType) : "típus nélkül"}: ${c.count}`).join(" · ")}
-          </p>
-        )}
-        <div className="space-y-3">
-          {interactions.map((r) => {
-            // A correction (supersedesInteractionId set) is never itself flagged
+    <>
+      {callTypeCounts.length > 0 && (
+        <p className={s.muted}>
+          {/* PROPOSAL copy */}
+          {callTypeCounts.map((c) => `${c.callType ? callTypeLabel(c.callType) : "típus nélkül"}: ${c.count}`).join(" · ")}
+        </p>
+      )}
+      <div className={s.list}>
+        {interactions.map((r) => {
+          // A correction (supersedesInteractionId set) is never itself flagged
             // as auto-derived: it IS the human correction. And the badge/button
             // only ever apply to an interaction that actually belongs to the lead
             // being viewed: the timeline query also pulls in sibling leads of the
@@ -66,45 +65,33 @@ export function CallsTab({
             const auto = ownLead && isAutoOutcome(r);
             const confidencePct = auto ? Math.round((r.autoConfidence ?? 0) * 100) : null;
             return (
-              <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--indigo)", marginTop: 5, flexShrink: 0 }} />
+              <div key={r.id} className={s.callItem}>
+                <div className={s.dot} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="flex items-center gap-2 flex-wrap" style={{ fontSize: 12, marginBottom: 2 }}>
-                    <span style={{ color: "var(--fg)", fontWeight: 500 }}>{interactionTypeLabel(r.type)}</span>
-                    {r.direction && <span style={{ color: "var(--fg-mute)" }}>· {interactionDirectionLabel(r.direction)}</span>}
-                    {r.outcome && (
-                      <span className="font-mono-ndt" style={{ fontSize: 12, padding: "1px 6px", borderRadius: 10, background: "var(--bg-hover)", color: "var(--fg-soft)" }}>
-                        {outcomeChipLabel(r.outcome)}
-                      </span>
-                    )}
-                    {r.user?.name && <span style={{ color: "var(--fg-faint)", fontSize: 12 }}>· {r.user.name}</span>}
-                    <span className="font-mono-ndt" style={{ color: "var(--fg-faint)", fontSize: 12, marginLeft: "auto" }}>{formatDateTime(r.occurredAt)}</span>
+                  <div className={s.row}>
+                    <span style={{ fontWeight: 600 }}>{interactionTypeLabel(r.type)}</span>
+                    {r.direction && <span className={s.muted}>· {interactionDirectionLabel(r.direction)}</span>}
+                    {r.outcome && <span className={s.chip}>{outcomeChipLabel(r.outcome)}</span>}
+                    {r.user?.name && <span className={s.muted}>· {r.user.name}</span>}
+                    <span className={s.rowEnd}>{formatDateTime(r.occurredAt)}</span>
                   </div>
                   {auto && (
-                    <div className="flex items-center gap-2" style={{ marginBottom: 2, flexWrap: "wrap" }}>
-                      <span className="font-mono-ndt" style={{ fontSize: 11, fontWeight: 600, padding: "1px 6px", borderRadius: 10, background: "var(--amber-soft)", color: "var(--amber)" }}>
-                        {AUTO_OUTCOME_LABELS.autoBadge}
-                      </span>
-                      <span style={{ fontSize: 11, color: "var(--fg-mute)" }}>
+                    <div className={s.row}>
+                      <span className={`${s.chip} ${s.chipAuto}`}>{AUTO_OUTCOME_LABELS.autoBadge}</span>
+                      <span className={s.muted} style={{ fontSize: 12 }}>
                         {AUTO_OUTCOME_LABELS.autoBadgeHint.replace("{pct}", String(confidencePct))}
                       </span>
-                      <button
-                        onClick={() => onCorrect(r.id)}
-                        disabled={closed}
-                        className="min-h-[44px]"
-                        style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 11, fontWeight: 600, padding: 0, cursor: "pointer" }}
-                      >
+                      <button type="button" onClick={() => onCorrect(r.id)} disabled={closed} className={s.linkBtn}>
                         {AUTO_OUTCOME_LABELS.correct}
                       </button>
                     </div>
                   )}
-                  {r.notes && <p style={{ fontSize: 12, color: "var(--fg-soft)", lineHeight: 1.4 }}>{r.notes}</p>}
+                  {r.notes && <p className={s.note}>{r.notes}</p>}
                 </div>
               </div>
             );
           })}
-        </div>
       </div>
-    </div>
+    </>
   );
 }

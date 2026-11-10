@@ -1,6 +1,7 @@
 import { lostReasonLabel } from "@/lib/leads/lifecycle";
 import { LEAD_OUTCOME_LABEL, type LeadOutcome } from "@/lib/leads/outcomes";
 import { formatRelativeTime } from "@/lib/utils";
+import s from "./lead.module.css";
 
 export interface AuditEntry {
   id: number;
@@ -38,36 +39,27 @@ export function HistoryTab({
 
   if (shown.length === 0 && auditEntries.length === 0) {
     // PROPOSAL copy
-    return <div style={{ fontSize: 14, color: "var(--fg-mute)", padding: "8px 0" }}>Még nincs előzmény. A lead módosításai itt jelennek meg.</div>;
+    return <p className={s.closedNote}>Még nincs előzmény. A lead módosításai itt jelennek meg.</p>;
   }
   return (
-    <div className="space-y-4">
+    <>
       {shown.length > 0 && (
-        <div className="panel">
-          <div className="panel-head"><div className="panel-title">Forrás</div></div>
-          <div className="panel-pad space-y-2">
-            {shown.map(([k, v, mono]) => (
-              <div key={k} className="flex justify-between gap-4" style={{ fontSize: 12 }}>
-                <span className={mono ? "font-mono-ndt" : undefined} style={{ color: mono ? "var(--fg-faint)" : "var(--fg-mute)" }}>{k}</span>
-                <span className="font-mono-ndt" style={{ color: "var(--fg)", textAlign: "right" }}>{v}</span>
-              </div>
-            ))}
-          </div>
+        <div className={s.list}>
+          <h3 className={s.h3}>Forrás</h3>
+          {shown.map(([k, v]) => (
+            <div key={k} className={s.kv}><span>{k}</span><span>{v}</span></div>
+          ))}
         </div>
       )}
       {auditEntries.length > 0 && (
-        <div className="panel">
-          <div className="panel-head"><div className="panel-title">Előzmények</div></div>
-          <div className="panel-pad space-y-2">
-            {auditEntries.slice(0, 12).map((a) => (
-              <div key={a.id} className="flex items-center justify-between" style={{ fontSize: 12 }}>
-                <span className="font-mono-ndt" style={{ color: "var(--fg-mute)" }}>{a.action}</span>
-                <span className="font-mono-ndt" style={{ color: "var(--fg-faint)" }}>{formatRelativeTime(a.occurredAt)}</span>
-              </div>
-            ))}
-          </div>
+        <div className={s.list}>
+          {/* PROPOSAL copy */}
+          <h3 className={s.h3}>Módosítások</h3>
+          {auditEntries.slice(0, 12).map((a) => (
+            <div key={a.id} className={s.kv}><span>{a.action}</span><span>{formatRelativeTime(a.occurredAt)}</span></div>
+          ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
