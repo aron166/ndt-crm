@@ -1,0 +1,16 @@
+/* Pipeline setup: layout the page kit lacks. Astryx tokens only. */
+.panel { background: var(--color-background-card); border-radius: var(--radius-container); box-shadow: var(--shadow-low); overflow: hidden; }
+.panelHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--color-border); }
+.panelTitle { font-size: 18px; font-weight: 600; color: var(--color-text-primary); }
+.panelPad { padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+.editCard { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--color-accent); border-radius: var(--radius-container); background: var(--color-background-card); }
+.stageRow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: 48px; border: 1px solid var(--color-border); border-radius: var(--radius-container); background: var(--color-background-card); cursor: pointer; }
+.stageRow:hover { background: var(--color-overlay-hover); }
+.label { display: block; font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 4px; }
+.field { box-sizing: border-box; width: 100%; min-height: 40px; padding: 6px 10px; font: inherit; font-size: 14px; background: var(--color-background-card); color: var(--color-text-primary); border: 1px solid var(--color-border-emphasized); border-radius: var(--radius-element); }
+.field:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.toggleBtn { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 12px 20px; background: none; border: 0; cursor: pointer; color: var(--color-text-primary); font: inherit; font-size: 14px; font-weight: 500; }
+.toggleBtn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.textBtn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; background: none; border: 0; cursor: pointer; color: var(--color-text-accent); font: inherit; font-size: 14px; }
+.swatch:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.code { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-secondary); background: var(--color-background-muted); padding: 1px 6px; border-radius: var(--radius-element); }
