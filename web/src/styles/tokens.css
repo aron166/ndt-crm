@@ -21,6 +21,7 @@
   /* lines */
   --ui-border: var(--color-border);
   --ui-border-strong: var(--color-border-emphasized);
+  --ui-control-border: var(--color-text-disabled);
 
   /* action */
   --ui-accent: var(--color-accent);

@@ -9,11 +9,11 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[var(--ui-accent)] text-[var(--ui-on-accent)] [a]:hover:brightness-95",
+        default: "bg-[var(--ui-accent)] text-[var(--ui-on-accent)] [a]:hover:bg-[color-mix(in_srgb,var(--ui-accent)_85%,white)]",
         secondary:
           "bg-[var(--ui-surface-muted)] text-[var(--ui-text)] [a]:hover:bg-[var(--ui-hover)]",
         destructive:
-          "bg-[var(--ui-danger-surface)] text-[var(--ui-danger-text)] [a]:hover:brightness-95",
+          "border-[var(--ui-danger)] bg-[var(--ui-danger-surface)] text-[var(--ui-text)] [a]:hover:bg-[var(--ui-hover)]",
         outline:
           "border-[var(--ui-border-strong)] text-[var(--ui-text)] [a]:hover:bg-[var(--ui-hover)]",
         ghost:

@@ -37,7 +37,7 @@ function DialogOverlay({
         // warm median on "outcome modal open" (104 -> 72, N=7). Áron's Phase 1.5
         // constraint already says "no glass, no animations". A test pins these
         // classes out; see docs/PERF_2026-09-08_INP.md before re-adding a fade.
-        "fixed inset-0 isolate z-50 bg-[var(--ui-scrim)] transition-opacity duration-[var(--ui-dur)] ease-[var(--ui-ease-out)] data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 motion-reduce:transition-none",
+        "fixed inset-0 isolate z-50 bg-[var(--ui-scrim)]",
         className
       )}
       {...props}
@@ -59,7 +59,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--ui-radius-surface)] bg-[var(--ui-surface-overlay)] p-6 text-sm text-[var(--ui-text)] shadow-[var(--ui-shadow-overlay)] outline-none sm:max-w-[480px] transition-[opacity,translate] duration-[var(--ui-dur)] ease-[var(--ui-ease-out)] data-[starting-style]:-translate-y-[calc(50%-8px)] data-[starting-style]:opacity-0 data-[ending-style]:-translate-y-[calc(50%-8px)] data-[ending-style]:opacity-0 motion-reduce:transition-none",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--ui-radius-surface)] bg-[var(--ui-surface-overlay)] p-6 text-sm text-[var(--ui-text)] shadow-[var(--ui-shadow-overlay)] outline-none sm:max-w-[480px]",
           className
         )}
         {...props}
@@ -127,7 +127,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "font-heading text-xl leading-tight font-semibold text-[var(--ui-text)]",
+        "pr-10 font-heading text-xl leading-tight font-semibold text-[var(--ui-text)]",
         className
       )}
       {...props}

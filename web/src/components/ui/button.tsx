@@ -8,7 +8,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[var(--ui-accent)] text-[var(--ui-on-accent)] hover:brightness-95",
+        default: "bg-[var(--ui-accent)] text-[var(--ui-on-accent)] hover:bg-[color-mix(in_srgb,var(--ui-accent)_85%,white)]",
         outline:
           "border-[var(--ui-border-strong)] bg-[var(--ui-surface)] text-[var(--ui-text)] hover:bg-[var(--ui-hover)] aria-expanded:bg-[var(--ui-hover)]",
         secondary:
@@ -16,7 +16,7 @@ const buttonVariants = cva(
         ghost:
           "bg-transparent text-[var(--ui-text)] hover:bg-[var(--ui-hover)] aria-expanded:bg-[var(--ui-hover)]",
         destructive:
-          "bg-[var(--ui-danger-surface)] text-[var(--ui-danger-text)] hover:brightness-95",
+          "border-[var(--ui-danger)] bg-[var(--ui-surface)] text-[var(--ui-danger-text)] hover:bg-[var(--ui-danger-surface)]",
         link: "text-[var(--ui-text-link)] underline underline-offset-4",
       },
       size: {
