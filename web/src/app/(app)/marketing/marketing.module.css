@@ -21,7 +21,7 @@
 .settingsBody { padding: 0 20px 16px; }
 .optionRow { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-control); cursor: pointer; }
 .optionRow[data-checked="true"] { background: var(--ui-surface-muted); border-color: var(--ui-border-strong); }
-.labelRow { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.labelRow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 44px; }
 .check { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--ui-accent); }
 .verdict { display: inline-flex; align-items: center; gap: 6px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }

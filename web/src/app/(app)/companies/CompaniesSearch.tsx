@@ -46,12 +46,12 @@ function CompaniesSearchInner({ search, includeFA }: CompaniesSearchProps) {
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <Input
         placeholder="Keresés cég neve, adószám, város..."
         value={value}
         onChange={handleChange}
-        className="max-w-sm"
+        className="w-full max-w-sm"
       />
       <label className={`flex items-center gap-2 cursor-pointer ${k.muted}`}>
         <input

@@ -311,7 +311,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
           <button
             key={key}
             onClick={() => setFilter(key as typeof filter)}
-            className="rounded-full transition-colors"
+            className="rounded-full transition-colors touch44"
             style={{
               height: 26, padding: "0 10px", fontSize: 12,
               background: filter === key ? "var(--ui-surface-muted)" : "var(--ui-surface)",
@@ -323,7 +323,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
           </button>
         ))}
 
-        <div className="ml-auto flex items-center gap-4" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
           {COLUMNS.map((col) => (
             <span key={col.key} className="flex items-center gap-1">
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: col.color }} />
@@ -398,7 +398,7 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
 
                 <button
                   onClick={() => { setModalStatus(col.key); setModalOpen(true); }}
-                  className="flex items-center gap-1.5 w-full rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 w-full rounded-lg transition-colors touch44"
                   style={{
                     height: 30, padding: "0 8px",
                     fontSize: 14, color: "var(--ui-text-muted)",

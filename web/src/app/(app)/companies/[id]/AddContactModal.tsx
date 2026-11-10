@@ -66,7 +66,7 @@ export function AddContactModal({ open, onClose, companyId }: AddContactModalPro
           <button
             type="button"
             onClick={() => setMode("find")}
-            className={`flex-1 min-h-9 rounded-[var(--ui-radius-control)] text-sm font-medium transition-colors ${
+            className={`flex-1 min-h-11 sm:min-h-9 rounded-[var(--ui-radius-control)] text-sm font-medium transition-colors ${
               mode === "find"
                 ? "bg-[var(--ui-surface)] text-[var(--ui-text)] shadow-[var(--ui-shadow-raised)]"
                 : "text-[var(--ui-text-muted)] hover:text-[var(--ui-text)]"
@@ -77,7 +77,7 @@ export function AddContactModal({ open, onClose, companyId }: AddContactModalPro
           <button
             type="button"
             onClick={() => setMode("create")}
-            className={`flex-1 min-h-9 rounded-[var(--ui-radius-control)] text-sm font-medium transition-colors ${
+            className={`flex-1 min-h-11 sm:min-h-9 rounded-[var(--ui-radius-control)] text-sm font-medium transition-colors ${
               mode === "create"
                 ? "bg-[var(--ui-surface)] text-[var(--ui-text)] shadow-[var(--ui-shadow-raised)]"
                 : "text-[var(--ui-text-muted)] hover:text-[var(--ui-text)]"
@@ -99,7 +99,7 @@ export function AddContactModal({ open, onClose, companyId }: AddContactModalPro
             </FormField>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField label="Keresztnév">
                   <Input name="firstName" placeholder="Béla" autoFocus />
                 </FormField>
@@ -107,7 +107,7 @@ export function AddContactModal({ open, onClose, companyId }: AddContactModalPro
                   <Input name="lastName" placeholder="Kovács" />
                 </FormField>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField label="Email">
                   <Input name="email" type="email" placeholder="bela@ceg.hu" />
                 </FormField>

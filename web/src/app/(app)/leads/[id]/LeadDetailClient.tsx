@@ -1,20 +1,24 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { LeadMoveDialog } from "@/components/LeadMoveDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Button as AButton } from "@astryxdesign/core/Button";
+import { useToast } from "@astryxdesign/core/Toast";
+import { useDeferredCall, DEFER_MS } from "./v2/useDeferredCall";
 import { DEFAULT_TRANSITIONS } from "@/lib/leads/lifecycle";
 import { SendEmailModal } from "@/components/SendEmailModal";
-import { moveLead, setLeadOutcomeAction, deleteLead, assignLeadAction } from "@/app/actions/leads";
+import { moveLead, setLeadOutcomeAction, deleteLead, assignLeadAction, logLeadCall } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/leads/qualification";
 import type { ScriptVariant } from "@/lib/leads/scripts";
-import type { CallOutcomeKey, LeadOutcome } from "@/lib/leads/outcomes";
+import { CALL_OUTCOMES, type CallOutcomeKey, type LeadOutcome } from "@/lib/leads/outcomes";
 import type { BookingKind } from "@/lib/booking/priority";
 import { suggestNextSteps, type Suggestion } from "@/lib/leads/suggestions";
 import { buildTimeline } from "@/lib/leads/timeline";
@@ -125,7 +129,13 @@ export function LeadDetailClient({
   const [padOutcome, setPadOutcome] = useState<CallOutcomeKey | undefined>(undefined);
   // Non-null while the modal is open to correct THAT auto-derived interaction.
   const [correcting, setCorrecting] = useState<number | null>(null);
-  const [booking, setBooking] = useState<BookingCtx | null>(null);
+  // ?book=1 (from the board / drive "Foglalt meeting" outcome) opens the drawer on arrival.
+  // Same kind / event / stage the outcome pad uses, so the stage move still happens.
+  const [booking, setBooking] = useState<BookingCtx | null>(() => {
+    if (params.get("book") !== "1") return null;
+    const sg = suggestNextSteps(lead.status ?? "new").find((x) => x.kind === "booking");
+    return { kind: sg?.bookingKind ?? "single_machine_demo", event: sg?.event, to: sg?.to };
+  });
   // Old ?tab=overview / ?tab=offers deep links land with the details open.
   const [detailsOpen, setDetailsOpen] = useState(tab === "overview" || tab === "offers");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -220,26 +230,114 @@ export function LeadDetailClient({
     else if (x.to) runMove(x.to, x.event);
   }
 
+  // One click logs these two; the write is deferred so Undo can cancel it (interactions are append-only).
+  const toast = useToast();
+  const pendingKey = `pendingCall:${lead.id}`;
+  // Only deletes the record of the same outcome, so an earlier commit cannot remove a later one's record.
+  const clearPending = (outcome: string) => {
+    try {
+      const raw = sessionStorage.getItem(pendingKey);
+      if (raw && (JSON.parse(raw) as { outcome: string }).outcome === outcome) sessionStorage.removeItem(pendingKey);
+    } catch { /* storage blocked or unreadable */ }
+  };
+  // Global toast: still shown if the page was left before the write finished.
+  const failed = (msg: string, outcome: string) => { clearPending(outcome); toast({ body: msg, type: "error", autoHideDuration: 10000 }); };
+  const quickCall = useDeferredCall<{ outcome: CallOutcomeKey; note: string }>((item) => {
+    logLeadCall(lead.id, item).then((res) => {
+      if ("error" in res) { failed(res.error, item.outcome); return; }
+      clearPending(item.outcome);
+      // Keep what was typed since the click.
+      setCallNote((cur) => (cur.trim() === item.note ? "" : cur));
+      router.refresh();
+    }).catch(() => failed("Mentés sikertelen: próbáld újra", item.outcome));
+  });
+
+  // A log that never got its answer (tab killed mid-write): tell, never replay (append-only).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(pendingKey);
+      if (!raw) return;
+      const p = JSON.parse(raw) as { outcome: string; at: number };
+      if (Date.now() - p.at > 10_000) {
+        sessionStorage.removeItem(pendingKey);
+        const label = CALL_OUTCOMES.find((o) => o.key === p.outcome)?.label ?? p.outcome;
+        toast({ body: `A call log may not have been saved: ${label}, open the timeline to check`, type: "error", autoHideDuration: 15000 }); // PROPOSAL copy
+      }
+    } catch { /* unreadable: ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Board / drive hand the typed note over once; ?book=1 is consumed here.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(`callNote:${lead.id}`);
+      if (raw) {
+        sessionStorage.removeItem(`callNote:${lead.id}`);
+        const v = JSON.parse(raw) as { note?: string; at?: number };
+        if (v.note && typeof v.at === "number" && Date.now() - v.at < 30 * 60_000) setCallNote(v.note);
+      }
+    } catch { /* storage blocked */ }
+    if (params.get("book") === "1") {
+      const q = new URLSearchParams(params.toString());
+      q.delete("book");
+      router.replace(q.size ? `${pathname}?${q}` : pathname, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function quickLog(k: "no_answer" | "wrong_number") {
+    setActionError(null);
+    const label = CALL_OUTCOMES.find((o) => o.key === k)?.label ?? k;
+    const item = { outcome: k, note: callNote.trim() || label };
+    if (!quickCall.schedule(k, item)) return;
+    try { sessionStorage.setItem(pendingKey, JSON.stringify({ outcome: k, at: Date.now() })); } catch { /* storage blocked */ }
+    // PROPOSAL copy
+    const dismiss = toast({
+      body: `Logged: ${label}`, autoHideDuration: DEFER_MS,
+      endContent: <AButton variant="ghost" size="sm" label="Undo" onClick={() => {
+        if (quickCall.cancel(k)) clearPending(k); else toast({ body: "Already saved", autoHideDuration: 3000 });
+        dismiss();
+      }} />,
+    });
+    quickCall.bindDismiss(k, dismiss);
+  }
+
   function pickOutcome(k: CallOutcomeKey) {
+    if (k === "no_answer" || k === "wrong_number") { quickLog(k); return; }
     // IF never books on its own: it opens the drawer.
     if (k === "meeting_booked") { setBooking({ kind: bookingSuggestion?.bookingKind ?? "single_machine_demo", event: bookingSuggestion?.event, to: bookingSuggestion?.to }); return; }
     setPadOutcome(k);
     setLogging(true);
   }
 
-  function handleBooked(kind: BookingKind) {
+  // The drawer already booked: a failed log is retried with the same task id, never re-booked.
+  function logBookedCall(taskId: number, note: string) {
+    const fail = () => toast({
+      body: "Booked, but the call was not logged", type: "error", autoHideDuration: 15000,
+      endContent: <AButton variant="ghost" size="sm" label="Log it again" onClick={() => logBookedCall(taskId, note)} />,
+    });
+    logLeadCall(lead.id, { outcome: "meeting_booked", note, existingBookingTaskId: taskId }).then((res) => {
+      if ("error" in res) { fail(); return; }
+      setCallNote("");
+      router.refresh();
+    }).catch(fail);
+  }
+
+  function handleBooked(kind: BookingKind, taskId: number) {
     if (bookedLock.current) return;
     bookedLock.current = true;
     try {
       const b = booking;
       // Close first so a failed follow-up move shows on the page, not behind the drawer.
       setBooking(null);
-      if (b?.event && b.to) {
+      // Call mode: the call log (against the meeting the drawer just created) moves the stage itself.
+      if (calling) {
+        const retry = { taskId, note: callNote.trim() || "Foglalt meeting" };
+        logBookedCall(retry.taskId, retry.note);
+      } else if (b?.event && b.to) {
         if (kind === b.kind) runMove(b.to, b.event);
         else setActionNote("Lefoglalva; a szakasz nem változott."); // PROPOSAL copy
       }
-      // Call mode: log the call as "meeting booked" with the typed note.
-      if (calling) { setPadOutcome("meeting_booked"); setLogging(true); }
     } finally {
       bookedLock.current = false;
     }
@@ -282,6 +380,7 @@ export function LeadDetailClient({
 
   return (
     <div className={s.page}>
+      {params.get("from") === "drive" && <Link href="/drive" className={s.back}>Back to the queue</Link>}
       <Header
         name={displayName}
         companyId={lead.company?.id ?? null}
@@ -437,7 +536,7 @@ export function LeadDetailClient({
         correctsInteractionId={correcting}
         initialOutcome={padOutcome}
         initialNote={correcting ? undefined : callNote || undefined}
-        hideMeetingBooked={padOutcome !== "meeting_booked"}
+        onBook={(note) => { setCallNote(note); setLogging(false); setPadOutcome(undefined); setBooking({ kind: bookingSuggestion?.bookingKind ?? "single_machine_demo", event: bookingSuggestion?.event, to: bookingSuggestion?.to }); }}
       />
 
       <LeadEditModal

@@ -265,7 +265,7 @@ function LeadCard({
             aria-label="Hívás eredménye"
             draggable={false}
             onClick={() => onCall(lead.id)}
-            className="h-[22px] min-h-[22px]"
+            className="h-[22px] min-h-[22px] touch44"
           >
             <PhoneCall style={{ width: 11, height: 11 }} />
             Hívás
@@ -275,6 +275,7 @@ function LeadCard({
             value={lead.outcome}
             aria-label="Kimenetel"
             draggable={false}
+            className="touch44"
             onChange={(e) => onOutcome(lead.id, e.target.value as LeadOutcome)}
             style={{
               fontSize: 12, height: 22, padding: "0 4px", borderRadius: 4, fontWeight: 600,

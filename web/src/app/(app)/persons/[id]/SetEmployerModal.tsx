@@ -84,7 +84,7 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
           <button
             type="button"
             onClick={() => setMode("find")}
-            className={`flex-1 min-h-9 rounded-[var(--ui-radius-control)] text-sm font-medium transition-colors ${
+            className={`flex-1 min-h-11 sm:min-h-9 rounded-[var(--ui-radius-control)] text-sm font-medium transition-colors ${
               mode === "find"
                 ? "bg-[var(--ui-surface)] text-[var(--ui-text)] shadow-[var(--ui-shadow-raised)]"
                 : "text-[var(--ui-text-muted)] hover:text-[var(--ui-text)]"
@@ -95,7 +95,7 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
           <button
             type="button"
             onClick={() => setMode("create")}
-            className={`flex-1 min-h-9 rounded-[var(--ui-radius-control)] text-sm font-medium transition-colors ${
+            className={`flex-1 min-h-11 sm:min-h-9 rounded-[var(--ui-radius-control)] text-sm font-medium transition-colors ${
               mode === "create"
                 ? "bg-[var(--ui-surface)] text-[var(--ui-text)] shadow-[var(--ui-shadow-raised)]"
                 : "text-[var(--ui-text-muted)] hover:text-[var(--ui-text)]"
@@ -120,7 +120,7 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
               <FormField label="Új cég neve" required>
                 <Input name="newCompanyName" placeholder="Pl. NDT Global Kft." autoFocus required={mode === "create"} />
               </FormField>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField label="Adószám">
                   <Input name="newCompanyVat" placeholder="12345678-2-01" />
                 </FormField>
@@ -131,7 +131,7 @@ export function SetEmployerModal({ open, onClose, personId, currentCompanyName }
             </>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField label="Beosztás">
               <Input name="role" placeholder="pl. Mérnök, Vezető..." />
             </FormField>
