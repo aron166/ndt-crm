@@ -24,6 +24,7 @@ import { employerState } from "@/lib/persons/employer";
 import { PageHeader } from "@/components/astryx/PageHeader";
 import { Badge } from "@astryxdesign/core/Badge";
 import k from "@/components/astryx/page.module.css";
+import s from "../persons.module.css";
 
 interface Contact {
   id: number; companyId: number; role: string | null;
@@ -241,6 +242,7 @@ export function PersonDetailClient({
               onClick={handleDelete}
               disabled={deleting}
               title="Személy törlése"
+              aria-label="Személy törlése"
             >
               <Trash2 style={{ width: 14, height: 14 }} />
             </button>
@@ -269,7 +271,9 @@ export function PersonDetailClient({
                 <span className={k.statV}>{contacts.length}</span>
                 <span className={k.statK}>munkahely</span>
               </div>
-              <Sparkline data={engagementSeries} width={400} height={48} color="var(--color-accent)" />
+              <div style={{ flex: "1 1 200px", minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
+                <Sparkline data={engagementSeries} width={240} height={48} color="var(--color-accent)" />
+              </div>
             </div>
           </div>
 
@@ -309,7 +313,7 @@ export function PersonDetailClient({
                     {interactions.map((r) => {
                       const accent = TYPE_COLOR[r.type ?? "note"] ?? "var(--color-text-secondary)";
                       return (
-                        <div key={r.id} className={k.row}>
+                        <div key={r.id} className={k.rowCompact}>
                           <span className={k.bar} style={{ background: accent }} />
                           <div className={k.cell}>
                             <span className={k.nameLine}>
@@ -319,13 +323,16 @@ export function PersonDetailClient({
                               {r.direction && (
                                 <span className={k.muted}>· {interactionDirectionLabel(r.direction)}</span>
                               )}
+                              <span className={`${k.muted} ${k.num}`}>{formatDateTime(r.occurredAt)}</span>
                             </span>
+                            {(r.notes || r.outcome) && (
+                              <p className={s.note}>
+                                {r.notes}
+                                {r.notes && r.outcome && <br />}
+                                {r.outcome && <span className={k.muted}>Eredmény: {r.outcome}</span>}
+                              </p>
+                            )}
                           </div>
-                          <div className={k.cell}>
-                            {r.notes && <span>{r.notes}</span>}
-                            {r.outcome && <span className={k.muted}>Eredmény: {r.outcome}</span>}
-                          </div>
-                          <span className={`${k.muted} ${k.num}`}>{formatDateTime(r.occurredAt)}</span>
                         </div>
                       );
                     })}
@@ -540,7 +547,7 @@ export function PersonDetailClient({
         </div>
 
         {/* Right: sidebar panels */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className={k.asideFirst} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Summary: contact facts, signal, tags */}
           <div className={k.card}>
             <div style={{

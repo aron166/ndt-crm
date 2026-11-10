@@ -96,7 +96,7 @@ export default async function PersonsPage({
     <div>
       <PageHeader
         title="Személyek"
-        eyebrow={total.toLocaleString("hu-HU")}
+        eyebrow={`${total.toLocaleString("hu-HU")} személy`} /* PROPOSAL copy */
         actions={<CreatePersonButton />}
         filters={
           <>
@@ -143,7 +143,7 @@ export default async function PersonsPage({
                 <tr key={p.id} className={s.row}>
                   {/* Avatar */}
                   <td>
-                    <Link href={`/persons/${p.id}`}>
+                    <Link href={`/persons/${p.id}`} tabIndex={-1} aria-hidden="true">
                       <div className={s.avatar} style={{ background: avatarBg(p.id) }}>
                         {initials}
                       </div>
@@ -180,7 +180,7 @@ export default async function PersonsPage({
                   </td>
 
                   {/* Phone — clickable */}
-                  <td>
+                  <td className={s.nowrap}>
                     {p.phone ? (
                       <a href={`tel:${p.phone}`} className={s.secLink}>
                         {p.phone}
