@@ -40,12 +40,19 @@ for (const c of rows(zipPath)) {
   }
   const k = `${name}\t${county}`
   let g = groups.get(k)
-  if (!g) groups.set(k, (g = { name, county, lat: Number(lat), lng: Number(lng), pc: new Set() }))
-  else if (Math.abs(g.lat - lat) > 0.05 || Math.abs(g.lng - lng) > 0.05) console.error(`warning: coordinates differ in ${name}, ${county}`)
+  if (!g) groups.set(k, (g = { name, county, votes: new Map(), pc: new Set() }))
+  // Most frequent point wins: a city's odd first postcode (Szeged 6700) sits km off the centre the other codes share.
+  const pt = `${lat},${lng}`
+  g.votes.set(pt, (g.votes.get(pt) ?? 0) + 1)
   g.pc.add(pc)
 }
 
-const out = [...groups.values()].map((g) => ({ name: g.name, county: g.county, district: null, lat: r4(g.lat), lng: r4(g.lng), pc: g.pc }))
+const out = [...groups.values()].map((g) => {
+  // Ties keep the first point seen, so the output stays deterministic.
+  const [pt] = [...g.votes].reduce((best, cur) => (cur[1] > best[1] ? cur : best))
+  const [lat, lng] = pt.split(',').map(Number)
+  return { name: g.name, county: g.county, district: null, lat: r4(lat), lng: r4(lng), pc: g.pc }
+})
 for (const [n, d] of dist) out.push({ name: 'Budapest', county: 'Budapest', district: n, lat: d.lat, lng: d.lng, pc: d.pc })
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
 out.sort((a, b) => cmp(a.county, b.county) || cmp(a.name, b.name) || (a.district ?? 0) - (b.district ?? 0))
