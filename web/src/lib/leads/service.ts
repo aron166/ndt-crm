@@ -221,6 +221,11 @@ export async function changeLeadStatus(
       await db.$transaction(move);
     }
   } catch (e) {
+    if (isLeadChanged(e) && newStatus === "won") {
+      // Double submit: the other request already won it, so this click succeeded too.
+      const now2 = await db.lead.findFirst({ where: { id: leadId, tenantId: ctx.tenantId }, select: { status: true, convertedDealId: true } });
+      if (now2?.status === "won" && now2.convertedDealId) return { success: true, changed: false };
+    }
     if (isLeadChanged(e)) return { error: LEAD_CHANGED_MSG };
     throw e;
   }

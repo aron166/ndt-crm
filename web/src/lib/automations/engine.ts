@@ -231,6 +231,8 @@ export async function runLeadAction(
   if (actionType === "change_lead_status") {
     const cfg = actionConfig as ChangeLeadStatusActionConfig;
     if (!cfg?.toStatus) return false;
+    // Won creates a real Deal: a human decides that, so stored or re-enabled rules cannot either.
+    if (cfg.toStatus === "won") throw new Error("Megnyert státuszba automatizmus nem léptethet");
     const { changeLeadStatus } = await import("@/lib/leads/service");
     // W2: a rule cannot type a next action, so a dateless target gets a review step.
     // Stages that need a reason (lost, qualified) still refuse, which surfaces in the firing error.
