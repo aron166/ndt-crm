@@ -1,14 +1,14 @@
 // Machine sales configuration for one tenant: the "gepeladas" question set with its 12 first-call questions,
 // and the "Gépeladás" deal pipeline (stages + custom fields), then tenants.settings.machineSalePipelineId.
-// Idempotent: re-running adds only what is missing. It never edits or deletes an existing question, stage or
-// field (Áron may have re-worded them at /leads/setup or /deals/setup). Config only: no lead, deal or answer is touched.
+// Idempotent: re-running adds only missing questions and fields (stages only into an empty pipeline). It never
+// edits or deletes an existing question, stage or field (Áron may have re-worded them at /leads/setup or /deals/setup). Config only: no lead, deal or answer is touched.
 // Usage (from web/):
 //   node scripts/seed-machine-sales.mjs --tenant 1            # dry run, prints the plan, writes nothing
 //   node scripts/seed-machine-sales.mjs --tenant 1 --apply    # writes, in ONE transaction, tenant row locked
 // Reads DIRECT_URL (or DATABASE_URL) from the environment or web/.env.local. planMachineSales is pure (tested).
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
-import { QUESTION_MAX, SETS_MAX, questionsFromSettings, setsFromSettings } from "../src/lib/leads/qualification.ts";
+import { DEFAULT_QUALIFICATION_QUESTIONS, QUESTION_MAX, SETS_MAX, parseQuestionSets, questionsFromSettings, setsFromSettings } from "../src/lib/leads/qualification.ts";
 import { MACHINE_QUESTIONS, MACHINE_SET_DEF, MACHINE_PIPELINE, MACHINE_PIPELINE_SETTING } from "../src/lib/leads/machine-sales.ts";
 
 /**
@@ -18,6 +18,14 @@ import { MACHINE_QUESTIONS, MACHINE_SET_DEF, MACHINE_PIPELINE, MACHINE_PIPELINE_
 export function planMachineSales(state) {
   const settings = state.settings && typeof state.settings === "object" ? state.settings : {};
   const questions = questionsFromSettings(settings);
+  // A stored list the app cannot parse reads as the DEFAULTS; merging onto that would overwrite the
+  // tenant's own questions for good. Refuse and let a human fix /leads/setup first (Vanda #185-3).
+  if (settings.qualificationQuestions !== undefined && questions === DEFAULT_QUALIFICATION_QUESTIONS) {
+    throw new Error("tenants.settings.qualificationQuestions does not parse; fix it at /leads/setup before seeding");
+  }
+  if (settings.qualificationSets !== undefined && "error" in parseQuestionSets(settings.qualificationSets)) {
+    throw new Error("tenants.settings.qualificationSets does not parse; fix it at /leads/setup before seeding");
+  }
   const sets = setsFromSettings(settings, questions);
   const haveSlugs = new Set(questions.map((q) => q.slug));
   const addQuestions = MACHINE_QUESTIONS.filter((q) => !haveSlugs.has(q.slug));
@@ -34,13 +42,13 @@ export function planMachineSales(state) {
 
   let pipeline;
   if (existing) {
-    const stageNames = new Set(existing.stages.map((s) => s.name));
     const fieldKeys = new Set(existing.fields.map((f) => f.key));
-    const nextStagePos = Math.max(-1, ...existing.stages.map((s) => s.position)) + 1;
     const nextFieldPos = Math.max(-1, ...existing.fields.map((f) => f.position)) + 1;
     pipeline = {
       id: existing.id,
-      addStages: MACHINE_PIPELINE.stages.filter((s) => !stageNames.has(s.name)).map((s, i) => ({ ...s, position: nextStagePos + i })),
+      // Stages are matched by nothing stable (a rename at /deals/setup changes the name), so an
+      // existing pipeline gets stages only when it has none (Vanda #185-2). Fields match by key.
+      addStages: existing.stages.length === 0 ? MACHINE_PIPELINE.stages.map((s, i) => ({ ...s, position: i })) : [],
       addFields: MACHINE_PIPELINE.customFields.filter((f) => !fieldKeys.has(f.key)).map((f, i) => ({ ...f, position: nextFieldPos + i })),
     };
   } else {

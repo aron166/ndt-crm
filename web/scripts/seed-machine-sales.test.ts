@@ -41,15 +41,26 @@ describe("planMachineSales", () => {
     expect(again.pipeline).toEqual({ id: 9, addStages: [], addFields: [] });
   });
 
-  it("an existing Gépeladás pipeline gets only its missing stages and fields, appended", () => {
-    const pipe = { id: 9, name: "Gépeladás", isArchived: false, position: 1, stages: [{ name: "Bemutató lefoglalva", position: 0 }], fields: [{ key: "offer_sent_at", position: 4 }] };
+  it("an existing Gépeladás pipeline keeps its (maybe renamed) stages; only missing fields are appended", () => {
+    const pipe = { id: 9, name: "Gépeladás", isArchived: false, position: 1, stages: [{ name: "Döntés", position: 0 }], fields: [{ key: "offer_sent_at", position: 4 }] };
     const plan: any = planMachineSales({ settings: {}, pipelines: [DEFAULT_PIPE, pipe] });
     expect(plan.pipeline.id).toBe(9);
-    expect(plan.pipeline.addStages.map((s: { name: string }) => s.name)).not.toContain("Bemutató lefoglalva");
-    expect(plan.pipeline.addStages[0].position).toBe(1);
+    expect(plan.pipeline.addStages).toEqual([]);
     expect(plan.pipeline.addFields.map((f: { key: string }) => f.key)).not.toContain("offer_sent_at");
     expect(plan.pipeline.addFields[0].position).toBe(5);
     expect(plan.settings.machineSalePipelineId).toBe(9);
+  });
+
+  it("an existing pipeline with no stages gets all of them", () => {
+    const pipe = { id: 9, name: "Gépeladás", isArchived: false, position: 1, stages: [], fields: [] };
+    const plan: any = planMachineSales({ settings: {}, pipelines: [pipe] });
+    expect(plan.pipeline.addStages).toHaveLength(MACHINE_PIPELINE.stages.length);
+  });
+
+  it("refuses a stored question list or set list the app cannot parse", () => {
+    const bad = [{ slug: "gate", label: "x".repeat(201) }];
+    expect(() => planMachineSales({ settings: { qualificationQuestions: bad }, pipelines: [] })).toThrow(/does not parse/);
+    expect(() => planMachineSales({ settings: { qualificationSets: [{ nope: 1 }] }, pipelines: [] })).toThrow(/does not parse/);
   });
 
   it("refuses a merge past the 40-question cap instead of losing the stored list", () => {

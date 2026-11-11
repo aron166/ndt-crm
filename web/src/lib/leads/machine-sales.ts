@@ -2,7 +2,7 @@
 //
 // PURE module, shared by the lead page, the won-to-Deal conversion and
 // scripts/seed-machine-sales.mjs. Nothing here needs a migration:
-//   - the 6 first-call questions are ordinary tenant questions in their own
+//   - the first-call questions (section 4's six, split into 12 answers) are ordinary tenant questions in their own
 //     set, so their answers land in leads.qualification + answer_sources like
 //     every other answer (form vs setter provenance kept);
 //   - "scan job or machine sale" is the existing W2 pair lead.offer_type

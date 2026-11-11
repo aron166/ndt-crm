@@ -88,3 +88,26 @@ describe("customFieldError", () => {
     expect(customFieldError({ key: "x", type, options: ["a"] }, value)).toBe(expected);
   });
 });
+
+describe("Vanda #185 follow-ups", () => {
+  it("customFieldsFromForm joins a multi_select's ticked boxes under the bare key", async () => {
+    const { customFieldsFromForm } = await import("./service");
+    const fd = new FormData();
+    fd.append("title", "x");
+    fd.append("cf_demo_moments[]", "a");
+    fd.append("cf_demo_moments[]", "b");
+    fd.append("cf_offer_sent_at", "2026-11-20");
+    fd.append("cf_empty", "  ");
+    expect(customFieldsFromForm(fd)).toEqual({ demo_moments: "a,b", offer_sent_at: "2026-11-20" });
+  });
+
+  it("dealStageError refuses another pipeline's stage, allows any for a legacy deal without one", async () => {
+    const { dealStageError } = await import("./service");
+    d.deal.findFirst.mockResolvedValueOnce({ pipelineId: 9 });
+    d.pipelineStage.findFirst.mockResolvedValueOnce({ pipelineId: 3 });
+    expect(await dealStageError(1, 5, 2)).toBe("A szakasz másik pipeline-hoz tartozik");
+    d.deal.findFirst.mockResolvedValueOnce({ pipelineId: null });
+    d.pipelineStage.findFirst.mockResolvedValueOnce({ pipelineId: 3 });
+    expect(await dealStageError(1, 5, 2)).toBeNull();
+  });
+});

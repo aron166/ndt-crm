@@ -413,7 +413,7 @@ No new endpoint and no new column: a BirdsView machine sale uses the routes abov
   `capex_signer_at_demo`, `units_estimate`. Write them like any answer:
   `PATCH /api/leads/:id { "qualification": { "funding_route": "hitel", "units_estimate": "2" } }`,
   or at intake with `question_set: "gepeladas"`. Before the seed has run these slugs are unknown
-  and PATCH rejects them. Existing slugs already cover two of the six: `concrete` (pain) and `timing`.
+  and PATCH rejects them. These are section 4's six questions split into 12 answers; two of its fields already existed: `concrete` (pain) and `timing`.
 - **Scan job or machine sale.** `offer_type` (`service` = scan job, `purchase` / `rental` = machine),
   set with a stage move (`PATCH { "status": "qualified", "offer_type": "purchase" }`); before it is set,
   the intake `intent` decides (`purchase` / `rental`). A "credits into purchase" shape is the
@@ -446,7 +446,7 @@ PATCH may write.
 - `custom_fields` merges; only keys the deal's pipeline defines are accepted (so `saleKind`,
   `fromLeadId`, `offerType` cannot be overwritten); `null` deletes a key. Values are strings in the
   form the `/deals` modal stores: `number` digits, `date` `YYYY-MM-DD`, `single_select` one option,
-  `multi_select` options joined with commas. A wrong key or value is a 400 and nothing is written.
+  `multi_select` options joined with commas. A wrong key or value, or a bad `stage_id`, is a 400 and nothing is written.
 - `stage_id` must be a stage of the deal's own pipeline (400 otherwise). A real stage change resets
   `stageEnteredAt` and fires `deal_stage_changed` automations, the same path as a drag on `/deals`.
 - Fields are written before the move. Returns `{ ok, deal }` (the GET shape).

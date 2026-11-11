@@ -33,7 +33,8 @@ export async function moveDealToStage(
     select: { name: true, pipelineId: true },
   });
   if (!newStage) return { error: "Szakasz nem található" };
-  if (opts.samePipeline && newStage.pipelineId !== deal.pipelineId) return { error: "A szakasz másik pipeline-hoz tartozik" };
+  // A legacy deal with no pipeline may be placed into any of the tenant's pipelines.
+  if (opts.samePipeline && deal.pipelineId != null && newStage.pipelineId !== deal.pipelineId) return { error: "A szakasz másik pipeline-hoz tartozik" };
 
   const stageChanged = deal.stageId !== stageId;
   let position = opts.position;
@@ -70,6 +71,37 @@ export async function moveDealToStage(
     });
   }
   return { success: true, changed: stageChanged };
+}
+
+/** The move's checks without the move, so an API PATCH can refuse before writing anything. */
+export async function dealStageError(tenantId: number, dealId: number, stageId: number): Promise<string | null> {
+  const [deal, stage] = await Promise.all([
+    db.deal.findFirst({ where: { id: dealId, tenantId }, select: { pipelineId: true } }),
+    db.pipelineStage.findFirst({ where: { id: stageId, pipeline: { tenantId } }, select: { pipelineId: true } }),
+  ]);
+  if (!deal) return "Deal nem található";
+  if (!stage) return "Szakasz nem található";
+  if (deal.pipelineId != null && stage.pipelineId !== deal.pipelineId) return "A szakasz másik pipeline-hoz tartozik";
+  return null;
+}
+
+/**
+ * The /deals modal's cf_ form fields as a custom-field map. A multi_select posts
+ * `cf_<key>[]` once per ticked box: joined with commas under `<key>` (Vanda #185-4).
+ */
+export function customFieldsFromForm(formData: FormData): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of new Set([...formData.keys()])) {
+    if (!k.startsWith("cf_")) continue;
+    if (k.endsWith("[]")) {
+      const v = formData.getAll(k).map(String).map((x) => x.trim()).filter(Boolean).join(",");
+      if (v) out[k.slice(3, -2)] = v;
+    } else {
+      const v = String(formData.get(k) ?? "");
+      if (v.trim()) out[k.slice(3)] = v;
+    }
+  }
+  return out;
 }
 
 interface FieldDef { key: string; type: string; options: unknown }

@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { moveDealToStage } from "@/lib/deals/service";
+import { customFieldsFromForm, moveDealToStage } from "@/lib/deals/service";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 import { requireCrmUser } from "@/lib/actor";
@@ -39,10 +39,7 @@ export async function createDeal(formData: FormData) {
   if (!companyIdStr) return { error: "Cég kötelező" };
 
   // collect custom field values (prefixed cf_)
-  const customFields: Record<string, string> = {};
-  for (const [k, v] of formData.entries()) {
-    if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
-  }
+  const customFields = customFieldsFromForm(formData);
 
   const refErr = await foreignIdError({
     companyId: parseInt(companyIdStr),
@@ -91,10 +88,7 @@ export async function updateDeal(id: number, formData: FormData) {
   const personIdStr = formData.get("personId") as string | null;
   const stageIdStr  = formData.get("stageId") as string | null;
 
-  const customFields: Record<string, string> = {};
-  for (const [k, v] of formData.entries()) {
-    if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
-  }
+  const customFields = customFieldsFromForm(formData);
 
   const refErr = await foreignIdError({
     personId: personIdStr ? parseInt(personIdStr) : null,
@@ -134,7 +128,8 @@ export async function moveDeal(
   if (denied) throw new Error(denied);
   // Shared with PATCH /api/deals/:id (lib/deals/service.ts): idle clock, audit, deal_stage_changed.
   const res = await moveDealToStage(TENANT_ID, dealId, newStageId, { position: newPosition });
-  if ("error" in res) throw new Error(res.error);
+  // A deal deleted in another tab stays a silent no-op, as before the shared path; a bad stage throws, as before.
+  if ("error" in res && res.error !== "Deal nem található") throw new Error(res.error);
   revalidatePath("/deals");
 }
 

@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { serializeDates } from "@/lib/serialize";
 import { json, leadApiCtx, parseLeadId, readJson } from "@/lib/leads/api";
 import { DEAL_API_SELECT, dealPatchSchema } from "@/lib/deals/api";
-import { moveDealToStage, patchDealCustomFields } from "@/lib/deals/service";
+import { dealStageError, moveDealToStage, patchDealCustomFields } from "@/lib/deals/service";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -49,6 +49,11 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const exists = await db.deal.findFirst({ where: { id, tenantId }, select: { id: true } });
   if (!exists) return json({ error: "Not found" }, 404);
+  // Refuse a bad stage BEFORE any field is written: a 400 writes nothing (Vanda #185-1).
+  if (parsed.data.stage_id !== undefined) {
+    const err = await dealStageError(tenantId, id, parsed.data.stage_id);
+    if (err) return json({ error: err }, 400);
+  }
   if (parsed.data.custom_fields) {
     const r = await patchDealCustomFields(tenantId, id, parsed.data.custom_fields, auditOpts);
     if ("error" in r) return json({ error: r.error }, 400);
