@@ -77,6 +77,13 @@ export interface Rendered {
   suffix: string[];
 }
 
+const FIELD_LABEL: Record<string, string> = {
+  greeting: "megszólítás", company: "cégnév", contact_name: "kapcsolattartó neve", city: "város", segment: "szegmens",
+  sender_name: "feladó neve", sender_phone: "feladó telefonszáma", why_now: "miért most", trip_date: "út napja", trip_city: "út városa",
+};
+/** A merge field as the UI names it; an unknown field keeps its raw name. */
+export const fieldLabel = (f: string) => FIELD_LABEL[f] ?? f;
+
 export const OPENER = "Azért írok Önnek, mert {{why_now}}.";
 const FIELD = /\{\{\s*([A-Za-z_]+)\s*\}\}/g;
 // A field followed straight by a letter or a hyphen and a letter: a Hungarian suffix glued on.

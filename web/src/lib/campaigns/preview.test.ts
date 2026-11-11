@@ -88,7 +88,7 @@ describe("campaignEmailCheck", () => {
     d.campaignMember.findMany.mockReset().mockResolvedValue([MEMBER, { ...MEMBER, id: 2, companyId: 41, segment: "drillers", person: { firstName: "Anna", lastName: "Kovács", email: "anna@p.example.test", phone: null } }]);
     const c = await campaignEmailCheck(T, 3, null);
     expect(c).toMatchObject({ total: 2, complete: 0, unresolved: 1, noAddress: 1, noAsset: 1, notLive: 0 });
-    expect(c.rows.find((r) => r.memberId === 2)?.problems).toEqual(["1. lépés: kitöltetlen mező: sender_phone"]);
+    expect(c.rows.find((r) => r.memberId === 2)?.problems).toEqual(["1. lépés: kitöltetlen mező: feladó telefonszáma"]);
     assertReadOnlyAndScoped();
   });
 });

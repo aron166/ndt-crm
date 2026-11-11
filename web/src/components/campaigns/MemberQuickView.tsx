@@ -11,14 +11,9 @@ import s from "@/app/(app)/campaigns/campaigns.module.css";
 import { memberQuickViewAction } from "@/app/actions/campaign-hub";
 import { assetStateLabel, CHANNEL_LABEL, memberStateLabel } from "@/lib/campaigns/labels";
 import type { QuickView, StepEmail } from "@/lib/campaigns/preview";
-import type { Part } from "@/lib/campaigns/email-preview";
+import { fieldLabel, type Part } from "@/lib/campaigns/email-preview";
 import type { StepChannel } from "@/lib/campaigns/rules";
 
-const FIELD_LABEL: Record<string, string> = {
-  greeting: "megszólítás", company: "cégnév", contact_name: "kapcsolattartó neve", city: "város", segment: "szegmens",
-  sender_name: "feladó neve", sender_phone: "feladó telefonszáma", why_now: "miért most", trip_date: "út napja", trip_city: "út városa",
-};
-const fieldLabel = (f: string) => FIELD_LABEL[f] ?? f;
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("hu-HU", { timeZone: "Europe/Budapest" }) : null);
 const Missing = ({ children }: { children: React.ReactNode }) => <span className={s.missing}>{children}</span>;
 
@@ -118,23 +113,32 @@ function Body({ v, slug }: { v: QuickView; slug: string }) {
 
 export function MemberQuickView({ slug, memberId, onClose }: { slug: string; memberId: number | null; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [view, setView] = useState<QuickView | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Keyed by member id: a result for another row is never shown, and no state is reset inside the effect.
+  const [res, setRes] = useState<{ id: number; view?: QuickView; error?: string } | null>(null);
 
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (memberId == null) { if (d.open) (typeof d.close === "function" ? d.close() : d.removeAttribute("open")); return; }
-    if (!d.open) { if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", ""); }
-    setView(null);
-    setError(null);
+    if (memberId == null) {
+      if (!d.open) return;
+      if (typeof d.close === "function") d.close();
+      else d.removeAttribute("open");
+      return;
+    }
+    if (!d.open) {
+      if (typeof d.showModal === "function") d.showModal();
+      else d.setAttribute("open", "");
+    }
     let live = true;
     memberQuickViewAction(slug, memberId)
-      .then((r) => { if (live) ("error" in r ? setError(r.error) : setView(r.view)); })
-      .catch(() => { if (live) setError("Hálózati hiba, próbáld újra"); });
+      .then((r) => { if (live) setRes("error" in r ? { id: memberId, error: r.error } : { id: memberId, view: r.view }); })
+      .catch(() => { if (live) setRes({ id: memberId, error: "Hálózati hiba, próbáld újra" }); });
     return () => { live = false; };
   }, [slug, memberId]);
 
+  const mine = res && res.id === memberId ? res : null;
+  const view = mine?.view ?? null;
+  const error = mine?.error ?? null;
   const v = view;
   const sub = v ? [v.member.segmentLabel ? `${v.member.segment}: ${v.member.segmentLabel}` : "szegmens ismeretlen", v.member.lane, v.member.city, v.member.tier ? `${v.member.tier} szint` : null].filter(Boolean).join(" · ") : "";
   return (

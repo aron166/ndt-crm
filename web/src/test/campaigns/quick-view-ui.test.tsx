@@ -19,7 +19,7 @@ const VIEW: QuickView = {
   history: { leadId: null, leads: [], deals: [], campaigns: [], events: [], interactions: 0, lastInteraction: null, controlLabor: { accountType: null, customerValue: null, frequency: null, methods: [] } },
   emails: [{ position: 1, itemId: 60, title: "T", status: "in_review", version: 1, approvedBy: [], via: "variant",
     rendered: renderEmail({ subject: "Mérés: {{company}}", body: "{{greeting}}\n{{sender_phone}}" }, VALUES) }],
-  problems: ["nincs e-mail cím", "1. lépés: kitöltetlen mező: sender_phone"],
+  problems: ["nincs e-mail cím", "1. lépés: kitöltetlen mező: feladó telefonszáma"],
   sender: { name: "Balogh Áron", phone: null, from: null, replyTo: null, footer: null },
 };
 const ROWS = [{ id: 1, company: "<b>Minta</b> Kft.", city: "Győr", tier: "B", lane: "MEP and drilling", segment: "D" as const, state: "needs_email", stepPosition: 1 }];

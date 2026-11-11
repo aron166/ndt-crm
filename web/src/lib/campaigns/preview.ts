@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { getResendConfig } from "@/lib/integrations/resend";
 import { isEmailAddress } from "./members";
 import {
-  pickAsset, renderEmail, segmentOf, SEGMENTS, variantTag,
+  fieldLabel, pickAsset, renderEmail, segmentOf, SEGMENTS, variantTag,
   type MergeValues, type Rendered, type SegmentKey, type StepVariant,
 } from "./email-preview";
 
@@ -20,7 +20,6 @@ export async function campaignVariants(tenantId: number, campaignId: number, cli
   });
 }
 
-type Contact = { companyId: number; personId: number; role: string | null; email: string | null; phone: string | null; person: { firstName: string; lastName: string; email: string | null; phone: string | null } };
 
 /** The address a draft would go to: the member's person, then its contacts at the company, then any contact. Same order as draftEmailStep. */
 export function memberAddress(m: { companyId: number; personId: number | null; person: { email: string | null } | null }, contacts: readonly { companyId: number; personId: number; email: string | null; person: { email: string | null } | null }[]): string | null {
@@ -131,8 +130,8 @@ export function emailProblems(address: string | null, emails: readonly StepEmail
   if (!address) out.push("nincs e-mail cím");
   for (const e of emails) {
     if (!e.rendered) out.push(segment ? `${e.position}. lépés: nincs anyag ehhez a szegmenshez (${segment})` : `${e.position}. lépés: nincs anyag (a szegmens ismeretlen)`);
-    else if (e.rendered.missing.length) out.push(`${e.position}. lépés: kitöltetlen mező: ${e.rendered.missing.join(", ")}`);
-    if (e.rendered?.suffix.length) out.push(`${e.position}. lépés: toldalék a mezőn: ${e.rendered.suffix.join(", ")}`);
+    else if (e.rendered.missing.length) out.push(`${e.position}. lépés: kitöltetlen mező: ${e.rendered.missing.map(fieldLabel).join(", ")}`);
+    if (e.rendered?.suffix.length) out.push(`${e.position}. lépés: toldalék a mezőn: ${e.rendered.suffix.map(fieldLabel).join(", ")}`);
   }
   return out;
 }
