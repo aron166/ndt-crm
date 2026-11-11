@@ -9,7 +9,7 @@ import { MarketingHeader } from "../marketing/MarketingTabs";
 import { CampaignsClient } from "../marketing/campaigns/CampaignsClient";
 import CampaignDashboard from "../outreach/campaigns/CampaignDashboard";
 import { listCampaignKeys, listSenders, getCampaignStats, getCampaignStepTemplates } from "@/app/actions/outreach-campaigns";
-import { filterByType, kindLabel, statusLabel, isContentOnly } from "@/lib/campaigns/labels";
+import { typeTabLabel, filterByType, kindLabel, statusLabel, isContentOnly } from "@/lib/campaigns/labels";
 import s from "./campaigns.module.css";
 
 export const dynamic = "force-dynamic";
@@ -46,8 +46,8 @@ export default async function CampaignsHubPage({ searchParams }: { searchParams:
         active="campaigns"
         title="Kampányok"
         help="Marketing és értékesítés egy helyen. Indítani csak Áron tud."
-        actions={<Link href="/campaigns/new" className={`${k.btn} ${k.btnPrimary}`}>Új kampány</Link>}
-        filters={<Seg label="Típus" current={type} items={TABS.map((t) => ({ key: t.key, label: t.key === "outreach" ? t.label : `${t.label} ${count(t.key)}`, href: t.key === "all" ? "/campaigns" : `/campaigns?type=${t.key}` }))} />}
+        actions={<>{type === "outreach" && <Link href="/outreach" className={k.btn}>Outreach piszkozatok</Link>}<Link href="/campaigns/new" className={`${k.btn} ${k.btnPrimary}`}>Új kampány</Link></>}
+        filters={<Seg label="Típus" current={type} items={TABS.map((t) => ({ key: t.key, label: typeTabLabel(t.key, t.label, count(t.key)), href: t.key === "all" ? "/campaigns" : `/campaigns?type=${t.key}` }))} />}
       />
       <div className={s.strip} aria-label="Összesítő">
         <span className={s.stripItem}><b>{summary.running}</b> fut</span>
