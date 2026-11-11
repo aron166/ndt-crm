@@ -8,16 +8,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import k from "@/components/astryx/page.module.css";
-import { stepLine } from "@/lib/campaigns/labels";
+import { assetStateLabel, stepLine } from "@/lib/campaigns/labels";
 import { adoptProposedStepsAction, updateCampaignAction } from "@/app/actions/campaign-hub";
 import type { AssetState } from "@/lib/campaigns/hub";
 import s from "../campaigns.module.css";
 
-const ASSET_STATE: Record<string, string> = {
-  draft: "piszkozat", in_review: "felülvizsgálatra", changes_requested: "javítást kértek", rewrite_requested: "újraírást kértek",
-  ai_working: "az ügynök dolgozik rajta", live: "jóváhagyva (élő)", archived: "archivált",
-};
-export const assetStateLabel = (st: string) => ASSET_STATE[st] ?? st;
 
 export interface Proposal {
   brief?: Record<string, unknown> | null;
