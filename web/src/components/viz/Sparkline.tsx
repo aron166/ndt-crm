@@ -15,7 +15,7 @@ export function Sparkline({
   data,
   width = 120,
   height = 36,
-  color = "var(--indigo)",
+  color = "var(--ui-accent)",
   fill = true,
   animate = true,
 }: SparklineProps) {

@@ -18,6 +18,7 @@ import { parseScriptBlocks } from "@/lib/leads/scripts";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
+import { DEFAULT_DATA_COLOR } from "@/lib/data-colors";
 
 const TENANT_ID = 1;
 
@@ -128,6 +129,9 @@ export async function logLeadCall(leadId: number, input: {
   outcome: string; note: string; callbackAt?: string | null; demoWith?: string | null;
   bookingAt?: string | null; bookingKind?: string | null;
   lostReason?: string | null; scriptVariant?: string | null; technologyWord?: string | null;
+  callType?: string | null;
+  /** The meeting task the booking drawer created (call mode): log against it, no second task. */
+  existingBookingTaskId?: number | null;
 }) {
   const ctx = await userLeadCtx(TENANT_ID);
   if ("error" in ctx) return ctx;
@@ -143,6 +147,8 @@ export async function logLeadCall(leadId: number, input: {
       ...(input.lostReason ? { lostReason: input.lostReason } : {}),
       ...(input.scriptVariant ? { scriptVariant: input.scriptVariant } : {}),
       ...(input.technologyWord ? { technologyWord: input.technologyWord } : {}),
+      ...(input.callType ? { callType: input.callType } : {}),
+      ...(input.existingBookingTaskId ? { existingBookingTaskId: input.existingBookingTaskId } : {}),
     },
     ctx,
   );
@@ -279,7 +285,7 @@ export async function createLeadStatus(formData: FormData) {
   const auth = await userLeadCtx(TENANT_ID);
   if ("error" in auth) return { error: auth.error };
   const label = (formData.get("label") as string)?.trim();
-  const color = (formData.get("color") as string) || "#6366f1";
+  const color = (formData.get("color") as string) || DEFAULT_DATA_COLOR;
   if (!label) return { error: "Név kötelező" };
 
   // Generate a unique slug key for this tenant.
@@ -313,7 +319,7 @@ export async function upsertLeadStatus(formData: FormData) {
   if ("error" in auth) return { error: auth.error };
   const id = parseInt(formData.get("id") as string);
   const label = (formData.get("label") as string)?.trim();
-  const color = (formData.get("color") as string) || "#6366f1";
+  const color = (formData.get("color") as string) || DEFAULT_DATA_COLOR;
   const isInitial = formData.get("isInitial") === "true";
   const isTerminal = formData.get("isTerminal") === "true";
   const isCommitment = formData.get("isCommitment") === "true";

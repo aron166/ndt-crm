@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { LeadIntake } from "./schema";
 import { normalizeIntakeAnswers, withAnswers, effectiveAnswers } from "./qualification";
 import { computeTier, type LeadTier } from "./tier";
+import { w2FieldsFromAnswers } from "./lifecycle";
 
 // Transaction-agnostic lead ingestion (Platform Foundation #4).
 //
@@ -97,6 +98,14 @@ function splitName(name: string | undefined, emailFallback?: string): {
   return { firstName: local || "Lead", lastName: "-" };
 }
 
+/** Reserved prefix for app-namespaced thread keys; callers may not send it (schema). */
+export const APP_THREAD_KEY_PREFIX = "app~";
+
+/** The stored form of a thread key that no draft vouched for: `app~<appSlug>~<key>`, lowercased. */
+export function appThreadKey(appSlug: string, threadKey: string): string {
+  return `${APP_THREAD_KEY_PREFIX}${appSlug.trim().toLowerCase()}~${threadKey.trim().toLowerCase()}`;
+}
+
 export async function ingestLead(
   input: LeadIntake,
   ctx: IngestCtx,
@@ -133,10 +142,30 @@ export async function ingestLead(
   const claimedThreadKey = input.thread_key?.trim() || null;
   const draftKey = input.draft_key?.trim() || null;
   const isColdEmailReply = input.channel === "cold_email";
+  // The draft is found by the DRAFT key, never by the conversation key, and FIRST:
+  // which key form to match depends on it. Newest sent touch first: once touches 1
+  // and 2 are both out they share one draft key, and an unordered findFirst reported
+  // whichever row Postgres happened to return as "the draft this reply answered". (Vanda, #89.)
+  const draft = draftKey && isColdEmailReply
+    ? await tx.emailDraft.findFirst({
+        where: { tenantId, threadKey: draftKey, ...(ctx.draftId != null ? { id: ctx.draftId } : {}) },
+        orderBy: [{ sentAt: "desc" }, { step: "desc" }],
+        select: { id: true, companyId: true, campaign: true },
+      })
+    : null;
 
-  if (claimedThreadKey && isColdEmailReply) {
+  // Without a draft of ours to vouch for it, a thread key is still honoured, but
+  // NAMESPACED by the authenticated app under a reserved prefix no caller can send
+  // (the schema rejects "app~"): the app key is the voucher, so an app dedupes only
+  // its own threads and never claims another app's or a draft-vouched key. Exactly
+  // one form is matched, so an unvouched caller cannot land on a vouched lead either
+  // (growth cold-email tool, 2026-11-10; Vanda #166-1, #166-2).
+  const matchKey = !claimedThreadKey || !isColdEmailReply ? null
+    : draft ? claimedThreadKey : appThreadKey(sourceApp, claimedThreadKey);
+
+  if (matchKey) {
     const existingLead = await tx.lead.findFirst({
-      where: { tenantId, threadKey: claimedThreadKey },
+      where: { tenantId, threadKey: matchKey },
       select: { id: true, companyId: true },
     });
     if (existingLead) {
@@ -153,20 +182,8 @@ export async function ingestLead(
     }
   }
 
-  // The draft is found by the DRAFT key, never by the conversation key.
-  // Newest sent touch first: once touches 1 and 2 are both out they share one
-  // draft key, and an unordered findFirst reported whichever row Postgres
-  // happened to return as "the draft this reply answered". (Vanda, #89.)
-  const draft = draftKey && isColdEmailReply
-    ? await tx.emailDraft.findFirst({
-        where: { tenantId, threadKey: draftKey, ...(ctx.draftId != null ? { id: ctx.draftId } : {}) },
-        orderBy: [{ sentAt: "desc" }, { step: "desc" }],
-        select: { id: true, companyId: true, campaign: true },
-      })
-    : null;
-
-  // The key is only stored once a draft has vouched for it.
-  const threadKey = draft ? claimedThreadKey : null;
+  // A draft-vouched key is stored as is; otherwise the app-namespaced key.
+  const threadKey = matchKey;
 
   // 1. Dedupe Company by exact name (case-insensitive) within the tenant —
   // unless the thread key already told us the company for certain.
@@ -296,6 +313,8 @@ export async function ingestLead(
           }
         : {}),
       ...(tier ? { tier } : {}),
+      // W2 columns from the form answers (intent, buyer_type); unknown slugs stay null.
+      ...w2FieldsFromAnswers(answers),
       ...(Object.keys(customFields).length > 0
         ? { customFields: customFields as Prisma.InputJsonValue }
         : {}),

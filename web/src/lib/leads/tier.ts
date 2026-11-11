@@ -27,15 +27,6 @@ export const TIER_LABEL: Record<LeadTier, string> = {
   E: "Nurture",
 };
 
-/** Board/card colours. Keyed to the existing CSS vars so themes stay in one place. */
-export const TIER_COLOR: Record<LeadTier, string> = {
-  A: "var(--coral)",
-  B: "var(--indigo)",
-  C: "var(--sky)",
-  D: "var(--amber)",
-  E: "var(--fg-faint)",
-};
-
 // ── Answer normalisation ────────────────────────────────────────────
 // The landing form posts canonical tokens; a setter types Hungarian free text
 // into the same slots. Both must tier the same way, so every answer is folded to

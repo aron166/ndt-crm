@@ -115,7 +115,7 @@ describe("planCallOutcome", () => {
     expect(a.transition?.to).toBe("lost");
     expect(a.input.lostReason).toBe("no_need");
     expect(a.input.lostNote).toBe("Van saját szkennerük");
-    expect(p("disqualified", lead("new"), { lostReason: "Nincs betonszerkezetük" }).input.lostReason).toBe("not_our_service");
+    expect(p("disqualified", lead("new"), { lostReason: "Nincs betonszerkezetük" }).input.lostReason).toBe("unqualified");
     expect(p("wrong_number", lead("new")).input.lostReason).toBe("invalid_contact");
   });
   it("an explicit lostCode overrides the default", () => {
@@ -145,5 +145,17 @@ describe("card helpers", () => {
     expect(daysSince(null, now)).toBeNull();
     expect(daysSince("2026-09-01T12:00:00Z", now)).toBe(3);
     expect(daysSince("2026-09-04T13:00:00Z", now)).toBe(0);
+  });
+});
+
+describe("existingBookingTaskId (booked in the lead page drawer)", () => {
+  const now = new Date("2026-11-10T10:00:00Z");
+  it("a user may log meeting_booked without a date when the drawer already booked it", () => {
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: undefined, existingBookingTaskId: 5 }, "user", now)).toBeNull();
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: undefined }, "user", now)?.path).toBe("bookingAt");
+  });
+  it("the schema does not demand demoWith when the booking task exists", () => {
+    expect(callOutcomeSchema.safeParse({ outcome: "meeting_booked", note: "ok", existingBookingTaskId: 5 }).success).toBe(true);
+    expect(callOutcomeSchema.safeParse({ outcome: "meeting_booked", note: "ok" }).success).toBe(false);
   });
 });

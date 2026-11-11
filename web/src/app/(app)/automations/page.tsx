@@ -20,7 +20,7 @@ export default async function AutomationsPage() {
         stages: { orderBy: { position: "asc" }, select: { id: true, name: true } },
       },
     }),
-    db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    db.user.findMany({ where: { tenantId: TENANT_ID, email: { not: { endsWith: "@system" } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   // Flatten stages across pipelines for the stage selects (label keeps the

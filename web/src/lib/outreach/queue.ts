@@ -30,12 +30,12 @@ export interface CallOutcome {
 // Order = button order. The judgment calls (interested/not/wants/bad) set the
 // status explicitly; "no answer" and "note only" are handled by nextStatusFor.
 export const CALL_OUTCOMES: CallOutcome[] = [
-  { key: "no_answer",      label: "Nem vették fel", interactionOutcome: "no_answer",      tone: "var(--amber)", followupDays: 3 },
-  { key: "interested",     label: "Érdeklődik",     interactionOutcome: "interested",     tone: "var(--sky)",   followupDays: 7 },
-  { key: "wants",          label: "Kéri / akarja",  interactionOutcome: "wants",          tone: "var(--mint)",  followupDays: 2 },
-  { key: "not_interested", label: "Nem érdekli",    interactionOutcome: "not_interested", tone: "var(--coral)", followupDays: 0 },
-  { key: "bad_number",     label: "Rossz szám",     interactionOutcome: "bad_number",     tone: "var(--fg-faint)", followupDays: 0 },
-  { key: "note_only",      label: "Csak jegyzet",   interactionOutcome: "note",           tone: "var(--fg-mute)",  followupDays: 0 },
+  { key: "no_answer",      label: "Nem vették fel", interactionOutcome: "no_answer",      tone: "var(--ui-text-muted)", followupDays: 3 },
+  { key: "interested",     label: "Érdeklődik",     interactionOutcome: "interested",     tone: "var(--ui-text-muted)", followupDays: 7 },
+  { key: "wants",          label: "Kéri / akarja",  interactionOutcome: "wants",          tone: "var(--ui-success-text)",  followupDays: 2 },
+  { key: "not_interested", label: "Nem érdekli",    interactionOutcome: "not_interested", tone: "var(--ui-danger-text)", followupDays: 0 },
+  { key: "bad_number",     label: "Rossz szám",     interactionOutcome: "bad_number",     tone: "var(--ui-text-muted)", followupDays: 0 },
+  { key: "note_only",      label: "Csak jegyzet",   interactionOutcome: "note",           tone: "var(--ui-text-muted)",  followupDays: 0 },
 ];
 
 const OUTCOME_BY_KEY = new Map(CALL_OUTCOMES.map((o) => [o.key, o]));

@@ -1,5 +1,6 @@
 "use client";
 
+import { LOST_REASONS, LOST_REASON_LABEL, isLostReason } from "@/lib/leads/lifecycle";
 import { useRef, useState, useTransition } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -96,18 +97,23 @@ export function LeadEditModal({ open, onClose, onSaved, initial }: LeadEditModal
           </FormField>
 
           <FormField label="Elvesztés oka">
-            <Input name="lostReason" defaultValue={initial.lostReason ?? ""} placeholder="Ha elveszett, miért" />
+            {/* The reason is a code (Péter's list); a legacy free-text value stays selectable as is. */}
+            <select name="lostReason" defaultValue={initial.lostReason ?? ""} className="input-ds">
+              <option value="">-</option>
+              {initial.lostReason && !isLostReason(initial.lostReason) && <option value={initial.lostReason}>{initial.lostReason}</option>}
+              {LOST_REASONS.map((k) => <option key={k} value={k}>{LOST_REASON_LABEL[k]}</option>)}
+            </select>
           </FormField>
 
           <FormField label="Kampány">
             <Input name="campaign" defaultValue={initial.campaign ?? ""} placeholder="pl. BirdsView Q3" />
           </FormField>
 
-          {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
+          {error && <p className="text-sm" style={{ color: "var(--ui-danger-text)" }}>{error}</p>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>Mégse</Button>
-            <Button type="submit" className="btn primary" disabled={isPending}>
+            <Button type="submit" disabled={isPending}>
               {isPending ? "Mentés..." : "Mentés"}
             </Button>
           </DialogFooter>

@@ -12,7 +12,7 @@ interface StackBarProps {
 export function StackBar({ segments, height = 10 }: StackBarProps) {
   const total = segments.reduce((s, x) => s + x.value, 0) || 1;
   return (
-    <div style={{ display: "flex", gap: 2, height, borderRadius: 999, overflow: "hidden", background: "var(--bg-2)" }}>
+    <div style={{ display: "flex", gap: 2, height, borderRadius: 999, overflow: "hidden", background: "var(--ui-surface-muted)" }}>
       {segments.map((s, i) => (
         <div
           key={i}

@@ -4,6 +4,9 @@ import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { NOT_A_CRM_USER } from "@/lib/crm-user-message";
+import { AstryxProviders } from "@/components/layout/AstryxProviders";
+import k from "@/components/astryx/page.module.css";
+import m from "./login.module.css";
 
 // The proxy sends signed-in accounts without a CRM user here with ?denied=1.
 const noSubscribe = () => () => {};
@@ -33,138 +36,78 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center relative"
-      style={{ background: "var(--bg-page)" }}
-    >
-      {/* Dot grid inherited from body */}
-
-      {/* Glow */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(900px 600px at 50% 40%, var(--tint-faint), transparent 65%)",
-        }}
-      />
-
-      <div className="relative z-10 w-full max-w-sm px-4">
-        {/* Brand mark */}
-        <div className="flex flex-col items-center mb-8">
-          <div
-            className="flex items-center justify-center rounded-xl mb-4"
-            style={{
-              width: 44, height: 44,
-              background: "linear-gradient(135deg, var(--indigo) 0%, var(--brand-grad-end) 100%)",
-              boxShadow: "var(--glow-indigo)",
-            }}
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M3 12 C7 4, 11 20, 15 12 S 21 4, 21 12" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/>
-            </svg>
+    <AstryxProviders>
+      <div className={m.page}>
+        <div className={m.wrap}>
+          {/* Brand mark */}
+          <div className={m.brand}>
+            <div className={m.mark}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M3 12 C7 4, 11 20, 15 12 S 21 4, 21 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
+              </svg>
+            </div>
+            <h1 className={m.title}>
+              Helm CRM
+            </h1>
+            <p className={m.sub}>
+              Controllabor · EU
+            </p>
           </div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: "var(--fg)", letterSpacing: "-0.01em" }}>
-            Helm CRM
-          </h1>
-          <p style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono-ndt)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>
-            Controllabor · EU
-          </p>
-        </div>
 
-        {/* Card */}
-        <div
-          className="rounded-xl p-6"
-          style={{
-            background: "var(--bg-panel)",
-            border: "1px solid var(--line-soft)",
-            boxShadow: "var(--shadow-card)",
-          }}
-        >
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)", marginBottom: 16 }}>
-            Bejelentkezés
-          </h2>
+          {/* Card */}
+          <section className={`${k.card} ${m.card}`}>
+            <h2 className={m.heading}>
+              Bejelentkezés
+            </h2>
 
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 6 }}>
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@controllabor.hu"
-                required
-                autoFocus
-                style={{
-                  width: "100%", height: 36, padding: "0 12px",
-                  background: "var(--bg-raised)", border: "1px solid var(--line)",
-                  borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none",
-                  fontFamily: "inherit",
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = "var(--indigo-line)";
-                  e.target.style.boxShadow = "0 0 0 3px var(--indigo-soft)";
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = "var(--line)";
-                  e.target.style.boxShadow = "none";
-                }}
-              />
-            </div>
+            <form onSubmit={handleSubmit} className={m.form}>
+              <div>
+                <label className={m.label}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@controllabor.hu"
+                  required
+                  autoFocus
+                  className={m.field}
+                />
+              </div>
 
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-faint)", textTransform: "uppercase", letterSpacing: "0.1em", display: "block", marginBottom: 6 }}>
-                Jelszó
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                style={{
-                  width: "100%", height: 36, padding: "0 12px",
-                  background: "var(--bg-raised)", border: "1px solid var(--line)",
-                  borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none",
-                  fontFamily: "inherit",
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = "var(--indigo-line)";
-                  e.target.style.boxShadow = "0 0 0 3px var(--indigo-soft)";
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = "var(--line)";
-                  e.target.style.boxShadow = "none";
-                }}
-              />
-            </div>
+              <div>
+                <label className={m.label}>
+                  Jelszó
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className={m.field}
+                />
+              </div>
 
-            {denied && !error && (
-              <p style={{ fontSize: 14, color: "var(--coral)" }}>{NOT_A_CRM_USER}</p>
-            )}
-            {error && (
-              <p style={{ fontSize: 14, color: "var(--coral)" }}>{error}</p>
-            )}
+              {denied && !error && (
+                <p className={m.error}>{NOT_A_CRM_USER}</p>
+              )}
+              {error && (
+                <p className={m.error}>{error}</p>
+              )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: "100%", height: 36, marginTop: 4,
-                background: "linear-gradient(180deg, var(--indigo), var(--indigo-dim))",
-                border: "1px solid var(--indigo-dim)",
-                borderRadius: 6, color: "white", fontSize: 14, fontWeight: 500,
-                cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1,
-                boxShadow: "var(--shadow-primary)",
-                fontFamily: "inherit",
-              }}
-            >
-              {loading ? "Bejelentkezés..." : "Bejelentkezés"}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading}
+                className={`${k.btn} ${k.btnPrimary} ${m.submit}`}
+              >
+                {loading ? "Bejelentkezés..." : "Bejelentkezés"}
+              </button>
+            </form>
+          </section>
         </div>
       </div>
-    </div>
+    </AstryxProviders>
   );
 }

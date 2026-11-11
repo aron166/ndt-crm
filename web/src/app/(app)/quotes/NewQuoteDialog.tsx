@@ -7,13 +7,9 @@ import {
   Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { createQuote, searchCompaniesForQuote } from "@/app/actions/quotes";
+import k from "@/components/astryx/page.module.css";
+import q from "./quotes.module.css";
 import { FormField } from "@/components/ui/FormField";
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "7px 10px", fontSize: 14,
-  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-  borderRadius: 6, color: "var(--fg)", outline: "none",
-};
 
 interface Props {
   /** When set, the quote is for this company and the picker is hidden. */
@@ -24,7 +20,7 @@ interface Props {
   triggerClassName?: string;
 }
 
-export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új árajánlat", triggerClassName = "btn primary" }: Props) {
+export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új árajánlat", triggerClassName = `${k.btn} ${k.btnPrimary}` }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -83,24 +79,24 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
           {!presetCompany && (
             <FormField label="Cég">
               {companyId ? (
-                <div className="flex items-center justify-between gap-2 mt-1" style={inputStyle}>
+                <div className={`flex items-center justify-between gap-2 mt-1 ${q.input}`}>
                   <span>{companyLabel}</span>
-                  <button type="button" style={{ color: "var(--fg-faint)", fontSize: 14 }}
+                  <button type="button" style={{ color: "var(--ui-text-muted)", fontSize: 14 }}
                     onClick={() => { setCompanyId(null); setCompanyLabel(""); setQuery(""); }}>módosít</button>
                 </div>
               ) : (
                 <div className="relative mt-1">
-                  <input style={inputStyle} value={query} autoFocus
+                  <input className={q.input} value={query} autoFocus
                     onChange={(e) => setQuery(e.target.value)} placeholder="Cég keresése…" />
                   {results.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md"
-                      style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)" }}>
+                    <div className="absolute z-10 mt-1 w-full overflow-hidden"
+                      style={{ background: "var(--ui-surface)", border: "1px solid var(--ui-border)", borderRadius: "var(--ui-radius-control)", boxShadow: "var(--ui-shadow-overlay)" }}>
                       {results.map((c) => (
                         <button key={c.id} type="button"
-                          className="block w-full text-left px-3 py-2 hover:bg-[var(--bg-0)]"
-                          style={{ fontSize: 14 }}
+                          className="block w-full text-left px-3 py-2 hover:bg-[var(--ui-hover)]"
+                          style={{ fontSize: 14, minHeight: 40 }}
                           onClick={() => { setCompanyId(c.id); setCompanyLabel(c.name); setResults([]); }}>
-                          {c.name}{c.city ? <span style={{ color: "var(--fg-faint)" }}> · {c.city}</span> : null}
+                          {c.name}{c.city ? <span style={{ color: "var(--ui-text-muted)" }}> · {c.city}</span> : null}
                         </button>
                       ))}
                     </div>
@@ -111,20 +107,20 @@ export function NewQuoteDialog({ presetCompany, leadId, triggerLabel = "+ Új á
           )}
 
           <FormField label="Tárgy">
-            <input style={{ ...inputStyle, marginTop: 4 }} value={title}
+            <input className={q.input} style={{ marginTop: 4 }} value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="pl. Hegesztési varratok UT vizsgálata" />
           </FormField>
 
           {error && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: "var(--coral)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: "var(--ui-danger-text)" }}>
               <AlertTriangle size={14} aria-hidden="true" /> {error}
             </span>
           )}
 
           <div className="flex justify-end gap-2 mt-1">
-            <button className="btn" onClick={() => setOpen(false)} disabled={pending}>Mégse</button>
-            <button className="btn primary" onClick={handleSubmit} disabled={pending}>
+            <button className={k.btn} onClick={() => setOpen(false)} disabled={pending}>Mégse</button>
+            <button className={`${k.btn} ${k.btnPrimary}`} onClick={handleSubmit} disabled={pending}>
               {pending ? "Létrehozás…" : "Létrehozás"}
             </button>
           </div>

@@ -7,10 +7,13 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "check:design": "node scripts/check-design.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@astryxdesign/core": "0.7.12",
+    "@astryxdesign/theme-neutral": "0.7.12",
     "@base-ui/react": "^1.4.1",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",

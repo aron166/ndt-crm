@@ -1,46 +1,27 @@
 "use client";
 
 import { displayScriptLabel, displayScriptText } from "@/lib/leads/placeholder";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { logLeadCall } from "@/app/actions/leads";
 import { correctCallOutcome } from "@/app/actions/calls";
-import { proposeBookingSlots } from "@/app/actions/bookings";
 import type { BookingConflictInfo } from "@/lib/leads/service";
-import { CALL_OUTCOMES, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
-import { BOOKING_KINDS, BOOKING_KIND_LABEL, type BookingKind } from "@/lib/booking/priority";
+import { CALL_OUTCOMES, CALL_TYPES, type CallOutcomeKey, isLostCallOutcome, LOST_REASON_MAX, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
 import { FormField } from "@/components/ui/FormField";
+import { localInputToIso } from "./[id]/booking/booking-view";
 import type { ScriptVariant } from "@/lib/leads/scripts";
-
-// datetime-local wants "YYYY-MM-DDTHH:mm" in local wall-clock time.
-function toDatetimeLocal(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-const SLOT_REASON_LINE: Record<string, string> = {
-  same_area: "arrafelé leszel aznap",
-  free_day: "szabad nap",
-  next_free: "legközelebbi szabad idő",
-};
-
-type SlotProposalsResult = Extract<Awaited<ReturnType<typeof proposeBookingSlots>>, { success: true }>;
-type SlotProposal = SlotProposalsResult["proposals"][number];
 
 // "Hívás eredménye" — the core lead interaction. Validation (note required,
 // callback needs date+hour, meeting needs who) is enforced SERVER-side in
 // lib/leads/service.ts; the `required` attributes here are just UX.
 
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 10px", fontSize: 14,
-  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-  borderRadius: 6, color: "var(--fg)", outline: "none",
-};
 
 export function CallOutcomeModal({
-  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null,
+  open, onClose, leadId, title, stageDescription, onLogged, scriptVariants = [], correctsInteractionId = null, initialOutcome, initialNote, hideMeetingBooked = false, onBook,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,6 +33,14 @@ export function CallOutcomeModal({
    * parsed and corrected outcomes measurable. Null = an ordinary call log.
    */
   correctsInteractionId?: number | null;
+  /** Pre-selects this outcome each time the modal opens (default no_answer). */
+  initialOutcome?: CallOutcomeKey;
+  /** Pre-fills the note each time the modal opens (the lead page's calling mode). */
+  initialNote?: string;
+  /** The lead page books through its own drawer, so the outcome is not offered there. */
+  hideMeetingBooked?: boolean;
+  /** On the lead page the drawer is right here: open it instead of linking to the same page. */
+  onBook?: (note: string) => void;
   title?: string | null;
   stageDescription?: string | null;
   onLogged?: () => void;
@@ -59,17 +48,15 @@ export function CallOutcomeModal({
 }) {
   const [outcome, setOutcome] = useState<string>("no_answer");
   const [note, setNote] = useState("");
+  // Pre-select on the closed -> open edge (adjust state during render, no effect).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) { setWasOpen(open); if (open && initialOutcome) setOutcome(initialOutcome); if (open && initialNote) setNote(initialNote); }
   const [callbackAt, setCallbackAt] = useState("");
-  const [demoWith, setDemoWith] = useState<"aron" | "peter">("aron");
-  const [bookingAt, setBookingAt] = useState("");
-  const [bookingKind, setBookingKind] = useState<BookingKind | "">("");
   const [lostReason, setLostReason] = useState("");
   const [technologyWord, setTechnologyWord] = useState("");
+  const [callType, setCallType] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [slotsPending, startSlotsTransition] = useTransition();
-  const [slotError, setSlotError] = useState<string | null>(null);
-  const [slotProposals, setSlotProposals] = useState<SlotProposal[]>([]);
   const [savedConflicts, setSavedConflicts] = useState<BookingConflictInfo[] | null>(null);
   // A/B: deterministic per-lead assignment (leadId % length), not random or
   // "always A" — every variant needs data, and a re-render must not switch
@@ -79,9 +66,9 @@ export function CallOutcomeModal({
   const script = scriptVariants.find((v) => v.key === scriptKey) ?? null;
 
   function reset() {
-    setOutcome("no_answer"); setNote(""); setCallbackAt(""); setDemoWith("aron"); setLostReason(""); setError(null);
-    setBookingAt(""); setBookingKind(""); setSlotProposals([]); setSlotError(null); setSavedConflicts(null);
-    setScriptKey(defaultScriptKey); setTechnologyWord("");
+    setOutcome("no_answer"); setNote(""); setCallbackAt(""); setLostReason(""); setError(null);
+    setSavedConflicts(null);
+    setScriptKey(defaultScriptKey); setTechnologyWord(""); setCallType("");
   }
   // The call is already saved while the conflict notice shows — closing then
   // must still refresh the parent, same as "Rendben".
@@ -93,14 +80,14 @@ export function CallOutcomeModal({
     startTransition(async () => {
       const payload = {
         outcome, note,
-        // datetime-local is wall-clock; Date parses it as local time → ISO for the wire.
-        callbackAt: outcome === "callback_requested" && callbackAt ? new Date(callbackAt).toISOString() : null,
-        demoWith: outcome === "meeting_booked" ? demoWith : null,
-        bookingAt: outcome === "meeting_booked" && bookingAt ? new Date(bookingAt).toISOString() : null,
-        bookingKind: outcome === "meeting_booked" ? bookingKind || null : null,
+        // datetime-local is Budapest wall-clock time, whatever zone the browser is in.
+        callbackAt: outcome === "callback_requested" && callbackAt ? localInputToIso(callbackAt) : null,
+        // Booking happens only in the lead page drawer.
+        demoWith: null, bookingAt: null, bookingKind: null,
         lostReason: isLostCallOutcome(outcome) ? lostReason : null,
         scriptVariant: scriptKey || undefined,
         technologyWord: technologyWord.trim() || undefined,
+        callType: callType || null,
       };
       const res = correctsInteractionId
         ? await correctCallOutcome(correctsInteractionId, leadId, payload)
@@ -109,19 +96,6 @@ export function CallOutcomeModal({
       if (res.bookingConflicts?.length > 0) { setSavedConflicts(res.bookingConflicts); return; }
       reset(); onClose(); onLogged?.();
     });
-  }
-
-  function suggestSlots() {
-    setSlotError(null);
-    startSlotsTransition(async () => {
-      const res = await proposeBookingSlots(leadId, demoWith);
-      if ("error" in res) { setSlotError(res.error); setSlotProposals([]); return; }
-      setSlotProposals(res.proposals);
-    });
-  }
-
-  function pickSlot(p: SlotProposal) {
-    setBookingAt(toDatetimeLocal(new Date(p.startsAt)));
   }
 
   function acknowledgeConflicts() {
@@ -133,29 +107,28 @@ export function CallOutcomeModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Hívás eredménye</DialogTitle>
-          {title && <p className="text-sm" style={{ color: "var(--fg-mute)" }}>{title}</p>}
+          {title && <p className="text-sm" style={{ color: "var(--ui-text-muted)" }}>{title}</p>}
         </DialogHeader>
         {stageDescription && (
-          <div style={{ fontSize: 12, color: "var(--fg-soft)", whiteSpace: "pre-wrap", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 180, overflowY: "auto" }}>
+          <div style={{ fontSize: 12, color: "var(--ui-text)", whiteSpace: "pre-wrap", background: "var(--ui-page)", border: "1px solid var(--ui-border)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 180, overflowY: "auto" }}>
             {displayScriptText(stageDescription)}
           </div>
         )}
         {scriptVariants.length > 0 && (
           <FormField label="Szkript">
-            <select style={inputStyle} value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
+            <select className="input-ds" value={scriptKey} onChange={(e) => setScriptKey(e.target.value)}>
               <option value="">Nincs szkript</option>
               {scriptVariants.map((v) => <option key={v.key} value={v.key}>{displayScriptLabel(v.label)}</option>)}
             </select>
             {script && (script.body || script.liveMissing) && (
-              <div style={{ marginTop: 8, fontSize: 13, color: "var(--fg-soft)", whiteSpace: "pre-wrap", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 220, overflowY: "auto" }}>
+              <div style={{ marginTop: 8, fontSize: 13, color: "var(--ui-text)", whiteSpace: "pre-wrap", background: "var(--ui-page)", border: "1px solid var(--ui-border)", borderRadius: 6, padding: "8px 10px", lineHeight: 1.5, maxHeight: 220, overflowY: "auto" }}>
                 {script.liveMissing ? "Nincs élő változat: a szkript még jóváhagyásra vár." : displayScriptText(script.body)}
               </div>
             )}
           </FormField>
         )}
         <FormField label="Ügyfél szava a technológiára" hint="Amit az ügyfél mondott, szó szerint. Opcionális.">
-          <input
-            style={inputStyle}
+          <Input
             value={technologyWord}
             onChange={(e) => setTechnologyWord(e.target.value)}
             maxLength={TECHNOLOGY_WORD_MAX}
@@ -163,7 +136,7 @@ export function CallOutcomeModal({
           />
         </FormField>
         {savedConflicts ? (
-          <div style={{ background: "var(--amber-soft)", color: "var(--amber)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
+          <div style={{ background: "var(--ui-warning-surface)", color: "var(--ui-warning-text)", fontSize: 13, padding: "8px 10px", borderRadius: 6 }}>
             <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Mentve: de ütközik a naptárban:</p>
             {savedConflicts.map((c) => (
               <p key={c.taskId} style={{ margin: 0 }}>
@@ -177,76 +150,35 @@ export function CallOutcomeModal({
         ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField label="Eredmény" required>
-            <select style={inputStyle} value={outcome} onChange={(e) => setOutcome(e.target.value)} autoFocus>
-              {CALL_OUTCOMES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+            <select className="input-ds" value={outcome} onChange={(e) => setOutcome(e.target.value)} autoFocus>
+              {CALL_OUTCOMES.filter((o) => !(hideMeetingBooked && o.key === "meeting_booked")).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+            </select>
+          </FormField>
+
+          {/* PROPOSAL copy */}
+          <FormField label="Hívás típusa">
+            <select aria-label="Hívás típusa" className="input-ds" value={callType} onChange={(e) => setCallType(e.target.value)}>
+              <option value="">nincs megadva</option>
+              {CALL_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
             </select>
           </FormField>
 
           {outcome === "callback_requested" && (
             <FormField label="Visszahívás időpontja (dátum + óra)" required>
-              <input type="datetime-local" style={inputStyle} value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} required />
+              <Input type="datetime-local" value={callbackAt} onChange={(e) => setCallbackAt(e.target.value)} required />
             </FormField>
           )}
 
           {outcome === "meeting_booked" && (
-            <>
-              <FormField label="Kivel lesz a demó?" required>
-                <div className="flex gap-4" style={{ fontSize: 14 }}>
-                  {(["aron", "peter"] as const).map((w) => (
-                    <label key={w} className="flex items-center gap-1.5" style={{ cursor: "pointer" }}>
-                      <input type="radio" name="demoWith" value={w} checked={demoWith === w} onChange={() => setDemoWith(w)} />
-                      {w === "aron" ? "Áron" : "Péter"}
-                    </label>
-                  ))}
-                </div>
-              </FormField>
-
-              <FormField label="Foglalás típusa" required>
-                <select style={inputStyle} value={bookingKind} onChange={(e) => setBookingKind(e.target.value as BookingKind | "")}>
-                  <option value="">Válassz típust</option>
-                  {BOOKING_KINDS.map((k) => <option key={k} value={k}>{BOOKING_KIND_LABEL[k]}</option>)}
-                </select>
-              </FormField>
-
-              <FormField label="Foglalás időpontja (dátum + óra)" required>
-                <input
-                  type="datetime-local" style={inputStyle} value={bookingAt} required
-                  min={toDatetimeLocal(new Date())}
-                  onChange={(e) => setBookingAt(e.target.value)}
-                />
-                <div style={{ marginTop: 6 }}>
-                  <Button type="button" variant="outline" onClick={suggestSlots} disabled={slotsPending}>
-                    {slotsPending ? "Keresés…" : "Javasolj időpontot"}
-                  </Button>
-                </div>
-                {slotError && <p className="text-sm" style={{ color: "var(--coral)", marginTop: 6 }}>{slotError}</p>}
-                {slotProposals.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                    {slotProposals.map((p, i) => {
-                      const d = new Date(p.startsAt);
-                      const dateLabel = d.toLocaleDateString("hu-HU", { month: "short", day: "numeric" });
-                      const timeLabel = d.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" });
-                      const reasonLine = SLOT_REASON_LINE[p.reason] ?? "";
-                      const kmLine = p.nearestKm != null ? ` · ${Math.round(p.nearestKm)} km` : "";
-                      return (
-                        <button
-                          key={i} type="button" onClick={() => pickSlot(p)}
-                          style={{ ...inputStyle, textAlign: "left", cursor: "pointer" }}
-                        >
-                          <strong>{dateLabel} {timeLabel}</strong>: {reasonLine}{kmLine}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </FormField>
-            </>
+            // PROPOSAL copy
+            onBook
+              ? <Button type="button" variant="outline" onClick={() => onBook(note)}>Időpont foglalása</Button>
+              : <p className="text-sm"><Link href={`/leads/${leadId}?mode=call&book=1`} onClick={() => { try { if (note.trim()) sessionStorage.setItem(`callNote:${leadId}`, JSON.stringify({ note: note.trim(), at: Date.now() })); } catch { /* storage blocked */ } }}>Book the time on the lead page</Link></p>
           )}
 
           {isLostCallOutcome(outcome) && (
             <FormField label="Miért veszett el? (kötelező)" required>
-              <input
-                style={inputStyle}
+              <Input
                 value={lostReason}
                 onChange={(e) => setLostReason(e.target.value)}
                 required
@@ -262,11 +194,11 @@ export function CallOutcomeModal({
               placeholder="Mi hangzott el? Mi a következő lépés?" />
           </FormField>
 
-          {error && <p className="text-sm" style={{ color: "var(--coral)" }}>{error}</p>}
+          {error && <p className="text-sm" style={{ color: "var(--ui-danger-text)" }}>{error}</p>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose} disabled={pending}>Mégse</Button>
-            <Button type="submit" disabled={pending} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button type="submit" disabled={pending || outcome === "meeting_booked"}>
               {pending ? "Mentés…" : "Rögzítés"}
             </Button>
           </DialogFooter>
@@ -274,7 +206,7 @@ export function CallOutcomeModal({
         )}
         {savedConflicts && (
           <DialogFooter>
-            <Button type="button" onClick={acknowledgeConflicts} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button type="button" onClick={acknowledgeConflicts}>
               Rendben
             </Button>
           </DialogFooter>

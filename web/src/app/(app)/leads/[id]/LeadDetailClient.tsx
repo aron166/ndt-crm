@@ -1,25 +1,41 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Building2, User, Mail, Phone, Globe, CheckCircle2, Pencil, Trash2, PhoneCall, CalendarClock } from "lucide-react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { LeadMoveDialog } from "@/components/LeadMoveDialog";
-import { setLeadOutcomeAction, deleteLead, assignLeadAction } from "@/app/actions/leads";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Button as AButton } from "@astryxdesign/core/Button";
+import { useToast } from "@astryxdesign/core/Toast";
+import { useDeferredCall, DEFER_MS } from "./v2/useDeferredCall";
+import { DEFAULT_TRANSITIONS } from "@/lib/leads/lifecycle";
+import { SendEmailModal } from "@/components/SendEmailModal";
+import { moveLead, setLeadOutcomeAction, deleteLead, assignLeadAction, logLeadCall } from "@/app/actions/leads";
 import { LeadEditModal } from "./LeadEditModal";
 import { LeadQualificationPanel } from "./LeadQualificationPanel";
 import { CallOutcomeModal } from "../CallOutcomeModal";
-import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
+import type { LeadStatusDef } from "@/lib/leads/statuses";
 import type { QualificationQuestion, AnswerSources, QuestionSet } from "@/lib/leads/qualification";
 import type { ScriptVariant } from "@/lib/leads/scripts";
-import { interactionTypeLabel, interactionDirectionLabel } from "@/lib/interactions";
-import { AUTO_OUTCOME_LABELS, isAutoOutcome } from "@/lib/calls/auto-outcome";
-import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callOutcomeLabel, callbackTone, promptLostReason, type LeadOutcome } from "@/lib/leads/outcomes";
-import { TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { CALL_OUTCOMES, type CallOutcomeKey, type LeadOutcome } from "@/lib/leads/outcomes";
+import type { BookingKind } from "@/lib/booking/priority";
+import { suggestNextSteps, type Suggestion } from "@/lib/leads/suggestions";
+import { buildTimeline } from "@/lib/leads/timeline";
+import { isAutoOutcome } from "@/lib/calls/auto-outcome";
+import { formatRelativeTime, fullName } from "@/lib/utils";
 import { formatMinutes } from "@/lib/leads/first-contact";
-import { formatDateTime, formatRelativeTime, fullName } from "@/lib/utils";
+import { OpenTasks, type OpenTask } from "./detail/OverviewTab";
+import { Header, CallBar } from "./v2/Header";
+import { Situation } from "./v2/Situation";
+import { Suggestions } from "./v2/Suggestions";
+import { Timeline } from "./v2/Timeline";
+import { Details, sourceRows, type Fact } from "./v2/Details";
+import { CallMode } from "./v2/CallMode";
+import { BookingDrawer } from "./v2/BookingDrawer";
+import s from "./v2/lead2.module.css";
 
-interface Interaction {
+export interface Interaction {
   id: number;
   type: string | null;
   direction: string | null;
@@ -33,15 +49,7 @@ interface Interaction {
   supersedesInteractionId?: number | null;
 }
 
-interface OpenTask {
-  id: number;
-  title: string;
-  dueDate: string | Date | null;
-  type: string | null;
-  assignedTo: { name: string } | null;
-}
-
-interface AuditEntry {
+export interface AuditEntry {
   id: number;
   action: string;
   occurredAt: string | Date;
@@ -51,22 +59,25 @@ interface AuditEntry {
 interface Lead {
   id: number;
   status: string | null;
-  source: string | null;
-  sourceApp: string | null;
-  subject: string | null;
-  serviceInterest: string | null;
   message: string | null;
   lostReason: string | null;
   outcome: string;
   assignedToId: number | null;
   estimatedValue: number | null;
   receivedDate: string | Date | null;
-  convertedDealId: number | null;
   createdAt: string | Date;
+  convertedDealId: number | null;
   customFields: Record<string, unknown> | null;
-  tier: string | null;
   companyId: number | null;
   campaign: string | null;
+  source: string | null;
+  sourceApp: string | null;
+  subject: string | null;
+  serviceInterest: string | null;
+  tier: string | null;
+  nextAction: string | null;
+  nextDue: string | Date | null;
+  attempts: number;
   company: { id: number; name: string; city: string | null; website: string | null } | null;
   contact: {
     id: number; role: string | null; email: string | null; phone: string | null;
@@ -74,38 +85,20 @@ interface Lead {
   } | null;
 }
 
-// ⚠️ HU string below is a PROPOSAL, unreviewed by Áron (same convention as
-// AUTO_OUTCOME_LABELS in lib/calls/auto-outcome.ts). `outcome: "transcribed"`
-// marks a queued dictation, not a real call outcome — it has no entry in
-// CALL_OUTCOMES, so the raw English key must never reach the chip.
-const TRANSCRIBED_OUTCOME_LABEL = "Átirat rögzítve";
-function outcomeChipLabel(outcome: string): string {
-  return outcome === "transcribed" ? TRANSCRIBED_OUTCOME_LABEL : callOutcomeLabel(outcome);
-}
-
-const MARKETING_KEYS = [
-  "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
-  "referrer", "landing_variant", "lead_score", "priority",
-];
+type BookingCtx = { kind: BookingKind; event?: string; to?: string };
 
 export function LeadDetailClient({
-  lead,
-  firstContactMin,
-  interactions,
-  auditEntries,
-  statuses,
-  users,
-  openTasks,
-  questions,
-  qualification,
-  answerSources,
-  questionSets,
-  scriptVariants,
+  lead, firstContactMin, interactions, auditEntries, statusHistory, datedTasks, offers, documents, statuses, users, openTasks,
+  questions, qualification, answerSources, questionSets, scriptVariants, callTypeCounts, offersPanel, keyFacts, leadOpen,
 }: {
   lead: Lead;
   firstContactMin: number | null;
   interactions: Interaction[];
   auditEntries: AuditEntry[];
+  statusHistory: { id: number; fromStatus: string | null; toStatus: string; event: string; at: string | Date; actorUser: { name: string } | null }[];
+  datedTasks: { id: number; title: string; type: string | null; status: string; dueDate: string | Date | null }[];
+  offers: { id: number; quoteNumber: string; status: string; createdAt: string | Date; sentAt: string | Date | null; acceptedAt: string | Date | null }[];
+  documents: { id: number; kind: string; number: string; createdAt: string | Date }[];
   statuses: LeadStatusDef[];
   users: { id: number; name: string }[];
   openTasks: OpenTask[];
@@ -114,24 +107,241 @@ export function LeadDetailClient({
   answerSources: AnswerSources;
   questionSets: QuestionSet[];
   scriptVariants: ScriptVariant[];
+  callTypeCounts: { callType: string | null; count: number }[];
+  offersPanel: React.ReactNode;
+  keyFacts: Fact[];
+  leadOpen: boolean;
 }) {
   const router = useRouter();
-  const [status, setStatus] = useState(lead.status ?? "new");
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const calling = params.get("mode") === "call";
+  const tab = params.get("tab");
+  const status = lead.status ?? "new";
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<string>(lead.outcome);
-  const [outcomePending, startOutcome] = useTransition();
-  const [statusPending, startStatus] = useTransition();
+  const [assignedTo, setAssignedTo] = useState(String(lead.assignedToId ?? ""));
   const [converted, setConverted] = useState<number | null>(lead.convertedDealId ?? null);
   const [editing, setEditing] = useState(false);
+  const [emailing, setEmailing] = useState(false);
   const [logging, setLogging] = useState(false);
+  const [callNote, setCallNote] = useState("");
+  const [padOutcome, setPadOutcome] = useState<CallOutcomeKey | undefined>(undefined);
   // Non-null while the modal is open to correct THAT auto-derived interaction.
   const [correcting, setCorrecting] = useState<number | null>(null);
-  const [deleting, startDelete] = useTransition();
+  // ?book=1 (from the board / drive "Foglalt meeting" outcome) opens the drawer on arrival.
+  // Same kind / event / stage the outcome pad uses, so the stage move still happens.
+  const [booking, setBooking] = useState<BookingCtx | null>(() => {
+    if (params.get("book") !== "1") return null;
+    const sg = suggestNextSteps(lead.status ?? "new").find((x) => x.kind === "booking");
+    return { kind: sg?.bookingKind ?? "single_machine_demo", event: sg?.event, to: sg?.to };
+  });
+  // Old ?tab=overview / ?tab=offers deep links land with the details open.
+  const [detailsOpen, setDetailsOpen] = useState(tab === "overview" || tab === "offers");
   const [actionError, setActionError] = useState<string | null>(null);
-  const [assignedTo, setAssignedTo] = useState(String(lead.assignedToId ?? ""));
-  // Resync when a successful assign (or any other refresh) brings new props in.
-  useEffect(() => { setAssignedTo(String(lead.assignedToId ?? "")); }, [lead.assignedToId]);
-  const closed = outcome !== "open" || converted !== null;
+  // An outcome note, not an error: booked, but the stage stays (the kind did not match the suggestion).
+  const [actionNote, setActionNote] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const moveLock = useRef(false);
+  const bookedLock = useRef(false);
+  const [outcomePending, startOutcome] = useTransition();
+  const [assignPending, startAssign] = useTransition();
+  const [movePending, startMove] = useTransition();
+  const [deleting, startDelete] = useTransition();
+  // A lost lead stays workable: call log allowed, it can be reopened.
+  const closed = outcome === "won" || converted !== null;
+
+  const person = lead.contact?.person;
+  const personName = person ? fullName(person.firstName, person.lastName) : null;
+  const cf = lead.customFields ?? {};
+  const contactName = personName || (cf.contact_name as string | undefined) || null;
+  const email = lead.contact?.email ?? person?.email ?? (cf.contact_email as string | undefined) ?? null;
+  const phone = lead.contact?.phone ?? person?.phone ?? (cf.contact_phone as string | undefined) ?? null;
+  const displayName = lead.company?.name ?? contactName ?? lead.subject ?? "Névtelen";
+  const stageLabel = statuses.find((x) => x.key === status)?.label ?? status;
+  const ownerName = users.find((u) => String(u.id) === assignedTo)?.name ?? null;
+
+  const stageLabels = Object.fromEntries(statuses.map((x) => [x.key, x.label]));
+  const timeline = buildTimeline({ interactions, auditEntries, statusHistory, tasks: datedTasks, offers, documents, lead, stageLabels });
+  const now = new Date();
+  const last = timeline.find((i) => new Date(i.at) <= now) ?? null;
+  const autoPct: Record<string, number> = {};
+  for (const r of interactions) if (r.leadId === lead.id && isAutoOutcome(r)) autoPct[`i-${r.id}`] = Math.round((r.autoConfidence ?? 0) * 100);
+
+  const suggestions = closed ? [] : suggestNextSteps(status, { hasPhone: !!phone, hasEmail: !!email });
+  // Every stage the rules allow from here; the dialog collects a reason where one is needed.
+  const stageTargets = [...new Set(DEFAULT_TRANSITIONS.filter((x) => x.from === status && x.to !== status).map((x) => x.to))];
+  const headerCall = !calling;
+  const firstIsCall = suggestions[0]?.kind === "call";
+  const firstPrimary = !(headerCall && firstIsCall);
+  const callOutline = headerCall && suggestions.length > 0 && !firstIsCall;
+  const bookingSuggestion = suggestNextSteps(status).find((x) => x.kind === "booking");
+
+  // A form slug ("service_concrete") is already a label in the key facts; only free text belongs here.
+  const rawSubject = lead.serviceInterest || lead.subject;
+  const subject = rawSubject && !/^[a-z0-9]+(_[a-z0-9]+)+$/.test(rawSubject) ? rawSubject : null;
+  const fiveFacts: Fact[] = [
+    { label: "Érkezett", value: formatRelativeTime(lead.receivedDate ?? lead.createdAt) },
+    { label: "Első kontakt", value: firstContactMin != null ? `${formatMinutes(firstContactMin)} a beérkezés után` : "Még nincs kontakt" },
+    ...keyFacts,
+  ].slice(0, 5);
+  const allFacts: Fact[] = [...(subject ? [{ label: "Tárgy", value: subject }] : []), ...fiveFacts, ...keyFacts.slice(3)];
+
+  function setMode(call: boolean) {
+    const q = new URLSearchParams(params.toString());
+    if (call) q.set("mode", "call"); else q.delete("mode");
+    router.replace(q.size ? `${pathname}?${q}` : pathname, { scroll: false });
+  }
+
+  function openDetails(anchor: string) {
+    setDetailsOpen(true);
+    setTimeout(() => {
+      const el = document.getElementById(anchor);
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (el instanceof HTMLSelectElement) el.focus();
+    }, 60);
+  }
+
+  function runMove(to: string, event?: string) {
+    if (moveLock.current) return;
+    moveLock.current = true;
+    setActionError(null);
+    startMove(async () => {
+      try {
+        const res = await moveLead(lead.id, to, event ? { event } : {});
+        if (res && "error" in res) setActionError(res.error);
+        router.refresh();
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "Nem sikerült a szakaszváltás."); // PROPOSAL copy
+      } finally {
+        moveLock.current = false;
+      }
+    });
+  }
+
+  function runSuggestion(x: Suggestion) {
+    setActionError(null);
+    if (x.kind === "call") setMode(true);
+    else if (x.kind === "booking") setBooking({ kind: x.bookingKind ?? "single_machine_demo", event: x.event, to: x.to });
+    else if (x.kind === "offer") openDetails("offers");
+    else if (x.kind === "email") setEmailing(true);
+    else if (x.kind === "signoff") router.push(`/leads/${lead.id}/signoff`);
+    else if (x.to === "lost" || x.to === "recall") setMoveTarget(x.to); // needs a reason: the dialog asks for it
+    else if (x.to) runMove(x.to, x.event);
+  }
+
+  // One click logs these two; the write is deferred so Undo can cancel it (interactions are append-only).
+  const toast = useToast();
+  const pendingKey = `pendingCall:${lead.id}`;
+  // Only deletes the record of the same outcome, so an earlier commit cannot remove a later one's record.
+  const clearPending = (outcome: string) => {
+    try {
+      const raw = sessionStorage.getItem(pendingKey);
+      if (raw && (JSON.parse(raw) as { outcome: string }).outcome === outcome) sessionStorage.removeItem(pendingKey);
+    } catch { /* storage blocked or unreadable */ }
+  };
+  // Global toast: still shown if the page was left before the write finished.
+  const failed = (msg: string, outcome: string) => { clearPending(outcome); toast({ body: msg, type: "error", autoHideDuration: 10000 }); };
+  const quickCall = useDeferredCall<{ outcome: CallOutcomeKey; note: string }>((item) => {
+    logLeadCall(lead.id, item).then((res) => {
+      if ("error" in res) { failed(res.error, item.outcome); return; }
+      clearPending(item.outcome);
+      // Keep what was typed since the click.
+      setCallNote((cur) => (cur.trim() === item.note ? "" : cur));
+      router.refresh();
+    }).catch(() => failed("Mentés sikertelen: próbáld újra", item.outcome));
+  });
+
+  // A log that never got its answer (tab killed mid-write): tell, never replay (append-only).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(pendingKey);
+      if (!raw) return;
+      const p = JSON.parse(raw) as { outcome: string; at: number };
+      if (Date.now() - p.at > 10_000) {
+        sessionStorage.removeItem(pendingKey);
+        const label = CALL_OUTCOMES.find((o) => o.key === p.outcome)?.label ?? p.outcome;
+        toast({ body: `A call log may not have been saved: ${label}, open the timeline to check`, type: "error", autoHideDuration: 15000 }); // PROPOSAL copy
+      }
+    } catch { /* unreadable: ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Board / drive hand the typed note over once; ?book=1 is consumed here.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(`callNote:${lead.id}`);
+      if (raw) {
+        sessionStorage.removeItem(`callNote:${lead.id}`);
+        const v = JSON.parse(raw) as { note?: string; at?: number };
+        if (v.note && typeof v.at === "number" && Date.now() - v.at < 30 * 60_000) setCallNote(v.note);
+      }
+    } catch { /* storage blocked */ }
+    if (params.get("book") === "1") {
+      const q = new URLSearchParams(params.toString());
+      q.delete("book");
+      router.replace(q.size ? `${pathname}?${q}` : pathname, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function quickLog(k: "no_answer" | "wrong_number") {
+    setActionError(null);
+    const label = CALL_OUTCOMES.find((o) => o.key === k)?.label ?? k;
+    const item = { outcome: k, note: callNote.trim() || label };
+    if (!quickCall.schedule(k, item)) return;
+    try { sessionStorage.setItem(pendingKey, JSON.stringify({ outcome: k, at: Date.now() })); } catch { /* storage blocked */ }
+    // PROPOSAL copy
+    const dismiss = toast({
+      body: `Logged: ${label}`, autoHideDuration: DEFER_MS,
+      endContent: <AButton variant="ghost" size="sm" label="Undo" onClick={() => {
+        if (quickCall.cancel(k)) clearPending(k); else toast({ body: "Already saved", autoHideDuration: 3000 });
+        dismiss();
+      }} />,
+    });
+    quickCall.bindDismiss(k, dismiss);
+  }
+
+  function pickOutcome(k: CallOutcomeKey) {
+    if (k === "no_answer" || k === "wrong_number") { quickLog(k); return; }
+    // IF never books on its own: it opens the drawer.
+    if (k === "meeting_booked") { setBooking({ kind: bookingSuggestion?.bookingKind ?? "single_machine_demo", event: bookingSuggestion?.event, to: bookingSuggestion?.to }); return; }
+    setPadOutcome(k);
+    setLogging(true);
+  }
+
+  // The drawer already booked: a failed log is retried with the same task id, never re-booked.
+  function logBookedCall(taskId: number, note: string) {
+    const fail = () => toast({
+      body: "Booked, but the call was not logged", type: "error", autoHideDuration: 15000,
+      endContent: <AButton variant="ghost" size="sm" label="Log it again" onClick={() => logBookedCall(taskId, note)} />,
+    });
+    logLeadCall(lead.id, { outcome: "meeting_booked", note, existingBookingTaskId: taskId }).then((res) => {
+      if ("error" in res) { fail(); return; }
+      setCallNote("");
+      router.refresh();
+    }).catch(fail);
+  }
+
+  function handleBooked(kind: BookingKind, taskId: number) {
+    if (bookedLock.current) return;
+    bookedLock.current = true;
+    try {
+      const b = booking;
+      // Close first so a failed follow-up move shows on the page, not behind the drawer.
+      setBooking(null);
+      // Call mode: the call log (against the meeting the drawer just created) moves the stage itself.
+      if (calling) {
+        const retry = { taskId, note: callNote.trim() || "Foglalt meeting" };
+        logBookedCall(retry.taskId, retry.note);
+      } else if (b?.event && b.to) {
+        if (kind === b.kind) runMove(b.to, b.event);
+        else setActionNote("Lefoglalva; a szakasz nem változott."); // PROPOSAL copy
+      }
+    } finally {
+      bookedLock.current = false;
+    }
+  }
 
   function handleDelete() {
     const label = lead.serviceInterest || lead.subject || `Lead #${lead.id}`;
@@ -143,402 +353,190 @@ export function LeadDetailClient({
     });
   }
 
-  const person = lead.contact?.person;
-  const personName = person ? fullName(person.firstName, person.lastName) : null;
-  const email = lead.contact?.email ?? person?.email ?? (lead.customFields?.contact_email as string | undefined) ?? null;
-  const phone = lead.contact?.phone ?? person?.phone ?? (lead.customFields?.contact_phone as string | undefined) ?? null;
-
-  const cf = lead.customFields ?? {};
-  const marketing = MARKETING_KEYS
-    .map((k) => [k, cf[k]] as const)
-    .filter(([, v]) => v !== undefined && v !== null && v !== "");
-
-  function handleStatusChange(next: string) {
-    if (next !== status) setMoveTarget(next);
-  }
-
   function handleOutcome(next: LeadOutcome) {
-    // A lost lead must say WHY (Péter, 2026-09-07); an already-lost lead keeps
-    // the stored reason, so only ask when there is none yet.
-    let reason: string | null = null;
-    if (next === "lost" && !lead.lostReason) {
-      reason = promptLostReason();
-      if (reason === null) return;
-    }
+    // Lost opens the move dialog so the user picks a Hungarian reason; cancel leaves the select as is.
+    if (next === "lost") { setMoveTarget("lost"); return; }
     const prev = outcome;
     setOutcome(next);
     setActionError(null);
     startOutcome(async () => {
-      const res = await setLeadOutcomeAction(lead.id, next, reason);
+      const res = await setLeadOutcomeAction(lead.id, next);
       if ("error" in res) { setOutcome(prev); setActionError(res.error); router.refresh(); return; }
       if (res.dealId) setConverted(res.dealId);
       router.refresh();
     });
   }
 
-  // Controlled so a failed assign visibly reverts — an uncontrolled select keeps
-  // the DOM value the user picked even though the server never took it (same
-  // silent-revert class as the kanban drag fix).
+  // Controlled so a failed assign visibly reverts (an uncontrolled select keeps the DOM value the server never took).
   function handleAssign(v: string) {
     const prev = assignedTo;
     setAssignedTo(v);
-    startStatus(async () => {
+    startAssign(async () => {
       const res = await assignLeadAction(lead.id, v === "" ? null : Number(v));
-      if ("error" in res) {
-        setActionError(res.error);
-        setAssignedTo(prev);
-      }
+      if ("error" in res) { setActionError(res.error); setAssignedTo(prev); }
       router.refresh();
     });
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="page-head">
-        <div>
-          <h1 className="page-title flex items-center gap-2">
-            {isTier(lead.tier) && (
-              <span
-                className="font-mono-ndt"
-                title={TIER_LABEL[lead.tier]}
-                style={{
-                  fontSize: 12, padding: "2px 7px", borderRadius: 4, fontWeight: 700,
-                  color: TIER_COLOR[lead.tier], border: `1px solid ${TIER_COLOR[lead.tier]}`,
-                  background: "var(--bg-hover)",
-                }}
-              >
-                {lead.tier}
-              </span>
-            )}
-            {lead.serviceInterest || lead.subject || "Lead"}
-          </h1>
-          <p className="page-sub">
-            {lead.sourceApp || lead.source || "web"} · érkezett {formatRelativeTime(lead.receivedDate ?? lead.createdAt)}
-            {" · "}
-            {firstContactMin != null ? `Első kontakt: ${formatMinutes(firstContactMin)} a beérkezés után` : "Még nincs kontakt"}
-          </p>
-        </div>
-        <div className="page-actions" style={{ gap: 8 }}>
-          <button onClick={() => setEditing(true)} className="btn" style={{ gap: 6 }}>
-            <Pencil style={{ width: 14, height: 14 }} />
-            Szerkesztés
-          </button>
+    <div className={s.page}>
+      {params.get("from") === "drive" && <Link href="/drive" className={s.back}>Back to the queue</Link>}
+      <Header
+        name={displayName}
+        companyId={lead.company?.id ?? null}
+        contactName={contactName}
+        personHref={person ? `/persons/${person.id}` : null}
+        role={lead.contact?.role ?? null}
+        town={lead.company?.city ?? null}
+        phone={phone}
+        email={email}
+        stageLabel={stageLabel}
+        tier={lead.tier}
+        ownerName={ownerName}
+        calling={calling}
+        callOutline={callOutline}
+        canMove={!closed && stageTargets.length > 0}
+        onStage={() => setPicking(true)}
+        canClose={status !== "lost" && !closed}
+        deleting={deleting}
+        onCall={() => setMode(true)}
+        onEdit={() => setEditing(true)}
+        onOwner={() => openDetails("lead-owner")}
+        onClose={() => setMoveTarget("lost")}
+        onDelete={handleDelete}
+      />
 
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="btn"
-            style={{ gap: 6, color: "var(--coral)" }}
-            title="Lead törlése"
-          >
-            <Trash2 style={{ width: 14, height: 14 }} />
-            {deleting ? "Törlés…" : "Törlés"}
-          </button>
+      {actionError && <p className={s.error} role="alert">{actionError}</p>}
+      {actionNote && <p className={s.muted} role="status">{actionNote}</p>}
 
-          <select
-            value={status}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            disabled={statusPending || closed}
-            className="font-mono-ndt"
-            style={{
-              fontSize: 12, padding: "6px 10px", borderRadius: 6,
-              background: "var(--bg-panel)", border: "1px solid var(--line-soft)",
-              color: "var(--fg)", outline: "none",
-            }}
-          >
-            {statuses.map((s) => (
-              <option key={s.key} value={s.key}>{s.label}</option>
-            ))}
-          </select>
-
-          {moveTarget && (
-            <LeadMoveDialog
-              leadId={lead.id}
-              target={moveTarget}
-              targetLabel={statuses.find((s) => s.key === moveTarget)?.label ?? moveTarget}
-              onClose={() => setMoveTarget(null)}
-              onMoved={() => { setStatus(moveTarget); setMoveTarget(null); router.refresh(); }}
-            />
-          )}
-
-          {/* Outcome — orthogonal to the stage. `won` is the door to the deal pipeline. */}
-          <select
-            value={outcome}
-            onChange={(e) => handleOutcome(e.target.value as LeadOutcome)}
-            disabled={outcomePending}
-            className="font-mono-ndt"
-            title="Kimenetel"
-            style={{
-              fontSize: 12, padding: "6px 10px", borderRadius: 6, fontWeight: 600,
-              background: outcome === "won" ? "var(--mint-soft)" : outcome === "lost" ? "var(--coral-soft)" : "var(--bg-panel)",
-              border: `1px solid ${outcome === "won" ? "var(--mint)" : outcome === "lost" ? "var(--coral)" : "var(--line-soft)"}`,
-              color: outcome === "won" ? "var(--mint)" : outcome === "lost" ? "var(--coral)" : "var(--fg)", outline: "none",
-            }}
-          >
-            {LEAD_OUTCOMES.map((o) => (
-              <option key={o} value={o}>{LEAD_OUTCOME_LABEL[o]}</option>
-            ))}
-          </select>
-
-          {converted && (
-            <Link href="/deals" className="btn" style={{ gap: 6, color: "var(--mint)" }}>
-              <CheckCircle2 style={{ width: 14, height: 14 }} />
-              Deal #{converted}
-            </Link>
-          )}
-
-          <button onClick={() => setLogging(true)} disabled={closed} className="btn primary" style={{ gap: 6 }} title={closed ? "Lezárt lead" : undefined}>
-            <PhoneCall style={{ width: 14, height: 14 }} />
-            Hívás eredménye
-          </button>
-        </div>
-      </div>
-
-      {actionError && (
-        <div className="panel" style={{ marginBottom: 12 }}>
-          <div className="panel-pad" style={{ fontSize: 14, color: "var(--coral)" }}>{actionError}</div>
-        </div>
+      {calling && (
+        <CallMode
+          closed={closed}
+          note={callNote}
+          onNote={setCallNote}
+          onPick={pickOutcome}
+          onLog={() => { setPadOutcome(undefined); setLogging(true); }}
+          onDone={() => setMode(false)}
+        />
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, alignItems: "start" }}>
-        {/* Left: entity + source */}
-        <div className="space-y-4">
-          {/* Company */}
-          <div className="panel">
-            <div className="panel-head"><div className="panel-title">Cég</div></div>
-            <div className="panel-pad space-y-3">
-              {lead.company ? (
-                <>
-                  <Link href={`/companies/${lead.company.id}`} className="flex items-center gap-2" style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>
-                    <Building2 style={{ width: 14, height: 14, color: "var(--indigo)" }} />
-                    {lead.company.name}
-                  </Link>
-                  {lead.company.city && <div className="field-value">{lead.company.city}</div>}
-                  {lead.company.website && (
-                    <a href={lead.company.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--sky)" }}>
-                      <Globe style={{ width: 12, height: 12 }} />
-                      {lead.company.website}
-                    </a>
-                  )}
-                </>
-              ) : (
-                <div className="field-value">-</div>
-              )}
-            </div>
-          </div>
-
-          {/* Contact */}
-          <div className="panel">
-            <div className="panel-head"><div className="panel-title">Kapcsolattartó</div></div>
-            <div className="panel-pad space-y-3">
-              {personName ? (
-                <Link href={`/persons/${person!.id}`} className="flex items-center gap-2" style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>
-                  <User style={{ width: 13, height: 13, color: "var(--indigo)" }} />
-                  {personName}
-                </Link>
-              ) : (
-                <div className="flex items-center gap-2" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
-                  <User style={{ width: 13, height: 13 }} />
-                  {(cf.contact_name as string) || "Névtelen"}
-                </div>
-              )}
-              {email && (
-                <a href={`mailto:${email}`} className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--sky)" }}>
-                  <Mail style={{ width: 12, height: 12 }} />{email}
-                </a>
-              )}
-              {phone && (
-                <a href={`tel:${phone}`} className="flex items-center gap-1.5" style={{ fontSize: 12, color: "var(--fg-soft)" }}>
-                  <Phone style={{ width: 12, height: 12 }} />{phone}
-                </a>
-              )}
-            </div>
-          </div>
-
-          {/* Source / marketing */}
-          <div className="panel">
-            <div className="panel-head"><div className="panel-title">Forrás</div></div>
-            <div className="panel-pad space-y-2">
-              <div className="flex justify-between" style={{ fontSize: 12 }}>
-                <span style={{ color: "var(--fg-mute)" }}>App</span>
-                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{lead.sourceApp ?? "-"}</span>
-              </div>
-              <div className="flex justify-between" style={{ fontSize: 12 }}>
-                <span style={{ color: "var(--fg-mute)" }}>Csatorna</span>
-                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{lead.source ?? "-"}</span>
-              </div>
-              <div className="flex justify-between" style={{ fontSize: 12 }}>
-                <span style={{ color: "var(--fg-mute)" }}>Státusz</span>
-                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>{leadStatusLabel(status, statuses)}</span>
-              </div>
-              <div className="flex justify-between" style={{ fontSize: 12 }}>
-                <span style={{ color: "var(--fg-mute)" }}>Kimenetel</span>
-                <span className="font-mono-ndt" style={{ color: "var(--fg)" }}>
-                  {LEAD_OUTCOME_LABEL[outcome as LeadOutcome] ?? outcome}
-                  {outcome === "lost" && lead.lostReason ? ` · ${callOutcomeLabel(lead.lostReason)}` : ""}
-                </span>
-              </div>
-              <div className="flex justify-between items-center" style={{ fontSize: 12 }}>
-                <span style={{ color: "var(--fg-mute)" }}>Felelős</span>
-                <select
-                  value={assignedTo}
-                  onChange={(e) => handleAssign(e.target.value)}
-                  disabled={statusPending}
-                  className="font-mono-ndt"
-                  style={{ fontSize: 12, padding: "2px 6px", borderRadius: 5, background: "var(--bg-0)", border: "1px solid var(--line-soft)", color: "var(--fg)" }}
-                >
-                  <option value="">nincs</option>
-                  {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
-              </div>
-              {marketing.length > 0 && (
-                <div style={{ paddingTop: 8, marginTop: 4, borderTop: "1px solid var(--line-soft)", display: "flex", flexDirection: "column", gap: 6 }}>
-                  {marketing.map(([k, v]) => (
-                    <div key={k} className="flex justify-between" style={{ fontSize: 12 }}>
-                      <span className="font-mono-ndt" style={{ color: "var(--fg-faint)" }}>{k}</span>
-                      <span className="font-mono-ndt" style={{ color: "var(--fg-soft)", textAlign: "right" }}>{String(v)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: message + interactions timeline */}
-        <div className="space-y-4">
-          {lead.message && (
-            <div className="panel">
-              <div className="panel-head"><div className="panel-title">Üzenet</div></div>
-              <div className="panel-pad">
-                <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--fg-soft)", whiteSpace: "pre-wrap" }}>{lead.message}</p>
-              </div>
-            </div>
-          )}
-
-          {openTasks.length > 0 && (
-            <div className="panel">
-              <div className="panel-head"><div className="panel-title">Nyitott feladatok · {openTasks.length}</div></div>
-              <div className="panel-pad space-y-2">
-                {openTasks.map((t) => {
-                  const tone = callbackTone(t.dueDate);
-                  return (
-                    <div key={t.id} className="flex items-center gap-2" style={{ fontSize: 12 }}>
-                      <CalendarClock style={{ width: 12, height: 12, color: tone === "overdue" ? "var(--coral)" : tone === "soon" ? "var(--amber)" : "var(--fg-faint)" }} />
-                      <Link href="/tasks" className="row-link" style={{ color: "var(--fg)", flex: 1 }}>{t.title}</Link>
-                      {t.assignedTo && <span style={{ color: "var(--fg-faint)" }}>{t.assignedTo.name}</span>}
-                      <span className="font-mono-ndt" style={{ color: tone === "overdue" ? "var(--coral)" : "var(--fg-mute)", fontSize: 12 }}>
-                        {t.dueDate ? formatDateTime(t.dueDate) : "-"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <LeadQualificationPanel
-            leadId={lead.id}
-            questions={questions}
-            qualification={qualification}
-            answerSources={answerSources}
-            campaign={lead.campaign}
-            receivedDate={lead.receivedDate}
-            sets={questionSets}
+      <div className={s.split}>
+        <div className={s.left}>
+          <Situation
+            last={last}
+            strip={{ status, stageLabel, nextAction: lead.nextAction, nextDue: lead.nextDue, ownerName, attempts: lead.attempts }}
           />
-
-          <div className="panel">
-            <div className="panel-head"><div className="panel-title">Hívások és interakciók · {interactions.length}</div></div>
-            <div className="panel-pad">
-              {interactions.length === 0 ? (
-                <div style={{ fontSize: 12, color: "var(--fg-mute)", padding: "8px 0" }}>Nincs rögzített interakció.</div>
-              ) : (
-                <div className="space-y-3">
-                  {interactions.map((r) => {
-                    // A correction (supersedesInteractionId set) is never itself flagged
-                    // as auto-derived — it IS the human correction. And the badge/button
-                    // only ever apply to an interaction that actually belongs to the lead
-                    // being viewed — the timeline query also pulls in sibling leads of the
-                    // same company/person, and correcting THOSE would silently act on a
-                    // different lead than the one shown in the modal.
-                    const ownLead = r.leadId === lead.id;
-                    // NOT gated on supersedesInteractionId: an applied parse
-                    // that answered a dictated transcript supersedes that
-                    // transcript, and it is exactly the flow the badge exists
-                    // for. isAutoOutcome already excludes a human correction,
-                    // which never carries a confidence.
-                    const auto = ownLead && isAutoOutcome(r);
-                    const confidencePct = auto ? Math.round((r.autoConfidence ?? 0) * 100) : null;
-                    return (
-                    <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                      <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--indigo)", marginTop: 5, flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="flex items-center gap-2" style={{ fontSize: 12, marginBottom: 2 }}>
-                          <span style={{ color: "var(--fg)", fontWeight: 500 }}>{interactionTypeLabel(r.type)}</span>
-                          {r.direction && <span style={{ color: "var(--fg-mute)" }}>· {interactionDirectionLabel(r.direction)}</span>}
-                          {r.outcome && (
-                            <span className="font-mono-ndt" style={{ fontSize: 12, padding: "1px 6px", borderRadius: 10, background: "var(--bg-hover)", color: "var(--fg-soft)" }}>
-                              {outcomeChipLabel(r.outcome)}
-                            </span>
-                          )}
-                          {r.user?.name && <span style={{ color: "var(--fg-faint)", fontSize: 12 }}>· {r.user.name}</span>}
-                          <span className="font-mono-ndt" style={{ color: "var(--fg-faint)", fontSize: 12, marginLeft: "auto" }}>{formatDateTime(r.occurredAt)}</span>
-                        </div>
-                        {auto && (
-                          <div className="flex items-center gap-2" style={{ marginBottom: 2, flexWrap: "wrap" }}>
-                            <span className="font-mono-ndt" style={{ fontSize: 11, fontWeight: 600, padding: "1px 6px", borderRadius: 10, background: "var(--amber-soft)", color: "var(--amber)" }}>
-                              {AUTO_OUTCOME_LABELS.autoBadge}
-                            </span>
-                            <span style={{ fontSize: 11, color: "var(--fg-mute)" }}>
-                              {AUTO_OUTCOME_LABELS.autoBadgeHint.replace("{pct}", String(confidencePct))}
-                            </span>
-                            <button
-                              onClick={() => { setCorrecting(r.id); setLogging(true); }}
-                              disabled={closed}
-                              style={{ background: "none", border: "none", color: "var(--indigo)", fontSize: 11, fontWeight: 600, padding: 0, cursor: "pointer" }}
-                            >
-                              {AUTO_OUTCOME_LABELS.correct}
-                            </button>
-                          </div>
-                        )}
-                        {r.notes && <p style={{ fontSize: 12, color: "var(--fg-soft)", lineHeight: 1.4 }}>{r.notes}</p>}
-                      </div>
-                    </div>
-                    );
-                  })}
-                </div>
-              )}
+          <Suggestions items={suggestions} pending={movePending} firstPrimary={firstPrimary} onRun={runSuggestion} />
+          <Timeline
+            items={timeline}
+            phone={phone}
+            autoPct={autoPct}
+            onCorrect={closed ? undefined : (id) => { setCorrecting(id); setPadOutcome(undefined); setLogging(true); }}
+          />
+        </div>
+        <div className={s.right}>
+          <Details
+            open={detailsOpen}
+            onToggle={setDetailsOpen}
+            facts={allFacts}
+            source={sourceRows({ sourceApp: lead.sourceApp, source: lead.source, campaign: lead.campaign, outcome, lostReason: lead.lostReason, customFields: lead.customFields })}
+            callTypeCounts={callTypeCounts}
+            users={users}
+            assignedTo={assignedTo}
+            assignPending={assignPending}
+            onAssign={handleAssign}
+            outcome={outcome}
+            outcomePending={outcomePending}
+            onOutcome={handleOutcome}
+            converted={converted}
+            website={lead.company?.website ?? null}
+          >
+            <section id="facts" className={s.section}>
+              <h3 className={s.h3}>{/* PROPOSAL copy */}Amit tudunk</h3>
+              <LeadQualificationPanel
+                leadId={lead.id}
+                questions={questions}
+                qualification={qualification}
+                answerSources={answerSources}
+                campaign={lead.campaign}
+                receivedDate={lead.receivedDate}
+                sets={questionSets}
+              />
+            </section>
+            <section id="offers" className={s.section}>
+              <h3 className={s.h3}>{/* PROPOSAL copy */}Ajánlatok és dokumentumok</h3>
+              {/* Wrapped: a server-built node as a direct sibling here trips a dev key warning. */}
+              <div>{offersPanel}</div>
+            </section>
+            <section id="tasks" className={s.section}>
+              <h3 className={s.h3}>{/* PROPOSAL copy */}Nyitott feladatok</h3>
+              <OpenTasks openTasks={openTasks} />
+            </section>
+          </Details>
+          <section className={s.card} aria-label="Röviden">
+            <h2 className={s.h2}>{/* PROPOSAL copy */}Röviden</h2>
+            <div className={s.facts}>
+              {fiveFacts.map((f) => <div key={f.label} className={s.fact}><span>{f.label}</span><span>{f.value}</span></div>)}
             </div>
-          </div>
-
-          {auditEntries.length > 0 && (
-            <div className="panel">
-              <div className="panel-head"><div className="panel-title">Előzmények</div></div>
-              <div className="panel-pad">
-                <div className="space-y-2">
-                  {auditEntries.slice(0, 12).map((a) => (
-                    <div key={a.id} className="flex items-center justify-between" style={{ fontSize: 12 }}>
-                      <span className="font-mono-ndt" style={{ color: "var(--fg-mute)" }}>{a.action}</span>
-                      <span className="font-mono-ndt" style={{ color: "var(--fg-faint)" }}>{formatRelativeTime(a.occurredAt)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          </section>
         </div>
       </div>
+
+      <Dialog open={picking} onOpenChange={setPicking}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{/* PROPOSAL copy */}Szakasz váltása</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            {stageTargets.map((k) => (
+              <Button key={k} type="button" variant="outline" onClick={() => { setPicking(false); setMoveTarget(k); }}>
+                {statuses.find((x) => x.key === k)?.label ?? k}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {moveTarget && (
+        <LeadMoveDialog
+          leadId={lead.id}
+          target={moveTarget}
+          targetLabel={statuses.find((x) => x.key === moveTarget)?.label ?? moveTarget}
+          onClose={() => setMoveTarget(null)}
+          onMoved={() => { if (moveTarget === "lost") setOutcome("lost"); setMoveTarget(null); router.refresh(); }}
+        />
+      )}
+
+      <BookingDrawer
+        open={booking !== null}
+        kind={booking?.kind ?? "single_machine_demo"}
+        leadId={lead.id}
+        leadOpen={leadOpen}
+        onClose={() => setBooking(null)}
+        onBooked={handleBooked}
+      />
+
+      <SendEmailModal
+        open={emailing}
+        onClose={() => setEmailing(false)}
+        companyId={lead.companyId}
+        personId={person?.id ?? null}
+        defaultTo={email ?? undefined}
+        contextLabel={displayName}
+      />
 
       <CallOutcomeModal
         open={logging}
-        onClose={() => { setLogging(false); setCorrecting(null); }}
+        onClose={() => { setLogging(false); setCorrecting(null); setPadOutcome(undefined); }}
         leadId={lead.id}
         title={[personName, lead.company?.name].filter(Boolean).join(" · ") || null}
-        stageDescription={statuses.find((s) => s.key === status)?.description ?? null}
-        onLogged={() => { setCorrecting(null); router.refresh(); }}
+        stageDescription={statuses.find((x) => x.key === status)?.description ?? null}
+        onLogged={() => { setCorrecting(null); setCallNote(""); router.refresh(); }}
         scriptVariants={scriptVariants}
         correctsInteractionId={correcting}
+        initialOutcome={padOutcome}
+        initialNote={correcting ? undefined : callNote || undefined}
+        onBook={(note) => { setCallNote(note); setLogging(false); setPadOutcome(undefined); setBooking({ kind: bookingSuggestion?.bookingKind ?? "single_machine_demo", event: bookingSuggestion?.event, to: bookingSuggestion?.to }); }}
       />
 
       <LeadEditModal
@@ -558,6 +556,8 @@ export function LeadDetailClient({
           campaign: lead.campaign,
         }}
       />
+
+      {!calling && <CallBar phone={phone} onCall={() => setMode(true)} outline={callOutline} />}
     </div>
   );
 }

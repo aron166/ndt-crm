@@ -1,0 +1,74 @@
+/* The ONE design token file (Áron 2026-11-10: "make it so we can always change this later").
+   App CSS reads only these --ui-* tokens. They resolve to the Astryx theme's tokens, so a re-theme is: swap the
+   Astryx theme in AstryxProviders, or change the right-hand sides below. Nothing else.
+   Declared on the theme element because Astryx tokens live there (a var() in a custom property resolves where it is
+   declared). After hydration Astryx syncs data-astryx-theme onto <html>, so portals (dialogs, menus, toasts) get them. */
+[data-astryx-theme] {
+  /* surfaces */
+  --ui-page: var(--color-background-body);
+  --ui-surface: var(--color-background-card);
+  --ui-surface-muted: var(--color-background-muted);
+  --ui-surface-overlay: var(--color-background-popover);
+  --ui-hover: var(--color-overlay-hover);
+  --ui-scrim: var(--color-overlay);
+
+  /* text */
+  --ui-text: var(--color-text-primary);
+  --ui-text-muted: var(--color-text-secondary);
+  --ui-text-disabled: var(--color-text-disabled);
+  --ui-text-link: var(--color-text-accent);
+
+  /* lines */
+  --ui-border: var(--color-border);
+  --ui-border-strong: var(--color-border-emphasized);
+  --ui-control-border: var(--color-text-disabled);
+
+  /* action */
+  --ui-accent: var(--color-accent);
+  --ui-on-accent: var(--color-on-accent);
+  --ui-focus: var(--color-accent);
+  --ui-accent-surface: var(--color-accent-muted);
+  --ui-on-danger: var(--color-on-error);
+
+  /* meaning (word plus colour, never colour alone) */
+  --ui-danger: var(--color-error);
+  --ui-danger-text: var(--color-text-error);
+  --ui-danger-surface: var(--color-error-muted);
+  --ui-success: var(--color-success);
+  --ui-success-text: var(--color-text-success);
+  --ui-success-surface: var(--color-success-muted);
+  --ui-warning: var(--color-warning);
+  --ui-warning-text: var(--color-text-warning);
+  --ui-warning-surface: var(--color-warning-muted);
+  --ui-info-text: var(--color-text-info);
+  --ui-info-surface: var(--color-info-muted);
+
+  /* shape and depth */
+  --ui-radius-control: var(--radius-element);
+  --ui-radius-surface: var(--radius-container);
+  --ui-radius-pill: var(--radius-full);
+  --ui-shadow-raised: var(--shadow-low);
+  --ui-shadow-overlay: var(--shadow-high);
+
+  /* type and size */
+  --ui-font: var(--font-family-body);
+  --ui-font-mono: var(--font-family-code);
+  --ui-text-sm: 13px;
+  --ui-text-md: 14px;
+  --ui-text-lg: 16px;
+  --ui-control-h: 40px;
+  --ui-control-h-touch: 44px;
+
+  /* motion */
+  --ui-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ui-dur-fast: 150ms;
+  --ui-dur: 220ms;
+}
+
+/* chart series: calm steps of the accent, then a neutral (added by the UI sweep) */
+[data-astryx-theme] {
+  --ui-chart-1: var(--ui-accent);
+  --ui-chart-2: color-mix(in oklch, var(--ui-accent) 65%, var(--ui-surface));
+  --ui-chart-3: color-mix(in oklch, var(--ui-accent) 40%, var(--ui-surface));
+  --ui-chart-4: var(--ui-border-strong);
+}

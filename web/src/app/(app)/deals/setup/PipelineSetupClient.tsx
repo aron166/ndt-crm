@@ -5,14 +5,11 @@ import { useRouter } from "next/navigation";
 import { upsertStage, deleteStage, createPipeline, reorderStages } from "@/app/actions/deals";
 import { upsertCustomField, deleteCustomField } from "@/app/actions/custom-fields";
 import { Plus, Trash2, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
+import { Badge } from "@astryxdesign/core/Badge";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-
-const STAGE_COLORS = [
-  "#64748b", "#6366f1", "#8b5cf6", "#3b82f6",
-  "#06b6d4", "#22c55e", "#f97316", "#f59e0b",
-  "#ef4444", "#f43f5e",
-];
+import { DEFAULT_STAGE_COLORS as STAGE_COLORS, DEFAULT_DATA_COLOR } from "@/lib/data-colors";
+import k from "@/components/astryx/page.module.css";
+import s from "./setup.module.css";
 
 interface Stage {
   id: number; name: string; color: string;
@@ -82,8 +79,7 @@ function StageRow({
   if (!editing) {
     return (
       <div
-        className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
-        style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)", cursor: "pointer" }}
+        className={s.stageRow}
         onClick={() => setEditing(true)}
       >
         <span
@@ -92,17 +88,17 @@ function StageRow({
           title="Húzd az átrendezéshez"
           style={{ display: "flex", flexShrink: 0, cursor: dragHandle ? "grab" : "default", touchAction: "none" }}
         >
-          <GripVertical style={{ width: 14, height: 14, color: "var(--fg-faint)" }} />
+          <GripVertical style={{ width: 14, height: 14, color: "var(--ui-text-muted)" }} />
         </span>
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: stage.color, flexShrink: 0, boxShadow: `0 0 var(--glow-size) ${stage.color}` }} />
-        <span style={{ flex: 1, fontSize: 14, color: "var(--fg)" }}>{stage.name}</span>
-        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>{stage.probability}%</span>
-        {stage.isTerminalWon && <span className="badge-ds mint" style={{ fontSize: 12 }}>Nyert</span>}
-        {stage.isTerminalLost && <span className="badge-ds coral" style={{ fontSize: 12 }}>Veszített</span>}
+        <span style={{ width: 10, height: 10, borderRadius: "50%", background: stage.color, flexShrink: 0 }} />
+        <span className={s.rowLabel} style={{ fontSize: 14, color: "var(--ui-text)" }}>{stage.name}</span>
+        <span style={{ fontSize: 14, color: "var(--ui-text-muted)", fontVariantNumeric: "tabular-nums" }}>{stage.probability}%</span>
+        {stage.isTerminalWon && <Badge variant="success" label="Nyert" />}
+        {stage.isTerminalLost && <Badge variant="error" label="Veszített" />}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-          style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer" }}
-          onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
-          onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}
+          className={`${k.btn} ${k.btnIcon}`}
+          aria-label="Fázis törlése" // PROPOSAL copy
+          title="Fázis törlése"
         >
           <Trash2 style={{ width: 13, height: 13 }} />
         </button>
@@ -111,38 +107,41 @@ function StageRow({
   }
 
   return (
-    <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--indigo-line)", background: "var(--bg-panel)" }}>
+    <div className={s.editCard}>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="field-label">Fázis neve</label>
+          <label className={s.label}>Fázis neve</label>
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div>
-          <label className="field-label">Valószínűség %</label>
+          <label className={s.label}>Valószínűség %</label>
           <Input type="number" value={probability} onChange={(e) => setProbability(parseInt(e.target.value) || 0)} min={0} max={100} />
         </div>
       </div>
 
       <div>
-        <label className="field-label">Szín</label>
+        <label className={s.label}>Szín</label>
         <div className="flex gap-2 flex-wrap">
           {STAGE_COLORS.map((c) => (
             <button
               key={c}
               type="button"
+              className={s.swatch}
+              aria-label={`Szín: ${c}`} // PROPOSAL copy
               onClick={() => setColor(c)}
-              style={{
-                width: 24, height: 24, borderRadius: "50%", background: c, cursor: "pointer",
+            >
+              <span style={{
+                width: 24, height: 24, borderRadius: "50%", background: c,
                 outline: color === c ? `2px solid ${c}` : "none", outlineOffset: 2,
                 // affordance, not decoration — keep a literal radius in both themes so the selected swatch stays visible
                 boxShadow: color === c ? `0 0 8px ${c}` : "none",
-              }}
-            />
+              }} />
+            </button>
           ))}
         </div>
       </div>
 
-      <div className="flex gap-4 text-sm" style={{ color: "var(--fg-soft)" }}>
+      <div className="flex gap-4 text-sm" style={{ color: "var(--ui-text)" }}>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={isTerminalWon} onChange={(e) => { setIsTerminalWon(e.target.checked); if (e.target.checked) setIsTerminalLost(false); setProbability(e.target.checked ? 100 : probability); }} />
           Nyert (lezárt)
@@ -154,10 +153,10 @@ function StageRow({
       </div>
 
       <div className="flex gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>Mégse</Button>
-        <Button type="button" size="sm" className="btn primary" onClick={save} disabled={isPending}>
+        <button type="button" className={k.btn} onClick={() => setEditing(false)}>Mégse</button>
+        <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={save} disabled={isPending}>
           {isPending ? "Mentés..." : "Mentés"}
-        </Button>
+        </button>
       </div>
     </div>
   );
@@ -208,7 +207,7 @@ function StagesList({ stages, pipelineId }: { stages: Stage[]; pipelineId: numbe
             onDrop={handleDrop}
             style={{
               opacity: dragIndex === i ? 0.4 : 1,
-              borderTop: `2px solid ${showIndicator ? "var(--indigo)" : "transparent"}`,
+              borderTop: `2px solid ${showIndicator ? "var(--ui-accent)" : "transparent"}`,
               borderRadius: 2,
               transition: "opacity .15s",
             }}
@@ -262,20 +261,19 @@ function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId:
   if (!editing) {
     return (
       <div
-        className="flex items-center gap-3 px-3 py-2 rounded-lg"
-        style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)", cursor: "pointer" }}
+        className={s.stageRow}
         onClick={() => setEditing(true)}
       >
-        <span style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono)", background: "var(--bg-hover)", padding: "1px 6px", borderRadius: 4 }}>
+        <span className={s.code}>
           {field.type}
         </span>
-        <span style={{ flex: 1, fontSize: 14, color: "var(--fg)" }}>{field.label}</span>
-        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{field.key}</span>
-        {field.required && <span className="badge-ds coral" style={{ fontSize: 12 }}>kötelező</span>}
+        <span className={s.rowLabel} style={{ fontSize: 14, color: "var(--ui-text)" }}>{field.label}</span>
+        <span className={s.code}>{field.key}</span>
+        {field.required && <Badge variant="error" label="kötelező" />}
         <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-          style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
-          onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
-          onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}
+          className={`${k.btn} ${k.btnIcon}`}
+          aria-label="Mező törlése" // PROPOSAL copy
+          title="Mező törlése"
         >
           <Trash2 style={{ width: 13, height: 13 }} />
         </button>
@@ -284,18 +282,18 @@ function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId:
   }
 
   return (
-    <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--indigo-line)", background: "var(--bg-panel)" }}>
+    <div className={s.editCard}>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="field-label">Mező neve</label>
+          <label className={s.label}>Mező neve</label>
           <Input value={label} onChange={(e) => setLabel(e.target.value)} />
         </div>
         <div>
-          <label className="field-label">Típus</label>
+          <label className={s.label}>Típus</label>
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none" }}
+            className={s.field}
           >
             {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
@@ -303,23 +301,23 @@ function CustomFieldRow({ field, pipelineId }: { field: CustomField; pipelineId:
       </div>
       {needsOptions && (
         <div>
-          <label className="field-label">Opciók (soronként egy)</label>
+          <label className={s.label}>Opciók (soronként egy)</label>
           <textarea
             value={options}
             onChange={(e) => setOptions(e.target.value)}
             rows={4}
             placeholder={"Opció 1\nOpció 2\nOpció 3"}
-            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, resize: "vertical", outline: "none", fontFamily: "var(--font-mono)" }}
+            className={s.field} style={{ resize: "vertical" }}
           />
         </div>
       )}
-      <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 14, color: "var(--fg-soft)" }}>
+      <label className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 14, color: "var(--ui-text)" }}>
         <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
         Kötelező mező
       </label>
       <div className="flex gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>Mégse</Button>
-        <Button type="button" size="sm" className="btn primary" onClick={save} disabled={isPending}>Mentés</Button>
+        <button type="button" className={k.btn} onClick={() => setEditing(false)}>Mégse</button>
+        <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={save} disabled={isPending}>Mentés</button>
       </div>
     </div>
   );
@@ -346,19 +344,19 @@ function AddCustomFieldForm({ pipelineId, position, onDone }: { pipelineId: numb
   }
 
   return (
-    <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--indigo-line)", background: "var(--bg-panel)" }}>
+    <div className={s.editCard}>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="field-label">Mező neve</label>
+          <label className={s.label}>Mező neve</label>
           <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="pl. NDT módszer" autoFocus
             onKeyDown={(e) => e.key === "Enter" && handleAdd()} />
         </div>
         <div>
-          <label className="field-label">Típus</label>
+          <label className={s.label}>Típus</label>
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, outline: "none" }}
+            className={s.field}
           >
             {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
@@ -366,15 +364,15 @@ function AddCustomFieldForm({ pipelineId, position, onDone }: { pipelineId: numb
       </div>
       {needsOptions && (
         <div>
-          <label className="field-label">Opciók (soronként egy)</label>
+          <label className={s.label}>Opciók (soronként egy)</label>
           <textarea rows={3} value={options} onChange={(e) => setOptions(e.target.value)}
             placeholder={"UT\nRT\nMT"}
-            style={{ width: "100%", padding: "6px 8px", background: "var(--bg-0)", border: "1px solid var(--line-soft)", borderRadius: 6, color: "var(--fg)", fontSize: 14, resize: "vertical", outline: "none", fontFamily: "var(--font-mono)" }} />
+            className={s.field} style={{ resize: "vertical" }} />
         </div>
       )}
       <div className="flex gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>Mégse</Button>
-        <Button type="button" size="sm" className="btn primary" onClick={handleAdd} disabled={isPending || !label.trim()}>Hozzáadás</Button>
+        <button type="button" className={k.btn} onClick={onDone}>Mégse</button>
+        <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={handleAdd} disabled={isPending || !label.trim()}>Hozzáadás</button>
       </div>
     </div>
   );
@@ -387,7 +385,7 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
   const [addingField, setAddingField] = useState<number | null>(null);
   const [expandedFields, setExpandedFields] = useState<Set<number>>(new Set());
   const [newStageName, setNewStageName] = useState("");
-  const [newStageColor, setNewStageColor] = useState("#6366f1");
+  const [newStageColor, setNewStageColor] = useState<string>(DEFAULT_DATA_COLOR);
   const [isPending, startTransition] = useTransition();
 
   function handleNewPipeline(e: React.FormEvent) {
@@ -412,26 +410,26 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
   }
 
   return (
-    <div className="space-y-8">
+    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
       {pipelines.map((pipeline) => (
-        <div key={pipeline.id} className="panel">
-          <div className="panel-head">
-            <div className="panel-title">{pipeline.name}</div>
+        <div key={pipeline.id} className={s.panel}>
+          <div className={s.panelHead}>
+            <div className={s.panelTitle}>{pipeline.name}</div>
             <button
-              className="btn sm"
+              className={k.btn}
               onClick={() => setAddingStage(pipeline.id)}
             >
               <Plus style={{ width: 12, height: 12 }} /> Fázis hozzáadása
             </button>
           </div>
-          <div className="panel-pad space-y-2">
+          <div className={s.panelPad}>
             <StagesList stages={pipeline.stages} pipelineId={pipeline.id} />
 
             {addingStage === pipeline.id && (
-              <div className="rounded-xl p-4 space-y-3" style={{ border: "1px solid var(--indigo-line)", background: "var(--bg-panel)" }}>
+              <div className={s.editCard}>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="field-label">Fázis neve</label>
+                    <label className={s.label}>Fázis neve</label>
                     <Input
                       value={newStageName}
                       onChange={(e) => setNewStageName(e.target.value)}
@@ -441,37 +439,36 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
                     />
                   </div>
                   <div>
-                    <label className="field-label">Szín</label>
+                    <label className={s.label}>Szín</label>
                     <div className="flex gap-2 flex-wrap pt-1">
                       {STAGE_COLORS.slice(0, 6).map((c) => (
-                        <button key={c} type="button" onClick={() => setNewStageColor(c)}
-                          style={{ width: 20, height: 20, borderRadius: "50%", background: c, cursor: "pointer", outline: newStageColor === c ? `2px solid ${c}` : "none", outlineOffset: 2 }}
-                        />
+                        <button key={c} type="button" className={s.swatch} aria-label={`Szín: ${c}`} /* PROPOSAL copy */ onClick={() => setNewStageColor(c)}>
+                          <span style={{ width: 20, height: 20, borderRadius: "50%", background: c, outline: newStageColor === c ? `2px solid ${c}` : "none", outlineOffset: 2 }} />
+                        </button>
                       ))}
                     </div>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setAddingStage(null)}>Mégse</Button>
-                  <Button type="button" size="sm" className="btn primary" onClick={() => handleAddStage(pipeline.id, pipeline.stages.length)} disabled={isPending}>
+                  <button type="button" className={k.btn} onClick={() => setAddingStage(null)}>Mégse</button>
+                  <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={() => handleAddStage(pipeline.id, pipeline.stages.length)} disabled={isPending}>
                     Hozzáadás
-                  </Button>
+                  </button>
                 </div>
               </div>
             )}
 
             {pipeline.stages.length === 0 && addingStage !== pipeline.id && (
-              <p style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center", padding: "24px 0" }}>
+              <p style={{ fontSize: 14, color: "var(--ui-text-muted)", textAlign: "center", padding: "24px 0" }}>
                 Nincs fázis. Adj hozzá egyet a pipeline működéséhez.
               </p>
             )}
           </div>
 
           {/* Custom fields section */}
-          <div style={{ borderTop: "1px solid var(--line-soft)" }}>
+          <div style={{ borderTop: "1px solid var(--ui-border)" }}>
             <button
-              className="flex items-center gap-2 w-full"
-              style={{ padding: "12px 20px", background: "none", border: "none", cursor: "pointer", color: "var(--fg-soft)", fontSize: 14, fontWeight: 500 }}
+              className={s.toggleBtn}
               onClick={() => setExpandedFields((prev) => {
                 const next = new Set(prev);
                 next.has(pipeline.id) ? next.delete(pipeline.id) : next.add(pipeline.id);
@@ -483,13 +480,13 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
                 : <ChevronRight style={{ width: 14, height: 14 }} />
               }
               Egyéni mezők
-              <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: 4 }}>
+              <span style={{ fontSize: 14, color: "var(--ui-text-muted)", marginLeft: 4, fontVariantNumeric: "tabular-nums" }}>
                 {pipeline.customFields.length}
               </span>
             </button>
 
             {expandedFields.has(pipeline.id) && (
-              <div className="panel-pad space-y-2" style={{ paddingTop: 0 }}>
+              <div className={s.panelPad} style={{ paddingTop: 0 }}>
                 {pipeline.customFields.map((f) => (
                   <CustomFieldRow key={f.id} field={f} pipelineId={pipeline.id} />
                 ))}
@@ -501,8 +498,7 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
                   />
                 ) : (
                   <button
-                    className="flex items-center gap-2"
-                    style={{ fontSize: 14, color: "var(--indigo)", padding: "6px 0", background: "none", border: "none", cursor: "pointer" }}
+                    className={s.textBtn}
                     onClick={() => setAddingField(pipeline.id)}
                   >
                     <Plus style={{ width: 12, height: 12 }} /> Mező hozzáadása
@@ -515,9 +511,9 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
       ))}
 
       {/* New pipeline */}
-      <div className="panel">
-        <div className="panel-head"><div className="panel-title">Új pipeline</div></div>
-        <div className="panel-pad">
+      <div className={s.panel}>
+        <div className={s.panelHead}><div className={s.panelTitle}>Új pipeline</div></div>
+        <div className={s.panelPad}>
           <form onSubmit={handleNewPipeline} className="flex gap-3">
             <Input
               value={newPipelineName}
@@ -525,9 +521,9 @@ export function PipelineSetupClient({ pipelines }: PipelineSetupClientProps) {
               placeholder="pl. BirdsView Pilots"
               style={{ maxWidth: 300 }}
             />
-            <Button type="submit" className="btn primary" disabled={isPending || !newPipelineName.trim()}>
+            <button type="submit" className={`${k.btn} ${k.btnPrimary}`} disabled={isPending || !newPipelineName.trim()}>
               Létrehozás
-            </Button>
+            </button>
           </form>
         </div>
       </div>

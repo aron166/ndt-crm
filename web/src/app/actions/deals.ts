@@ -7,6 +7,7 @@ import { runAutomations } from "@/lib/automations/engine";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 import { requireCrmUser } from "@/lib/actor";
+import { DEFAULT_DATA_COLOR } from "@/lib/data-colors";
 
 const TENANT_ID = 1;
 
@@ -227,7 +228,7 @@ export async function upsertStage(formData: FormData) {
   const pipelineId  = parseInt(formData.get("pipelineId") as string);
   const stageIdStr  = formData.get("stageId") as string | null;
   const name        = (formData.get("name") as string)?.trim();
-  const color       = (formData.get("color") as string) || "#6366f1";
+  const color       = (formData.get("color") as string) || DEFAULT_DATA_COLOR;
   const probability = parseInt(formData.get("probability") as string) || 50;
   const position    = parseInt(formData.get("position") as string) || 0;
   const isTerminalWon  = formData.get("isTerminalWon") === "true";

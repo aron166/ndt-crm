@@ -11,6 +11,9 @@ function matches(row: Record<string, unknown> | null | undefined, where: Record<
   if (!row) return false;
   if (!where) return true;
   return Object.entries(where).every(([k, v]) => {
+    if (v && typeof v === "object" && "in" in (v as Record<string, unknown>)) {
+      return !(k in row) || (v as { in: unknown[] }).in.includes(row[k]);
+    }
     const want = v && typeof v === "object" && "equals" in (v as Record<string, unknown>)
       ? (v as { equals: unknown }).equals
       : v;
@@ -191,6 +194,26 @@ describe("ingestLead", () => {
     expect(data.tier).toBe("A");
   });
 
+  it("copies the W7 intent and buyer_type answers into the W2 columns (Kai 2026-11-09)", async () => {
+    const input = parse({
+      company_name: "teszt ltd", contact_phone: "+36301234567", question_set: "w7",
+      qualification: { gate: "task", intent: "service_concrete", buyer_type: "company", call_window: "8_10", location: "Budapest" },
+    });
+    const { tx } = makeTx({});
+    await ingestLead(input, ctx, tx);
+    const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(data).toMatchObject({ intent: "service_concrete", buyerType: "company" });
+    expect(data.qualification).toMatchObject({ call_window: "8_10", location: "Budapest" });
+  });
+
+  it("an unknown intent slug leaves the W2 column unset", async () => {
+    const input = parse({ company_name: "x", contact_phone: "+36301234567", qualification: { intent: "valami_uj" } });
+    const { tx } = makeTx({});
+    await ingestLead(input, ctx, tx);
+    const data = (tx.lead.create as ReturnType<typeof vi.fn>).mock.calls[0][0].data;
+    expect(data.intent).toBeUndefined();
+  });
+
   it("a derived tier wins over the caller's pre-tier when answers are present", async () => {
     const input = parse({
       company_name: "Acme",
@@ -345,9 +368,8 @@ describe("ingestLead — cold-email reply intake (thread_key)", () => {
     expect(res.draftId).toBeNull();
     expect(draftUpdates).toHaveLength(0);
     expect(created.lead).toBe(1);
-    // No draft to vouch for the claimed key, so it is NOT honoured/stored —
-    // an unvouched key is indistinguishable from a forged one. (Vanda, #89.)
-    expect((lastLeadData.value as { threadKey: string | null }).threadKey).toBeNull();
+    // No draft to vouch for the claimed key: it is stored app-namespaced, never raw.
+    expect((lastLeadData.value as { threadKey: string | null }).threadKey).toBe("app~betonscan_landing~gmail-thread-aaa111");
   });
 
   it("an ordinary lead with no thread key is unaffected", async () => {
@@ -462,7 +484,7 @@ describe("ingestLead — tenant scoping has no DB backstop, so the lookup must c
 
   it("a case-variant thread_key still normalises and dedupes to the canonical lowercase key", async () => {
     const { tx, created } = makeTx({
-      lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: "gmail-thread-aaa111" },
+      lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: "app~betonscan_landing~gmail-thread-aaa111" },
     });
     const input = parse({
       company_name: "Vasmű Zrt.",
@@ -477,5 +499,83 @@ describe("ingestLead — tenant scoping has no DB backstop, so the lookup must c
     expect(res.deduped).toBe(true);
     expect(res.leadId).toBe(900);
     expect(created.lead).toBe(0);
+  });
+});
+
+describe("ingestLead - app-namespaced thread keys (no draft vouching)", () => {
+  const growth = { tenantId: 1, appSlug: "growth" };
+  const intake = (extra: Record<string, unknown> = {}) =>
+    parse({
+      company_name: "Vasmű Zrt.",
+      contact_email: "kovacs@vasmu.hu",
+      channel: "cold_email",
+      thread_key: "Thread-ABC",
+      ...extra,
+    });
+
+  it("stores app~growth~<key lowercased> when no draft vouched", async () => {
+    const { tx, lastLeadData } = makeTx({});
+    await ingestLead(intake(), growth, tx);
+    expect((lastLeadData.value as { threadKey: string }).threadKey).toBe("app~growth~thread-abc");
+  });
+
+  it("a second intake with the same key dedupes without creating a lead", async () => {
+    const { tx, created } = makeTx({
+      lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: "app~growth~thread-abc" },
+    });
+    const res = await ingestLead(intake(), growth, tx);
+    expect(res.deduped).toBe(true);
+    expect(res.leadId).toBe(900);
+    expect(created.lead).toBe(0);
+  });
+
+  it("another app sending the same raw key does not match growth's lead", async () => {
+    const { tx, created, lastLeadData } = makeTx({
+      lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: "app~growth~thread-abc" },
+    });
+    const res = await ingestLead(intake(), { tenantId: 1, appSlug: "otherapp" }, tx);
+    expect(res.deduped).toBe(false);
+    expect(created.lead).toBe(1);
+    expect((lastLeadData.value as { threadKey: string }).threadKey).toBe("app~otherapp~thread-abc");
+  });
+
+  it("a draft-vouched key is still stored raw", async () => {
+    const { tx, lastLeadData } = makeTx({ draft: { id: 5, companyId: 42, campaign: "BirdsView Q4" } });
+    await ingestLead(intake({ draft_key: "birdsview-q4:42", campaign: "BirdsView Q4" }), growth, tx);
+    expect((lastLeadData.value as { threadKey: string }).threadKey).toBe("thread-abc");
+  });
+
+  it("a draft-vouched post cannot send an app~ thread_key (schema rejects it)", () => {
+    expect(leadIntakeSchema.safeParse({
+      company_name: "X", contact_email: "a@b.hu", channel: "cold_email",
+      thread_key: "app~growth~thread-abc", draft_key: "birdsview-q4:42",
+    }).success).toBe(false);
+  });
+
+  it("an unvouched post does NOT dedupe onto a draft-vouched lead stored with the raw key", async () => {
+    const { tx, created, lastLeadData } = makeTx({
+      lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: "thread-abc" },
+    });
+    const res = await ingestLead(intake(), growth, tx);
+    expect(res.deduped).toBe(false);
+    expect(created.lead).toBe(1);
+    expect((lastLeadData.value as { threadKey: string }).threadKey).toBe("app~growth~thread-abc");
+  });
+
+  it("a vouched post still dedupes on the raw key", async () => {
+    const { tx, created } = makeTx({
+      draft: { id: 5, companyId: 42, campaign: "BirdsView Q4" },
+      lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: "thread-abc" },
+    });
+    const res = await ingestLead(intake({ draft_key: "birdsview-q4:42", campaign: "BirdsView Q4" }), growth, tx);
+    expect(res.deduped).toBe(true);
+    expect(res.leadId).toBe(900);
+    expect(created.lead).toBe(0);
+  });
+
+  it("a non cold_email intake stores no thread key", async () => {
+    const { tx, lastLeadData } = makeTx({});
+    await ingestLead(intake({ channel: "landing" }), growth, tx);
+    expect((lastLeadData.value as { threadKey: string | null }).threadKey).toBeNull();
   });
 });

@@ -12,21 +12,21 @@ import { cn } from "@/lib/utils";
 import { BOOKING_KIND_LABEL, isBookingKind } from "@/lib/booking/priority";
 
 const COLUMNS = [
-  { key: "created",     label: "Kiírva",      color: "var(--fg-mute)",  glow: "var(--mute-glow)" },
-  { key: "in_progress", label: "Folyamatban", color: "var(--indigo)",   glow: "var(--indigo-glow)"  },
-  { key: "done",        label: "Elvégezve",   color: "var(--mint)",     glow: "var(--mint-glow)"  },
-  { key: "cancelled",   label: "Törölve",     color: "var(--coral)",    glow: "var(--coral-glow)"   },
+  { key: "created",     label: "Kiírva",      color: "var(--ui-text-muted)" },
+  { key: "in_progress", label: "Folyamatban", color: "var(--ui-accent)" },
+  { key: "done",        label: "Elvégezve",   color: "var(--ui-success-text)" },
+  { key: "cancelled",   label: "Törölve",     color: "var(--ui-danger-text)" },
 ] as const;
 
 type Status = (typeof COLUMNS)[number]["key"];
 
 const TYPE_COLOR: Record<string, { bg: string; color: string }> = {
-  call:        { bg: "var(--mint-soft)",   color: "var(--mint)"   },
-  email:       { bg: "var(--indigo-soft)", color: "var(--indigo)" },
-  meeting:     { bg: "var(--sky-soft)",    color: "var(--sky)"    },
-  document:    { bg: "var(--amber-soft)",  color: "var(--amber)"  },
-  field_visit: { bg: "var(--coral-soft)",  color: "var(--coral)"  },
-  internal:    { bg: "var(--bg-raised)",   color: "var(--fg-mute)"},
+  call:        { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  email:       { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  meeting:     { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  document:    { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  field_visit: { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
+  internal:    { bg: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" },
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -61,22 +61,12 @@ function isOverdue(dueDate: Date | null, status: string) {
   return new Date(dueDate) < new Date(new Date().toDateString());
 }
 
-function avatarColor(name: string) {
-  const colors = [
-    "var(--indigo)", "var(--mint)", "var(--amber)",
-    "var(--sky)", "var(--violet)", "var(--coral)",
-  ];
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return colors[Math.abs(h) % colors.length];
-}
-
 function PersonAvatar({ name }: { name: string }) {
   const initials = name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
   return (
     <span
-      className="inline-flex items-center justify-center rounded-full font-mono-ndt shrink-0"
-      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: avatarColor(name), color: "var(--fg-on-accent)" }}
+      className="inline-flex items-center justify-center rounded-full shrink-0"
+      style={{ width: 20, height: 20, fontSize: 12, fontWeight: 600, background: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" }}
     >
       {initials}
     </span>
@@ -105,23 +95,23 @@ function KanbanCard({
       draggable
       onDragStart={() => onDragStart(task.id)}
       onDragEnd={onDragEnd}
-      className={cn("group rounded-lg select-none", dragging && "opacity-40 cursor-grabbing")}
+      className={cn("group select-none", dragging && "opacity-40 cursor-grabbing")}
       style={{
-        background: "var(--bg-panel)",
-        border: "1px solid var(--line-soft)",
-        padding: "10px 12px",
+        background: "var(--ui-surface)",
+        border: "1px solid var(--ui-border)",
+        padding: "10px 12px", borderRadius: "var(--ui-radius-surface)", boxShadow: "var(--ui-shadow-raised)",
         cursor: "grab",
         transition: "transform 280ms cubic-bezier(0.32,0.72,0,1), box-shadow 280ms cubic-bezier(0.32,0.72,0,1), border-color 150ms ease",
         willChange: "transform",
       }}
       onMouseOver={(e) => {
-        e.currentTarget.style.borderColor = "var(--indigo-line)";
-        e.currentTarget.style.boxShadow = "var(--glow-indigo)";
+        e.currentTarget.style.borderColor = "var(--ui-border-strong)";
+        e.currentTarget.style.boxShadow = "var(--ui-shadow-overlay)";
         e.currentTarget.style.transform = "translateY(-2px) rotate(-0.2deg)";
       }}
       onMouseOut={(e) => {
-        e.currentTarget.style.borderColor = "var(--line-soft)";
-        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.borderColor = "var(--ui-border)";
+        e.currentTarget.style.boxShadow = "var(--ui-shadow-raised)";
         e.currentTarget.style.transform = "none";
       }}
       onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.99)"; e.currentTarget.style.transition = "transform 80ms ease"; }}
@@ -129,18 +119,17 @@ function KanbanCard({
     >
       {/* Top row: ID + type badge */}
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+        <span  style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
           #{task.id}
         </span>
         {task.type && (
           <span
-            className="font-mono-ndt rounded"
+            className="rounded"
             style={{
               fontSize: 12, padding: "1px 6px",
               background: typeStyle.bg,
               color: typeStyle.color,
-              border: `1px solid ${typeStyle.color}40`,
-            }}
+                          }}
           >
             {TYPE_LABEL[task.type] ?? task.type}
           </span>
@@ -153,28 +142,28 @@ function KanbanCard({
         style={{
           display: "block",
           fontSize: 14, fontWeight: 500, lineHeight: 1.35,
-          color: task.status === "done" ? "var(--fg-faint)" : "var(--fg)",
+          color: task.status === "done" ? "var(--ui-text-muted)" : "var(--ui-text)",
           textDecoration: task.status === "done" ? "line-through" : "none",
           marginBottom: 8,
         }}
         onClick={(e) => e.stopPropagation()}
-        onMouseOver={(e) => { if (task.status !== "done") e.currentTarget.style.color = "var(--indigo)"; }}
-        onMouseOut={(e) => { e.currentTarget.style.color = task.status === "done" ? "var(--fg-faint)" : "var(--fg)"; }}
+        onMouseOver={(e) => { if (task.status !== "done") e.currentTarget.style.color = "var(--ui-accent)"; }}
+        onMouseOut={(e) => { e.currentTarget.style.color = task.status === "done" ? "var(--ui-text-muted)" : "var(--ui-text)"; }}
       >
         {task.title}
       </Link>
 
       {/* Booking: start time + priority-rung chip (task with startsAt IS a booking) */}
       {task.startsAt && (
-        <div className="flex items-center gap-2 font-mono-ndt" style={{ marginBottom: 8 }}>
-          <span className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--sky)", fontWeight: 600 }}>
+        <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+          <span className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--ui-text-muted)", fontWeight: 600 }}>
             <Clock style={{ width: 9, height: 9 }} />
             {new Date(task.startsAt).toLocaleString("hu-HU", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           </span>
           {isBookingKind(task.bookingKind) && (
             <span
-              className="font-mono-ndt rounded"
-              style={{ fontSize: 11, padding: "1px 6px", background: "var(--sky-soft)", color: "var(--sky)", border: "1px solid var(--sky)40" }}
+              className="rounded"
+              style={{ fontSize: 11, padding: "1px 6px", background: "var(--ui-surface-muted)", color: "var(--ui-text-muted)" }}
             >
               {BOOKING_KIND_LABEL[task.bookingKind]}
             </span>
@@ -186,7 +175,7 @@ function KanbanCard({
       {(personName || task.company) && (
         <div
           className="flex items-center gap-2 pb-2 mb-2"
-          style={{ borderBottom: "1px dashed var(--line-soft)" }}
+          style={{ borderBottom: "1px dashed var(--ui-border)" }}
         >
           {personName && (
             <div className="flex items-center gap-1.5 min-w-0">
@@ -194,10 +183,10 @@ function KanbanCard({
               <Link
                 href={`/persons/${task.personId}`}
                 className="truncate"
-                style={{ fontSize: 12, color: "var(--fg-soft)" }}
+                style={{ fontSize: 12, color: "var(--ui-text)" }}
                 onClick={(e) => e.stopPropagation()}
-                onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-                onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-soft)")}
+                onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-accent)")}
+                onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text)")}
               >
                 {personName}
               </Link>
@@ -207,10 +196,10 @@ function KanbanCard({
             <Link
               href={`/companies/${task.company.id}`}
               className="truncate shrink-0 ml-auto"
-              style={{ fontSize: 12, color: "var(--fg-mute)" }}
+              style={{ fontSize: 12, color: "var(--ui-text-muted)" }}
               onClick={(e) => e.stopPropagation()}
-              onMouseOver={(e) => (e.currentTarget.style.color = "var(--indigo)")}
-              onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}
+              onMouseOver={(e) => (e.currentTarget.style.color = "var(--ui-accent)")}
+              onMouseOut={(e) => (e.currentTarget.style.color = "var(--ui-text-muted)")}
             >
               {task.company.name.length > 18 ? task.company.name.slice(0, 16) + "…" : task.company.name}
             </Link>
@@ -219,13 +208,13 @@ function KanbanCard({
       )}
 
       {/* Bottom: due date + est. minutes */}
-      <div className="flex items-center gap-2 font-mono-ndt">
+      <div className="flex items-center gap-2">
         {task.dueDate && (
           <span
             className="flex items-center gap-1"
             style={{
               fontSize: 12,
-              color: overdue ? "var(--coral)" : "var(--fg-faint)",
+              color: overdue ? "var(--ui-danger-text)" : "var(--ui-text-muted)",
               fontWeight: overdue ? 600 : 400,
             }}
           >
@@ -235,12 +224,12 @@ function KanbanCard({
           </span>
         )}
         {task._count.subTasks > 0 && (
-          <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+          <span style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
             ↳ {task._count.subTasks}
           </span>
         )}
         {task.estimatedMinutes && (
-          <span style={{ fontSize: 12, color: "var(--fg-faint)", marginLeft: "auto" }}>
+          <span style={{ fontSize: 12, color: "var(--ui-text-muted)", marginLeft: "auto" }}>
             {task.estimatedMinutes}m
           </span>
         )}
@@ -322,19 +311,19 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
           <button
             key={key}
             onClick={() => setFilter(key as typeof filter)}
-            className="rounded-full font-mono-ndt transition-colors"
+            className="rounded-full transition-colors touch44"
             style={{
               height: 26, padding: "0 10px", fontSize: 12,
-              background: filter === key ? "var(--indigo-soft)" : "var(--bg-panel)",
-              color: filter === key ? "var(--indigo)" : "var(--fg-mute)",
-              border: `1px solid ${filter === key ? "var(--indigo-line)" : "var(--line-soft)"}`,
+              background: filter === key ? "var(--ui-surface-muted)" : "var(--ui-surface)",
+              color: filter === key ? "var(--ui-accent)" : "var(--ui-text-muted)",
+              border: `1px solid ${filter === key ? "var(--ui-border-strong)" : "var(--ui-border)"}`,
             }}
           >
             {label}
           </button>
         ))}
 
-        <div className="ml-auto flex items-center gap-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
           {COLUMNS.map((col) => (
             <span key={col.key} className="flex items-center gap-1">
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: col.color }} />
@@ -358,8 +347,8 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
               key={col.key}
               className="flex flex-col rounded-xl transition-all duration-150"
               style={{
-                background: isHover ? `${col.color}10` : "var(--bg-col)",
-                border: `1px solid ${isHover ? col.color : "var(--line-soft)"}`,
+                background: isHover ? `color-mix(in srgb, ${col.color} 6%, transparent)` : "var(--ui-surface-muted)",
+                border: `1px solid ${isHover ? col.color : "var(--ui-border)"}`,
                 minHeight: 200,
                 maxHeight: "calc(100vh - 215px)",
               }}
@@ -370,27 +359,26 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
               {/* Column header */}
               <div
                 className="flex items-center gap-2 shrink-0"
-                style={{ padding: "10px 14px 10px", borderBottom: "1px solid var(--line-soft)" }}
+                style={{ padding: "10px 14px 10px", borderBottom: "1px solid var(--ui-border)" }}
               >
                 <span
                   className="rounded-full shrink-0"
                   style={{
                     width: 8, height: 8,
                     background: col.color,
-                    boxShadow: `0 0 8px ${col.glow}`,
                   }}
                 />
-                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg-soft)", letterSpacing: "0.02em" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ui-text)", letterSpacing: "0.02em" }}>
                   {col.label}
                 </span>
                 <span
-                  className="font-mono-ndt rounded"
-                  style={{ marginLeft: "auto", fontSize: 12, background: "var(--bg-raised)", color: "var(--fg-mute)", padding: "1px 6px" }}
+                  className="rounded"
+                  style={{ marginLeft: "auto", fontSize: 12, background: "var(--ui-surface-muted)", color: "var(--ui-text-muted)", padding: "1px 6px" }}
                 >
                   {cards.length}
                 </span>
                 {mins > 0 && (
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+                  <span  style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
                     {h > 0 ? `${h}h` : ""}{m > 0 ? ` ${m}m` : ""}
                   </span>
                 )}
@@ -410,15 +398,15 @@ export function TasksKanban({ tasks: initialTasks }: TasksKanbanProps) {
 
                 <button
                   onClick={() => { setModalStatus(col.key); setModalOpen(true); }}
-                  className="flex items-center gap-1.5 w-full rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 w-full rounded-lg transition-colors touch44"
                   style={{
                     height: 30, padding: "0 8px",
-                    fontSize: 14, color: "var(--fg-faint)",
+                    fontSize: 14, color: "var(--ui-text-muted)",
                     background: "transparent",
-                    border: "1px dashed var(--line-soft)",
+                    border: "1px dashed var(--ui-border)",
                   }}
-                  onMouseOver={(e) => { e.currentTarget.style.color = "var(--fg-soft)"; e.currentTarget.style.borderColor = "var(--line)"; }}
-                  onMouseOut={(e) => { e.currentTarget.style.color = "var(--fg-faint)"; e.currentTarget.style.borderColor = "var(--line-soft)"; }}
+                  onMouseOver={(e) => { e.currentTarget.style.color = "var(--ui-text)"; e.currentTarget.style.borderColor = "var(--ui-border-strong)"; }}
+                  onMouseOut={(e) => { e.currentTarget.style.color = "var(--ui-text-muted)"; e.currentTarget.style.borderColor = "var(--ui-border)"; }}
                 >
                   <Plus style={{ width: 11, height: 11 }} />
                   Feladat hozzáadása

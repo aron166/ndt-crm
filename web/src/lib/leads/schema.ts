@@ -4,7 +4,7 @@ import { TIERS } from "./tier";
 import { REPLY_TYPES } from "@/lib/outreach/campaign";
 
 // Public lead-intake payload (POST /api/leads).
-// Landing pages (BetonScan/BirdsView) and automations (n8n) post this shape.
+// Landing pages (BetonRadar/BirdsView) and automations (n8n) post this shape.
 // snake_case on the wire — that's what external HTML forms / webhooks emit.
 
 const emptyToUndef = (v: unknown) =>
@@ -52,7 +52,9 @@ export const leadIntakeSchema = z
     // skill hand-builds these strings — "BirdsView-Q4:42" and "birdsview-q4:42"
     // would otherwise be two index entries, i.e. two leads and two intro emails
     // for one answered thread. (Vanda, #89.)
-    thread_key: z.preprocess(emptyToUndef, z.string().trim().toLowerCase().max(200).optional()),
+    // "app~" is reserved for the CRM's app-namespaced keys (lib/leads/ingest.ts), so no caller can forge one.
+    thread_key: z.preprocess(emptyToUndef, z.string().trim().toLowerCase().max(200)
+      .refine((v) => !v.startsWith("app~"), { message: "thread_key may not start with app~" }).optional()),
     draft_key: z.preprocess(emptyToUndef, z.string().trim().toLowerCase().max(200).optional()),
     // How the prospect answered (lib/outreach/campaign.ts REPLY_TYPES) —
     // stamped on the replied draft for the campaign dashboard. Optional.

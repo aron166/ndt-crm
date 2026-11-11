@@ -45,6 +45,7 @@ model Tenant {
   leadStatuses           LeadStatus[]
   leadStatusTransitions  LeadStatusTransition[]
   leadStatusHistory      LeadStatusHistory[]
+  leadDocuments          LeadDocument[]
   automationRules        AutomationRule[]
   automationFirings      AutomationFiring[]
   automationEmailSends   AutomationEmailSend[]
@@ -296,6 +297,7 @@ model User {
   contentNotes           ContentNote[]
   assistantConversations AssistantConversation[]
   leadStatusChanges      LeadStatusHistory[]     @relation("LeadStatusHistoryActor")
+  leadDocumentsCreated   LeadDocument[]          @relation("LeadDocumentCreator")
 
   @@map("users")
 }
@@ -379,6 +381,7 @@ model Lead {
   firings       AutomationFiring[]
   quotes        Quote[]
   statusHistory LeadStatusHistory[]
+  documents     LeadDocument[]
 
   @@unique([tenantId, threadKey])
   @@index([tenantId, nextDue])
@@ -618,6 +621,13 @@ model Task {
   // (lib/booking/priority.ts) — the money rungs come from the deal/lead value.
   startsAt         DateTime? @map("starts_at")
   bookingKind      String?   @map("booking_kind")
+  // W8b route-aware booking: where the job is done (settlement precision) and
+  // which machine (bookable equipment) does it. All nullable, additive.
+  siteSettlementId Int?      @map("site_settlement_id")
+  siteAddress      String?   @map("site_address")
+  siteSource       String?   @map("site_source") // stated, permit, tender, premises, company_address_assumed (CHECK in SQL)
+  equipmentId      Int?      @map("equipment_id") // the machine; null on pre-W8b bookings (read as the first machine)
+  overrideReason   String?   @map("override_reason") // typed reason when booked against a red feasibility flag
   completedAt      DateTime? @map("completed_at")
   estimatedMinutes Int?      @map("estimated_minutes") // normaidő — measured against actual
   actualMinutes    Int?      @map("actual_minutes")
@@ -633,6 +643,8 @@ model Task {
   deal       Deal?    @relation("TaskDeal", fields: [dealId], references: [id])
   person     Person?  @relation("TaskPerson", fields: [personId], references: [id])
   lead       Lead?    @relation("TaskLead", fields: [leadId], references: [id], onDelete: SetNull)
+  siteSettlement HuSettlement? @relation(fields: [siteSettlementId], references: [id], onDelete: SetNull)
+  equipment  Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
   parentTask Task?    @relation("SubTasks", fields: [parentTaskId], references: [id])
   subTasks   Task[]   @relation("SubTasks")
 
@@ -680,6 +692,10 @@ model Quote {
   leadId      Int?      @map("lead_id") // origin lead, if quoted from intake
   dealId      Int?      @map("deal_id") // linked deal (acceptance never auto-advances it)
   quoteNumber String    @map("quote_number") // per-tenant human id, e.g. AJ-2026-0001
+  // Offer generated from a lead (lib/offers): demo | big_service | rental | purchase.
+  // null = a hand-built quote. `meta` freezes the document facts (issuer, terms) at creation.
+  template    String?
+  meta        Json?
   title       String
   status      String    @default("draft") // draft | sent | accepted | rejected | expired
   currency    String    @default("HUF")
@@ -694,12 +710,13 @@ model Quote {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  tenant  Tenant          @relation(fields: [tenantId], references: [id])
-  company Company         @relation(fields: [companyId], references: [id])
-  person  Person?         @relation(fields: [personId], references: [id])
-  lead    Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  deal    Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  items   QuoteLineItem[]
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  company   Company         @relation(fields: [companyId], references: [id])
+  person    Person?         @relation(fields: [personId], references: [id])
+  lead      Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  deal      Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  items     QuoteLineItem[]
+  documents LeadDocument[]
 
   @@unique([tenantId, quoteNumber])
   @@index([tenantId, status])
@@ -780,6 +797,8 @@ model Interaction {
   supersedesInteractionId Int?     @map("supersedes_interaction_id")
   callId                  String?  @map("call_id")
   occurredAt              DateTime @default(now()) @map("occurred_at")
+  // Call label (raw60 D20), NOT a sequence: qualification | support | booking | offer_followup.
+  callType                String?  @map("call_type")
   createdAt               DateTime @default(now()) @map("created_at")
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
@@ -812,12 +831,36 @@ model Equipment {
   manufacturer   String?
   calibrationDue DateTime? @map("calibration_due")
   notes          String?
+  // W8b: a bookable machine has its own timeline; the base is where its day starts and ends.
+  bookable         Boolean   @default(false)
+  baseSettlementId Int?      @map("base_settlement_id")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  baseSettlement HuSettlement? @relation(fields: [baseSettlementId], references: [id], onDelete: SetNull)
+  tasks          Task[]
 
   @@map("equipment")
+}
+
+/// Hungarian settlements (Budapest split into its 23 districts) with centroid
+/// coordinates and postcodes. Reference data, no tenant: GeoNames postal codes
+/// (CC BY 4.0), generated by web/scripts/gen-hu-settlements.mjs. W8b.
+model HuSettlement {
+  id        Int      @id @default(autoincrement())
+  name      String
+  county    String
+  district  Int?     @db.SmallInt // Budapest district 1-23, else null
+  lat       Float
+  lng       Float
+  postcodes String[] @default([])
+
+  tasks     Task[]
+  equipment Equipment[]
+
+  @@index([postcodes], type: Gin)
+  @@map("hu_settlements")
 }
 
 // ─────────────────────────────────────────────
@@ -1569,4 +1612,28 @@ model ContentNote {
 
   @@index([tenantId, itemId])
   @@map("content_notes")
+}
+
+// Documents generated for a lead (lib/documents): the Megrendelő on acceptance and
+// the on-site teljesítésigazolás. `data` is frozen at creation; the PDF renders it.
+model LeadDocument {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  leadId      Int      @map("lead_id")
+  quoteId     Int?     @map("quote_id")
+  kind        String // order | completion (CHECK in the migration)
+  number      String // MR-YYYY-NNNN | TI-YYYY-NNNN
+  data        Json
+  createdById Int?     @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  lead      Lead   @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  quote     Quote? @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  createdBy User?  @relation("LeadDocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, number])
+  @@unique([quoteId, kind])
+  @@index([tenantId, leadId])
+  @@map("lead_documents")
 }

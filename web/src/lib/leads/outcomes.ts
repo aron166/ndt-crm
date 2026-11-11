@@ -28,6 +28,22 @@ export const CALL_OUTCOMES = [
   { key: "meeting_booked",     label: "Foglalt meeting" },
 ] as const;
 export type CallOutcomeKey = (typeof CALL_OUTCOMES)[number]["key"];
+
+/**
+ * Call LABELS (raw60 D20, Péter): what kind of call it was, deliberately NOT a
+ * numbered sequence. Counts per lead are a signal. Labels are PROPOSAL copy.
+ */
+export const CALL_TYPES = [
+  { key: "qualification",  label: "Minősítő hívás" },
+  { key: "support",        label: "Kérdés / árkifogás / tisztázás" },
+  { key: "booking",        label: "Időpont-egyeztetés (elfogadás után)" },
+  { key: "offer_followup", label: "Gépajánlat utánkövetése" },
+] as const;
+export type CallTypeKey = (typeof CALL_TYPES)[number]["key"];
+export const CALL_TYPE_KEYS = CALL_TYPES.map((t) => t.key) as [CallTypeKey, ...CallTypeKey[]];
+export function callTypeLabel(key: string | null): string {
+  return CALL_TYPES.find((t) => t.key === key)?.label ?? key ?? "-";
+}
 /**
  * The call outcomes that CLOSE the lead as lost. Péter's rule (BRIEFING addendum
  * 2026-09-07): "mandatory note on every outcome, INCLUDING a reason for
@@ -78,6 +94,8 @@ export const callOutcomeSchema = z
     bookingKind: z.enum(BOOKING_KINDS).optional(),
     /** Required when the outcome is lost/disqualified — a short free text WHY. */
     lostReason: z.string().trim().max(LOST_REASON_MAX).optional(),
+    /** Call label (CALL_TYPES); optional, never a sequence. */
+    callType: z.enum(CALL_TYPE_KEYS).optional(),
     /** W2 lost reason CODE; defaults per outcome (CALL_OUTCOME_LOST_REASON). lostReason is the note. */
     lostCode: z.enum(LOST_REASONS).optional(),
     /** Optional: who the callback task is assigned to (defaults to the actor). */
@@ -108,6 +126,8 @@ export const callOutcomeSchema = z
     callId: z.string().trim().max(200).optional(),
     /** The interaction this one replaces: a correction, or a parse answering a transcript. */
     supersedesInteractionId: z.number().int().positive().optional(),
+    /** The meeting task the lead page's booking drawer already created: log the call against it, create no second one. */
+    existingBookingTaskId: z.number().int().positive().optional(),
     /**
      * When the CALL happened, if that is not now. A parse of yesterday's queued
      * transcript belongs on the timeline at the time of the call, not of the
@@ -122,7 +142,7 @@ export const callOutcomeSchema = z
         ctx.addIssue({ code: "custom", path: ["callbackAt"], message: "Visszahíváshoz dátum és óra kötelező" });
       }
     }
-    if (d.outcome === "meeting_booked" && !d.demoWith) {
+    if (d.outcome === "meeting_booked" && !d.demoWith && !d.existingBookingTaskId) {
       ctx.addIssue({ code: "custom", path: ["demoWith"], message: "Add meg, kivel lesz a demó (Áron / Péter)" });
     }
     // The booking fields come as a PAIR (a date without a rung cannot be ranked).
@@ -158,12 +178,14 @@ export type CallOutcomeInput = z.infer<typeof callOutcomeSchema>;
  * Returns the first problem as a Zod-style issue, or null.
  */
 export function bookingIssue(
-  input: Pick<CallOutcomeInput, "outcome" | "bookingAt">,
+  input: Pick<CallOutcomeInput, "outcome" | "bookingAt"> & { existingBookingTaskId?: number },
   actor: "user" | "agent",
   now: Date,
 ): { path: "bookingAt"; message: string } | null {
   if (input.outcome !== "meeting_booked") return null;
   if (!input.bookingAt) {
+    // Booked in the drawer already: the time lives on that task.
+    if (input.existingBookingTaskId) return null;
     return actor === "user" ? { path: "bookingAt", message: "Foglaláshoz dátum és óra kötelező" } : null;
   }
   if (input.bookingAt.getTime() < now.getTime()) {
@@ -260,24 +282,4 @@ export function callbackTone(due: Date | string | null | undefined, now: Date = 
 export function daysSince(date: Date | string | null | undefined, now: Date = new Date()): number | null {
   if (!date) return null;
   return Math.max(0, Math.floor((now.getTime() - new Date(date).getTime()) / 86_400_000));
-}
-
-/**
- * Ask for the mandatory lost reason from the two manual outcome dropdowns (lead
- * card + lead detail). Returns null when the user cancels or types nothing usable
- * — the caller aborts, so a lead is never closed as lost without a why.
- *
- * ponytail: `window.prompt`, matching the `confirm()`/`alert()` already used on
- * both surfaces. The high-frequency path (setter logging a call) gets a real
- * required field in CallOutcomeModal; upgrade this to a dialog if the manual
- * dropdown turns out to be used often.
- */
-export function promptLostReason(): string | null {
-  const raw = window.prompt("Miért veszett el a lead? (kötelező)");
-  const reason = raw?.trim() ?? "";
-  if (reason.length < LOST_REASON_MIN) {
-    if (raw !== null) window.alert("Az elvesztés oka kötelező (min. 3 karakter).");
-    return null;
-  }
-  return reason.slice(0, LOST_REASON_MAX);
 }

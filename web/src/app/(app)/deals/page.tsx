@@ -3,6 +3,8 @@ import Link from "next/link";
 import { serializeDates } from "@/lib/serialize";
 import { DealsKanban } from "./DealsKanban";
 import { Settings } from "lucide-react";
+import { PageHeader, Seg } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
 
 const TENANT_ID = 1;
 
@@ -26,14 +28,12 @@ export default async function DealsPage({
 
   if (pipelines.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center" style={{ height: "60vh", gap: 16 }}>
-        <div className="font-mono-ndt text-xs px-2 py-0.5 rounded" style={{ background: "var(--indigo-soft)", color: "var(--indigo)", border: "1px solid var(--indigo-line)" }}>
-          NINCS PIPELINE
-        </div>
-        <p style={{ fontSize: 14, color: "var(--fg-soft)", textAlign: "center", maxWidth: 360 }}>
+      <div className={k.empty} style={{ alignItems: "center", textAlign: "center", minHeight: "60vh", justifyContent: "center" }}>
+        <span className={k.strong}>NINCS PIPELINE</span>
+        <p className={k.muted} style={{ maxWidth: 360, margin: 0 }}>
           Hozz létre egy pipeline-t a deals kezeléséhez.
         </p>
-        <Link href="/deals/setup" className="btn primary">
+        <Link href="/deals/setup" className={`${k.btn} ${k.btnPrimary}`}>
           Pipeline létrehozása
         </Link>
       </div>
@@ -86,53 +86,34 @@ export default async function DealsPage({
 
   return (
     <div className="mount">
-      {/* Header */}
-      <div className="page-head">
-        <div>
-          <h1 className="page-title" style={{ gap: 12 }}>
-            Pipeline
-            <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-mute)", fontWeight: 400 }}>
-              · {openDeals} aktív
-            </span>
-            {staleDeals > 0 && (
-              <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--coral)", fontWeight: 500 }}>
-                · {staleDeals} lejárt
-              </span>
-            )}
-          </h1>
-          <p className="page-sub">
-            Várható forgalom:{" "}
-            <span className="font-mono-ndt" style={{ color: "var(--mint)" }}>
+      <PageHeader
+        title="Pipeline"
+        eyebrow={
+          <>
+            {openDeals} aktív
+            {staleDeals > 0 && <span style={{ color: "var(--ui-danger-text)" }}> · {staleDeals} lejárt</span>}
+            {" · "}Várható forgalom:{" "}
+            <span className={k.num} style={{ color: "var(--ui-text)", fontWeight: 600 }}>
               {Math.round(forecast).toLocaleString("hu-HU")} HUF
             </span>
-          </p>
-        </div>
-        <div className="page-actions">
-          {/* Pipeline selector */}
-          {pipelines.length > 1 && (
-            <div className="flex items-center gap-1" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: 2 }}>
-              {pipelines.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/deals?pipeline=${p.id}`}
-                  className="font-mono-ndt rounded"
-                  style={{
-                    fontSize: 14, padding: "3px 10px",
-                    background: p.id === activePipeline.id ? "var(--bg-hover)" : "transparent",
-                    color: p.id === activePipeline.id ? "var(--fg)" : "var(--fg-mute)",
-                  }}
-                >
-                  {p.name}
-                </Link>
-              ))}
-            </div>
-          )}
-          <Link href="/deals/setup" className="btn" style={{ gap: 6 }}>
-            <Settings style={{ width: 13, height: 13 }} />
+          </>
+        }
+        views={
+          pipelines.length > 1 ? (
+            <Seg
+              label="Pipeline"
+              current={String(activePipeline.id)}
+              items={pipelines.map((p) => ({ key: String(p.id), label: p.name, href: `/deals?pipeline=${p.id}` }))}
+            />
+          ) : undefined
+        }
+        actions={
+          <Link href="/deals/setup" className={k.btn}>
+            <Settings style={{ width: 14, height: 14 }} />
             Beállítás
           </Link>
-        </div>
-      </div>
+        }
+      />
 
       <DealsKanban
         pipeline={serializeDates(activePipeline)}

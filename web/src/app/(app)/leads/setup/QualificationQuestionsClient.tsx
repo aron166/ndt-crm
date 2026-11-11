@@ -5,9 +5,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, ArrowDown, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { saveQualificationQuestions } from "@/app/actions/leads";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import k from "@/components/astryx/page.module.css";
+import m from "./setup.module.css";
 import {
   ANSWER_TYPES,
   BRANCHES,
@@ -57,7 +56,7 @@ export function QualificationQuestionsClient({
       prev.map((q, idx) => {
         if (idx !== i) return q;
         const cur = q.sets ?? [];
-        return { ...q, sets: on ? [...cur, key] : cur.filter((k) => k !== key) };
+        return { ...q, sets: on ? [...cur, key] : cur.filter((sk) => sk !== key) };
       }),
     );
   }
@@ -94,194 +93,179 @@ export function QualificationQuestionsClient({
   const visible = questionsInSet(items, activeSet).map((q) => ({ q, i: items.indexOf(q) }));
 
   return (
-    <div className="panel" style={{ marginTop: 16 }}>
-      <div className="panel-head"><div className="panel-title">Setter kérdések</div></div>
-      <div className="panel-pad space-y-3">
-        <div className="flex gap-1 flex-wrap" role="tablist">
-          {sets.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              role="tab"
-              aria-selected={activeSet === s.key}
-              onClick={() => setActiveSet(s.key)}
-              className="badge-ds"
-              style={{
-                cursor: "pointer",
-                border: "1px solid var(--line-soft)",
-                background: activeSet === s.key ? "var(--indigo)" : "var(--bg-panel)",
-                color: activeSet === s.key ? "#fff" : "var(--fg-soft)",
-                padding: "4px 10px",
-                fontSize: 12,
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+    <section className={k.section}>
+      <h2 className={k.h2}>Setter kérdések</h2>
+      <div className={m.tabs} role="tablist">
+        {sets.map((st) => (
+          <button
+            key={st.key}
+            type="button"
+            role="tab"
+            aria-selected={activeSet === st.key}
+            onClick={() => setActiveSet(st.key)}
+            className={`${m.tab} ${activeSet === st.key ? m.tabOn : ""}`}
+          >
+            {st.label}
+          </button>
+        ))}
+      </div>
 
-        <div className="space-y-3">
-          {visible.map(({ q, i }, pos) => {
-            const noSets = (q.sets ?? []).length === 0;
-            return (
-              <div key={i} className="rounded-xl p-4 space-y-2" style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)" }}>
-                <div className="flex items-center justify-between">
-                  <div style={{ fontSize: 11, color: "var(--fg-mute)" }}>
-                    azonosító: <code>{q.slug || "(új, mentéskor kapja)"}</code> (statisztikai kulcs, soha nem változik)
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button type="button" aria-label="Feljebb" onClick={() => moveInSet(i, -1)} disabled={pos === 0}
-                      style={{ padding: 4, color: "var(--fg-faint)", cursor: pos === 0 ? "default" : "pointer", background: "none", border: "none", opacity: pos === 0 ? 0.4 : 1 }}>
-                      <ArrowUp style={{ width: 13, height: 13 }} />
-                    </button>
-                    <button type="button" aria-label="Lejjebb" onClick={() => moveInSet(i, 1)} disabled={pos === visible.length - 1}
-                      style={{ padding: 4, color: "var(--fg-faint)", cursor: pos === visible.length - 1 ? "default" : "pointer", background: "none", border: "none", opacity: pos === visible.length - 1 ? 0.4 : 1 }}>
-                      <ArrowDown style={{ width: 13, height: 13 }} />
-                    </button>
-                    <button type="button" aria-label="Kérdés törlése" onClick={() => removeQuestion(i)}
-                      style={{ padding: 4, color: "var(--fg-faint)", cursor: "pointer", background: "none", border: "none" }}
-                      onMouseOver={(e) => (e.currentTarget.style.color = "var(--coral)")}
-                      onMouseOut={(e) => (e.currentTarget.style.color = "var(--fg-faint)")}>
-                      <Trash2 style={{ width: 13, height: 13 }} />
-                    </button>
-                  </div>
+      <div className={m.list}>
+        {visible.map(({ q, i }, pos) => {
+          const noSets = (q.sets ?? []).length === 0;
+          return (
+            <div key={i} className={k.card}>
+              <div className={m.rowHead}>
+                <div className={k.muted}>
+                  azonosító: <code>{q.slug || "(új, mentéskor kapja)"}</code> (statisztikai kulcs, soha nem változik)
                 </div>
-
-                <div>
-                  <label className="field-label">Kérdés szövege (űrlap)</label>
-                  <Input value={q.label} maxLength={LABEL_MAX} onChange={(e) => patch(i, { label: e.target.value })} />
-                </div>
-                <div>
-                  <label className="field-label">Kérdés szövege (telefon), üresen az űrlap szövege hangzik el</label>
-                  <Input value={q.phoneLabel ?? ""} maxLength={LABEL_MAX} onChange={(e) => patch(i, { phoneLabel: e.target.value || undefined })} />
-                </div>
-
-                <div className="flex gap-3 flex-wrap">
-                  <div>
-                    <label className="field-label">Válasz típusa</label>
-                    <select
-                      value={q.type ?? "text"}
-                      onChange={(e) => patch(i, { type: e.target.value === "text" ? undefined : (e.target.value as QualificationQuestion["type"]) })}
-                      className="h-8 rounded-lg border px-2 text-sm"
-                      style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)", color: "var(--fg)" }}
-                    >
-                      {ANSWER_TYPES.map((t) => (
-                        <option key={t} value={t}>{TYPE_LABELS[t] ?? t}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="field-label">Ág</label>
-                    <select
-                      value={q.branch ?? ""}
-                      onChange={(e) => patch(i, { branch: (e.target.value || undefined) as QualificationQuestion["branch"] })}
-                      className="h-8 rounded-lg border px-2 text-sm"
-                      style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)", color: "var(--fg)" }}
-                    >
-                      <option value="">mindkettő</option>
-                      {BRANCHES.map((b) => (
-                        <option key={b} value={b}>{BRANCH_LABELS[b] ?? b}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="field-label">Célközönség</label>
-                    <select
-                      value={q.audience ?? ""}
-                      onChange={(e) => patch(i, { audience: (e.target.value || undefined) as QualificationQuestion["audience"] })}
-                      className="h-8 rounded-lg border px-2 text-sm"
-                      style={{ border: "1px solid var(--line-soft)", background: "var(--bg-panel)", color: "var(--fg)" }}
-                    >
-                      <option value="">mindkettő</option>
-                      {AUDIENCES.map((a) => (
-                        <option key={a} value={a}>{AUDIENCE_LABELS[a] ?? a}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {q.type === "choice" && (
-                  <div>
-                    <label className="field-label">Válaszlehetőségek (soronként egy)</label>
-                    <Textarea
-                      rows={3}
-                      value={(q.options ?? []).join("\n")}
-                      onChange={(e) => patch(i, { options: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
-                      className="font-mono-ndt"
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-4 text-sm flex-wrap" style={{ color: "var(--fg-soft)" }}>
-                  {/* Not choice-only: a free-text question is exactly where the
-                      "egyéb" answers are meant to accumulate (raw46 D11). */}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={q.allowOther ?? false} onChange={(e) => patch(i, { allowOther: e.target.checked })} />
-                    Egyéb szabad szöveg engedélyezve
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={q.required ?? false} onChange={(e) => patch(i, { required: e.target.checked })} />
-                    Kötelező
-                  </label>
-                </div>
-
-                <div>
-                  <label className="field-label">Kérdéscsoportok</label>
-                  <div className="flex gap-4 text-sm flex-wrap" style={{ color: "var(--fg-soft)" }}>
-                    {sets.map((s) => (
-                      <label key={s.key} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={(q.sets ?? []).includes(s.key)}
-                          onChange={(e) => toggleSet(i, s.key, e.target.checked)}
-                        />
-                        {s.label}
-                      </label>
-                    ))}
-                  </div>
-                  {noSets && (
-                    // Not "sehol nem lesz feltéve": questionsFromSettings puts a
-                    // set-less question back into the discovery set, so the
-                    // warning has to say what actually happens. Retiring a
-                    // question is the delete button. (Vanda, #113.)
-                    <p className="flex items-center gap-1" style={{ fontSize: 12, color: "var(--amber)", marginTop: 4 }}>
-                      <AlertTriangle size={12} aria-hidden="true" /> Egyik kérdéscsoportban sincs: mentés után a felmérő kérdések közé kerül. Végleges eltávolításhoz töröld.
-                    </p>
-                  )}
+                <div className={m.iconRow}>
+                  <button type="button" aria-label="Feljebb" onClick={() => moveInSet(i, -1)} disabled={pos === 0} className={`${k.btn} ${k.btnIcon}`}>
+                    <ArrowUp style={{ width: 13, height: 13 }} />
+                  </button>
+                  <button type="button" aria-label="Lejjebb" onClick={() => moveInSet(i, 1)} disabled={pos === visible.length - 1} className={`${k.btn} ${k.btnIcon}`}>
+                    <ArrowDown style={{ width: 13, height: 13 }} />
+                  </button>
+                  <button type="button" aria-label="Kérdés törlése" onClick={() => removeQuestion(i)} className={`${k.btn} ${k.btnIcon} ${m.danger}`}>
+                    <Trash2 style={{ width: 13, height: 13 }} />
+                  </button>
                 </div>
               </div>
-            );
-          })}
 
+              <div>
+                <label className={m.label}>Kérdés szövege (űrlap)</label>
+                <input className={m.field} value={q.label} maxLength={LABEL_MAX} onChange={(e) => patch(i, { label: e.target.value })} />
+              </div>
+              <div>
+                <label className={m.label}>Kérdés szövege (telefon), üresen az űrlap szövege hangzik el</label>
+                <input className={m.field} value={q.phoneLabel ?? ""} maxLength={LABEL_MAX} onChange={(e) => patch(i, { phoneLabel: e.target.value || undefined })} />
+              </div>
+
+              <div className={m.fieldRow}>
+                <div>
+                  <label className={m.label}>Válasz típusa</label>
+                  <select
+                    value={q.type ?? "text"}
+                    onChange={(e) => patch(i, { type: e.target.value === "text" ? undefined : (e.target.value as QualificationQuestion["type"]) })}
+                    className={m.field}
+                  >
+                    {ANSWER_TYPES.map((t) => (
+                      <option key={t} value={t}>{TYPE_LABELS[t] ?? t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={m.label}>Ág</label>
+                  <select
+                    value={q.branch ?? ""}
+                    onChange={(e) => patch(i, { branch: (e.target.value || undefined) as QualificationQuestion["branch"] })}
+                    className={m.field}
+                  >
+                    <option value="">mindkettő</option>
+                    {BRANCHES.map((b) => (
+                      <option key={b} value={b}>{BRANCH_LABELS[b] ?? b}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={m.label}>Célközönség</label>
+                  <select
+                    value={q.audience ?? ""}
+                    onChange={(e) => patch(i, { audience: (e.target.value || undefined) as QualificationQuestion["audience"] })}
+                    className={m.field}
+                  >
+                    <option value="">mindkettő</option>
+                    {AUDIENCES.map((a) => (
+                      <option key={a} value={a}>{AUDIENCE_LABELS[a] ?? a}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {q.type === "choice" && (
+                <div>
+                  <label className={m.label}>Válaszlehetőségek (soronként egy)</label>
+                  <textarea
+                    rows={3}
+                    value={(q.options ?? []).join("\n")}
+                    onChange={(e) => patch(i, { options: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
+                    className={`${m.field} ${m.textarea} font-mono-ndt`}
+                  />
+                </div>
+              )}
+
+              <div className={m.checks}>
+                {/* Not choice-only: a free-text question is exactly where the
+                    "egyéb" answers are meant to accumulate (raw46 D11). */}
+                <label className={m.check}>
+                  <input type="checkbox" checked={q.allowOther ?? false} onChange={(e) => patch(i, { allowOther: e.target.checked })} />
+                  Egyéb szabad szöveg engedélyezve
+                </label>
+                <label className={m.check}>
+                  <input type="checkbox" checked={q.required ?? false} onChange={(e) => patch(i, { required: e.target.checked })} />
+                  Kötelező
+                </label>
+              </div>
+
+              <div>
+                <label className={m.label}>Kérdéscsoportok</label>
+                <div className={m.checks}>
+                  {sets.map((st) => (
+                    <label key={st.key} className={m.check}>
+                      <input
+                        type="checkbox"
+                        checked={(q.sets ?? []).includes(st.key)}
+                        onChange={(e) => toggleSet(i, st.key, e.target.checked)}
+                      />
+                      {st.label}
+                    </label>
+                  ))}
+                </div>
+                {noSets && (
+                  // Not "sehol nem lesz feltéve": questionsFromSettings puts a
+                  // set-less question back into the discovery set, so the
+                  // warning has to say what actually happens. Retiring a
+                  // question is the delete button. (Vanda, #113.)
+                  <p className={m.warn}>
+                    <AlertTriangle size={12} aria-hidden="true" /> Egyik kérdéscsoportban sincs: mentés után a felmérő kérdések közé kerül. Végleges eltávolításhoz töröld.
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        <div>
           <button
             type="button"
-            className="flex items-center gap-2"
-            style={{ fontSize: 14, color: "var(--indigo)", padding: "8px 0", background: "none", border: "none", cursor: "pointer" }}
+            className={k.btn}
             onClick={addQuestion}
           >
             <Plus style={{ width: 14, height: 14 }} /> Kérdés hozzáadása
           </button>
         </div>
-
-        <div>
-          <label className="field-label">Termékismertető linkje</label>
-          <Input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…"
-            className="font-mono-ndt"
-          />
-          <p style={{ fontSize: 12, color: "var(--fg-mute)", marginTop: 4 }}>
-            Ezt a linket kapja a lead, ha a landing űrlap a termékismertetőt kéri
-            (send_intro). Amíg üres, a levélben helykitöltő szerepel.
-          </p>
-        </div>
-
-        {error && <p style={{ fontSize: 12, color: "var(--coral)" }}>{error}</p>}
-        <Button className="btn primary" size="sm" onClick={handleSave} disabled={isPending}>
-          {isPending ? "Mentés…" : "Mentés"}
-        </Button>
       </div>
-    </div>
+
+      <div>
+        <label className={m.label}>Termékismertető linkje</label>
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://…"
+          className={`${m.field} font-mono-ndt`}
+        />
+        <p className={`${k.muted} ${m.hint}`}>
+          Ezt a linket kapja a lead, ha a landing űrlap a termékismertetőt kéri
+          (send_intro). Amíg üres, a levélben helykitöltő szerepel.
+        </p>
+      </div>
+
+      {error && <p className={m.error}>{error}</p>}
+      <div>
+        <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={handleSave} disabled={isPending}>
+          {isPending ? "Mentés…" : "Mentés"}
+        </button>
+      </div>
+    </section>
   );
 }

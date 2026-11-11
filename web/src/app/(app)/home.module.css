@@ -1,0 +1,18 @@
+/* Dashboard home extras on top of the page kit. Astryx tokens only. */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-block-end: 32px; }
+.sub { font-size: 12px; color: var(--ui-text-muted); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.pipeline { grid-column: 1 / -1; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (min-width: 1024px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sectionHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.line { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--ui-border); text-decoration: none; color: inherit; min-height: 44px; }
+a.line:hover { background: var(--ui-hover); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.lineMain { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.lineText { overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--ui-text); }
+.bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; }
+.stages { display: flex; gap: 12px; flex-wrap: wrap; }
+.stage { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--ui-surface-muted); border-radius: var(--ui-radius-control); font-size: 14px; }
+.pill { font-size: 14px; font-weight: 500; padding: 4px 12px; border-radius: 16px; text-decoration: none; background: var(--ui-surface-muted); }

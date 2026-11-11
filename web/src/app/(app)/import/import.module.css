@@ -1,0 +1,15 @@
+/* Import wizard (Astryx direction A). Layout the page kit lacks. Astryx tokens only. */
+
+.drop { border: 1px dashed var(--ui-border-strong); background: var(--ui-surface-muted); }
+.drop:focus-within { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.dropText { font-size: 14px; color: var(--ui-text); }
+
+/* Radix select trigger (shadcn SelectTrigger), styled as an Astryx field */
+.select[data-slot="select-trigger"] { box-sizing: border-box; min-height: 40px; border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); background: var(--ui-surface); color: var(--ui-text); }
+.select[data-slot="select-trigger"]:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+
+/* Plain buttons used as a segmented control (state lives in React) */
+.segBtn { border: 0; font-family: inherit; cursor: pointer; background: transparent; }
+.segBtn[aria-pressed="true"] { background: var(--ui-surface); }
+
+.selectCell { width: 220px; }

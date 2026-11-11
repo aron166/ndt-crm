@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  ALL_STAGES, DEFAULT_TRANSITIONS, atBudapest, slaDeadline, addWorkdays, cadenceTask, recallDefaultDate, RECALL_REASONS,
+  w2FieldsFromAnswers, ALL_STAGES, DEFAULT_TRANSITIONS, atBudapest, slaDeadline, addWorkdays, cadenceTask, recallDefaultDate, RECALL_REASONS,
   planTransition, findTransition, buildDigest, entryTasks, type LifecycleLead, type DigestLead,
 } from "./lifecycle";
 
@@ -89,16 +89,16 @@ describe("planTransition", () => {
     if ("error" in r) throw new Error(r.error);
     expect(r.data).toMatchObject({ outcome: "lost", nextAction: null, nextDue: null });
   });
-  it("entering demo_done sets the credit clock (now + 30 d) and plans 5 tasks", () => {
+  it("entering demo_done sets the credit clock (now + 14 d, Áron 2026-11-09) and plans 5 tasks", () => {
     const r = planTransition(lead("demo_booked"), row("demo_booked", "demo_delivered"), {}, now);
     if ("error" in r) throw new Error(r.error);
-    expect(r.data.demoCreditUntil?.getTime()).toBe(now.getTime() + 30 * DAY);
+    expect(r.data.demoCreditUntil?.getTime()).toBe(now.getTime() + 14 * DAY);
     expect(r.data.demoDoneAt).toEqual(now);
     expect(r.tasks).toHaveLength(5);
   });
   it("entering qualified without offerType errors; with the lead's own offerType passes", () => {
     const t = row("contacting", "call_qualified");
-    expect(err(planTransition(lead("contacting"), t, {}, now))).toContain("ajánlat típusa");
+    expect(err(planTransition(lead("contacting"), t, {}, now))).toContain("ajánlat típusát");
     expect(err(planTransition(lead("contacting", { offerType: "rental" }), t, {}, now))).toBeNull();
   });
   it("leaving lost sets outcome open", () => {
@@ -190,5 +190,25 @@ describe("call_logged: reached, second call agreed", () => {
   it("still needs a next action (no entry task)", () => {
     const t1 = findTransition(DEFAULT_TRANSITIONS, "new", "call_logged")!;
     expect(planTransition(base, t1, {}, now)).toHaveProperty("error");
+  });
+});
+
+describe("entryTasks ordered", () => {
+  it("plans the booking call task first", () => {
+    const t = entryTasks("ordered", "offer_accepted", new Date("2026-11-09T10:00:00Z"));
+    expect(t[0].title).toContain("Időpont-egyeztető hívás");
+    expect(t[0].type).toBe("call");
+  });
+});
+
+describe("w2FieldsFromAnswers", () => {
+  it("maps the landing slugs and never guesses", () => {
+    expect(w2FieldsFromAnswers({ intent: "service_concrete", buyer_type: "company" })).toEqual({ intent: "service_concrete", buyerType: "company" });
+    expect(w2FieldsFromAnswers({ intent: "service" })).toEqual({ intent: "service_vague" });
+    expect(w2FieldsFromAnswers({ intent: "device" })).toEqual({ intent: "unknown" });
+    expect(w2FieldsFromAnswers({ intent: "info" })).toEqual({ intent: "unknown" });
+    expect(w2FieldsFromAnswers({ intent: "rental" })).toEqual({ intent: "rental" });
+    expect(w2FieldsFromAnswers({ situation: "private" })).toEqual({ buyerType: "private" });
+    expect(w2FieldsFromAnswers({ intent: "valami", buyer_type: "ceg" })).toEqual({});
   });
 });

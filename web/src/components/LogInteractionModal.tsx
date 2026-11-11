@@ -104,7 +104,7 @@ export function LogInteractionModal({
         <DialogHeader>
           <DialogTitle>Interakció naplózása</DialogTitle>
           {contextLabel && (
-            <p className="text-sm text-slate-500">{contextLabel}</p>
+            <p className="text-sm text-[var(--ui-text-muted)]">{contextLabel}</p>
           )}
         </DialogHeader>
 
@@ -176,7 +176,7 @@ export function LogInteractionModal({
             <Input name="campaign" placeholder="pl. BirdsView Q3" />
           </FormField>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-[var(--ui-danger-text)]">{error}</p>}
 
           <DialogFooter>
             <Button
@@ -189,7 +189,6 @@ export function LogInteractionModal({
             </Button>
             <Button
               type="submit"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
               disabled={isPending}
             >
               {isPending ? "Mentés..." : "Naplózás"}

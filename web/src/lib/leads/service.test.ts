@@ -1,7 +1,7 @@
 import type { AnswerSources } from "./qualification";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { db } from "@/lib/db";
-import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, setLeadQualification, type LeadCtx } from "./service";
+import { changeLeadStatus, logLeadCallOutcome, completeOpenLeadCallTasks, setLeadQualification, setLeadOutcome, type LeadCtx } from "./service";
 import { resolveDemoHost, loadBookings } from "@/lib/booking/queries";
 
 // The task ↔ kanban sync (Péter, BRIEFING addendum 2026-09-07 P0 #4). Both
@@ -30,7 +30,7 @@ vi.mock("./queries", () => ({
 vi.mock("@/lib/db", () => ({
   db: {
     lead: { findFirst: vi.fn(), updateMany: vi.fn() },
-    task: { updateMany: vi.fn(), create: vi.fn() },
+    task: { updateMany: vi.fn(), create: vi.fn(), findFirst: vi.fn() },
     user: { findFirst: vi.fn() },
     interaction: { create: vi.fn() },
     company: { updateMany: vi.fn() },
@@ -42,7 +42,7 @@ vi.mock("@/lib/db", () => ({
 type M = ReturnType<typeof vi.fn>;
 const mockDb = db as unknown as {
   lead: { findFirst: M; updateMany: M };
-  task: { updateMany: M; create: M };
+  task: { updateMany: M; create: M; findFirst: M };
   pipeline: { findFirst: M };
   $transaction: M;
 };
@@ -358,6 +358,22 @@ describe("completeOpenLeadCallTasks is the single shared query", () => {
 describe("logLeadCallOutcome — bookings", () => {
   const inDays = (n: number) => new Date(Date.now() + n * 86_400_000);
 
+  it("existingBookingTaskId: logs against the drawer's meeting, no second task, scoped lookup", async () => {
+    const startsAt = inDays(2);
+    mockDb.task.findFirst.mockResolvedValueOnce({ assignedToId: 7, startsAt, dueDate: startsAt });
+    const res = await logLeadCallOutcome(10, { outcome: "meeting_booked", note: "foglalva", existingBookingTaskId: 55 }, ctx);
+    expect(res).toMatchObject({ success: true });
+    expect(mockDb.task.findFirst.mock.calls[0][0].where).toMatchObject({ id: 55, tenantId: ctx.tenantId, leadId: 10, type: "meeting" });
+    expect(txTaskCreate).not.toHaveBeenCalled();
+  });
+
+  it("existingBookingTaskId of another lead, tenant or a done meeting: rejected, nothing written", async () => {
+    mockDb.task.findFirst.mockResolvedValueOnce(null);
+    const res = await logLeadCallOutcome(10, { outcome: "meeting_booked", note: "foglalva", existingBookingTaskId: 99 }, ctx);
+    expect(res).toMatchObject({ error: expect.any(String) });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+
   it("user ctx, meeting_booked without bookingAt: rejected with issues.bookingAt, no task created", async () => {
     const res = await logLeadCallOutcome(10, {
       outcome: "meeting_booked", note: "demo egyeztetve", demoWith: "aron",
@@ -437,5 +453,72 @@ describe("logLeadCallOutcome — bookings", () => {
       bookingAt: inDays(3).toISOString(), bookingKind: "single_machine_demo",
     }, ctx);
     expect(res).toMatchObject({ success: true, bookingConflicts: [] });
+  });
+});
+
+// Áron 2026-11-09: "lostra állításnál technikailag nem tudta elmenteni" and
+// "hívás eredménye lezártnál nem nyílik meg".
+describe("lost flow (fix/crm-lost-flow)", () => {
+  it("bug 1: re-closing a lead whose stored reason is 'other' keeps its note and saves", async () => {
+    // Already lost, reason other + note: the old code passed "other" without its note.
+    mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, status: "lost", outcome: "lost", lostReason: "other", lostNote: "test" });
+    const res = await setLeadOutcome(10, "lost", ctx, null);
+    expect(res).toEqual({ success: true, dealId: undefined });
+    expect(mockDb.lead.updateMany.mock.calls[0][0].data).toMatchObject({ lostReason: "other", lostNote: "test" });
+  });
+
+  it("bug 1: closing with a Hungarian label stores the key, no note needed", async () => {
+    const res = await setLeadOutcome(10, "lost", ctx, "Nem ez kell neki");
+    expect(res).toEqual({ success: true });
+    const move = txLeadUpdateMany.mock.calls.find((c) => c[0].data.status === "lost")![0];
+    expect(move.data).toMatchObject({ outcome: "lost", lostReason: "not_our_service", lostNote: null });
+  });
+
+  it("bug 1: free text closes as 'other' with the text as note; nothing at all is a clear error", async () => {
+    expect(await setLeadOutcome(10, "lost", ctx, "nem válaszol sehol")).toEqual({ success: true });
+    const move = txLeadUpdateMany.mock.calls.find((c) => c[0].data.status === "lost")![0];
+    expect(move.data).toMatchObject({ lostReason: "other", lostNote: "nem válaszol sehol" });
+    expect(await setLeadOutcome(10, "lost", ctx, null)).toEqual({ error: "Válaszd ki, miért veszett el a lead" });
+  });
+
+  it("reopen clears the old closing reason", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, status: "lost", outcome: "lost", lostReason: "other", lostNote: "test" });
+    expect(await setLeadOutcome(10, "open", ctx)).toEqual({ success: true });
+    const move = txLeadUpdateMany.mock.calls.find((c) => c[0].data.status === "new")![0];
+    expect(move.data).toMatchObject({ outcome: "open", closedAt: null, lostReason: null, lostNote: null });
+  });
+
+  it("bug 2: a lost lead can log a call; stage, tasks and next action stay", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, status: "lost", outcome: "lost", lostReason: "no_need" });
+    const res = await logLeadCallOutcome(10, { outcome: "no_answer", note: "visszahívtam, nem vette fel" }, ctx);
+    expect(res).toMatchObject({ success: true, status: "lost", outcome: "lost", taskId: null });
+    expect(txHistoryCreate).not.toHaveBeenCalled();
+    expect(txTaskCreate).not.toHaveBeenCalled();
+    expect(txLeadUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("a callback or booking on a lost lead is refused, so the auto paths file a confirm task (Vanda #159-1)", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, status: "lost", outcome: "lost", lostReason: "no_need" });
+    const res = await logLeadCallOutcome(10, { outcome: "callback_requested", note: "kérte", callbackAt: "2026-12-01T09:00:00Z" }, ctx);
+    expect(res).toMatchObject({ error: expect.stringContaining("előbb nyisd újra") });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("the reported flow: an OPEN lead with a stale 'other' and no typed reason gets a clear error, not the stale code (Vanda #159-2)", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, lostReason: "other", lostNote: null });
+    expect(await setLeadOutcome(10, "lost", ctx, null)).toEqual({ error: "Válaszd ki, miért veszett el a lead" });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("a lost lead whose stored reason is legacy free text re-closes as other with that text as note (Vanda #159-4)", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, status: "lost", outcome: "lost", lostReason: "Nincs keret idén", lostNote: null });
+    expect(await setLeadOutcome(10, "lost", ctx, null)).toEqual({ success: true, dealId: undefined });
+    expect(mockDb.lead.updateMany.mock.calls[0][0].data).toMatchObject({ lostReason: "other", lostNote: "Nincs keret idén" });
+  });
+
+  it("bug 2: a converted (won) lead still refuses a call log", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, status: "won", outcome: "won", convertedDealId: 9 });
+    const res = await logLeadCallOutcome(10, { outcome: "no_answer", note: "x" }, ctx);
+    expect(res).toMatchObject({ error: "A lead már lezárt: előbb nyisd újra" });
   });
 });

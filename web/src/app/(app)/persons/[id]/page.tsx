@@ -7,13 +7,11 @@ import { getTagsForEntity } from "@/app/actions/tags";
 import { getEntityHistory } from "@/app/actions/audit";
 import { serializeDates } from "@/lib/serialize";
 import { serializeTaskCost } from "@/lib/tasks/costing";
+import k from "@/components/astryx/page.module.css";
 
 const TENANT_ID = 1;
 
-const AVATAR_PALETTE = [
-  "var(--indigo)", "var(--mint)", "var(--amber)",
-  "var(--sky)", "var(--violet)", "var(--coral)",
-];
+// One neutral avatar style (taste rules): no per-name colours.
 
 export default async function PersonDetailPage({
   params,
@@ -77,21 +75,14 @@ export default async function PersonDetailPage({
   const last90 = interactions.filter((x) => now - new Date(x.occurredAt).getTime() < 90 * 24 * 3600 * 1000).length;
   const signalLevel = last30 >= 3 ? 6 : last30 >= 2 ? 5 : last30 >= 1 ? 4 : last90 >= 2 ? 3 : last90 >= 1 ? 2 : 1;
 
-  const avatarColor = AVATAR_PALETTE[personId % AVATAR_PALETTE.length];
   const initials = [person.firstName?.[0], person.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "?";
 
   return (
-    <div className="mount">
-      <div style={{ marginBottom: 16 }}>
-        <Link
-          href="/persons"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
-          className="row-link"
-        >
-          <ArrowLeft style={{ width: 14, height: 14 }} />
-          Vissza a személyekhez
-        </Link>
-      </div>
+    <div>
+      <Link href="/persons" className={k.back}>
+        <ArrowLeft className="size-4" />
+        Vissza a személyekhez
+      </Link>
 
       <PersonDetailClient
         person={serializeDates(person)}
@@ -101,7 +92,6 @@ export default async function PersonDetailPage({
         conversations={serializeDates(conversations)}
         engagementSeries={engagementSeries}
         signalLevel={signalLevel}
-        avatarColor={avatarColor}
         initials={initials}
         initialTags={initialTags}
         auditEntries={serializeDates(auditEntries)}

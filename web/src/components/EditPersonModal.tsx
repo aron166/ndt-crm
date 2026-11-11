@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { updatePerson } from "@/app/actions/persons";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/ui/FormField";
 
 interface Person {
@@ -48,33 +51,33 @@ export function EditPersonModal({ open, onClose, person }: Props) {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField label="Vezetéknév" required>
-              <input name="lastName" className="input-ds" defaultValue={person.lastName ?? ""} required />
+              <Input name="lastName" defaultValue={person.lastName ?? ""} required />
             </FormField>
             <FormField label="Keresztnév" required>
-              <input name="firstName" className="input-ds" defaultValue={person.firstName ?? ""} required />
+              <Input name="firstName" defaultValue={person.firstName ?? ""} required />
             </FormField>
             <FormField label="Email">
-              <input name="email" className="input-ds" defaultValue={person.email ?? ""} type="email" />
+              <Input name="email" defaultValue={person.email ?? ""} type="email" />
             </FormField>
             <FormField label="Telefon">
-              <input name="phone" className="input-ds" defaultValue={person.phone ?? ""} type="tel" />
+              <Input name="phone" defaultValue={person.phone ?? ""} type="tel" />
             </FormField>
             <FormField label="LinkedIn URL" full>
-              <input name="linkedinUrl" className="input-ds" defaultValue={person.linkedinUrl ?? ""} />
+              <Input name="linkedinUrl" defaultValue={person.linkedinUrl ?? ""} />
             </FormField>
             <FormField label="Megjegyzés" full>
-              <textarea name="notes" className="input-ds" rows={3} defaultValue={person.notes ?? ""} style={{ resize: "vertical" }} />
+              <Textarea name="notes" rows={3} defaultValue={person.notes ?? ""} />
             </FormField>
           </div>
 
-          {error && <div style={{ fontSize: 14, color: "var(--coral)", padding: "6px 10px", background: "var(--coral-soft)", borderRadius: 5 }}>{error}</div>}
+          {error && <div style={{ fontSize: 14, color: "var(--ui-danger-text)", padding: "6px 10px", background: "var(--ui-danger-surface)", borderRadius: "var(--ui-radius-control)" }}>{error}</div>}
 
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
-            <button type="button" className="btn" onClick={onClose} disabled={pending}>Mégse</button>
-            <button type="submit" className="btn primary" disabled={pending}>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={pending}>Mégse</Button>
+            <Button type="submit" disabled={pending}>
               {pending ? "Mentés..." : "Mentés"}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { LOST_REASON_MAX, LOST_REASON_MIN, TECHNOLOGY_WORD_MAX } from "@/lib/leads/outcomes";
+import { CALL_TYPE_KEYS, LOST_REASON_MAX, LOST_REASON_MIN, TECHNOLOGY_WORD_MAX, type CallTypeKey } from "@/lib/leads/outcomes";
 
 // Pure half of the call-note ingest (port of workspace/tools/callnotes/callnotes.py).
 // A dictated post-call transcript -> LLM JSON -> validated CallNote -> call-outcome input.
@@ -18,6 +18,7 @@ export type CallNote = {
   company: string;
   person: string | null;
   outcome: (typeof CALLNOTE_OUTCOMES)[number];
+  call_type: CallTypeKey | null;
   callback_at: string | null;
   next_step: string | null;
   objections: string[];
@@ -42,6 +43,7 @@ export const callNoteSchema: z.ZodType<CallNote> = z
     company: z.string().min(1).max(300),
     person: nullStr,
     outcome: z.enum(CALLNOTE_OUTCOMES),
+    call_type: z.enum(CALL_TYPE_KEYS).nullish().transform((v) => v ?? null),
     callback_at: nullStr,
     next_step: nullStr,
     objections: z.array(z.string()).nullish().transform((v) => v ?? []),
@@ -74,11 +76,12 @@ const nullable = (extra: Record<string, unknown> = {}) => ({ type: ["string", "n
 export const CALLNOTE_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
-  required: ["company", "person", "outcome", "callback_at", "next_step", "objections", "technology_word", "lost_reason", "note"],
+  required: ["company", "person", "outcome", "call_type", "callback_at", "next_step", "objections", "technology_word", "lost_reason", "note"],
   properties: {
     company: { type: "string" },
     person: nullable(),
     outcome: { type: "string", enum: [...CALLNOTE_OUTCOMES] },
+    call_type: { type: ["string", "null"], enum: [...CALL_TYPE_KEYS, null] },
     callback_at: nullable(),
     next_step: nullable(),
     objections: { type: "array", items: { type: "string" } },
@@ -96,6 +99,7 @@ Reply with ONE JSON object only, no prose, no code fence. Keys (null when not sa
 company: string, company called
 person: string|null, who was spoken to (name, title if said)
 outcome: one of ${CALLNOTE_OUTCOMES.join(" | ")}
+call_type: one of ${CALL_TYPE_KEYS.join(" | ")} or null: qualification = first fit call, support = question / price objection / unclear point, booking = scheduling after an accepted offer, offer_followup = following up a machine or rental offer
 callback_at: string|null, local Budapest time "YYYY-MM-DDTHH:MM", only for callback_requested; needs date AND hour
 next_step: string|null, Hungarian, what we do next
 objections: array of strings, Hungarian, objections the customer voiced, verbatim where possible, [] if none
@@ -156,6 +160,7 @@ export function toCallOutcomeInput(
     n.person && `Beszélgetőpartner: ${n.person}`,
   ].filter(Boolean);
   const p: Record<string, unknown> = { outcome: n.outcome, note: [n.note, ...extra].join("\n") };
+  if (n.call_type) p.callType = n.call_type;
   if (n.outcome === "callback_requested" && n.callback_at) p.callbackAt = budapestLocalToUtc(n.callback_at);
   if (n.outcome === "not_interested" || n.outcome === "disqualified") p.lostReason = n.lost_reason;
   if (n.outcome === "meeting_booked") p.demoWith = opts.demoWith ?? "peter";

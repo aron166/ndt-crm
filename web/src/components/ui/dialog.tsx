@@ -37,7 +37,7 @@ function DialogOverlay({
         // warm median on "outcome modal open" (104 -> 72, N=7). Áron's Phase 1.5
         // constraint already says "no glass, no animations". A test pins these
         // classes out; see docs/PERF_2026-09-08_INP.md before re-adding a fade.
-        "fixed inset-0 isolate z-50 bg-black/10",
+        "fixed inset-0 isolate z-50 bg-[var(--ui-scrim)]",
         className
       )}
       {...props}
@@ -59,7 +59,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none sm:max-w-sm",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--ui-radius-surface)] bg-[var(--ui-surface-overlay)] p-6 text-sm text-[var(--ui-text)] shadow-[var(--ui-shadow-overlay)] outline-none sm:max-w-[480px]",
           className
         )}
         {...props}
@@ -68,17 +68,16 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
+            aria-label="Bezárás" // PROPOSAL copy
             render={
               <Button
                 variant="ghost"
                 className="absolute top-2 right-2"
-                size="icon-sm"
+                size="icon"
               />
             }
           >
-            <XIcon
-            />
-            <span className="sr-only">Close</span>
+            <XIcon />
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>
@@ -108,7 +107,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "flex flex-wrap justify-end gap-2 max-sm:[&>button]:w-full",
         className
       )}
       {...props}
@@ -128,7 +127,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "font-heading text-base leading-none font-medium",
+        "pr-10 font-heading text-xl leading-tight font-semibold text-[var(--ui-text)]",
         className
       )}
       {...props}
@@ -144,7 +143,7 @@ function DialogDescription({
     <DialogPrimitive.Description
       data-slot="dialog-description"
       className={cn(
-        "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        "text-sm text-[var(--ui-text-muted)] *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-[var(--ui-text)]",
         className
       )}
       {...props}

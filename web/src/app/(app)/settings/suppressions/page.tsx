@@ -1,4 +1,7 @@
 import { db } from "@/lib/db";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "../settings.module.css";
 import { SuppressionForm } from "./SuppressionForm";
 
 const TENANT_ID = 1;
@@ -14,48 +17,46 @@ export default async function SuppressionsPage() {
   });
 
   return (
-    <div className="mount space-y-5">
-      <div>
-        <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)" }}>
-          Tiltólista
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Akik kérték, hogy ne keressük őket. Minden kiküldés és célpontlista kihagyja őket. Csak hozzáadni lehet.
-        </p>
-      </div>
-      <div className="panel">
+    <div className={`mount ${s.stack}`}>
+      <PageHeader
+        title="Tiltólista"
+        help="Akik kérték, hogy ne keressük őket. Minden kiküldés és célpontlista kihagyja őket. Csak hozzáadni lehet."
+      />
+      <section className={k.card}>
         <SuppressionForm />
-      </div>
-      <div className="panel">
+      </section>
+      <section className={k.card}>
         {rows.length === 0 ? (
-          <div className="panel-pad text-sm text-slate-500">Még nincs senki a tiltólistán.</div>
+          <div className={k.muted}>Még nincs senki a tiltólistán.</div>
         ) : (
-          <table className="tbl" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>Email cím vagy domain</th>
-                <th>Kérés dátuma</th>
-                <th>Csatorna</th>
-                <th>Forrás</th>
-                <th>Megjegyzés</th>
-                <th>Felvéve</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.email ?? `@${r.domain}`}</td>
-                  <td>{day(r.requestedAt)}</td>
-                  <td>{r.channel ?? ""}</td>
-                  <td>{r.source ?? ""}</td>
-                  <td>{r.note ?? ""}</td>
-                  <td>{day(r.createdAt)}</td>
+          <div className={k.tableWrap}>
+            <table className={k.table}>
+              <thead>
+                <tr>
+                  <th>Email cím vagy domain</th>
+                  <th>Kérés dátuma</th>
+                  <th>Csatorna</th>
+                  <th>Forrás</th>
+                  <th>Megjegyzés</th>
+                  <th>Felvéve</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.email ?? `@${r.domain}`}</td>
+                    <td>{day(r.requestedAt)}</td>
+                    <td>{r.channel ?? ""}</td>
+                    <td>{r.source ?? ""}</td>
+                    <td>{r.note ?? ""}</td>
+                    <td>{day(r.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

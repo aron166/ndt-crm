@@ -70,7 +70,7 @@ describe("addSuppression", () => {
     expect(res).toEqual({ success: true, cancelled: 1 });
     expect(db.emailDraft.updateMany).toHaveBeenCalledTimes(1);
     expect(db.emailDraft.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: 1 }, data: { status: "cancelled" } });
-    expect(audit).toHaveBeenCalledWith("email_draft", 1, "update", { status: "draft" }, expect.objectContaining({ status: "cancelled" }));
+    expect(audit).toHaveBeenCalledWith("email_draft", 1, "update", { status: "draft" }, expect.objectContaining({ status: "cancelled" }), expect.anything());
   });
 
   it("a domain entry cancels subdomain drafts but not lookalikes", async () => {

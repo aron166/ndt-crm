@@ -195,12 +195,16 @@ needs.
    A unique index on `(tenant_id, thread_key)` is the guarantee, so two
    concurrent posts cannot both win; the loser also returns the 200. Both keys
    are lowercased on the way in, so a case variant is the same key.
-2. **A thread key must be vouched for.** It is honoured **only** when
-   `channel` is `cold_email` **and** `draft_key` resolves to a real draft of
-   yours. Otherwise it is dropped and the post takes the ordinary intake path.
-   This endpoint is CORS-open and draft keys are enumerable, so an unvouched key
-   would let anyone with a tenant app key claim a thread — burning it, so the
-   genuine reply later returns `deduped: true` and is silently discarded.
+2. **A thread key must be vouched for.** With `channel: cold_email` and a
+   `draft_key` that resolves to a real draft of yours, the key is stored as sent.
+   Without a draft (2026-11-10, the growth cold-email tool, which has no CRM
+   drafts), the key is stored **namespaced by your app key** under a reserved
+   prefix: `app~<app slug>~<key>`. A `thread_key` you send may not start with
+   `app~` (that is a `400`), so nobody can forge another app's key. Dedupe matches
+   exactly one form: the raw key when a draft vouches, otherwise your namespaced key. This endpoint is
+   CORS-open and draft keys are enumerable, so an unvouched raw key would let
+   anyone with a tenant app key claim a thread, burning it, so the genuine reply
+   later returns `deduped: true` and is silently discarded. Other channels never store a thread key.
 3. **The company comes from the draft**, not from dedupe-by-name on whatever the
    replier typed — sidestepping the weak spot of this intake (exact-name
    matching collapses every `"(magánérdeklődő)"` onto one row).
@@ -397,6 +401,40 @@ see above). Answers are ≤2000 chars each. Every write recomputes `tier`.
 
 The default list is the locked model's `gate` + Branch A seven + Branch B three,
 with the spec's draft Hungarian marked ⚠️ until Áron signs off on the wording.
+
+## Suppressions
+
+### `POST /api/suppressions`: report an opt-out (app key)
+
+For the growth cold-email tool and any other app: adds an address to the **one
+shared suppression list**. Every outbound path checks it in `sendEmail` (cold
+email, nurture, intro material), and any queued outreach draft to that address
+is cancelled at once. Only adds, never removes; removal is a human action in
+Settings.
+
+```bash
+curl -X POST $CRM/api/suppressions -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{ "email": "x@masik.hu", "requested_at": "2026-11-10", "channel": "email", "source": "cv1" }'
+```
+
+| Field | Rule |
+|---|---|
+| `email` | required, a valid address; stored trimmed and lowercased |
+| `requested_at` | optional `YYYY-MM-DD`, a real calendar day the person asked (default today; at most one day ahead) |
+| `channel` | `email` (default), `phone`, `linkedin`, `in_person` |
+| `source` | optional, max 200; stored as `<app slug>: <source>` |
+| `note` | optional, max 1000 |
+
+Unknown fields are a `400`. Idempotent: a new address returns `201 { ok, created: true, id, cancelledDrafts }`,
+an address already on the list (or a race with your own retry) returns `200 { ok, created: false, id }`.
+`cancelledDrafts` is how many queued drafts to that address were cancelled
+(null if that step failed; it runs again on a retry). `401` without a valid key,
+`429` over 30 requests a minute; the bucket is shared with `/api/leads` for the
+same key, so retry on the next run.
+
+Any app key of the tenant can add any address, and only a person can remove one
+(Settings), so treat app keys as secrets: a leaked key could silence real customers.
+Every add is in the audit log with the app slug.
 
 ## Companies & persons
 
@@ -954,3 +992,60 @@ Rules live in `/automations`. Triggers: `lead_created`, `lead_status_changed`,
 `assign_lead`, `webhook_out` (POSTs `{ event, tenantId, leadId, dealId, companyId,
 personId, company, fields, firedAt }` to your URL — the seam for n8n / a voice agent).
 Time-based triggers run from the daily cron (`/api/cron/automations`, 07:00 UTC).
+
+## Booking (W8b route-aware, session auth)
+
+Auth: the session cookie plus a CRM user of the tenant. Anything else gets 403 `{ error }`. This is not the app-key (`Bearer`) surface. All times are ISO 8601 (`startsAt` may carry an offset); working-day and "tomorrow" logic runs in Europe/Budapest, and there are no same-day bookings. Drive times are a straight-line band in slice 1 (`DriveBand { min, max }` minutes: `min` cannot be quicker, `max` will not be slower) and become exact (`min == max`) when the OSRM matrix lands. Validation errors are 400 `{ error }`.
+
+Shared types:
+- `Settlement`: `{ id, name, county, district|null, lat, lng, postcodes[] }`
+- `Machine`: `{ id, name, base: Settlement }`
+- `RouteStop`: `{ id, machineId, startsAt, minutes, place: {id,name,lat,lng}|null, title?, kind?, leadId? }`
+- `Flag`: `{ code, severity: "block"|"warn", leg?: "before"|"after"|"from_base"|"to_base", againstId?, drive?: DriveBand, gapMinutes?, slackMinutes?, earliestStart?, latestStart? }`
+  - block: `infeasible` (cannot get there or back in time), `machine_clash` (overlaps another booking on the machine), `outside_window` (outside the visit window), `day_full` (maxVisitsPerDay reached)
+  - warn: `tight` (inside the band or under tightSlackMinutes), `long_day` (home after homeBy or long driving), `no_site` (a site is missing, flat gap used), `site_assumed` (site from the company address, confirm on the call)
+- `LegInfo`: `{ stop: RouteStop|null (null = base), drive: DriveBand|null, gapMinutes: number|null }`
+- `PlacementResult`: `{ machineId, startsAt, endsAt, feasible (no block flag), flags[], before: LegInfo, after: LegInfo, dayStops: RouteStop[], leaveBaseAt|null, homeAt|null, dayDriveMinutes, addedDriveMinutes }`
+- `BundleHint`: `{ stop: RouteStop, sameDay, driveMinutes, tier: "same_city"|"near"|"in_area", workingDaysApart, suggestedStart?, suggestedMachineId? }` (the suggested fields are set for other-day hints)
+- `RankedSlot`: `PlacementResult` plus `{ cost (lower is better), reason: "same_trip"|"on_the_way"|"earliest"|"free_day"|"next_free", bundles: BundleHint[] }`
+
+### `GET /api/booking/settlements?q=`: job-site type-ahead
+
+`q` (max 60 chars): 4 digits = postcode match, otherwise name prefix (case-insensitive, min 2 chars; shorter returns an empty list). Max 15 results.
+-> 200 `{ settlements: Settlement[] }`
+
+### `GET /api/booking/machines`: bookable machines
+
+-> 200 `{ machines: Machine[] }` (tenant equipment that is bookable and has a base, by id)
+
+### `GET /api/booking/leads/{id}/site`: booking form prefill
+
+-> 200 `LeadSite` = `{ settlement: Settlement|null, address: string|null, source: "company_address_assumed"|"stated"|null }`. `stated` = the postcode the lead gave; `company_address_assumed` = the company's site or registered address (the UI must confirm it); all null = nothing matched. 400 invalid id, 404 lead not in the tenant.
+
+### `POST /api/booking/slots`: ranked, feasible slots
+
+Request:
+- `settlementId` (int > 0 or null, required), `kind?` (`multi_unit_demo`|`single_machine_demo`|`job`|`private`|null), `minutes?` (int 15..600, default from kind), `machineId?` (only this machine, else any), `excludeTaskId?` (moving a booking), `siteSource?` (`stated`|`permit`|`tender`|`premises`|`company_address_assumed`; the last adds `site_assumed` to every result)
+- `wanted?` (ISO date or instant), `urgent?` (boolean), `days?` (1..60, default 21), `count?` (1..20, default 3)
+
+-> 200 `SlotsResult` = `{ site: Settlement|null, kind, minutes, from, machines: Machine[], slots: RankedSlot[] }`. Only physically possible slots are returned. 400 unknown settlement or machine, 409 no bookable machine configured.
+
+### `POST /api/booking/check`: a hand-picked time
+
+Request: the same fields as `slots` (without `wanted`, `urgent`, `days`, `count`) plus `startsAt` (ISO, required).
+
+-> 200 `CheckResult` = `{ site, kind, minutes, startsAt, feasible (some machine can take it), bestMachineId|null (feasible machine adding the least driving), machines: (PlacementResult & { machineName })[], bundles: BundleHint[], alternatives: RankedSlot[] }`. `alternatives` is filled (up to 3, all feasible) only when `feasible` is false. 400 / 409 as for `slots`.
+
+### `POST /api/booking/bookings`: create a booking
+
+Request:
+- `leadId` (int > 0), `settlementId` (int > 0), `siteSource` (as above), `startsAt` (ISO), `kind` (required, as above)
+- `siteAddress?` (max 500), `minutes?` (15..600), `machineId?` (default: the check's best machine), `demoWith?` (`aron`|`peter`, sets the assignee), `overrideReason?` (5..500 chars)
+
+The route check runs again on the write. -> 201 `{ success: true, taskId, machineId, overridden, check: CheckResult }`; `overridden` is true when the machine could not make the time and `overrideReason` was given (stored on the task, otherwise null).
+
+Errors, all `{ error }`:
+- 400 invalid body, unknown settlement or machine
+- 404 lead not in the tenant
+- 409 lead not open; `demoWith` host not configured; no bookable machine
+- 409 time not feasible and no `overrideReason`: `{ error, check: CheckResult }` (factors plus `alternatives`), nothing is written

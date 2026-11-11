@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { listDrafts, getOutreachSettings } from "@/app/actions/email-drafts";
 import { listSenders, getDueTouches } from "@/app/actions/outreach-campaigns";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "./outreach.module.css";
 import OutreachQueue from "./OutreachQueue";
 import DueToday from "./DueToday";
 
@@ -15,10 +18,16 @@ export default async function OutreachPage() {
     getDueTouches(),
   ]);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <Link href="/outreach/campaigns" style={{ fontSize: 14, color: "var(--indigo)" }}>
-        Kampány-áttekintés →
-      </Link>
+    <div className={s.stack}>
+      <PageHeader
+        title="Outreach piszkozatok"
+        eyebrow="Kampányonként megírt emailek jóváhagyása és küldése"
+        actions={
+          <Link href="/outreach/campaigns" className={k.btn}>
+            Kampány-áttekintés →
+          </Link>
+        }
+      />
       <DueToday touches={touches} senders={senders} />
       <OutreachQueue initialDrafts={drafts} campaigns={campaigns} initialSettings={settings} senders={senders} />
     </div>
