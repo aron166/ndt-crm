@@ -10,6 +10,11 @@ export const TRIGGER_TYPES = [
   "lead_idle",
   "deal_stage_changed",
   "deal_idle_in_stage",
+  // Campaign-scoped (item 5): fire only for the campaign named in trigger_config.campaignId.
+  "campaign_member_replied",
+  "campaign_member_promoted",
+  "campaign_call_outcome",
+  "campaign_step_completed",
 ] as const;
 export type TriggerType = (typeof TRIGGER_TYPES)[number];
 
@@ -19,8 +24,14 @@ export const ACTION_TYPES = [
   "change_lead_status",
   "assign_lead",
   "webhook_out",
+  "add_note",
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
+
+export const CAMPAIGN_TRIGGERS: readonly TriggerType[] = ["campaign_member_replied", "campaign_member_promoted", "campaign_call_outcome", "campaign_step_completed"];
+export const isCampaignTrigger = (t: string) => (CAMPAIGN_TRIGGERS as readonly string[]).includes(t);
+/** Actions that leave the CRM: on a campaign rule only while the campaign's outbound switch is on. */
+export const OUTBOUND_ACTION_TYPES: readonly string[] = ["send_email", "webhook_out"];
 
 export const CONDITION_OPS = [
   "eq",
@@ -50,7 +61,14 @@ export interface TriggerConfig {
   idleDays?: number;
   /** lead_idle: only leads in this status (optional — any open lead if unset). */
   status?: string;
+  /** campaign_*: the campaign the rule belongs to (required; a campaign rule without it never fires). */
+  campaignId?: number;
+  /** campaign_call_outcome: only this outcome key (optional). */
+  outcome?: string;
 }
+
+/** add_note: an append-only note interaction on the company; {company}/{campaign}/... placeholders. */
+export interface AddNoteActionConfig { textTemplate: string }
 
 export interface ChangeLeadStatusActionConfig { toStatus: string }
 export interface AssignLeadActionConfig { assignedToId: number }
@@ -97,6 +115,10 @@ export interface AutomationEvent {
   /** deal_stage_changed: the stage the deal just entered. */
   toStageId?: number;
   fields: Record<string, string | number | null | undefined>;
+  /** campaign_*: the campaign the event happened in. */
+  campaignId?: number | null;
+  /** campaign_call_outcome / campaign_member_replied: the outcome key. */
+  outcome?: string;
   /** Action types this event must not run (a campaign promotion skips outbound actions unless the campaign opts in). */
   skipActionTypes?: readonly string[];
 }

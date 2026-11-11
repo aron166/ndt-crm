@@ -5,11 +5,13 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import {
-  TRIGGER_TYPES, ACTION_TYPES,
+  TRIGGER_TYPES, ACTION_TYPES, isCampaignTrigger, OUTBOUND_ACTION_TYPES,
   type TriggerType, type ActionType,
 } from "@/lib/automations/types";
 import { getLeadStatuses } from "@/lib/leads/queries";
-import { requireCrmUser } from "@/lib/actor";
+import { getActor, requireCrmUser } from "@/lib/actor";
+import { resolveDemoHost } from "@/lib/booking/queries";
+import { CALL_OUTCOME_KEYS } from "@/lib/campaigns/rules";
 
 const TENANT_ID = 1;
 
@@ -80,6 +82,10 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
     const user = await db.user.findFirst({ where: { id: assignedToId, tenantId: TENANT_ID }, select: { id: true } });
     if (!user) return { error: "Ismeretlen felelős" };
     actionConfig.assignedToId = assignedToId;
+  } else if (actionType === "add_note") {
+    const text = typeof actionConfig.textTemplate === "string" ? actionConfig.textTemplate.trim() : "";
+    if (!text) return { error: "A jegyzet szövege kötelező" };
+    actionConfig.textTemplate = text.slice(0, 2000);
   } else if (actionType === "webhook_out") {
     // HTTPS only: the payload carries CRM identifiers, and webhook_out sends no
     // auth header by design — the secret lives IN the URL, so cleartext leaks it.
@@ -125,6 +131,29 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
   const triggerConfig =
     trigParsed.value && typeof trigParsed.value === "object" &&
     Object.keys(trigParsed.value).length > 0 ? trigParsed.value : null;
+  if (isCampaignTrigger(triggerType)) {
+    // A campaign rule is scoped to one campaign of this tenant (item 5).
+    const campaignId = Number(triggerConfig?.campaignId);
+    if (!Number.isInteger(campaignId) || campaignId <= 0) return { error: "Kampány szabályhoz kampány kell" };
+    const c = await db.campaign.findFirst({ where: { id: campaignId, tenantId: TENANT_ID }, select: { id: true, outboundAutomations: true } });
+    if (!c) return { error: "Ismeretlen kampány" };
+    // Outbound only while Áron's switch is on; the engine skips it too when the switch is off later.
+    if (OUTBOUND_ACTION_TYPES.includes(actionType)) {
+      if (!c.outboundAutomations) return { error: "Kimenő művelet csak bekapcsolt kimenő automatizmusú kampányban" };
+      // The switch is Áron's; so is what goes out under it: rule content is not in the approval hash (Vanda #193-2).
+      const { userId } = await getActor(TENANT_ID);
+      if (userId == null || userId !== (await resolveDemoHost(TENANT_ID, "aron"))) return { error: "Kimenő kampány szabályt csak Áron menthet" };
+    }
+    if (triggerType === "campaign_member_replied" && triggerConfig?.outcome != null && triggerConfig.outcome !== "") {
+      if (triggerConfig.outcome !== "reply_positive" && triggerConfig.outcome !== "reply_negative") return { error: "Ismeretlen válasz típus" };
+    }
+    if (triggerType === "campaign_call_outcome" && triggerConfig?.outcome != null && triggerConfig.outcome !== "") {
+      if (!CALL_OUTCOME_KEYS.includes(triggerConfig.outcome as never) || triggerConfig.outcome === "note_only") return { error: "Ismeretlen hívás eredmény" };
+    }
+    triggerConfig!.campaignId = campaignId;
+  } else if (actionType === "add_note") {
+    return { error: "Jegyzet művelet csak kampány szabályban" };
+  }
 
   return {
     name,

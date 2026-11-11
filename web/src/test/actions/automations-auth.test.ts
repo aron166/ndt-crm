@@ -8,6 +8,7 @@ const { db } = vi.hoisted(() => ({
   db: {
     automationRule: { create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
     user: { findFirst: vi.fn() },
+    campaign: { findFirst: vi.fn() },
   },
 }));
 
@@ -15,6 +16,8 @@ vi.mock("@/lib/db", () => ({ db }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/leads/queries", () => ({ getLeadStatuses: vi.fn().mockResolvedValue([]) }));
+const resolveDemoHost = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/booking/queries", () => ({ resolveDemoHost }));
 vi.mock("@/lib/actor", () => {
   const getActor = vi.fn();
   return { getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
@@ -54,5 +57,55 @@ describe("automations actions auth gate", () => {
     db.automationRule.create.mockResolvedValue({ id: 9 });
     expect(await createAutomation(webhookRule())).toEqual({ success: true });
     expect(db.automationRule.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("campaign-scoped rules (item 5)", () => {
+  beforeEach(() => mockGetActor.mockResolvedValue({ userId: 2, email: "a@x.hu" }));
+  const rule = (actionType: string, actionConfig: object, triggerConfig: object | null = { campaignId: 3 }) => {
+    const f = new FormData();
+    f.set("name", "r"); f.set("triggerType", "campaign_member_replied"); f.set("actionType", actionType);
+    f.set("actionConfig", JSON.stringify(actionConfig));
+    if (triggerConfig) f.set("triggerConfig", JSON.stringify(triggerConfig));
+    return f;
+  };
+  it("needs a campaign of this tenant", async () => {
+    expect(await createAutomation(rule("create_task", { titleTemplate: "Hívd vissza" }, null))).toEqual({ error: "Kampány szabályhoz kampány kell" });
+    db.campaign.findFirst.mockResolvedValue(null);
+    expect(await createAutomation(rule("create_task", { titleTemplate: "Hívd vissza" }))).toEqual({ error: "Ismeretlen kampány" });
+    expect(db.automationRule.create).not.toHaveBeenCalled();
+  });
+  it("an outbound action needs the campaign's outbound switch on (Áron's, in the approval hash)", async () => {
+    db.campaign.findFirst.mockResolvedValue({ id: 3, outboundAutomations: false });
+    expect(await createAutomation(rule("webhook_out", { url: "https://n8n.example/hook" }))).toEqual({ error: "Kimenő művelet csak bekapcsolt kimenő automatizmusú kampányban" });
+    db.campaign.findFirst.mockResolvedValue({ id: 3, outboundAutomations: true });
+    db.automationRule.create.mockResolvedValue({ id: 1 });
+    resolveDemoHost.mockResolvedValue(2); // the caller (user 2) is Áron
+    expect(await createAutomation(rule("webhook_out", { url: "https://n8n.example/hook" }))).toEqual({ success: true });
+  });
+  it("only Áron saves an outbound campaign rule, even with the switch on (Vanda #193-2)", async () => {
+    db.campaign.findFirst.mockResolvedValue({ id: 3, outboundAutomations: true });
+    resolveDemoHost.mockResolvedValue(9);
+    expect(await createAutomation(rule("webhook_out", { url: "https://n8n.example/hook" }))).toEqual({ error: "Kimenő kampány szabályt csak Áron menthet" });
+    expect(db.automationRule.create).not.toHaveBeenCalled();
+  });
+  it("add_note is a campaign rule action only (Vanda #193-4)", async () => {
+    const f = new FormData();
+    f.set("name", "n"); f.set("triggerType", "lead_created"); f.set("actionType", "add_note"); f.set("actionConfig", JSON.stringify({ textTemplate: "x" }));
+    expect(await createAutomation(f)).toEqual({ error: "Jegyzet művelet csak kampány szabályban" });
+  });
+  it("a reply filter is positive or negative only (Vanda #193 r2-1)", async () => {
+    db.campaign.findFirst.mockResolvedValue({ id: 3, outboundAutomations: false });
+    expect(await createAutomation(rule("create_task", { titleTemplate: "x" }, { campaignId: 3, outcome: "no_answer" }))).toEqual({ error: "Ismeretlen válasz típus" });
+  });
+  it("a call outcome filter must be a real outcome (Vanda #193-5)", async () => {
+    db.campaign.findFirst.mockResolvedValue({ id: 3, outboundAutomations: false });
+    const f = rule("create_task", { titleTemplate: "x" }, { campaignId: 3, outcome: "foo" });
+    f.set("triggerType", "campaign_call_outcome");
+    expect(await createAutomation(f)).toEqual({ error: "Ismeretlen hívás eredmény" });
+  });
+  it("add_note needs its text", async () => {
+    db.campaign.findFirst.mockResolvedValue({ id: 3, outboundAutomations: false });
+    expect(await createAutomation(rule("add_note", { textTemplate: " " }))).toEqual({ error: "A jegyzet szövege kötelező" });
   });
 });

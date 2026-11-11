@@ -2,13 +2,15 @@ import { db } from "@/lib/db";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { serializeDates } from "@/lib/serialize";
 import { AutomationsClient } from "./AutomationsClient";
+import { CAMPAIGN_TRIGGERS } from "@/lib/automations/types";
 
 const TENANT_ID = 1;
 
 export default async function AutomationsPage() {
   const [rules, leadStatuses, pipelines, users] = await Promise.all([
     db.automationRule.findMany({
-      where: { tenantId: TENANT_ID },
+      // Campaign rules live on their campaign's Automatizálás tab (item 5).
+      where: { tenantId: TENANT_ID, triggerType: { notIn: [...CAMPAIGN_TRIGGERS] } },
       orderBy: { createdAt: "asc" },
     }),
     getLeadStatuses(TENANT_ID),

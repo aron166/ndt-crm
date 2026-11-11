@@ -7,6 +7,7 @@
 // Nothing here sends a message, and nothing here creates an SLA task except the one the
 // existing reply intake creates for a positive e-mail reply.
 
+import { OUTBOUND_ACTION_TYPES } from "@/lib/automations/types";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { audit, type AuditOptions } from "@/lib/audit";
@@ -27,7 +28,7 @@ import { createItem } from "@/lib/content/service";
 import type { ContentCategory } from "@/lib/content/types";
 import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
-  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor } from "./rules";
+  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor, campaignAutomationEvents } from "./rules";
 import { closeSpecRequests } from "./spec-requests";
 export { requestSpecification } from "./spec-requests";
 import { planMembers, type MemberRow, type MembersPlan, reachFromContacts } from "./members";
@@ -66,7 +67,7 @@ async function isAron(ctx: CampaignCtx): Promise<boolean> {
 }
 
 /** Automation actions that reach outside the CRM (an e-mail, a webhook into n8n). */
-export const OUTBOUND_ACTIONS: readonly string[] = ["send_email", "webhook_out"];
+export const OUTBOUND_ACTIONS = OUTBOUND_ACTION_TYPES;
 
 /** Roles that may write CRM records in bulk (apply a member load, undo one). */
 export const OPERATOR_ROLES: readonly string[] = ["admin", "manager"];
@@ -799,6 +800,16 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
       tenantId, userId: ctx.userId, actor: ctx.userId != null ? "user" : "agent", actorAgentId: ctx.appSlug,
     }, { nextAction: plan.promote.nextAction, skipAutomationActions: outboundSkip, ...(followup ? { nextDue: followup } : {}) });
     moved = "error" in r ? { ok: false, error: r.error } : { ok: true };
+  }
+  // Per-campaign automations (item 5): rules scoped to THIS campaign; outbound actions stay skipped unless Áron's switch is on.
+  for (const type of campaignAutomationEvents(input.outcome, {
+    promoted: Boolean(plan.promote && res.leadId != null), stepFrom: m.stepPosition, stepTo: plan.member.stepPosition, done: plan.member.state === "done",
+  })) {
+    await runAutomations({
+      skipActionTypes: outboundSkip, type, tenantId, campaignId: c.id, outcome: input.outcome,
+      leadId: res.leadId, companyId: m.companyId, personId: m.personId, companyName: m.company.name,
+      fields: { company: m.company.name, campaign: c.slug, outcome: input.outcome, step_position: m.stepPosition, member_state: plan.member.state, message: input.notes ?? null },
+    }).catch((err) => reportError("campaigns.recordOutcome.campaignAutomations", err, { campaignId: c.id, type }));
   }
   audit("campaign", c.id, "update", { member: m.id, state: m.state }, { member: m.id, state: plan.member.state, outcome: input.outcome, leadId: res.leadId }, auditOpts(ctx));
   return {

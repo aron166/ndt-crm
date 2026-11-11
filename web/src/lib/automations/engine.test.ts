@@ -15,6 +15,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     automationRule: { findMany: vi.fn(), update: vi.fn() },
     task: { create: vi.fn() },
+    interaction: { create: vi.fn() },
     company: { findFirst: vi.fn() },
     person: { findFirst: vi.fn() },
   },
@@ -347,5 +348,46 @@ describe("runLeadAction / runAutomationAction (v2 actions)", () => {
     ]);
     await runAutomations(leadCreated({ leadId: 1 }));
     expect(mockDb.automationRule.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("campaign-scoped triggers (item 5)", () => {
+  const ev = (over: Partial<AutomationEvent> = {}): AutomationEvent => ({
+    type: "campaign_member_replied", tenantId: 1, companyId: 7, personId: null, campaignId: 1, fields: { outcome: "reply_positive" }, ...over,
+  });
+  it("a rule scoped to campaign A does not fire for campaign B", () => {
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1 }, ev())).toBe(true);
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1 }, ev({ campaignId: 2 }))).toBe(false);
+  });
+  it("a campaign trigger without a campaign never fires (scoped only)", () => {
+    expect(triggerMatches("campaign_member_replied", null, ev())).toBe(false);
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1 }, ev({ campaignId: null }))).toBe(false);
+  });
+  it("call outcome rules can name the outcome", () => {
+    const call = ev({ type: "campaign_call_outcome", outcome: "interested" });
+    expect(triggerMatches("campaign_call_outcome", { campaignId: 1, outcome: "interested" }, call)).toBe(true);
+    expect(triggerMatches("campaign_call_outcome", { campaignId: 1, outcome: "no_answer" }, call)).toBe(false);
+    expect(triggerMatches("campaign_call_outcome", { campaignId: 1 }, call)).toBe(true);
+  });
+});
+
+describe("add_note (item 5, Vanda #193-3)", () => {
+  it("writes one append-only note interaction on the company with the campaign key", async () => {
+    const ok = await runLeadAction("add_note", { textTemplate: "Válaszolt: {company}" }, {
+      type: "campaign_member_replied", tenantId: 1, companyId: 7, personId: 8, leadId: 30, campaignId: 3, companyName: "Példa Kft.",
+      fields: { company: "Példa Kft.", campaign: "bp" },
+    });
+    expect(ok).toBe(true);
+    expect((db as unknown as { interaction: { create: ReturnType<typeof vi.fn> } }).interaction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tenantId: 1, companyId: 7, personId: 8, leadId: 30, type: "note", direction: null, notes: "Válaszolt: Példa Kft.", campaign: "bp" }),
+    });
+  });
+});
+
+describe("reply rules can name positive or negative (Vanda #193 r2-1)", () => {
+  it("a callback rule on positive replies does not fire for a 'not interested' reply", () => {
+    const e = (outcome: string): AutomationEvent => ({ type: "campaign_member_replied", tenantId: 1, companyId: 7, personId: null, campaignId: 1, outcome, fields: {} });
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1, outcome: "reply_positive" }, e("reply_negative"))).toBe(false);
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1, outcome: "reply_positive" }, e("reply_positive"))).toBe(true);
   });
 });

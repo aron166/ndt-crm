@@ -330,3 +330,19 @@ describe("a campaign promotion sends nothing by default (Vanda #188-8)", () => {
     expect(d.campaign.update.mock.calls[0][0].data).toMatchObject({ outboundAutomations: true, status: "draft", approvedHash: null });
   });
 });
+
+describe("per-campaign automations (item 5)", () => {
+  it("a touch raises its campaign events with the campaign id, outbound actions skipped while the switch is off", async () => {
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "interested" }, NOW);
+    const calls = (runAutomations as M).mock.calls.map((c) => c[0]);
+    const camp = calls.filter((e) => String(e.type).startsWith("campaign_"));
+    expect(camp.map((e) => e.type)).toEqual(["campaign_call_outcome", "campaign_member_promoted"]);
+    for (const e of camp) expect(e).toMatchObject({ campaignId: 3, skipActionTypes: ["send_email", "webhook_out"] });
+  });
+  it("with Áron's outbound switch on, campaign events may run outbound actions", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", ownerUserId: 9, outboundAutomations: true, steps: STEPS });
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "no_answer" }, NOW);
+    const camp = (runAutomations as M).mock.calls.map((c) => c[0]).filter((e) => String(e.type).startsWith("campaign_"));
+    expect(camp).toEqual([expect.objectContaining({ type: "campaign_call_outcome", outcome: "no_answer", skipActionTypes: [] })]);
+  });
+});
