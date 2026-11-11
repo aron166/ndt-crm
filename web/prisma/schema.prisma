@@ -55,6 +55,8 @@ model Tenant {
   contentNotes           ContentNote[]
   assistantConversations AssistantConversation[]
   campaigns              Campaign[]
+  campaignSteps          CampaignStep[]
+  campaignMembers        CampaignMember[]
   contentItems           ContentItem[]
   emailDrafts            EmailDraft[]
   contentAssets          ContentAsset[]
@@ -120,6 +122,8 @@ model Person {
   appEvents     AppEvent[]
   quotes        Quote[]
   emailDrafts   EmailDraft[]
+
+  campaignMembers CampaignMember[]
 
   @@map("persons")
 }
@@ -207,6 +211,8 @@ model Company {
   emailDrafts   EmailDraft[]
   quotes        Quote[]
   contentItems  ContentItem[]
+
+  campaignMembers CampaignMember[]
 
   @@unique([tenantId, vatNumber])
   @@map("companies")
@@ -298,6 +304,8 @@ model User {
   assistantConversations AssistantConversation[]
   leadStatusChanges      LeadStatusHistory[]     @relation("LeadStatusHistoryActor")
   leadDocumentsCreated   LeadDocument[]          @relation("LeadDocumentCreator")
+  campaignsOwned         Campaign[]              @relation("CampaignOwner")
+  campaignsApproved      Campaign[]              @relation("CampaignApprover")
 
   @@map("users")
 }
@@ -382,6 +390,8 @@ model Lead {
   quotes        Quote[]
   statusHistory LeadStatusHistory[]
   documents     LeadDocument[]
+
+  campaignMembers CampaignMember[]
 
   @@unique([tenantId, threadKey])
   @@index([tenantId, nextDue])
@@ -637,16 +647,16 @@ model Task {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  assignedTo User?    @relation("TaskAssignee", fields: [assignedToId], references: [id])
-  company    Company? @relation("TaskCompany", fields: [companyId], references: [id])
-  deal       Deal?    @relation("TaskDeal", fields: [dealId], references: [id])
-  person     Person?  @relation("TaskPerson", fields: [personId], references: [id])
-  lead       Lead?    @relation("TaskLead", fields: [leadId], references: [id], onDelete: SetNull)
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  assignedTo     User?         @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  company        Company?      @relation("TaskCompany", fields: [companyId], references: [id])
+  deal           Deal?         @relation("TaskDeal", fields: [dealId], references: [id])
+  person         Person?       @relation("TaskPerson", fields: [personId], references: [id])
+  lead           Lead?         @relation("TaskLead", fields: [leadId], references: [id], onDelete: SetNull)
   siteSettlement HuSettlement? @relation(fields: [siteSettlementId], references: [id], onDelete: SetNull)
-  equipment  Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
-  parentTask Task?    @relation("SubTasks", fields: [parentTaskId], references: [id])
-  subTasks   Task[]   @relation("SubTasks")
+  equipment      Equipment?    @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  parentTask     Task?         @relation("SubTasks", fields: [parentTaskId], references: [id])
+  subTasks       Task[]        @relation("SubTasks")
 
   @@index([tenantId, leadId])
   @@index([tenantId, startsAt])
@@ -823,19 +833,19 @@ model Interaction {
 // ─────────────────────────────────────────────
 
 model Equipment {
-  id             Int       @id @default(autoincrement())
-  tenantId       Int       @map("tenant_id")
-  name           String
-  serialNumber   String?   @map("serial_number")
-  model          String?
-  manufacturer   String?
-  calibrationDue DateTime? @map("calibration_due")
-  notes          String?
+  id               Int       @id @default(autoincrement())
+  tenantId         Int       @map("tenant_id")
+  name             String
+  serialNumber     String?   @map("serial_number")
+  model            String?
+  manufacturer     String?
+  calibrationDue   DateTime? @map("calibration_due")
+  notes            String?
   // W8b: a bookable machine has its own timeline; the base is where its day starts and ends.
   bookable         Boolean   @default(false)
   baseSettlementId Int?      @map("base_settlement_id")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   tenant         Tenant        @relation(fields: [tenantId], references: [id])
   baseSettlement HuSettlement? @relation(fields: [baseSettlementId], references: [id], onDelete: SetNull)
@@ -1183,18 +1193,18 @@ model EnrichmentProposal {
 // strings (codebase convention — no Prisma enums), validated by Zod / the UI.
 
 model Campaign {
-  id             Int      @id @default(autoincrement())
-  tenantId       Int      @map("tenant_id")
+  id             Int       @id @default(autoincrement())
+  tenantId       Int       @map("tenant_id")
   name           String
   slug           String // stable handle; auto-created on first content POST
   project        String? // e.g. "birdsview"
   description    String?
-  isArchived     Boolean  @default(false) @map("is_archived")
+  isArchived     Boolean   @default(false) @map("is_archived")
   // Feature E2: the target AUDIENCE = a saved company view (segment). Resolved
   // live (no membership snapshot) so the audience tracks the underlying data.
   // This is ALSO the outreach target list: /api/outreach/targets restricts to
   // it when the campaign whose `slug` equals the outreach key sets one.
-  audienceViewId Int?     @map("audience_view_id")
+  audienceViewId Int?      @map("audience_view_id")
   // Outreach defaults (2026-09-20). `slug` IS the outreach campaign key stored
   // in email_drafts.campaign / leads.campaign / interactions.campaign, so one
   // campaign row now names both the content queue and the cold-email batch.
@@ -1202,21 +1212,101 @@ model Campaign {
   // which is what lets a human pick a wave and a sender BEFORE any draft row
   // exists. Both nullable: a legacy outreach key with no campaign row keeps
   // behaving exactly as it did.
-  senderUserId   Int?     @map("sender_user_id")
-  currentWave    Int?     @map("current_wave")
-  createdAt      DateTime @default(now()) @map("created_at")
+  senderUserId   Int?      @map("sender_user_id")
+  currentWave    Int?      @map("current_wave")
+  // v2 campaigns (slice 1, 2026-11-11, docs/proposals/2026-11-11-prospects-and-campaigns.md v2.4).
+  // kind NULL = a pre-v2 marketing row. Only Áron's session moves status to running (lib/campaigns).
+  kind           String? // content | ad | organic | cold_call | cold_email | sequence
+  status         String    @default("draft") // draft | running | paused | stopped | done
+  dailyCap       Int       @default(15) @map("daily_cap")
+  ownerUserId    Int?      @map("owner_user_id")
+  startsOn       DateTime? @map("starts_on") @db.Date
+  endsOn         DateTime? @map("ends_on") @db.Date
+  brief          Json? // the human-approved spec: { audience, offer, angle, notes }
+  briefProposal  Json?     @map("brief_proposal") // what an agent proposed; never written over `brief`
+  audience       Json? // recipe: { kind: "import" | "segment" | "lead_filter", ... }
+  approvedById   Int?      @map("approved_by_id")
+  approvedAt     DateTime? @map("approved_at")
+  approvedHash   String?   @map("approved_hash")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  tenant       Tenant           @relation(fields: [tenantId], references: [id])
   contentItems ContentItem[]
-  audienceView SavedView?    @relation("CampaignAudience", fields: [audienceViewId], references: [id], onDelete: SetNull)
+  audienceView SavedView?       @relation("CampaignAudience", fields: [audienceViewId], references: [id], onDelete: SetNull)
   // SetNull: losing a user must never delete a campaign.
-  sender       User?         @relation("CampaignSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  sender       User?            @relation("CampaignSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  owner        User?            @relation("CampaignOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  approvedBy   User?            @relation("CampaignApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  steps        CampaignStep[]
+  members      CampaignMember[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([audienceViewId])
   @@index([senderUserId])
   @@map("campaigns")
+}
+
+/// One step of a campaign sequence. The step's asset (e-mail copy, call script,
+/// ad) is a content item; only a LIVE item is used.
+model CampaignStep {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int      @map("tenant_id")
+  campaignId    Int      @map("campaign_id")
+  position      Int
+  channel       String // email | call | ad | post | dm
+  waitDays      Int      @default(0) @map("wait_days") // working days after the previous step
+  audienceRule  String   @default("all") @map("audience_rule") // all | no_reply | no_answer
+  contentItemId Int?     @map("content_item_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  campaign    Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contentItem ContentItem? @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, position])
+  @@index([tenantId])
+  @@map("campaign_steps")
+}
+
+/// A company in a campaign. A prospect = a member with no lead; promotion sets
+/// lead_id. Per-campaign state lives here, never on the company.
+model CampaignMember {
+  id             Int       @id @default(autoincrement())
+  tenantId       Int       @map("tenant_id")
+  campaignId     Int       @map("campaign_id")
+  companyId      Int       @map("company_id")
+  personId       Int?      @map("person_id")
+  leadId         Int?      @map("lead_id")
+  stepPosition   Int       @default(1) @map("step_position")
+  state          String    @default("queued") // queued | needs_contact | promoted | declined | unreachable | excluded | done
+  attempts       Int       @default(0)
+  nextEligibleOn DateTime? @map("next_eligible_on") @db.Date
+  priority       Int       @default(100)
+  tier           String?
+  lane           String?
+  phoneOnly      Boolean   @default(false) @map("phone_only")
+  why            String?
+  city           String?
+  importBatch    String?   @map("import_batch")
+  createdCompany Boolean   @default(false) @map("created_company")
+  createdPerson  Boolean   @default(false) @map("created_person")
+  lastOutcome    String?   @map("last_outcome")
+  lastTouchedAt  DateTime? @map("last_touched_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  stateChangedAt DateTime  @default(now()) @map("state_changed_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  company  Company  @relation(fields: [companyId], references: [id])
+  person   Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+  lead     Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, companyId])
+  @@index([tenantId, campaignId, state, nextEligibleOn])
+  @@index([tenantId, campaignId, importBatch])
+  @@index([companyId])
+  @@map("campaign_members")
 }
 
 model ContentItem {
@@ -1282,6 +1372,7 @@ model ContentItem {
   versions       ContentVersion[] @relation("ItemVersions")
   checks         ContentCheck[]
   notes          ContentNote[]
+  campaignSteps  CampaignStep[]
   currentVersion ContentVersion?  @relation("ItemCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   liveVersion    ContentVersion?  @relation("ItemLiveVersion", fields: [liveVersionId], references: [id], onDelete: SetNull)
 
