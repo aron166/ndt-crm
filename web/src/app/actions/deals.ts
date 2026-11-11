@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { runAutomations } from "@/lib/automations/engine";
+import { customFieldsFromForm, moveDealToStage } from "@/lib/deals/service";
 import { deleteCompany } from "@/app/actions/companies";
 import { deletePerson } from "@/app/actions/persons";
 import { requireCrmUser } from "@/lib/actor";
@@ -39,10 +39,7 @@ export async function createDeal(formData: FormData) {
   if (!companyIdStr) return { error: "Cég kötelező" };
 
   // collect custom field values (prefixed cf_)
-  const customFields: Record<string, string> = {};
-  for (const [k, v] of formData.entries()) {
-    if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
-  }
+  const customFields = customFieldsFromForm(formData);
 
   const refErr = await foreignIdError({
     companyId: parseInt(companyIdStr),
@@ -91,10 +88,7 @@ export async function updateDeal(id: number, formData: FormData) {
   const personIdStr = formData.get("personId") as string | null;
   const stageIdStr  = formData.get("stageId") as string | null;
 
-  const customFields: Record<string, string> = {};
-  for (const [k, v] of formData.entries()) {
-    if (k.startsWith("cf_") && String(v).trim()) customFields[k.slice(3)] = String(v);
-  }
+  const customFields = customFieldsFromForm(formData);
 
   const refErr = await foreignIdError({
     personId: personIdStr ? parseInt(personIdStr) : null,
@@ -132,55 +126,10 @@ export async function moveDeal(
 ) {
   const denied = await requireCrmUser(TENANT_ID);
   if (denied) throw new Error(denied);
-  const deal = await db.deal.findFirst({
-    where: { id: dealId, tenantId: TENANT_ID },
-    select: {
-      stageId: true, companyId: true, personId: true, value: true,
-      stage: { select: { name: true } },
-      company: { select: { name: true } },
-    },
-  });
-
-  const newStage = await db.pipelineStage.findFirst({
-    where: { id: newStageId, pipeline: { tenantId: TENANT_ID } },
-    select: { name: true },
-  });
-  if (!newStage) throw new Error("Szakasz nem található");
-
-  // Only a real stage change resets the idle clock (drags within the same
-  // column reorder but keep the deal in its stage).
-  const stageChanged = !!deal && deal.stageId !== newStageId;
-
-  await db.deal.updateMany({
-    where: { id: dealId, tenantId: TENANT_ID },
-    data: {
-      stageId: newStageId, position: newPosition, updatedAt: new Date(),
-      ...(stageChanged ? { stageEnteredAt: new Date() } : {}),
-    },
-  });
-
-  audit("deal", dealId, "update",
-    { stageId: deal?.stageId, stageName: deal?.stage?.name },
-    { stageId: newStageId, stageName: newStage?.name }
-  );
-
-  if (stageChanged && deal) {
-    await runAutomations({
-      type: "deal_stage_changed",
-      tenantId: TENANT_ID,
-      companyId: deal.companyId,
-      personId: deal.personId,
-      dealId,
-      companyName: deal.company?.name ?? null,
-      toStageId: newStageId,
-      fields: {
-        company: deal.company?.name ?? null,
-        stageId: newStageId,
-        value: deal.value != null ? Number(deal.value) : null,
-      },
-    });
-  }
-
+  // Shared with PATCH /api/deals/:id (lib/deals/service.ts): idle clock, audit, deal_stage_changed.
+  const res = await moveDealToStage(TENANT_ID, dealId, newStageId, { position: newPosition });
+  // A deal deleted in another tab stays a silent no-op, as before the shared path; a bad stage throws, as before.
+  if ("error" in res && res.error !== "Deal nem található") throw new Error(res.error);
   revalidatePath("/deals");
 }
 

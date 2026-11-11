@@ -35,6 +35,7 @@ vi.mock("@/lib/db", () => ({
     interaction: { create: vi.fn() },
     company: { updateMany: vi.fn() },
     pipeline: { findFirst: vi.fn() },
+    tenant: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -44,6 +45,7 @@ const mockDb = db as unknown as {
   lead: { findFirst: M; updateMany: M };
   task: { updateMany: M; create: M; findFirst: M };
   pipeline: { findFirst: M };
+  tenant: { findUnique: M };
   $transaction: M;
 };
 const ctx: LeadCtx = { tenantId: 1, userId: 2, actor: "user" };
@@ -163,7 +165,9 @@ describe("changeLeadStatus: won converts the lead to a Deal", () => {
     const res = await changeLeadStatus(10, "won", ctx);
     expect(res).toEqual({ success: true, changed: true });
     expect(txDealCreate).toHaveBeenCalledTimes(1);
-    expect(txDealCreate.mock.calls[0][0].data.customFields).toEqual({ fromLeadId: 10, offerType: "service" });
+    expect(txDealCreate.mock.calls[0][0].data.customFields).toEqual({ fromLeadId: 10, saleKind: "scan", offerType: "service" });
+    // A scan job never reads the machine-pipeline setting.
+    expect(mockDb.tenant.findUnique).not.toHaveBeenCalled();
     const claim = txLeadUpdateMany.mock.calls[0][0];
     expect(claim.where).toMatchObject({ id: 10, convertedDealId: null });
     expect(claim.data).toMatchObject({ convertedDealId: 500 });
@@ -197,6 +201,28 @@ describe("changeLeadStatus: won converts the lead to a Deal", () => {
     expect(txDealCreate).not.toHaveBeenCalled();
     expect(txHistoryCreate).not.toHaveBeenCalled();
     expect(txLeadUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("a machine sale lands in the configured Gépeladás pipeline, marked machine", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...ORDERED, offerType: "purchase" });
+    mockDb.tenant.findUnique.mockResolvedValue({ settings: { machineSalePipelineId: 9 } });
+    mockDb.pipeline.findFirst.mockResolvedValueOnce({ id: 9, stages: [{ id: 90 }] });
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ success: true, changed: true });
+    expect(mockDb.pipeline.findFirst.mock.calls[0][0].where).toEqual({ id: 9, tenantId: 1, isArchived: false });
+    expect(txDealCreate.mock.calls[0][0].data).toMatchObject({
+      pipelineId: 9, stageId: 90, customFields: { fromLeadId: 10, saleKind: "machine", offerType: "purchase" },
+    });
+  });
+
+  it("a machine sale falls back to the default pipeline when the configured one is gone", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...ORDERED, offerType: null, intent: "rental" });
+    mockDb.tenant.findUnique.mockResolvedValue({ settings: { machineSalePipelineId: 9 } });
+    mockDb.pipeline.findFirst.mockResolvedValueOnce(null);
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ success: true, changed: true });
+    expect(mockDb.pipeline.findFirst).toHaveBeenCalledTimes(2);
+    expect(txDealCreate.mock.calls[0][0].data).toMatchObject({ pipelineId: 3, stageId: 4, customFields: { saleKind: "machine" } });
   });
 
   it("a non-won move never touches deal.create", async () => {

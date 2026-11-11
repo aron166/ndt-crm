@@ -17,6 +17,7 @@ import {
   parseAnswers, answersFrom, answerSourcesFrom, withAnswers, effectiveAnswers, legacyAnswers,
 } from "./qualification";
 import { computeTier } from "./tier";
+import { isMachineSale, machinePipelineIdFrom } from "./machine-sales";
 import { reportError } from "@/lib/report-error";
 import { DEFAULT_BOOKING_MINUTES, conflictsFor } from "@/lib/booking/conflicts";
 import { loadBookings, resolveDemoHost } from "@/lib/booking/queries";
@@ -290,11 +291,17 @@ export async function convertLeadToDeal(
   }
   if (!lead.companyId || !lead.company) return { error: "A leadhez nincs cég társítva" };
 
-  const pipeline = await db.pipeline.findFirst({
-    where: { tenantId, isArchived: false },
-    orderBy: { position: "asc" },
-    include: { stages: { orderBy: { position: "asc" }, take: 1 } },
-  });
+  // A machine sale goes to the tenant's "Gépeladás" pipeline when one is configured
+  // (scripts/seed-machine-sales.mjs); otherwise, and for scan jobs, the default pipeline.
+  const machineId = isMachineSale(lead)
+    ? machinePipelineIdFrom((await db.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }))?.settings)
+    : null;
+  const stagesFirst = { stages: { orderBy: { position: "asc" as const }, take: 1 } };
+  const pipeline =
+    (machineId != null
+      ? await db.pipeline.findFirst({ where: { id: machineId, tenantId, isArchived: false }, include: stagesFirst })
+      : null) ??
+    (await db.pipeline.findFirst({ where: { tenantId, isArchived: false }, orderBy: { position: "asc" }, include: stagesFirst }));
   if (!pipeline) return { error: "Nincs pipeline: hozz létre egyet előbb" };
   const firstStage = pipeline.stages[0];
   if (!firstStage) return { error: "A pipeline-nak nincs egyetlen szakasza sem: előbb hozz létre egyet" };
@@ -313,7 +320,10 @@ export async function convertLeadToDeal(
           pipelineId: pipeline.id, stageId: firstStage.id,
           value: lead.estimatedValue ?? null, currency: "HUF",
           // W2: what was sold travels with the deal (no Deal column for it).
-          customFields: { fromLeadId: leadId, ...(lead.offerType ? { offerType: lead.offerType } : {}) },
+          customFields: {
+            fromLeadId: leadId, saleKind: isMachineSale(lead) ? "machine" : "scan",
+            ...(lead.offerType ? { offerType: lead.offerType } : {}),
+          },
           position: (maxPos._max.position ?? -1) + 1,
           stageEnteredAt: new Date(),
         },

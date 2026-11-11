@@ -16,6 +16,7 @@ import {
   type QualificationQuestion,
   type QuestionSet,
 } from "@/lib/leads/qualification";
+import { MACHINE_SET } from "@/lib/leads/machine-sales";
 import { formatDateTime } from "@/lib/utils";
 
 /**
@@ -141,10 +142,13 @@ function CallAnswersBlock({
   leadId,
   questions,
   sources,
+  section,
 }: {
   leadId: number;
   questions: QualificationQuestion[];
   sources: AnswerSources;
+  /** A heading shown above the question with this slug (the machine-sale questions). */
+  section?: { slug: string; label: string };
 }) {
   const router = useRouter();
   const answers = setterAnswersFrom(sources, questions);
@@ -191,6 +195,11 @@ function CallAnswersBlock({
           const oneLine = q.type === "choice" || q.type === "text" || q.type === "contact";
           return (
             <div key={q.slug}>
+              {section?.slug === q.slug && (
+                <div className="panel-title" style={{ borderTop: "1px solid var(--ui-border)", paddingTop: 12, marginBottom: 8 }}>
+                  {section.label}
+                </div>
+              )}
               <label className="field-label">
                 {phoneWording(q)}
                 {q.required && (
@@ -256,6 +265,7 @@ export function LeadQualificationPanel({
   campaign,
   receivedDate,
   sets,
+  machineSale = false,
 }: {
   leadId: number;
   questions: QualificationQuestion[];
@@ -264,7 +274,13 @@ export function LeadQualificationPanel({
   campaign: string | null;
   receivedDate: string | Date | null;
   sets: QuestionSet[];
+  /** offer_type or intent says purchase/rental: ask the machine-sale questions too. */
+  machineSale?: boolean;
 }) {
+  const discovery = questionsInSet(questions, SET_DISCOVERY);
+  const machine = questionsInSet(questions, MACHINE_SET).filter((q) => !discovery.includes(q));
+  // Shown for a machine-sale lead, and for any lead that already has one of these answers.
+  const showMachine = machine.length > 0 && (machineSale || machine.some((q) => answerSources[q.slug] || qualification[q.slug]));
   return (
     <div className="space-y-4">
       <FormAnswersBlock
@@ -280,8 +296,9 @@ export function LeadQualificationPanel({
           form, and its answer is the contact columns, not a stored answer. */}
       <CallAnswersBlock
         leadId={leadId}
-        questions={questionsInSet(questions, SET_DISCOVERY)}
+        questions={showMachine ? [...discovery, ...machine] : discovery}
         sources={answerSources}
+        section={showMachine ? { slug: machine[0].slug, label: sets.find((x) => x.key === MACHINE_SET)?.label ?? MACHINE_SET } : undefined}
       />
     </div>
   );

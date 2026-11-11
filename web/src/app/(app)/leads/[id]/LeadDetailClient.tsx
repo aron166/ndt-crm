@@ -34,6 +34,7 @@ import { Details, sourceRows, type Fact } from "./v2/Details";
 import { CallMode } from "./v2/CallMode";
 import { BookingDrawer } from "./v2/BookingDrawer";
 import s from "./v2/lead2.module.css";
+import { isMachineSale } from "@/lib/leads/machine-sales";
 
 export interface Interaction {
   id: number;
@@ -68,6 +69,8 @@ interface Lead {
   createdAt: string | Date;
   convertedDealId: number | null;
   customFields: Record<string, unknown> | null;
+  offerType?: string | null;
+  intent?: string | null;
   companyId: number | null;
   campaign: string | null;
   source: string | null;
@@ -461,6 +464,7 @@ export function LeadDetailClient({
                 campaign={lead.campaign}
                 receivedDate={lead.receivedDate}
                 sets={questionSets}
+                machineSale={isMachineSale(lead)}
               />
             </section>
             <section id="offers" className={s.section}>
