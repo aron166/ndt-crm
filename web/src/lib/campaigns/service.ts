@@ -940,10 +940,18 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   const tenantId = ctx.tenantId;
   const c = await db.campaign.findFirst({
     where: { tenantId, slug },
-    select: { id: true, slug: true, status: true, dailyCap: true, startsOn: true, endsOn: true, audience: true, senderUserId: true, approvedAt: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true } } },
+    select: { id: true, slug: true, status: true, dailyCap: true, startsOn: true, endsOn: true, audience: true, senderUserId: true, approvedHash: true, outboundAutomations: true, steps: { select: { position: true, channel: true, waitDays: true, audienceRule: true, contentItemId: true } } },
   });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status !== "running") return fail(409, "Csak jóváhagyott, futó kampány e-mail lépése készít piszkozatot");
+  // Drafted is what Áron approved: the approval hash over the same inputs as approveCampaign must still match,
+  // so any drift (a variant restored or tagged after approval) waits for a re-approval (Vanda #195-1, r2-1).
+  const [hashMembers, hashVariants] = await Promise.all([
+    db.campaignMember.findMany({ where: { tenantId, campaignId: c.id }, select: { companyId: true } }),
+    campaignVariants(tenantId, c.id),
+  ]);
+  const hashNow = approvalHash({ memberCompanyIds: hashMembers.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations, audience: audienceOf(c.audience), variants: hashVariants });
+  if (c.approvedHash == null || hashNow !== c.approvedHash) return fail(409, "A kampány változott a jóváhagyás óta (például egy szegmensváltozat); hagyd jóvá újra");
   // The cap is per day, not per click (Vanda #194-5).
   const madeToday = await db.emailDraft.count({ where: { tenantId, campaign: c.slug, createdAt: { gte: atLocal(localDay(now), 0) } } });
   const room = Math.max(0, c.dailyCap - madeToday);
@@ -980,9 +988,7 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
     if (leadsAudience ? !openLead.has(m.companyId) : openLead.has(m.companyId)) continue;
     const segment = segmentOf(m);
     const step = ec.steps.find((x) => x.position === m.stepPosition);
-    // Only variants that existed when Áron approved: one attached later (an app key can tag one) waits for a re-approval (Vanda #195-1).
-    const approved = (ec.variants.get(m.stepPosition) ?? []).filter((v) => c.approvedAt != null && v.createdAt != null && v.createdAt <= c.approvedAt);
-    const itemId = step ? pickAsset(step, approved, segment, true) : null;
+    const itemId = step ? pickAsset(step, ec.variants.get(m.stepPosition) ?? [], segment, true) : null;
     const asset = itemId != null ? ec.items.find((i) => i.id === itemId && i.status === "live" && i.liveVersion) : undefined;
     if (!asset) { noAsset++; continue; }
     const to = memberAddress(m, contacts);

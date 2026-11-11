@@ -38,6 +38,15 @@ const CO = { name: "Minta Kft.", city: null };
 /** A live content item as the preview context loads it: the draft uses the LIVE version's text. */
 const live = (id: number, title: string, body: string, meta: unknown = null) => ({ id, title, status: "live", sourceMeta: meta, createdAt: new Date("2026-11-01T00:00:00Z"), liveVersion: { id: id * 10, number: 1, body }, currentVersion: { id: id * 10 + 1, number: 2, body: "UNAPPROVED NEWER TEXT" } });
 
+/** A running campaign as approved over exactly these members and items: the drafter re-checks this hash. */
+const approvedAs = (c: { steps: unknown[]; dailyCap: number } & Record<string, unknown>, members: { companyId: number }[], items: { id: number; sourceMeta: unknown }[]) => ({
+  ...c, outboundAutomations: false,
+  approvedHash: approvalHash({
+    memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as Parameters<typeof approvalHash>[0]["steps"], dailyCap: c.dailyCap, outboundAutomations: false,
+    variants: items.flatMap((i) => { const t = i.sourceMeta as { campaignStep?: number; segment?: string } | null; return t?.campaignStep ? [{ step: t.campaignStep, segment: t.segment!, itemId: i.id }] : []; }),
+  }),
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   d.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
@@ -111,14 +120,15 @@ describe("leads by stage (retargeting, nurture)", () => {
 
 describe("an e-mail step produces drafts for the gated sender, never a send", () => {
   it("drafts the step's live asset for due members with an address, once; members without an address or asset are counted", async () => {
-    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null,
-      steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 50 }, { position: 2, channel: "email", waitDays: 2, contentItemId: null }] });
-    d.campaignMember.findMany.mockResolvedValue([
+    const ms1 = [
       { id: 1, companyId: 7, personId: 8, stepPosition: 1, nextEligibleOn: null, person: { email: "a@p.example.test", firstName: "-", lastName: "-" }, company: CO },
       { id: 2, companyId: 9, personId: null, stepPosition: 1, nextEligibleOn: null, person: null, company: CO },
       { id: 3, companyId: 11, personId: 12, stepPosition: 2, nextEligibleOn: null, person: { email: "c@p.example.test", firstName: "-", lastName: "-" }, company: CO },
       { id: 4, companyId: 13, personId: 14, stepPosition: 1, nextEligibleOn: new Date("2026-11-20T00:00:00Z"), person: { email: "d@p.example.test", firstName: "-", lastName: "-" }, company: CO },
-    ]);
+    ];
+    d.campaignMember.findMany.mockResolvedValue(ms1);
+    d.campaign.findFirst.mockResolvedValue(approvedAs({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null,
+      steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 50 }, { position: 2, channel: "email", waitDays: 2, contentItemId: null }] }, ms1, []));
     d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: 50 }, { position: 2, contentItemId: null }]);
     d.contentItem.findMany.mockResolvedValue([live(50, "Első levél", "Tisztelt ...")]);
     d.emailDraft.findMany.mockResolvedValue([]);
@@ -131,18 +141,19 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
     expect(d.emailDraft.createMany.mock.calls[0][0].data).toEqual([expect.objectContaining({ companyId: 7, personId: 8, campaign: "bp", step: 1, subject: "Első levél", body: "Tisztelt ...", toEmail: "a@p.example.test", status: "draft" })]);
   });
   it("drafts what the preview shows: the segment's variant, merge fields filled, live text only; an unresolved field is counted, never drafted", async () => {
-    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null, senderUserId: null,
-      approvedAt: new Date("2026-11-12T08:00:00Z"), steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }] });
     d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: null }]);
     d.campaignMember.findMany.mockResolvedValue([
       { id: 1, companyId: 7, personId: 8, stepPosition: 1, nextEligibleOn: null, person: { email: "a@p.example.test", firstName: "Anna", lastName: "Kovács" }, company: CO, segment: "drillers", lane: null, city: "Győr" },
       { id: 2, companyId: 9, personId: 10, stepPosition: 1, nextEligibleOn: null, person: { email: "b@p.example.test", firstName: "-", lastName: "-" }, company: CO, segment: null, lane: "engineer", city: null },
       { id: 3, companyId: 11, personId: 12, stepPosition: 1, nextEligibleOn: null, person: { email: "c@p.example.test", firstName: "-", lastName: "-" }, company: CO, segment: null, lane: "warm network (Péter phones)", city: null },
     ]);
-    d.contentItem.findMany.mockResolvedValue([
+    const items2 = [
       live(60, "Fúrás előtt", "{{greeting}} {{city}}", { campaignStep: 1, segment: "D" }),
       live(61, "Tervezőknek", "{{greeting}} {{sender_phone}}", { campaignStep: 1, segment: "B" }),
-    ]);
+    ];
+    d.contentItem.findMany.mockResolvedValue(items2);
+    d.campaign.findFirst.mockResolvedValue(approvedAs({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null, senderUserId: null,
+      approvedAt: new Date("2026-11-12T08:00:00Z"), steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }] }, [{ companyId: 7 }, { companyId: 9 }, { companyId: 11 }], items2));
     d.emailDraft.findMany.mockResolvedValue([]);
     d.emailDraft.count.mockResolvedValue(0);
     d.lead.findMany.mockResolvedValue([]);
@@ -152,8 +163,9 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
     expect(d.emailDraft.createMany.mock.calls[0][0].data).toEqual([expect.objectContaining({ companyId: 7, subject: "Fúrás előtt", body: "Tisztelt Kovács Anna! Győr", templateVersionId: 600 })]);
   });
   it("Vanda #195-1: a variant created after the approval is never drafted on a running campaign", async () => {
-    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null, senderUserId: null,
-      approvedAt: new Date("2026-11-12T08:00:00Z"), steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }] });
+    // Approved with no variant; the variant came later.
+    d.campaign.findFirst.mockResolvedValue(approvedAs({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null, senderUserId: null,
+      approvedAt: new Date("2026-11-12T08:00:00Z"), steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }] }, [{ companyId: 7 }], []));
     d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: null }]);
     d.campaignMember.findMany.mockResolvedValue([
       { id: 1, companyId: 7, personId: 8, stepPosition: 1, nextEligibleOn: null, person: { email: "a@p.example.test", firstName: "-", lastName: "-" }, company: CO, segment: "drillers", lane: null, city: null },
@@ -163,11 +175,11 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
     d.emailDraft.count.mockResolvedValue(0);
     d.lead.findMany.mockResolvedValue([]);
     d.contact.findMany.mockResolvedValue([]);
-    expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 0, noAsset: 1 });
+    expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ status: 409 });
     expect(d.emailDraft.createMany).not.toHaveBeenCalled();
   });
   it("Vanda #195 r2-1: a variant archived at approval and restored later is never drafted (the approval hash no longer matches)", async () => {
-    const steps = [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }];
+    const steps = [{ position: 1, channel: "email" as const, waitDays: 0, contentItemId: null }];
     // Approved while the variant was archived: no variants in the hash.
     const approvedHash = approvalHash({ memberCompanyIds: [7], steps, dailyCap: 15, outboundAutomations: false });
     d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null, senderUserId: null, outboundAutomations: false, audience: null,
@@ -203,7 +215,8 @@ describe("a sent draft advances its member (item 4)", () => {
 });
 
 describe("Vanda #194 fixes", () => {
-  const running = { id: 3, slug: "bp", status: "running", dailyCap: 2, startsOn: null, endsOn: null, audience: null, steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 50 }] };
+  const base = { id: 3, slug: "bp", status: "running", dailyCap: 2, startsOn: null, endsOn: null, audience: null, steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 50 }] };
+  const running = (ms: { companyId: number }[]) => approvedAs(base, ms, []);
   const mem = (id: number, companyId: number, email: string | null) => ({ id, companyId, personId: id * 10, stepPosition: 1, nextEligibleOn: null, person: email ? { email, firstName: "-", lastName: "-" } : null, company: { name: `Cég ${id}`, city: null }, segment: null, lane: null, city: null });
   beforeEach(() => {
     d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: 50 }]);
@@ -215,7 +228,7 @@ describe("Vanda #194 fixes", () => {
     d.emailDraft.createMany.mockResolvedValue({ count: 1 });
   });
   it("1: a prospect who replied (a replied draft or an open lead) gets no further cold e-mail", async () => {
-    d.campaign.findFirst.mockResolvedValue(running);
+    d.campaign.findFirst.mockResolvedValue(running([{ companyId: 7 }, { companyId: 9 }]));
     d.campaignMember.findMany.mockResolvedValue([mem(1, 7, "a@x.example.test"), mem(2, 9, "b@x.example.test")]);
     d.emailDraft.findMany.mockResolvedValue([{ companyId: 9, step: 1, status: "replied" }]); // a reply on an earlier touch
     d.lead.findMany.mockResolvedValue([{ companyId: 7 }]); // became a lead some other way
@@ -223,13 +236,13 @@ describe("Vanda #194 fixes", () => {
     expect(d.emailDraft.createMany).not.toHaveBeenCalled();
   });
   it("4: the address may sit on the company's contact", async () => {
-    d.campaign.findFirst.mockResolvedValue(running);
+    d.campaign.findFirst.mockResolvedValue(running([{ companyId: 7 }]));
     d.campaignMember.findMany.mockResolvedValue([mem(1, 7, null)]);
     d.contact.findMany.mockResolvedValue([{ companyId: 7, personId: 10, email: "k@x.example.test", person: { email: null } }]);
     expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 1, noAddress: 0 });
   });
   it("5: the daily cap counts today's drafts already made", async () => {
-    d.campaign.findFirst.mockResolvedValue(running);
+    d.campaign.findFirst.mockResolvedValue(running([{ companyId: 7 }, { companyId: 9 }]));
     d.campaignMember.findMany.mockResolvedValue([mem(1, 7, "a@x.example.test"), mem(2, 9, "b@x.example.test")]);
     d.emailDraft.count.mockResolvedValue(1);
     expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 1 });

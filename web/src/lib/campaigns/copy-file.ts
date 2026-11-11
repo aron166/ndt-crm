@@ -15,12 +15,12 @@ const fence = (s: string) => s.match(/```[a-z]*\n([\s\S]*?)\n```/)?.[1] ?? null;
 export function copyRuleBreaks(text: string): string[] {
   const t = text.toLowerCase();
   const out: string[] = [];
-  if (/\d\s*(ft|huf|eur|€)(?!\p{L})|(?<!\p{L})forint|(?<!\p{L})ár(?:a|ak|at|on|ban|ról|ért|ainkat|aink|unk|akat|akról|akon)?(?!\p{L})|(?<!\p{L})díj/u.test(t)) out.push("ár vagy díj");
+  if (/\d\s*(?:e|ezer)?\s*(ft|huf|eur|€)(?!\p{L})|(?<!\p{L})forint|(?<!\p{L})ár(?:á\p{L}*|ai\p{L}*|ak\p{L}*|a|at|on|ban|ért|ról|unk|lista\p{L}*|az\p{L}*|ajánlat\p{L}*)?(?!\p{L})|(?<!\p{L})díj/u.test(t)) out.push("ár vagy díj");
   if (/engedély/.test(t)) out.push("„engedély”");
   if (/garanci/.test(t)) out.push("„garancia”");
   if (/(?<!\p{L})első(?!\p{L})/u.test(t)) out.push("„első” (minősítés nélkül tilos)");
   if (/±|\+\/-|\+-\s*\d|plusz-mínusz/.test(t)) out.push("plusz-mínusz pontosság");
-  if (/(?<!\p{L})foglal(?:jon|janak|hat|hatnak|j)(?!\p{L})|naptár|calendly|időpontot válasszon|válasszon időpontot|időpontot választ/u.test(t)) out.push("az ügyfél foglal (mi foglalunk, soha az ügyfél)");
+  if (/foglal(?:jon|janak|hatja|hat|hatnak|j)(?!\p{L})|naptár|calendly|időpontot válasszon|válasszon időpontot|időpontot választ/u.test(t)) out.push("az ügyfél foglal (mi foglalunk, soha az ügyfél)");
   if (!/„érdekel”|"érdekel"/.test(text)) out.push("nincs „érdekel” válasz kérés");
   return out;
 }
