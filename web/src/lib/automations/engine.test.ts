@@ -313,6 +313,10 @@ describe("runLeadAction / runAutomationAction (v2 actions)", () => {
     expect(await runLeadAction("assign_lead", { assignedToId: 2 }, leadCreated())).toBe(false);
   });
 
+  it("change_lead_status never moves a lead to won (that creates a Deal)", async () => {
+    await expect(runLeadAction("change_lead_status", { toStatus: "won" }, leadCreated({ leadId: 1 }))).rejects.toThrow();
+  });
+
   it("orchestrator stamps lastRunAt only when a v2 action actually fired", async () => {
     mockDb.automationRule.findMany.mockResolvedValue([
       { id: 7, triggerType: "lead_created", triggerConfig: null, conditions: null, actionType: "webhook_out", actionConfig: { url: "nope" } },

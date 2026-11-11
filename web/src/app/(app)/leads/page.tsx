@@ -23,6 +23,9 @@ const TENANT_ID = 1;
 // natural page; add per-column "load more" when a column actually exceeds this.
 const COLUMN_LIMIT = 50;
 
+/** Start of the won column window: the last 30 days. */
+const wonSince = () => new Date(Date.now() - 30 * 86_400_000);
+
 export default async function LeadsPage({
   searchParams,
 }: {
@@ -145,6 +148,9 @@ export default async function LeadsPage({
   const colWhere = (key: string) =>
     sideView === "lost" ? ACTIVE
     : sideView ? { ...ACTIVE, status: key }
+    // Won leads are closed (outcome won, converted to a Deal) but keep their column.
+    // Last 30 days only, so the column does not fill with old deals; older ones live in Lezárt.
+    : key === "won" ? { tenantId: TENANT_ID, status: "won", closedAt: { gte: wonSince() }, ...(tier ? { tier } : {}), ...(assignedToId != null ? { assignedToId } : {}) }
     : key === initialKey
       ? { ...ACTIVE, OR: [{ status: key }, { status: null }, { status: { notIn: knownKeys } }] }
       : { ...ACTIVE, status: key };
