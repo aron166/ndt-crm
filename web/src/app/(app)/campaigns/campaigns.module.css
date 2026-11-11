@@ -68,3 +68,4 @@ textarea.input { min-height: 72px; resize: vertical; }
   .step > :last-child { grid-column: 2; }
 }
 @media (pointer: coarse) { .input, .callRow { min-height: 44px; } }
+.metric { width: 6ch; text-align: right; }

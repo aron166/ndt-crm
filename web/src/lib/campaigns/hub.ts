@@ -90,7 +90,7 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
   const [items, counts, batches, me, aron, stats, owner, memberIds] = await Promise.all([
     db.contentItem.findMany({
       where: { tenantId, OR: [{ id: { in: assetIds } }, { campaignId: c.id }] },
-      select: { id: true, title: true, status: true, metrics: true, currentVersion: { select: { number: true } } },
+      select: { id: true, title: true, status: true, metrics: true, publishedAt: true, currentVersion: { select: { number: true } } },
       orderBy: { id: "asc" },
     }),
     db.campaignMember.groupBy({ by: ["state"], where: { tenantId, campaignId: c.id }, _count: { _all: true } }),
@@ -113,7 +113,7 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
     owner: owner?.name ?? null,
     proposal,
     assets,
-    metrics: items.map((i) => ({ id: i.id, title: i.title, metrics: (i.metrics ?? null) as Record<string, number> | null })),
+    metrics: items.map((i) => ({ id: i.id, title: i.title, published: i.publishedAt != null, metrics: (i.metrics ?? null) as Record<string, number> | null })),
     members: Object.fromEntries(counts.map((x) => [x.state, x._count._all])) as Record<string, number>,
     batches,
     stats: stats[0]?.stats ?? null,

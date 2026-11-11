@@ -14,13 +14,13 @@ import { SpecifyPanel, type Proposal } from "./SpecifyPanel";
 import { StepsSection } from "./StepsSection";
 import { LaunchPanel } from "./LaunchPanel";
 import { MemberLoad } from "./MemberLoad";
+import { MetricsCells } from "./MetricsCells";
+import { METRIC_KEYS, METRIC_LABEL } from "@/lib/content/metrics";
 import s from "../campaigns.module.css";
 
 export const dynamic = "force-dynamic";
 const TENANT_ID = 1;
 
-const METRIC_KEYS = ["impressions", "reactions", "comments", "clicks", "leads"] as const;
-const METRIC_LABEL: Record<string, string> = { impressions: "Megjelenés", reactions: "Reakció", comments: "Hozzászólás", clicks: "Kattintás", leads: "Lead" };
 
 export default async function CampaignPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { slug } = await params;
@@ -75,13 +75,13 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           {contentOnly ? (
             <section className={k.section} aria-label="Anyagok és számok">
               <h2 className={k.groupTitle}>Anyagok és számok</h2>
-              <p className={k.muted}>Ez a típus egyelőre csak tartalom: nincs tag, nincs indítás. A számokat az anyagoknál rögzíted kézzel, amíg nincs csatoló.</p>
+              <p className={k.muted}>Ez a típus egyelőre csak tartalom: nincs tag, nincs indítás. A számokat itt rögzíted kézzel a megjelent anyagoknál, amíg nincs csatoló.</p>
               {d.metrics.length === 0 ? (
                 <p className={k.muted}>Nincs anyag ebben a kampányban. <Link href="/marketing" className={k.link}>Marketing</Link></p>
               ) : (
                 <div className={k.tableWrap}>
                   <table className={k.table}>
-                    <thead><tr><th>Anyag</th><th>Állapot</th>{METRIC_KEYS.map((m) => <th key={m}>{METRIC_LABEL[m]}</th>)}</tr></thead>
+                    <thead><tr><th>Anyag</th><th>Állapot</th>{METRIC_KEYS.map((m) => <th key={m}>{METRIC_LABEL[m]}</th>)}<th /></tr></thead>
                     <tbody>
                       {d.metrics.map((m) => {
                         const a = d.assets.find((x) => x.id === m.id);
@@ -89,7 +89,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
                           <tr key={m.id}>
                             <td><Link href={`/marketing/${m.id}`} className={k.link}>{m.title}</Link></td>
                             <td><span className={s.state} data-s={a?.status}>{a ? assetStateLabel(a.status) : "-"}</span></td>
-                            {METRIC_KEYS.map((key) => <td key={key} className={k.num}>{typeof m.metrics?.[key] === "number" ? m.metrics[key] : "-"}</td>)}
+                            <MetricsCells id={m.id} published={m.published} metrics={m.metrics} />
                           </tr>
                         );
                       })}
