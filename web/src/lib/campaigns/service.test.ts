@@ -8,6 +8,7 @@ import { approvalHash, type StepDef } from "./rules";
 import { addMembers, approveCampaign, recordOutcome, setCampaignStatus, specifyCampaign, setSteps, undoBatch, updateCampaign } from "./service";
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
+import { audit } from "@/lib/audit";
 vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/enrichment/recompute", () => ({ recomputeCloseness: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolvedValue(undefined) }));
@@ -32,7 +33,7 @@ vi.mock("@/lib/db", () => {
     leadStatusHistory: { create: m() },
     interaction: { create: m(), updateMany: m(), findMany: m() },
     suppression: { upsert: m() },
-    task: { create: m(), findMany: m() },
+    task: { create: m(), findMany: m(), updateMany: m() },
     contentItem: { findMany: m() },
     deal: { findMany: m() },
     $queryRaw: vi.fn().mockResolvedValue([]),
@@ -212,6 +213,7 @@ describe("only Áron launches", () => {
 describe("specify: proposals only", () => {
   it("writes brief_proposal and in-review assets, never the brief, steps or status", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
+    d.task.findMany.mockResolvedValue([{ id: 91 }]);
     const r = await specifyCampaign(APP, "bp", {
       brief: { offer: "x" }, steps: [{ channel: "email" }, { channel: "call", wait_days: 3 }],
       assets: [{ title: "Szkript", body: "Jó napot", category: "script", channel: "other", content_type: "other", format: "phone_script", step_position: 2 }],
@@ -220,6 +222,23 @@ describe("specify: proposals only", () => {
     const data = d.campaign.update.mock.calls[0][0].data;
     expect(Object.keys(data)).toEqual(["briefProposal"]);
     expect(d.campaignStep.createMany).not.toHaveBeenCalled();
+    // The proposal answers this campaign's open specification requests, and only this campaign's (item 6).
+    expect(d.task.updateMany.mock.calls[0][0]).toMatchObject({
+      where: { tenantId: 1, status: { in: ["created", "in_progress"] }, setMembership: { hasEvery: ["campaign_spec_request", "campaign:bp"] }, id: { in: [91] } },
+      data: { status: "done" },
+    });
+  });
+  it("an empty proposal is a 400 and closes no request (Vanda #192-3)", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
+    expect(await specifyCampaign(APP, "bp", {})).toMatchObject({ status: 400 });
+    expect(await specifyCampaign(APP, "bp", { brief: {} })).toMatchObject({ status: 400 });
+    expect(d.task.updateMany).not.toHaveBeenCalled();
+  });
+  it("closing a request is audited with the agent as actor (Vanda #192-2)", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
+    d.task.findMany.mockResolvedValue([{ id: 91 }]);
+    await specifyCampaign(APP, "bp", { brief: { offer: "x" } });
+    expect(audit).toHaveBeenCalledWith("task", 91, "update", { status: "open" }, { status: "done", by: "corvid" }, expect.objectContaining({ actorAgentId: "corvid" }));
   });
   it("proposed steps must fit the kind (a call before the e-mail is a 400)", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });

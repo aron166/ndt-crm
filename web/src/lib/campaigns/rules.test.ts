@@ -213,3 +213,20 @@ describe("approval and status", () => {
     expect(isForwardMove(MAIN_STAGES, "new", "new")).toBe(false);
   });
 });
+
+describe("call script per step (item 6)", () => {
+  it("each call step shows its own script; a call step without one shows none, never another step's", async () => {
+    const { scriptItemFor } = await import("./rules");
+    const steps = [
+      { position: 1, channel: "email", contentItemId: 10 },
+      { position: 2, channel: "call", contentItemId: 20 },
+      { position: 3, channel: "email", contentItemId: 30 },
+      { position: 4, channel: "call", contentItemId: 40 },
+      { position: 5, channel: "call", contentItemId: null },
+    ];
+    expect(scriptItemFor(steps, 2)).toBe(20);
+    expect(scriptItemFor(steps, 4)).toBe(40);
+    expect(scriptItemFor(steps, 5)).toBeNull();
+    expect(scriptItemFor(steps, 1)).toBeNull();
+  });
+});

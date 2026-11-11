@@ -131,3 +131,14 @@ export async function recordCampaignOutcomeAction(slug: string, input: unknown) 
   revalidatePath("/calls");
   return { ok: true as const, member: r.member, lead: r.lead };
 }
+
+/** Ask an agent for a specification (item 6): writes a task an agent lists through the API; no model call here. */
+export async function requestSpecificationAction(slug: string, missing: string): Promise<{ ok: true; created: boolean } | Err> {
+  const { userId } = await getActor(TENANT_ID);
+  if (userId == null) return { error: NOT_A_CRM_USER };
+  if (typeof slug !== "string" || typeof missing !== "string") return { error: "Érvénytelen adat" };
+  const r = await svc.requestSpecification({ tenantId: TENANT_ID, userId }, slug, missing);
+  if (!("ok" in r)) return { error: r.error };
+  touch(slug);
+  return { ok: true, created: r.created };
+}

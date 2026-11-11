@@ -27,9 +27,10 @@ import { createItem } from "@/lib/content/service";
 import type { ContentCategory } from "@/lib/content/types";
 import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
-  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel,
-} from "./rules";
-import { planMembers, type MemberRow, type MembersPlan } from "./members";
+  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor } from "./rules";
+import { closeSpecRequests } from "./spec-requests";
+export { requestSpecification } from "./spec-requests";
+import { planMembers, type MemberRow, type MembersPlan, reachFromContacts } from "./members";
 
 export interface CampaignCtx {
   tenantId: number;
@@ -277,6 +278,8 @@ export async function specifyCampaign(ctx: CampaignCtx, slug: string, input: Spe
   if (!c) return fail(404, "Kampány nem található");
   if (c.status === "running") return fail(409, "Futó kampányhoz nem írható javaslat; előbb álljon meg vagy legyen piszkozat");
   if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampány");
+  // An empty proposal answers nothing: it would wipe the last one and close open requests (Vanda #192-3).
+  if (!Object.keys(input.brief ?? {}).length && !input.steps?.length && !input.assets?.length && !input.note?.trim()) return fail(400, "Üres javaslat: brief, lépések vagy anyag kell");
   if (input.steps) {
     const misfit = stepsFitKind(c.kind as CampaignKind | null, input.steps.map((st, i) => ({ channel: st.channel, position: i + 1 })));
     if (misfit) return fail(400, misfit);
@@ -309,6 +312,8 @@ export async function specifyCampaign(ctx: CampaignCtx, slug: string, input: Spe
   });
   if ("error" in result) return result;
   audit("campaign", c.id, "update", null, { briefProposal: { by: source, assets: result.assets.length } }, auditOpts(ctx));
+  // The proposal answers the campaign's open specification requests (item 6).
+  await closeSpecRequests(ctx.tenantId, slug, auditOpts(ctx), source);
   return { ok: true as const, proposal: result };
 }
 
@@ -361,16 +366,7 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
     where: { tenantId, endedAt: null, companyId: { in: resolvedIds } },
     select: { companyId: true, personId: true, email: true, phone: true, person: { select: { email: true, phone: true } } },
   });
-  const companyReach = new Map<number, { phone: boolean; email: boolean; personId: number | null }>();
-  for (const k of contacts) {
-    const prev = companyReach.get(k.companyId) ?? { phone: false, email: false, personId: null };
-    companyReach.set(k.companyId, {
-      phone: prev.phone || Boolean(k.phone || k.person.phone),
-      // A suppressed (unsubscribed or bounced) address is no e-mail: it never refreshes a needs_email member (Vanda #188 r2-1).
-      email: prev.email || [k.email, k.person.email].some((e) => e && !isSuppressed(normalizeEmail(e)!, suppressions)),
-      personId: prev.personId ?? k.personId,
-    });
-  }
+  const companyReach = reachFromContacts(contacts, suppressions);
 
   const plan: MembersPlan = planMembers(input.rows, {
     aliveCompanyIds: new Set(companies.map((x) => x.id)), byVat, byName,
@@ -590,7 +586,7 @@ export async function dailyList(tenantId: number, slug: string, now: Date = new 
   // Outside its dates a running campaign lists nobody: Kezdés 11-26 means no call before 11-26 (Vanda #190-3).
   const ymdKey = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
   if (c.status !== "running" || !inWindow(ymdKey(c.startsOn), ymdKey(c.endsOn), localDay(now).key)) {
-    return { ok: true as const, campaign: { slug: c.slug, name: c.name, status: c.status, dailyCap: c.dailyCap }, items: [], touchedToday: 0, remaining: 0, script: null };
+    return { ok: true as const, campaign: { slug: c.slug, name: c.name, status: c.status, dailyCap: c.dailyCap }, items: [], touchedToday: 0, remaining: 0, script: null, scripts: {} };
   }
   const all = await db.campaignMember.findMany({
     where: { tenantId, campaignId: c.id, company: { deletedAt: null } },
@@ -620,15 +616,23 @@ export async function dailyList(tenantId: number, slug: string, now: Date = new 
   });
   const order = new Map(sel.ids.map((id, i) => [id, i]));
   rows.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
-  // The campaign's call script: the first call step's LIVE content item (current version body).
-  const scriptStep = c.steps.find((s) => s.channel === "call" && s.contentItemId != null);
-  const script = scriptStep
-    ? await db.contentItem.findFirst({ where: { tenantId, id: scriptStep.contentItemId!, status: "live" }, select: { id: true, title: true, body: true } })
-    : null;
+  // Each call step's own script: its LIVE content item (current version body), by step position (item 6).
+  const scriptIds = c.steps.map((s) => scriptItemFor(c.steps, s.position)).filter((v): v is number => v != null);
+  const live = scriptIds.length
+    ? await db.contentItem.findMany({ where: { tenantId, id: { in: scriptIds }, status: "live" }, select: { id: true, title: true, body: true } })
+    : [];
+  const scripts: Record<number, { id: number; title: string; body: string }> = {};
+  for (const s of c.steps) {
+    const hit = live.find((i) => i.id === scriptItemFor(c.steps, s.position));
+    if (hit) scripts[s.position] = hit;
+  }
+  // `script` (pre item 6 field): the first listed member's step script, else the first call step's.
+  const firstCall = c.steps.find((s) => s.channel === "call");
+  const script = scripts[rows[0]?.stepPosition ?? firstCall?.position ?? 0] ?? null;
   return {
     ok: true as const,
     campaign: { slug: c.slug, name: c.name, status: c.status, dailyCap: c.dailyCap },
-    items: rows, touchedToday: sel.touchedToday, remaining: sel.remaining, script,
+    items: rows, touchedToday: sel.touchedToday, remaining: sel.remaining, script, scripts,
   };
 }
 

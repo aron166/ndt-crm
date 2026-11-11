@@ -35,6 +35,26 @@ export const memberRowSchema = z.object({
 export type MemberRow = z.infer<typeof memberRowSchema>;
 
 export const MEMBERS_MAX_PER_CALL = 1000;
+
+/** user@domain.tld, nothing else: "nincs", "-" or a bare name in an e-mail column is no e-mail (item 6). */
+export const isEmailAddress = (v: string | null | undefined): v is string => typeof v === "string" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.trim());
+
+/** Existing contact reach per company. A suppressed (unsubscribed or bounced) address is no e-mail (Vanda #188 r2-1). */
+export function reachFromContacts(
+  contacts: readonly { companyId: number; personId: number; email: string | null; phone: string | null; person: { email: string | null; phone: string | null } }[],
+  suppressions: SuppressionSet,
+): Map<number, { phone: boolean; email: boolean; personId: number | null }> {
+  const out = new Map<number, { phone: boolean; email: boolean; personId: number | null }>();
+  for (const k of contacts) {
+    const prev = out.get(k.companyId) ?? { phone: false, email: false, personId: null };
+    out.set(k.companyId, {
+      phone: prev.phone || Boolean(k.phone || k.person.phone),
+      email: prev.email || [k.email, k.person.email].some((e) => isEmailAddress(e) && !isSuppressed(e, suppressions)),
+      personId: prev.personId ?? k.personId,
+    });
+  }
+  return out;
+}
 export const addMembersSchema = z.object({
   dry_run: z.boolean().default(true),
   /** One batch id per load; the undo key. Letters, digits, dash, underscore. */

@@ -81,3 +81,12 @@ describe("Hívás mód, campaign tab", () => {
     expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("Alfa Kft.");
   });
 });
+
+describe("second call step (item 6)", () => {
+  it("a member on the second call step sees that step's script, not the first one's", () => {
+    const two = { ...DATA, items: DATA.items.map((i) => ({ ...i, stepPosition: 4 })), script: { id: 9, title: "Első szkript", body: "egy" }, scripts: { 2: { id: 9, title: "Első szkript", body: "egy" }, 4: { id: 11, title: "Második szkript", body: "kettő" } } };
+    render(<CampaignCallView slug="bp" data={two} />);
+    expect(screen.getByText(/Második szkript/)).toBeTruthy();
+    expect(screen.queryByText(/Első szkript/)).toBeNull();
+  });
+});

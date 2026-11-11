@@ -44,6 +44,7 @@ describe("isServiceApiPath", () => {
     "/api/campaigns/bp/outcome",
     "/api/campaigns/bp/analytics",
     "/api/reports/campaigns",
+    "/api/specification-requests", // Vanda #192-1: the agent polls with an app key, no cookie
   ];
   for (const path of bypassed) {
     it(`bypasses the session gate: ${path}`, () => {

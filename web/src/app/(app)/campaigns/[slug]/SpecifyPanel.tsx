@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import k from "@/components/astryx/page.module.css";
 import { assetStateLabel, stepLine } from "@/lib/campaigns/labels";
-import { adoptProposedStepsAction, updateCampaignAction } from "@/app/actions/campaign-hub";
+import { adoptProposedStepsAction, requestSpecificationAction, updateCampaignAction } from "@/app/actions/campaign-hub";
 import type { AssetState } from "@/lib/campaigns/hub";
 import s from "../campaigns.module.css";
 
@@ -29,8 +29,17 @@ export interface Proposal {
  * `editable`: the brief can be adopted (not part of the approval). `canAdoptSteps`: only on a draft
  * with per-member steps, since adopting steps on a running campaign silently resets it (Vanda #189-1, -2).
  */
-export function SpecifyPanel({ slug, proposal, assets, editable, canAdoptSteps = false }: { slug: string; proposal: Proposal | null; assets: AssetState[]; editable: boolean; canAdoptSteps?: boolean }) {
+export function SpecifyPanel({ slug, proposal, assets, editable, canAdoptSteps = false, missing = [], openRequest = false, canRequest = false }: {
+  slug: string; proposal: Proposal | null; assets: AssetState[]; editable: boolean; canAdoptSteps?: boolean;
+  /** What the campaign still lacks (labels.missingForSpec), prefilled into a request. */
+  missing?: string[];
+  /** An open specification request (a task an agent lists through GET /api/specification-requests). */
+  openRequest?: boolean;
+  /** Requests only on a draft or paused campaign (the specify endpoint refuses a running one). */
+  canRequest?: boolean;
+}) {
   const router = useRouter();
+  const [ask, setAsk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const byId = new Map(assets.map((a) => [a.id, a]));
@@ -95,8 +104,32 @@ export function SpecifyPanel({ slug, proposal, assets, editable, canAdoptSteps =
           )}
         </>
       )}
+      {canRequest && (
+        <div>
+          {openRequest && <p className={k.muted}>Nyitott kérés vár egy ügynökre (Feladatok). Az ügynök a válaszával lezárja.</p>}
+          {ask == null ? (
+            <button type="button" className={k.btn} disabled={busy} onClick={() => setAsk(missing.length ? `Hiányzik: ${missing.join(", ")}.` : "")}>
+              {openRequest ? "Kérés frissítése" : "Ügynök kérése"}
+            </button>
+          ) : (
+            <div className={s.field}>
+              <label className={s.field}>
+                <span>Mit kérsz az ügynöktől?</span>
+                <textarea className={s.input} value={ask} maxLength={2000} disabled={busy} onChange={(e) => setAsk(e.target.value)} />
+              </label>
+              <div className={k.actions}>
+                <button type="button" className={`${k.btn} ${k.btnPrimary}`} disabled={busy || !ask.trim()}
+                  onClick={() => run(async () => { const r = await requestSpecificationAction(slug, ask); if ("ok" in r) setAsk(null); return r; }, "Kérés rögzítve: egy ügynök az API-n látja, és javaslattal válaszol")}>
+                  Kérés küldése
+                </button>
+                <button type="button" className={k.btn} disabled={busy} onClick={() => setAsk(null)}>Mégse</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {msg && <p className={msg.ok ? s.ok : s.err} role="status">{msg.text}</p>}
-      <p className={s.code}>Ügynöknek: POST /api/campaigns/{slug}/specify (app kulcs, csak javaslat)</p>
+      <p className={s.code}>Ügynöknek: GET /api/specification-requests, majd POST /api/campaigns/{slug}/specify (app kulcs, csak javaslat)</p>
     </section>
   );
 }

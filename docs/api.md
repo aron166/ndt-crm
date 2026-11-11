@@ -990,6 +990,7 @@ approval pipeline: e-mail copy, call script, ad), a `daily_cap` (default 15) and
 | `PATCH /api/campaigns/:slug` with `outbound_automations` | **session only, Áron only** |
 | `PUT /api/campaigns/:slug/steps` | **session only** |
 | `POST /api/campaigns/:slug/specify` (proposals) | key or session |
+| `GET /api/specification-requests` (open requests from the campaign page) | key or session |
 | `GET /api/campaigns/:slug/members` (loads with member and touched counts) | key or session |
 | `POST /api/campaigns/:slug/members` with `dry_run: true`, `DELETE ...?batch=` dry run | key or session |
 | `POST /api/campaigns/:slug/members` with `dry_run: false` (apply), `DELETE ...&dry_run=0` (undo) | **session only, role `admin` or `manager`** (an app key gets `403`; it may dry-run and propose) |
@@ -1018,6 +1019,23 @@ default for the launch list: e-mail first for everyone, Áron 2026-11-11); `cold
 cold-call type); `cold_email` has `email` steps only; `ad`, `organic` and `content` are content only for now (assets
 and hand-entered numbers, no `email` or `call` step, no members, no launch). A step's `content_item_id` must be in the tenant and
 not another campaign's; an unclaimed item is attached to this campaign.
+
+### Specification requests: how an outside agent is asked and answers
+
+The CRM never calls a model for a campaign (the in-app assistant is the one exception). On a draft or paused
+campaign the page's "Ügynök kérése" button writes a request: a task (`type: internal`, `executor_type: ai_agent`,
+`set_membership: ["campaign_spec_request", "campaign:<slug>"]`) whose description says what is missing (brief
+fields, steps, step assets). One open request per campaign; pressing again updates its text.
+
+An agent with an app key polls and answers:
+
+1. `GET /api/specification-requests` returns
+   `{ "ok": true, "items": [ { "task_id": 91, "slug": "budapest-indulas", "campaign": "Budapest indulás", "kind": "sequence", "status": "draft", "missing": "Hiányzik: ...", "created_at": "..." } ] }`,
+   oldest first, open requests only. Poll at most once a minute (the key's 30 req/min limit covers every route).
+2. `POST /api/campaigns/:slug/specify` (below) with the proposal (an empty one is a `400` and closes nothing). A successful proposal marks every open request
+   of that campaign `done`, so the next poll no longer lists it. A `409` (the campaign started running meanwhile)
+   leaves the request open; skip it until it is a draft or paused again.
+3. Nothing else: the agent cannot adopt its own proposal, touch members or launch.
 
 ### `POST /api/campaigns/:slug/specify` (AI specification, proposals only)
 
@@ -1090,7 +1108,8 @@ Today's call list, computed on read (no cron, no tasks made in advance): `queued
 `next_eligible_on` is today or earlier (Budapest), priority then city, at most `daily_cap` minus the members already
 touched today; members whose company has an open lead are left out. Outside `starts_on` .. `ends_on` (Budapest
 days, open ends allowed) the list is empty. Returns `items` (member with company and person
-contact), `touchedToday`, `remaining`, and `script` (the first call step's LIVE content item: title and body) for
+contact), `touchedToday`, `remaining`, and `scripts` (each call step's own LIVE content item, title and body, keyed by step position; a call step without
+a live script has no key, it never borrows another step's) and `script` (the first listed member's step script; with nobody listed, the first call step's, which may be none) for
 Hívás mód. Empty unless the campaign is `running`.
 
 ### `POST /api/campaigns/:slug/outcome`

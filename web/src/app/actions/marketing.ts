@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { createVersion } from "@/lib/content/service";
+import { parseMetrics } from "@/lib/content/metrics";
 
 // Legacy marketing actions (pre content-approval). Approve / reject / back to
 // edit are GONE — status now only changes through lib/content/service.ts
@@ -107,10 +108,13 @@ export async function publishContent(id: number, externalUrl: string) {
 /** Manual metrics entry on a published item. */
 export async function saveContentMetrics(
   id: number,
-  metrics: { impressions?: number; reactions?: number; comments?: number; clicks?: number; leads?: number },
+  input: Record<string, unknown>,
 ) {
   const me = await requireUser();
   if ("error" in me) return me;
+  // The client is not trusted: known keys, whole non-negative numbers only.
+  const metrics = parseMetrics(input && typeof input === "object" ? input : {});
+  if ("error" in metrics) return metrics;
   const item = await loadItem(id);
   if (!item) return { error: "Tartalom nem található" };
   if (!item.publishedAt) return { error: "Metrikák csak megjelent tartalmon" };
