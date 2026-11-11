@@ -150,6 +150,21 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
     expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ ok: true, drafted: 1, unresolved: 1, noAsset: 1 });
     expect(d.emailDraft.createMany.mock.calls[0][0].data).toEqual([expect.objectContaining({ companyId: 7, subject: "Fúrás előtt", body: "Tisztelt Kovács Anna! Győr", templateVersionId: 600 })]);
   });
+  it("Vanda #195-1: a variant created after the approval is never drafted on a running campaign", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null, senderUserId: null,
+      approvedAt: new Date("2026-11-12T08:00:00Z"), steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }] });
+    d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: null }]);
+    d.campaignMember.findMany.mockResolvedValue([
+      { id: 1, companyId: 7, personId: 8, stepPosition: 1, nextEligibleOn: null, person: { email: "a@p.example.test", firstName: "-", lastName: "-" }, company: CO, segment: "drillers", lane: null, city: null },
+    ]);
+    d.contentItem.findMany.mockResolvedValue([{ ...live(60, "Később jött", "Szöveg", { campaignStep: 1, segment: "D" }), createdAt: new Date("2026-11-12T10:00:00Z") }]);
+    d.emailDraft.findMany.mockResolvedValue([]);
+    d.emailDraft.count.mockResolvedValue(0);
+    d.lead.findMany.mockResolvedValue([]);
+    d.contact.findMany.mockResolvedValue([]);
+    expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 0, noAsset: 1 });
+    expect(d.emailDraft.createMany).not.toHaveBeenCalled();
+  });
   it("a draft campaign drafts nothing (approval first)", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "draft", dailyCap: 15, startsOn: null, endsOn: null, steps: [] });
     expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ status: 409 });

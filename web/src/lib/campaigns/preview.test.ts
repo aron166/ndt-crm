@@ -73,6 +73,10 @@ describe("memberQuickView", () => {
     expect(v.problems).toEqual(["nincs e-mail cím", "1. lépés: nincs anyag (a szegmens ismeretlen)"]);
     expect(v.emails[0]).toMatchObject({ itemId: null, rendered: null });
   });
+  it("Vanda #195-5: a phone only on the contact's person is shown", async () => {
+    d.contact.findMany.mockResolvedValue([{ companyId: 40, personId: 3, role: null, email: null, phone: null, person: { firstName: "A", lastName: "B", email: null, phone: "+36 1 000 0001" } }]);
+    expect((await memberQuickView(T, "bp", 1))!.contact.phone).toBe("+36 1 000 0001");
+  });
   it("a member of another campaign or tenant is not found", async () => {
     d.campaignMember.findFirst.mockResolvedValue(null);
     expect(await memberQuickView(T, "bp", 999)).toBeNull();

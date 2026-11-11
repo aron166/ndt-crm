@@ -19,6 +19,12 @@ describe("parseSegmentCopy", () => {
     expect(r.refused.map((x) => x.what)).toEqual(["B szegmens", "H szegmens", "Utánkövetés (minden szegmens)"]);
     expect(r.refused[0].reason).toContain("ár vagy díj");
   });
+  it("Vanda #195-4: a second section for the same segment is refused, not counted", () => {
+    const dup = MD + "\n## Segment A (megint)\n\nTárgy: Más\n\n" + fenceOf("{{greeting}}\n\nMásik A.") + "\n";
+    const r = parseSegmentCopy(dup, CTA);
+    expect(r.items.map((i) => i.segment)).toEqual(["A"]);
+    expect(r.refused.some((x) => x.what === "A szegmens" && /kétszer/.test(x.reason))).toBe(true);
+  });
   it("refuses everything without a CTA", () => {
     expect(parseSegmentCopy(MD, " ").items).toEqual([]);
   });
@@ -33,6 +39,18 @@ describe("copyRuleBreaks", () => {
     expect(copyRuleBreaks("Foglaljon időpontot. „érdekel”")).toEqual(["az ügyfél foglal (mi foglalunk, soha az ügyfél)"]);
     expect(copyRuleBreaks("Írjon vissza.")).toEqual(["nincs „érdekel” válasz kérés"]);
     expect(copyRuleBreaks("Radarral mérünk, a járat előtt. Válaszoljon: „érdekel”")).toEqual([]);
+  });
+  it("Vanda #195-2: suffixed price words are caught", () => {
+    for (const t of ["kedvező áron", "az árat megbeszéljük", "árakról", "árban benne", "ezer forint"]) expect(copyRuleBreaks(`${t} „érdekel”`), t).toEqual(["ár vagy díj"]);
+  });
+  it("Vanda #195-3: booking wording caught, a plain verb form not", () => {
+    expect(copyRuleBreaks("Foglalhat időpontot. „érdekel”")).toEqual(["az ügyfél foglal (mi foglalunk, soha az ügyfél)"]);
+    expect(copyRuleBreaks("Válasszon időpontot. „érdekel”")).toEqual(["az ügyfél foglal (mi foglalunk, soha az ügyfél)"]);
+    expect(copyRuleBreaks("Ezt ők foglalják le. „érdekel”")).toEqual([]);
+  });
+  it("Vanda #195-6: the CTA is kept verbatim, $ sequences included", () => {
+    const r = parseSegmentCopy(MD, "Írjon: „érdekel” $& $'");
+    expect(r.items[0].body).toContain("Írjon: „érdekel” $& $'");
   });
 });
 
