@@ -17,11 +17,11 @@ vi.mock("@/lib/db", () => {
   const m = () => vi.fn();
   return { db: {
     campaign: { findFirst: m(), update: m() },
-    campaignStep: { deleteMany: m(), createMany: m() },
+    campaignStep: { deleteMany: m(), createMany: m(), findMany: m() },
     campaignMember: { findFirst: m(), findMany: m(), updateMany: m(), createMany: m() },
     campaignEvent: { findFirst: m(), create: m() },
     contact: { findFirst: m(), findMany: m() }, lead: { findFirst: m(), findMany: m(), create: m() }, interaction: { create: m(), updateMany: m() },
-    contentItem: { findMany: m() }, emailDraft: { findMany: m(), createMany: m(), count: m() }, user: { findFirst: m() }, task: { findMany: m(), updateMany: m() },
+    contentItem: { findMany: m() }, emailDraft: { findMany: m(), createMany: m(), count: m(), updateMany: m() }, user: { findFirst: m() }, task: { findMany: m(), updateMany: m() },
     suppression: { upsert: m() }, company: { updateMany: m() }, leadStatusHistory: { create: m() },
     $queryRaw: vi.fn().mockResolvedValue([]), $executeRaw: vi.fn().mockResolvedValue(1), $transaction: vi.fn(),
   } };
@@ -180,5 +180,19 @@ describe("Vanda #194 fixes", () => {
     expect(await campaignSendBlock(1, "corvid-betonscan-w1")).toBeNull();
     d.campaign.findFirst.mockResolvedValueOnce({ kind: null, status: "draft" });
     expect(await campaignSendBlock(1, "birdsview_q3")).toBeNull();
+  });
+});
+
+describe("Vanda #194 r2: a step edit retires its stale drafts", () => {
+  it("drafts of a removed step or a step whose asset changed are cancelled; unchanged steps keep theirs", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, kind: "sequence", audience: null });
+    d.campaignStep.findMany.mockResolvedValue([
+      { position: 1, contentItemId: 50 }, { position: 2, contentItemId: 51 }, { position: 3, contentItemId: 52 },
+    ]);
+    await setSteps(SESSION, "bp", [{ channel: "email", content_item_id: 50 }, { channel: "email", wait_days: 2, content_item_id: 61 }]);
+    expect(d.emailDraft.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: 1, campaign: "bp", step: { in: [2, 3] }, status: { in: ["draft", "approved", "failed"] } },
+      data: { status: "cancelled", lastError: "A kampány lépései változtak" },
+    });
   });
 });
