@@ -60,6 +60,13 @@ export function nextApplicable(steps: readonly StepDef[], position: number, h: M
   return sortSteps(steps).find((s) => s.position > position && conditionHolds(s.audienceRule, h)) ?? null;
 }
 
+/** The audience a campaign row names (campaigns.audience JSON); anything else is a prospect list. */
+export function audienceOf(raw: unknown): { source: AudienceSource; stages: string[] } {
+  const a = (raw ?? {}) as { source?: unknown; stages?: unknown };
+  if (a.source === "leads_by_stage" && Array.isArray(a.stages)) return { source: "leads_by_stage", stages: a.stages.filter((s): s is string => typeof s === "string") };
+  return { source: "prospect_list", stages: [] };
+}
+
 /** After a mid-run edit a member keeps its place in line; one past the new end is done. */
 export function remapAfterEdit(position: number, steps: readonly StepDef[]): { stepPosition: number; done: boolean } {
   const last = sortSteps(steps).at(-1)?.position ?? 1;

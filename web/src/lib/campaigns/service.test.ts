@@ -27,7 +27,7 @@ vi.mock("@/lib/db", () => {
     emailDraft: { findMany: m() }, invoice: { findMany: m() }, proposal: { findMany: m() }, quote: { findMany: m() },
     company: { findMany: m(), updateMany: m(), create: m() },
     campaignStep: { deleteMany: m(), createMany: m() },
-    campaignEvent: { create: m() },
+    campaignEvent: { create: m(), findFirst: m() },
     contact: { findFirst: m(), findMany: m(), create: m(), updateMany: m() },
     lead: { findFirst: m(), create: m(), findMany: m() },
     leadStatusHistory: { create: m() },

@@ -28,10 +28,10 @@ import { createItem } from "@/lib/content/service";
 import type { ContentCategory } from "@/lib/content/types";
 import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
-  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor, campaignAutomationEvents, type StepCondition } from "./rules";
+  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor, campaignAutomationEvents, type StepCondition, audienceOf, type AudienceSource, OPEN_MEMBER_STATES, startFor } from "./rules";
 import { closeSpecRequests } from "./spec-requests";
 export { requestSpecification } from "./spec-requests";
-import { planMembers, type MemberRow, type MembersPlan, reachFromContacts } from "./members";
+import { planMembers, type MemberRow, type MembersPlan, reachFromContacts, isEmailAddress } from "./members";
 
 export interface CampaignCtx {
   tenantId: number;
@@ -165,7 +165,7 @@ export async function createCampaign(
   },
 ) {
   const steps = input.steps ?? [];
-  const misfit = stepsFitKind(input.kind as CampaignKind, steps.map((st, i) => ({ channel: st.channel, position: i + 1 })));
+  const misfit = stepsFitKind(input.kind as CampaignKind, steps.map((st, i) => ({ channel: st.channel, position: i + 1 })), audienceOf(input.audience).source);
   if (misfit) return fail(400, misfit);
   const bad = await checkStepItems(ctx.tenantId, steps, null);
   if (bad) return bad;
@@ -201,7 +201,7 @@ export async function createCampaign(
 const BACK_TO_DRAFT = { status: "draft", approvedById: null, approvedAt: null, approvedHash: null } as const;
 
 async function loadForWrite(tenantId: number, slug: string) {
-  return db.campaign.findFirst({ where: { tenantId, slug }, select: { id: true, status: true, dailyCap: true, kind: true } });
+  return db.campaign.findFirst({ where: { tenantId, slug }, select: { id: true, status: true, dailyCap: true, kind: true, audience: true } });
 }
 
 export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[]) {
@@ -210,7 +210,7 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
   const c = await loadForWrite(ctx.tenantId, slug);
   if (!c) return fail(404, "Kampány nem található");
   if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampány lépései nem módosíthatók");
-  const misfit = stepsFitKind(c.kind as CampaignKind | null, steps.map((st, i) => ({ channel: st.channel, position: i + 1 })));
+  const misfit = stepsFitKind(c.kind as CampaignKind | null, steps.map((st, i) => ({ channel: st.channel, position: i + 1 })), audienceOf(c.audience).source);
   if (misfit) return fail(400, misfit);
   const bad = await checkStepItems(ctx.tenantId, steps, c.id);
   if (bad) return bad;
@@ -218,6 +218,13 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
     await lockCampaign(tx, c.id);
     await tx.campaignStep.deleteMany({ where: { tenantId: ctx.tenantId, campaignId: c.id } });
     if (steps.length) await tx.campaignStep.createMany({ data: stepRows(ctx.tenantId, c.id, steps) });
+    // A member keeps its place in line; one past the new end has finished the sequence (item 4, remapAfterEdit).
+    if (steps.length) {
+      await tx.campaignMember.updateMany({
+        where: { tenantId: ctx.tenantId, campaignId: c.id, stepPosition: { gt: steps.length }, state: { in: [...OPEN_MEMBER_STATES] } },
+        data: { state: "done", stepPosition: steps.length, stateChangedAt: new Date() },
+      });
+    }
     if (c.status !== "draft") await tx.campaign.update({ where: { id: c.id }, data: BACK_TO_DRAFT });
   });
   audit("campaign", c.id, "update", { status: c.status }, { steps: steps.length, status: "draft" }, auditOpts(ctx));
@@ -227,11 +234,11 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
 export async function updateCampaign(
   ctx: CampaignCtx,
   slug: string,
-  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean; outbound_automations?: boolean },
+  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean; outbound_automations?: boolean; audience?: { source: AudienceSource; stages?: string[] } },
 ) {
   const s = needsSession(ctx);
   if (s) return s;
-  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, status: true, dailyCap: true, briefProposal: true, outboundAutomations: true } });
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, status: true, dailyCap: true, briefProposal: true, outboundAutomations: true, audience: true } });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampány nem módosítható");
   const outboundChanged = patch.outbound_automations !== undefined && patch.outbound_automations !== c.outboundAutomations;
@@ -241,7 +248,10 @@ export async function updateCampaign(
     if (!u) return fail(400, "Ismeretlen felelős");
   }
   // Cap and outbound switch are part of the approval hash: changing either needs a new approval.
-  const capChanged = (patch.daily_cap !== undefined && patch.daily_cap !== c.dailyCap) || outboundChanged;
+  // Who is touched is part of what Áron approves: a new audience needs a new approval too (item 4).
+  const audience = patch.audience ? { source: patch.audience.source, stages: patch.audience.source === "leads_by_stage" ? [...new Set(patch.audience.stages ?? [])] : [] } : undefined;
+  const audienceChanged = audience !== undefined && JSON.stringify(audience) !== JSON.stringify(audienceOf(c.audience));
+  const capChanged = (patch.daily_cap !== undefined && patch.daily_cap !== c.dailyCap) || outboundChanged || audienceChanged;
   const brief = patch.adopt_brief_proposal ? ((c.briefProposal as Prisma.JsonObject | null)?.brief as Prisma.InputJsonValue | undefined) : patch.brief;
   const data: Prisma.CampaignUpdateInput = {
     ...(patch.name !== undefined ? { name: patch.name } : {}),
@@ -251,6 +261,7 @@ export async function updateCampaign(
     ...(patch.ends_on !== undefined ? { endsOn: patch.ends_on ? new Date(`${patch.ends_on}T00:00:00Z`) : null } : {}),
     ...(brief !== undefined ? { brief } : {}),
     ...(outboundChanged ? { outboundAutomations: patch.outbound_automations } : {}),
+    ...(audience !== undefined ? { audience } : {}),
     ...(capChanged && c.status !== "draft" ? BACK_TO_DRAFT : {}),
   };
   await db.campaign.update({ where: { id: c.id }, data });
@@ -324,9 +335,10 @@ export async function specifyCampaign(ctx: CampaignCtx, slug: string, input: Spe
 export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_run: boolean; batch: string; rows: MemberRow[] }) {
   const c = await db.campaign.findFirst({
     where: { tenantId: ctx.tenantId, slug },
-    select: { id: true, status: true, kind: true, steps: { select: { position: true, channel: true, waitDays: true } } },
+    select: { id: true, status: true, kind: true, audience: true, steps: { select: { position: true, channel: true, waitDays: true, audienceRule: true } } },
   });
   if (!c) return fail(404, "Kampány nem található");
+  if (audienceOf(c.audience).source === "leads_by_stage") return fail(409, "Ennek a kampánynak a közönsége leadek szakasz szerint; prospekt lista nem tölthető be");
   if (!input.dry_run) {
     const s = await needsOperator(ctx);
     if (s) return s;
@@ -529,13 +541,13 @@ export async function approveCampaign(ctx: CampaignCtx, slug: string, expect?: {
   await lockCampaign(tx, head.id);
   const c = await tx.campaign.findFirst({
     where: { tenantId: ctx.tenantId, id: head.id },
-    select: { id: true, status: true, kind: true, dailyCap: true, outboundAutomations: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true, contentItem: { select: { status: true } } } } },
+    select: { id: true, status: true, kind: true, dailyCap: true, outboundAutomations: true, audience: true, steps: { select: { position: true, channel: true, waitDays: true, audienceRule: true, contentItemId: true, contentItem: { select: { status: true } } } } },
   });
   if (!c) return fail(404, "Kampány nem található");
   if (!canApprove(c.status as CampaignStatus)) return fail(409, `Ebből az állapotból nem indítható (${c.status})`);
   if (!MEMBER_KINDS.includes(c.kind as CampaignKind)) return fail(409, "Ez a kampánytípus csak tartalom, nincs mit indítani");
   if (c.steps.length === 0) return fail(409, "Nincs lépés");
-  const misfit = stepsFitKind(c.kind as CampaignKind, c.steps);
+  const misfit = stepsFitKind(c.kind as CampaignKind, c.steps, audienceOf(c.audience).source);
   if (misfit) return fail(409, misfit);
   if (c.steps.some((st) => st.channel === "email" && st.contentItem?.status !== "live")) return fail(409, "Az e-mail lépés anyaga még nincs jóváhagyva (élő)");
   if (c.steps.some((st) => st.contentItemId != null && st.contentItem?.status !== "live")) return fail(409, "Egy lépés anyaga még nincs jóváhagyva (élő)");
@@ -578,7 +590,7 @@ export async function dailyList(tenantId: number, slug: string, now: Date = new 
   const c = await db.campaign.findFirst({
     where: { tenantId, slug },
     select: {
-      id: true, slug: true, name: true, status: true, dailyCap: true, startsOn: true, endsOn: true,
+      id: true, slug: true, name: true, status: true, dailyCap: true, startsOn: true, endsOn: true, audience: true,
       steps: { orderBy: { position: "asc" }, select: { position: true, channel: true, contentItemId: true } },
     },
   });
@@ -598,11 +610,13 @@ export async function dailyList(tenantId: number, slug: string, now: Date = new 
     where: { tenantId, outcome: "open", convertedDealId: null, companyId: { in: all.map((m) => m.companyId) } },
     select: { companyId: true },
   })).map((l) => l.companyId));
+  // Prospects: a company that became a lead leaves the list. Leads by stage: the reverse, a lead that closed leaves it.
+  const leadsAudience = audienceOf(c.audience).source === "leads_by_stage";
   const sel = selectDailyList(
     // Still counted for "touched today" (the cap), never listed.
     all.map((m) => ({
       ...m,
-      state: open.has(m.companyId) && m.state === "queued" ? "has_open_lead" : m.state,
+      state: m.state === "queued" && (leadsAudience ? !open.has(m.companyId) : open.has(m.companyId)) ? "has_open_lead" : m.state,
       nextEligibleOn: m.nextEligibleOn ? m.nextEligibleOn.toISOString().slice(0, 10) : null,
     })),
     callSteps, c.dailyCap, now,
@@ -655,7 +669,7 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
   const tenantId = ctx.tenantId;
   const c = await db.campaign.findFirst({
     where: { tenantId, slug },
-    select: { id: true, slug: true, status: true, ownerUserId: true, outboundAutomations: true, steps: { select: { position: true, channel: true, waitDays: true } } },
+    select: { id: true, slug: true, status: true, ownerUserId: true, outboundAutomations: true, steps: { select: { position: true, channel: true, waitDays: true, audienceRule: true } } },
   });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status !== "running" && c.status !== "paused") return fail(409, `Nem futó kampány (${c.status})`);
@@ -671,7 +685,9 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
   const reach = await db.contact.findFirst({ where: { tenantId, companyId: m.companyId, endedAt: null, NOT: { phone: null } }, select: { id: true } });
   const hasPhone = Boolean(m.person?.phone) || Boolean(reach);
   const today = localDay(now);
-  const plan = planOutcome({ state: m.state as never, stepPosition: m.stepPosition, attempts: m.attempts, hasPhone }, input.outcome, c.steps as StepDef[], today);
+  // Conditions read the member's history: did it reply earlier in this campaign (item 4).
+  const replied = Boolean(await db.campaignEvent.findFirst({ where: { tenantId, campaignId: c.id, memberId: m.id, outcome: "reply_positive" }, select: { id: true } }));
+  const plan = planOutcome({ state: m.state as never, stepPosition: m.stepPosition, attempts: m.attempts, hasPhone, replied }, input.outcome, c.steps as StepDef[], today);
   if ("error" in plan) return fail(409, plan.error);
 
   const existingLead = await db.lead.findFirst({
@@ -822,3 +838,120 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
   };
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// Item 4: leads by stage (retargeting, nurture) and the e-mail step's drafts
+
+/**
+ * Load open leads in the campaign's chosen stages as members (dry run by default; apply is an
+ * operator's, like a prospect load). One member per company; the batch id is the undo key.
+ */
+export async function loadLeadAudience(ctx: CampaignCtx, slug: string, input: { dry_run: boolean; batch: string }) {
+  const c = await db.campaign.findFirst({
+    where: { tenantId: ctx.tenantId, slug },
+    select: { id: true, status: true, kind: true, audience: true, steps: { select: { position: true, channel: true, waitDays: true, audienceRule: true } } },
+  });
+  if (!c) return fail(404, "Kampány nem található");
+  const aud = audienceOf(c.audience);
+  if (aud.source !== "leads_by_stage" || aud.stages.length === 0) return fail(409, "A kampány közönsége nem leadek szakasz szerint");
+  if (!MEMBER_KINDS.includes(c.kind as CampaignKind)) return fail(409, "Ez a kampánytípus csak tartalom, tagokat nem kap");
+  if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampányhoz nem adható tag");
+  if (c.steps.length === 0) return fail(409, "Előbb a lépéseket kell megadni (a tagok kezdő lépése ebből jön)");
+  if (!input.dry_run) {
+    const s = await needsOperator(ctx);
+    if (s) return s;
+  }
+  const tenantId = ctx.tenantId;
+  const [leads, existing] = await Promise.all([
+    db.lead.findMany({
+      where: { tenantId, outcome: "open", convertedDealId: null, status: { in: aud.stages }, companyId: { not: null }, company: { deletedAt: null } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, companyId: true, contact: { select: { personId: true, phone: true, email: true, person: { select: { phone: true, email: true } } } }, company: { select: { city: true } } },
+    }),
+    db.campaignMember.findMany({ where: { tenantId, campaignId: c.id }, select: { companyId: true } }),
+  ]);
+  const have = new Set(existing.map((m) => m.companyId));
+  const rows: Prisma.CampaignMemberCreateManyInput[] = [];
+  let alreadyMember = 0;
+  for (const l of leads) {
+    if (have.has(l.companyId!)) { alreadyMember++; continue; }
+    have.add(l.companyId!);
+    const k = l.contact;
+    const start = startFor(c.steps as StepDef[], {
+      hasEmail: isEmailAddress(k?.email) || isEmailAddress(k?.person?.email),
+      hasPhone: Boolean(k?.phone || k?.person?.phone),
+    });
+    rows.push({
+      tenantId, campaignId: c.id, companyId: l.companyId!, personId: k?.personId ?? null, leadId: l.id,
+      stepPosition: start.stepPosition, state: start.state, city: l.company?.city ?? null, importBatch: input.batch,
+    });
+  }
+  const summary = { leads: leads.length, add: rows.length, already_member: alreadyMember, needs_email: rows.filter((r) => r.state === "needs_email").length, needs_contact: rows.filter((r) => r.state === "needs_contact").length };
+  if (input.dry_run) return { ok: true as const, dry_run: true, summary };
+  await db.$transaction(async (tx) => {
+    await lockCampaign(tx, c.id);
+    if (rows.length) await tx.campaignMember.createMany({ data: rows, skipDuplicates: true });
+    if (c.status !== "draft" && rows.length) await tx.campaign.update({ where: { id: c.id }, data: BACK_TO_DRAFT });
+  });
+  audit("campaign", c.id, "update", null, { leadAudience: { batch: input.batch, ...summary } }, auditOpts(ctx));
+  return { ok: true as const, dry_run: false, summary };
+}
+
+/**
+ * The e-mail step's work for today: a DRAFT in the Outreach queue for each queued member on an
+ * e-mail step whose wait is over, with the step's live asset as subject and body. Nothing is sent
+ * here: the drafts go through the existing gated sender (approval, footer, suppression), and a
+ * sent draft advances its member (advanceOnSent). At most the daily cap per run; once per member and step.
+ */
+export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date = new Date()) {
+  const s = needsSession(ctx);
+  if (s) return s;
+  const op = await needsOperator(ctx);
+  if (op) return op;
+  const tenantId = ctx.tenantId;
+  const c = await db.campaign.findFirst({
+    where: { tenantId, slug },
+    select: { id: true, slug: true, status: true, dailyCap: true, startsOn: true, endsOn: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true } } },
+  });
+  if (!c) return fail(404, "Kampány nem található");
+  if (c.status !== "running") return fail(409, "Csak jóváhagyott, futó kampány e-mail lépése készít piszkozatot");
+  const today = localDay(now).key;
+  const ymdKey = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+  if (!inWindow(ymdKey(c.startsOn), ymdKey(c.endsOn), today)) return { ok: true as const, drafted: 0, noAddress: 0, noAsset: 0 };
+  const emailSteps = new Map(c.steps.filter((x) => x.channel === "email").map((x) => [x.position, x]));
+  const members = (await db.campaignMember.findMany({
+    where: { tenantId, campaignId: c.id, state: "queued", stepPosition: { in: [...emailSteps.keys()] }, company: { deletedAt: null } },
+    orderBy: [{ priority: "asc" }, { id: "asc" }],
+    select: { id: true, companyId: true, personId: true, stepPosition: true, nextEligibleOn: true, person: { select: { email: true } } },
+  })).filter((m) => m.nextEligibleOn == null || m.nextEligibleOn.toISOString().slice(0, 10) <= today);
+  const itemIds = [...new Set([...emailSteps.values()].map((x) => x.contentItemId).filter((v): v is number => v != null))];
+  const live = itemIds.length ? await db.contentItem.findMany({ where: { tenantId, id: { in: itemIds }, status: "live" }, select: { id: true, title: true, body: true } }) : [];
+  const done = await db.emailDraft.findMany({ where: { tenantId, campaign: c.slug, companyId: { in: members.map((m) => m.companyId) } }, select: { companyId: true, step: true } });
+  const seen = new Set(done.map((x) => `${x.companyId}:${x.step}`));
+  let noAddress = 0, noAsset = 0;
+  const data: Prisma.EmailDraftCreateManyInput[] = [];
+  for (const m of members) {
+    if (data.length >= c.dailyCap) break;
+    if (seen.has(`${m.companyId}:${m.stepPosition}`)) continue;
+    const asset = live.find((i) => i.id === emailSteps.get(m.stepPosition)?.contentItemId);
+    if (!asset) { noAsset++; continue; }
+    const to = m.person?.email;
+    if (!isEmailAddress(to)) { noAddress++; continue; }
+    data.push({ tenantId, companyId: m.companyId, personId: m.personId, campaign: c.slug, step: m.stepPosition, subject: asset.title, body: asset.body, toEmail: to.trim(), status: "draft", createdById: ctx.userId });
+  }
+  if (data.length) await db.emailDraft.createMany({ data });
+  audit("campaign", c.id, "update", null, { emailDrafts: data.length, noAddress, noAsset }, auditOpts(ctx));
+  return { ok: true as const, drafted: data.length, noAddress, noAsset };
+}
+
+/**
+ * A draft of this campaign went out through the gated sender (Resend or marked sent by hand):
+ * advance its member exactly like POST .../outcome email_sent. No member on that step: nothing.
+ */
+export async function advanceOnSent(ctx: CampaignCtx, campaignSlug: string, companyId: number, step: number, now: Date = new Date()) {
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug: campaignSlug, status: { in: ["running", "paused"] } }, select: { id: true } });
+  if (!c) return null;
+  const m = await db.campaignMember.findFirst({ where: { tenantId: ctx.tenantId, campaignId: c.id, companyId, stepPosition: step, state: "queued" }, select: { id: true } });
+  if (!m) return null;
+  return recordOutcome(ctx, campaignSlug, { member_id: m.id, outcome: "email_sent" }, now);
+}
