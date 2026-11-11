@@ -35,6 +35,15 @@ describe("isServiceApiPath", () => {
     "/api/reports/weekly",
     "/api/assistant/callnote",
     "/api/health",
+    "/api/campaigns",
+    "/api/campaigns/budapest-indulas",
+    "/api/campaigns/birdsview_q3/specify",
+    "/api/campaigns/bp/members",
+    "/api/campaigns/bp/pause",
+    "/api/campaigns/bp/today",
+    "/api/campaigns/bp/outcome",
+    "/api/campaigns/bp/analytics",
+    "/api/reports/campaigns",
   ];
   for (const path of bypassed) {
     it(`bypasses the session gate: ${path}`, () => {
@@ -64,6 +73,11 @@ describe("isServiceApiPath", () => {
     "/api/content/queue/x",
     "/api/calls/pending/x", // no item route for apps
     "/content",
+    "/api/campaigns/bp/approve", // only Áron's session launches
+    "/api/campaigns/bp/stop",
+    "/api/campaigns/bp/steps",
+    "/api/campaigns/bp/members/x",
+    "/api/campaigns/a.b",
   ];
   for (const path of sessionGated) {
     it(`stays behind the session gate: ${path}`, () => {

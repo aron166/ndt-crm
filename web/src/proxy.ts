@@ -54,6 +54,10 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/cron/content-digest" ||
     pathname === "/api/cron/weekly-report" ||
     pathname === "/api/reports/weekly" ||
+    // Campaigns (slice 1): app keys read, create drafts, propose, load members, pause, log
+    // outcomes. approve, stop and steps are NOT here: they are session routes (Áron launches).
+    /^\/api\/campaigns(\/[A-Za-z0-9_-]{1,80}(\/(specify|members|pause|today|outcome|analytics))?)?$/.test(pathname) ||
+    pathname === "/api/reports/campaigns" ||
     pathname === "/api/assistant/callnote" ||
     pathname === "/api/health"
   );
