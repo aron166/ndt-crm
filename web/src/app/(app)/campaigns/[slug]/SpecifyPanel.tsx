@@ -14,6 +14,8 @@ import type { AssetState } from "@/lib/campaigns/hub";
 import s from "../campaigns.module.css";
 
 
+const BRIEF_LABEL: Record<string, string> = { offer: "Cél, ajánlat", audience: "Célközönség", angle: "Szög" };
+
 export interface Proposal {
   brief?: Record<string, unknown> | null;
   steps?: { channel: string; wait_days?: number; audience_rule?: string }[] | null;
@@ -52,7 +54,7 @@ export function SpecifyPanel({ slug, proposal, assets, editable }: { slug: strin
             <div>
               <div className={k.strong}>Brief javaslat</div>
               {Object.entries(proposal.brief).map(([key, v]) => (
-                <div key={key} className={k.kv}><span>{key}</span><span>{typeof v === "string" ? v : JSON.stringify(v)}</span></div>
+                <div key={key} className={k.kv}><span>{BRIEF_LABEL[key] ?? key}</span><span>{typeof v === "string" ? v : JSON.stringify(v)}</span></div>
               ))}
             </div>
           )}
