@@ -20,14 +20,14 @@ vi.mock("@/lib/db", () => {
     campaignStep: { deleteMany: m(), createMany: m() },
     campaignMember: { findFirst: m(), findMany: m(), updateMany: m(), createMany: m() },
     campaignEvent: { findFirst: m(), create: m() },
-    contact: { findFirst: m() }, lead: { findFirst: m(), findMany: m(), create: m() }, interaction: { create: m(), updateMany: m() },
-    contentItem: { findMany: m() }, emailDraft: { findMany: m(), createMany: m() }, user: { findFirst: m() }, task: { findMany: m(), updateMany: m() },
+    contact: { findFirst: m(), findMany: m() }, lead: { findFirst: m(), findMany: m(), create: m() }, interaction: { create: m(), updateMany: m() },
+    contentItem: { findMany: m() }, emailDraft: { findMany: m(), createMany: m(), count: m() }, user: { findFirst: m() }, task: { findMany: m(), updateMany: m() },
     suppression: { upsert: m() }, company: { updateMany: m() }, leadStatusHistory: { create: m() },
     $queryRaw: vi.fn().mockResolvedValue([]), $executeRaw: vi.fn().mockResolvedValue(1), $transaction: vi.fn(),
   } };
 });
 
-import { setSteps, updateCampaign, recordOutcome, loadLeadAudience, draftEmailStep, advanceOnSent } from "./service";
+import { setSteps, updateCampaign, recordOutcome, loadLeadAudience, draftEmailStep, advanceOnSent, campaignSendBlock } from "./service";
 
 type M = ReturnType<typeof vi.fn>;
 const d = db as unknown as Record<string, Record<string, M>> & { $transaction: M };
@@ -114,6 +114,9 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
     ]);
     d.contentItem.findMany.mockResolvedValue([{ id: 50, title: "Első levél", body: "Tisztelt ..." }]);
     d.emailDraft.findMany.mockResolvedValue([]);
+    d.emailDraft.count.mockResolvedValue(0);
+    d.lead.findMany.mockResolvedValue([]);
+    d.contact.findMany.mockResolvedValue([]);
     d.emailDraft.createMany.mockResolvedValue({ count: 1 });
     const r = await draftEmailStep(SESSION, "bp", NOW);
     expect(r).toMatchObject({ ok: true, drafted: 1, noAddress: 1, noAsset: 1 });
@@ -133,5 +136,49 @@ describe("a sent draft advances its member (item 4)", () => {
     d.campaignMember.findFirst.mockResolvedValueOnce(null);
     expect(await advanceOnSent(SESSION, "bp", 7, 2, NOW)).toBeNull();
     expect(d.campaignMember.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("Vanda #194 fixes", () => {
+  const running = { id: 3, slug: "bp", status: "running", dailyCap: 2, startsOn: null, endsOn: null, audience: null, steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 50 }] };
+  const mem = (id: number, companyId: number, email: string | null) => ({ id, companyId, personId: id * 10, stepPosition: 1, nextEligibleOn: null, person: email ? { email } : null });
+  beforeEach(() => {
+    d.contentItem.findMany.mockResolvedValue([{ id: 50, title: "Levél", body: "Szöveg" }]);
+    d.emailDraft.findMany.mockResolvedValue([]);
+    d.emailDraft.count.mockResolvedValue(0);
+    d.lead.findMany.mockResolvedValue([]);
+    d.contact.findMany.mockResolvedValue([]);
+    d.emailDraft.createMany.mockResolvedValue({ count: 1 });
+  });
+  it("1: a prospect who replied (a replied draft or an open lead) gets no further cold e-mail", async () => {
+    d.campaign.findFirst.mockResolvedValue(running);
+    d.campaignMember.findMany.mockResolvedValue([mem(1, 7, "a@x.example.test"), mem(2, 9, "b@x.example.test")]);
+    d.emailDraft.findMany.mockResolvedValue([{ companyId: 9, step: 1, status: "replied" }]); // a reply on an earlier touch
+    d.lead.findMany.mockResolvedValue([{ companyId: 7 }]); // became a lead some other way
+    expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 0 });
+    expect(d.emailDraft.createMany).not.toHaveBeenCalled();
+  });
+  it("4: the address may sit on the company's contact", async () => {
+    d.campaign.findFirst.mockResolvedValue(running);
+    d.campaignMember.findMany.mockResolvedValue([mem(1, 7, null)]);
+    d.contact.findMany.mockResolvedValue([{ companyId: 7, personId: 10, email: "k@x.example.test", person: { email: null } }]);
+    expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 1, noAddress: 0 });
+  });
+  it("5: the daily cap counts today's drafts already made", async () => {
+    d.campaign.findFirst.mockResolvedValue(running);
+    d.campaignMember.findMany.mockResolvedValue([mem(1, 7, "a@x.example.test"), mem(2, 9, "b@x.example.test")]);
+    d.emailDraft.count.mockResolvedValue(1);
+    expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 1 });
+    expect(d.emailDraft.createMany.mock.calls[0][0]).toMatchObject({ skipDuplicates: true });
+  });
+  it("2: a draft of a member campaign that is not running cannot be sent; other keys are untouched", async () => {
+    d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "draft" });
+    expect(await campaignSendBlock(1, "bp")).toMatch(/nem fut/);
+    d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "running" });
+    expect(await campaignSendBlock(1, "bp")).toBeNull();
+    d.campaign.findFirst.mockResolvedValueOnce(null);
+    expect(await campaignSendBlock(1, "corvid-betonscan-w1")).toBeNull();
+    d.campaign.findFirst.mockResolvedValueOnce({ kind: null, status: "draft" });
+    expect(await campaignSendBlock(1, "birdsview_q3")).toBeNull();
   });
 });

@@ -58,9 +58,19 @@ describe("the engine follows the edited sequence", () => {
     expect(p).toMatchObject({ member: { stepPosition: 5, attempts: 0, state: "queued", nextEligibleOn: "2026-11-18" } });
     expect(planOutcome(m({ stepPosition: 3, attempts: 2 }), "no_answer", seq.slice(0, 4), FRI)).toMatchObject({ member: { state: "unreachable" } });
   });
+  it("three unanswered calls stay unreachable unless the next step is a no-answer follow-up (Vanda #194-3)", () => {
+    const cold: StepDef[] = [{ position: 1, channel: "call", waitDays: 0, audienceRule: "all" }, { position: 2, channel: "call", waitDays: 2, audienceRule: "all" }];
+    expect(planOutcome(m({ stepPosition: 1, attempts: 2 }), "no_answer", cold, FRI)).toMatchObject({ member: { state: "unreachable" } });
+  });
   it("an edit mid-run keeps each member's place; a member past the new end is done", () => {
     expect(remapAfterEdit(5, seq.slice(0, 3))).toEqual({ stepPosition: 3, done: true });
     expect(remapAfterEdit(2, seq.slice(0, 3))).toEqual({ stepPosition: 2, done: false });
+  });
+  it("a leads-by-stage audience is part of the approval hash (Vanda #194-7)", () => {
+    const steps = seq.map((s) => ({ ...s, contentItemId: null }));
+    const base = approvalHash({ memberCompanyIds: [1], steps, dailyCap: 15 });
+    expect(approvalHash({ memberCompanyIds: [1], steps, dailyCap: 15, audience: { source: "prospect_list", stages: [] } })).toBe(base);
+    expect(approvalHash({ memberCompanyIds: [1], steps, dailyCap: 15, audience: { source: "leads_by_stage", stages: ["contacting"] } })).not.toBe(base);
   });
   it("conditions are part of what Áron approves; a plan with none hashes as before", () => {
     const plain = seq.map((s) => ({ ...s, audienceRule: "all", contentItemId: null }));
