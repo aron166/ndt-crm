@@ -143,6 +143,12 @@ export function planOutcome(
 ): OutcomePlan | PlanError {
   const open = OPEN_MEMBER_STATES.includes(m.state);
   if (!open && outcome !== "note_only") return { error: `A tag már lezárt (${m.state})` };
+  // A call outcome needs a queued member on a call step: nobody is called before the e-mail
+  // went out, and a needs_email member is never called instead (Vanda #188 r2-2).
+  if (CALL_OUTCOME_KEYS.includes(outcome as CallOutcomeKey) && outcome !== "note_only") {
+    const step = steps.find((s) => s.position === m.stepPosition);
+    if (m.state !== "queued" || step?.channel !== "call") return { error: "Ez a tag most nem hívható (előbb az e-mail lépés jön)" };
+  }
   const base = { state: m.state, stepPosition: m.stepPosition, attempts: m.attempts, nextEligibleOn: null as string | null, lastOutcome: outcome };
   const plan = (member: Partial<OutcomePlan["member"]>, extra: Partial<Omit<OutcomePlan, "member">> = {}): OutcomePlan => ({
     member: { ...base, ...member },
@@ -190,7 +196,8 @@ export function planOutcome(
     case "bounce":
       // A dead address is no e-mail: the member waits for a working one and is never called
       // instead (Áron 2026-11-11, nobody is called before an e-mail went out).
-      return plan({ state: "needs_email" });
+      // The dead address is suppressed so a reload with the same address cannot requeue it (Vanda #188 r2-1).
+      return plan({ state: "needs_email" }, { suppress: true });
   }
 }
 

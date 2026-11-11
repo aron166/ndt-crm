@@ -9,7 +9,7 @@
 //   ... --undo                     # dry run of the undo for --batch
 //   ... --include-lost             # keep rows the builder marked crm_lost (default: skipped)
 // Applying a load or an undo is SESSION ONLY (Kai 2026-11-11): an app key gets 403. The apply is
-// done by a logged-in admin or manager from the campaign's member-load screen, or by this script
+// done by a logged-in admin or manager from the campaign's member-load screen (hub UI, in review), or by this script
 // with that person's session cookie instead of a key: CRM_COOKIE='sb-...-auth-token=...' plus
 // --apply (CRM_KEY is then ignored). Never put a cookie in a file in this repo.
 // Prints counts only, never a name, phone or e-mail. mapLaunchRow is pure (tested).

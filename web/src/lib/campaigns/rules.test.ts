@@ -124,6 +124,16 @@ describe("planOutcome: the promotion rule", () => {
     if ("error" in p) throw new Error(p.error);
     expect(p.member).toMatchObject({ stepPosition: 1, state: "needs_email" });
   });
+  it("a bounce suppresses the dead address so a reload cannot requeue it", () => {
+    const p = planOutcome(open({ stepPosition: 1 }), "bounce", EMAIL_THEN_CALL, WED);
+    if ("error" in p) throw new Error(p.error);
+    expect(p.suppress).toBe(true);
+  });
+  it("a call outcome is refused before the e-mail went out or on a needs_email member", () => {
+    expect(planOutcome(open({ stepPosition: 1 }), "interested", EMAIL_THEN_CALL, WED)).toHaveProperty("error");
+    expect(planOutcome({ ...open(), state: "needs_email" as never }, "no_answer", EMAIL_THEN_CALL, WED)).toHaveProperty("error");
+    expect(planOutcome({ ...open({ stepPosition: 1 }), state: "needs_email" as never }, "note_only", EMAIL_THEN_CALL, WED)).not.toHaveProperty("error");
+  });
   it("a closed member takes no outcome but a note", () => {
     const closed = { ...open(), state: "promoted" as never };
     expect(planOutcome(closed, "interested", CALL_ONLY, WED)).toHaveProperty("error");

@@ -16,6 +16,7 @@ import { addWorkingDays, atLocal, localDay } from "@/lib/booking/time";
 import { companyKey, normalizeVat } from "@/lib/import/normalize";
 import { normalizeEmail } from "@/lib/email";
 import { loadSuppressionSet } from "@/lib/suppression";
+import { isSuppressed } from "@/lib/suppression/match";
 import { MAIN_STAGES } from "@/lib/leads/lifecycle";
 import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
 import { changeLeadStatus } from "@/lib/leads/service";
@@ -272,11 +273,13 @@ export interface SpecifyInput {
  * running campaign: a live campaign changes only by a human edit that sends it back to draft.
  */
 export async function specifyCampaign(ctx: CampaignCtx, slug: string, input: SpecifyInput) {
-  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, status: true } });
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, status: true, kind: true } });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status === "running") return fail(409, "Futó kampányhoz nem írható javaslat; előbb álljon meg vagy legyen piszkozat");
   if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampány");
   if (input.steps) {
+    const misfit = stepsFitKind(c.kind as CampaignKind | null, input.steps.map((st, i) => ({ channel: st.channel, position: i + 1 })));
+    if (misfit) return fail(400, misfit);
     const bad = await checkStepItems(ctx.tenantId, input.steps, c.id);
     if (bad) return bad;
   }
@@ -363,7 +366,8 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
     const prev = companyReach.get(k.companyId) ?? { phone: false, email: false, personId: null };
     companyReach.set(k.companyId, {
       phone: prev.phone || Boolean(k.phone || k.person.phone),
-      email: prev.email || Boolean(k.email || k.person.email),
+      // A suppressed (unsubscribed or bounced) address is no e-mail: it never refreshes a needs_email member (Vanda #188 r2-1).
+      email: prev.email || [k.email, k.person.email].some((e) => e && !isSuppressed(normalizeEmail(e)!, suppressions)),
       personId: prev.personId ?? k.personId,
     });
   }

@@ -202,7 +202,7 @@ describe("only Áron launches", () => {
 
 describe("specify: proposals only", () => {
   it("writes brief_proposal and in-review assets, never the brief, steps or status", async () => {
-    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft" });
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
     const r = await specifyCampaign(APP, "bp", {
       brief: { offer: "x" }, steps: [{ channel: "email" }, { channel: "call", wait_days: 3 }],
       assets: [{ title: "Szkript", body: "Jó napot", category: "script", channel: "other", content_type: "other", format: "phone_script", step_position: 2 }],
@@ -211,6 +211,10 @@ describe("specify: proposals only", () => {
     const data = d.campaign.update.mock.calls[0][0].data;
     expect(Object.keys(data)).toEqual(["briefProposal"]);
     expect(d.campaignStep.createMany).not.toHaveBeenCalled();
+  });
+  it("proposed steps must fit the kind (a call before the e-mail is a 400)", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
+    expect(await specifyCampaign(APP, "bp", { steps: [{ channel: "call" }, { channel: "email" }] })).toMatchObject({ status: 400 });
   });
   it("a session user's assets are refused (they go through Marketing with their author)", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft" });

@@ -1065,7 +1065,8 @@ true. Touched members stay. The undo itself (`dry_run=0`) is session only, `admi
 
 Script: `web/scripts/load-campaign-members.mjs --file <builder json> --campaign <slug> --batch <id> [--undo]` dry-runs
 with `CRM_KEY` (reads the builder's file from the given path; contact data never enters this repo; prints counts
-only). The apply is done by a logged-in person: from the campaign's member-load screen, or by the script with
+only). The apply is done by a logged-in person: from the campaign's member-load screen (Campaigns hub UI, in review,
+not yet live), or until then by the script with
 `--apply` and that person's session in `CRM_COOKIE` (the script refuses `--apply` without it). Never by key.
 
 ### `POST /api/campaigns/:slug/approve`, `/pause`, `/stop`
@@ -1093,7 +1094,8 @@ Hívás mód. Empty unless the campaign is `running`.
 For e-mail events, `email` names the address the event came from; `unsubscribe` suppresses it (else the person's e-mail).
 
 `outcome`: the Hívás mód taps `no_answer`, `interested`, `wants`, `not_interested`, `bad_number`, `note_only`, or an
-e-mail event `email_sent`, `reply_positive`, `reply_negative`, `unsubscribe`, `bounce`. The promotion rule:
+e-mail event `email_sent`, `reply_positive`, `reply_negative`, `unsubscribe`, `bounce`. A call tap other than `note_only`
+needs a `queued` member on a call step (`409` otherwise: nobody is called before the e-mail step). The promotion rule:
 
 | Outcome | Member | Lead |
 |---|---|---|
@@ -1104,7 +1106,7 @@ e-mail event `email_sent`, `reply_positive`, `reply_negative`, `unsubscribe`, `b
 | `not_interested` / `bad_number` | declined / excluded | none |
 | `email_sent` | moves to the next step, eligible after its `wait_days` | none |
 | `unsubscribe` | declined, suppression written | none |
-| `bounce` | `needs_email` (a dead address is no e-mail; never called instead) | none |
+| `bounce` | `needs_email`, the address suppressed (a dead address is no e-mail; never called instead) | none |
 
 A company that already has an open lead is linked, not duplicated, and moves forward only through the tenant's
 transition table. Calls log an append-only `interactions` row stamped `campaign = <slug>` (and move the company's
@@ -1112,7 +1114,9 @@ transition table. Calls log an append-only `interactions` row stamped `campaign 
 `lead_created` automations with `fields.campaign = <slug>`: a per-campaign automation is a rule with the condition
 `campaign eq <slug>`. **A promotion sends nothing by default:** `send_email` and `webhook_out` rules are skipped on
 the `lead_created` and `lead_status_changed` events a promotion fires, unless the campaign's `outbound_automations`
-is `true` (default `false`; only Áron switches it, and switching it needs a new approval). Task rules still run. `409` when the member changed meanwhile (double tap) or the campaign is not running or paused.
+is `true` (default `false`; only Áron switches it, and switching it needs a new approval). Task rules still run.
+Not covered: later events on the lead itself (a `lead_idle` sweep, a human stage move) run every rule as for any
+lead; an outbound rule that must never touch campaign leads takes the condition `source ne campaign`. `409` when the member changed meanwhile (double tap) or the campaign is not running or paused.
 
 ### `GET /api/campaigns/:slug/analytics`, `GET /api/reports/campaigns`
 
