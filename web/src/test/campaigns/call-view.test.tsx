@@ -62,6 +62,17 @@ describe("Hívás mód, campaign tab", () => {
     expect(screen.getByRole("status").textContent).toMatch(/Hálózati hiba/);
     expect((screen.getByRole("button", { name: "Érdeklődik" }) as HTMLButtonElement).disabled).toBe(false);
   });
+  it("a note stays with its company: switching rows never sends it with another company's tap", async () => {
+    recordCampaignOutcomeAction.mockResolvedValue({ ok: true, member: { id: 3 }, lead: null });
+    render(<CampaignCallView slug="bp" data={DATA} />);
+    await userEvent.type(screen.getByLabelText("Jegyzet"), "kedden visszahívni");
+    await userEvent.click(screen.getByRole("button", { name: /Gamma Kft/ }));
+    expect((screen.getByLabelText("Jegyzet") as HTMLTextAreaElement).value).toBe("");
+    await userEvent.click(screen.getByRole("button", { name: "Nem vették fel" }));
+    expect(recordCampaignOutcomeAction).toHaveBeenCalledWith("bp", { member_id: 3, outcome: "no_answer" });
+    await userEvent.click(screen.getByRole("button", { name: /Alfa Kft/ }));
+    expect((screen.getByLabelText("Jegyzet") as HTMLTextAreaElement).value).toBe("kedden visszahívni");
+  });
   it("a refused tap shows the server's reason and keeps the company", async () => {
     recordCampaignOutcomeAction.mockResolvedValue({ error: "Ez a tag most nem hívható" });
     render(<CampaignCallView slug="bp" data={DATA} />);

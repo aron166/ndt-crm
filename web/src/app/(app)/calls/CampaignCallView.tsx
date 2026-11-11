@@ -39,10 +39,12 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
   const [done, setDone] = useState<Set<number>>(new Set());
   const items = useMemo(() => data.items.filter((i) => !done.has(i.id)), [data.items, done]);
   const [selected, setSelected] = useState<number | null>(data.items[0]?.id ?? null);
-  const [notes, setNotes] = useState("");
+  // One note per member: a note typed on company A never goes out with company B's tap (interactions are append-only).
+  const [notesBy, setNotesBy] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string; leadId?: number } | null>(null);
   const current = items.find((i) => i.id === selected) ?? items[0] ?? null;
+  const notes = current ? notesBy[current.id] ?? "" : "";
   const groups = groupByCity(items);
   const personName = (p: CallItem["person"]) => (p ? `${p.lastName} ${p.firstName}`.replace(/^- | -$/g, "").trim() : null);
 
@@ -65,7 +67,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
     const next = ordered.slice(at + 1).concat(ordered.slice(0, at))[0] ?? null;
     setDone((d) => new Set(d).add(current.id));
     setSelected(next?.id ?? null);
-    setNotes("");
+    setNotesBy((n) => ({ ...n, [current.id]: "" }));
     setMsg(r.lead
       ? { ok: true, text: `${current.company.name}: lead lett, a Leadek oldalon a megfelelő oszlopban, SLA feladat nélkül.`, leadId: r.lead.id }
       : { ok: true, text: `${current.company.name}: rögzítve.` });
@@ -134,7 +136,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
               </div>
               <label className={s.field}>
                 <span>Jegyzet</span>
-                <textarea className={s.input} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} disabled={busy} />
+                <textarea className={s.input} value={notes} onChange={(e) => current && setNotesBy((n) => ({ ...n, [current.id]: e.target.value }))} maxLength={2000} disabled={busy} />
               </label>
               <div className={s.outcomes} role="group" aria-label="Kimenetel">
                 {CAMPAIGN_OUTCOMES.map((o) => (
