@@ -21,6 +21,8 @@ vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolve
 vi.mock("@/lib/leads/ingest", () => ({ ingestLead: vi.fn() }));
 vi.mock("@/lib/outreach/registry", () => ({ campaignBySlug: vi.fn(), resolveAudience: vi.fn() }));
 vi.mock("@/lib/marketing/audience-query", () => ({ countAudience: vi.fn() }));
+const campaignSvc = vi.hoisted(() => ({ advanceOnSent: vi.fn().mockResolvedValue(null), campaignSendBlock: vi.fn().mockResolvedValue(null) }));
+vi.mock("@/lib/campaigns/service", () => campaignSvc);
 vi.mock("@/lib/db", () => ({
   db: {
     user: { findMany: vi.fn() },
@@ -145,6 +147,13 @@ describe("markDraftSentManually", () => {
     expect(mockDb.$transaction).not.toHaveBeenCalled();
   });
 
+  it("a draft of a member campaign that is not running is refused, nothing claimed (Vanda #194-2)", async () => {
+    mockDb.emailDraft.findFirst.mockResolvedValue(ROW);
+    mockDb.tenant.findUnique.mockResolvedValue({ settings: { outreachFooter: "unsubscribe here" } });
+    campaignSvc.campaignSendBlock.mockResolvedValueOnce("A kampány most nem fut (draft)");
+    expect(await markDraftSentManually({ draftId: 1 })).toEqual({ ok: false, error: "A kampány most nem fut (draft)" });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
   it("happy path: claims the row, logs the interaction, returns ok", async () => {
     mockDb.emailDraft.findFirst.mockResolvedValue(ROW);
     mockDb.tenant.findUnique.mockResolvedValue({ settings: { outreachFooter: "unsubscribe here" } });
