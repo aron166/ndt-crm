@@ -22,6 +22,8 @@ describe("isServiceApiPath", () => {
     "/api/calls/pending",
     "/api/companies/42",
     "/api/persons/7",
+    "/api/deals",
+    "/api/deals/9",
     "/api/outreach/targets",
     "/api/outreach/drafts",
     "/api/cron/automations",
@@ -45,6 +47,8 @@ describe("isServiceApiPath", () => {
     "/api/companies/42/notes", // a future nested route must not inherit the bypass
     "/api/persons/7/enrichment",
     "/api/companies/abc",
+    "/api/deals/9/stage", // only the item route is an app route
+    "/api/deals/abc",
     "/companies/42",
     "/leads",
     "/api/suppressions/anything", // exact match only

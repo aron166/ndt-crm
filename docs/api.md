@@ -402,6 +402,60 @@ see above). Answers are ≤2000 chars each. Every write recomputes `tier`.
 The default list is the locked model's `gate` + Branch A seven + Branch B three,
 with the spec's draft Hungarian marked ⚠️ until Áron signs off on the wording.
 
+### Machine sales: the `gepeladas` set, scan job vs machine sale (2026-11-11)
+
+No new endpoint and no new column: a BirdsView machine sale uses the routes above.
+
+- **Questions.** `scripts/seed-machine-sales.mjs` adds the set `gepeladas` and 12 questions
+  (Mira's MACHINE-SALES-SYSTEM.md section 4) to `qualificationQuestions`. Their slugs:
+  `pain_story`, `situations_per_year`, `parallel_sites`, `operator_role`, `use_mode`,
+  `competing_lab`, `funding_route`, `budget_window`, `site_outside_budapest`, `capex_signer`,
+  `capex_signer_at_demo`, `units_estimate`. Write them like any answer:
+  `PATCH /api/leads/:id { "qualification": { "funding_route": "hitel", "units_estimate": "2" } }`,
+  or at intake with `question_set: "gepeladas"`. Before the seed has run these slugs are unknown
+  and PATCH rejects them. Existing slugs already cover two of the six: `concrete` (pain) and `timing`.
+- **Scan job or machine sale.** `offer_type` (`service` = scan job, `purchase` / `rental` = machine),
+  set with a stage move (`PATCH { "status": "qualified", "offer_type": "purchase" }`); before it is set,
+  the intake `intent` decides (`purchase` / `rental`). A "credits into purchase" shape is the
+  `funding_route` answer `mérési díjak beszámítása`, not an intent.
+- **Won.** Moving a machine-sale lead to `won` creates its deal in the pipeline named by
+  `tenants.settings.machineSalePipelineId` (the seed writes it), first stage; scan jobs, and
+  machine sales before the seed, go to the default (first) pipeline as before. Every converted deal
+  carries `custom_fields.saleKind` = `machine` | `scan`, plus `fromLeadId` and `offerType`.
+- **Deal stages and fields** of the "Gépeladás" pipeline: see `/api/deals` below.
+
+## Deals
+
+App key, same auth and rate limit as `/api/leads`. Tenant scoped.
+
+### `GET /api/deals?pipeline_id=&stage_id=&page=&page_size=`
+Paginated (max 100), newest first. Each item: `id, title, value, currency, pipelineId, stageId,
+stage { name, isTerminalWon, isTerminalLost }, companyId, company { name }, personId, assignedToId,
+customFields, convertedFromLeads [{ id }], expectedCloseDate, stageEnteredAt, createdAt, updatedAt`.
+
+### `GET /api/deals/:id`
+The deal plus `pipeline { name, stages [{ id, name, position, isTerminalWon, isTerminalLost }],
+customFields [{ key, label, type, options }] }`: the stage ids a move may use and the field keys a
+PATCH may write.
+
+### `PATCH /api/deals/:id`
+```json
+{ "custom_fields": { "offer_sent_at": "2026-11-20", "demo_moments": "művezető kezelte a gépet,statikus megkapta az adatlapot" },
+  "stage_id": 41 }
+```
+- `custom_fields` merges; only keys the deal's pipeline defines are accepted (so `saleKind`,
+  `fromLeadId`, `offerType` cannot be overwritten); `null` deletes a key. Values are strings in the
+  form the `/deals` modal stores: `number` digits, `date` `YYYY-MM-DD`, `single_select` one option,
+  `multi_select` options joined with commas. A wrong key or value is a 400 and nothing is written.
+- `stage_id` must be a stage of the deal's own pipeline (400 otherwise). A real stage change resets
+  `stageEnteredAt` and fires `deal_stage_changed` automations, the same path as a drag on `/deals`.
+- Fields are written before the move. Returns `{ ok, deal }` (the GET shape).
+
+Gépeladás pipeline (seeded, editable at `/deals/setup`): Bemutató lefoglalva, Bemutató megtartva,
+Ajánlat elküldve, Döntési hívás, Finanszírozás, Megrendelve, Leszállítva, betanítva (won),
+Elveszett (lost). Fields: `offer_shape`, `offer_sent_at`, `offer_incentive_until`, `demo_credit_ft`,
+`demo_moments`, `unit_count`.
+
 ## Suppressions
 
 ### `POST /api/suppressions`: report an opt-out (app key)
