@@ -48,6 +48,14 @@ describe("copyRuleBreaks", () => {
     expect(copyRuleBreaks("Válasszon időpontot. „érdekel”")).toEqual(["az ügyfél foglal (mi foglalunk, soha az ügyfél)"]);
     expect(copyRuleBreaks("Ezt ők foglalják le. „érdekel”")).toEqual([]);
   });
+  it("Vanda #195 r2-2: possessive and compound price words are caught; look-alikes are not", () => {
+    for (const t of ["az árát", "árában", "áráról", "árainkról", "árajánlatot küldünk", "árlista", "árazás", "50e ft"]) expect(copyRuleBreaks(`${t} „érdekel”`), t).toEqual(["ár vagy díj"]);
+    for (const t of ["áram", "Árpád", "várat", "határ", "árok"]) expect(copyRuleBreaks(`${t} „érdekel”`), t).toEqual([]);
+  });
+  it("Vanda #195 r2-3: foglalhatja and lefoglalhatja are caught, lefoglaljuk is not", () => {
+    for (const t of ["Foglalhatja most.", "Le is foglalhatja.", "Lefoglalhatja a napot."]) expect(copyRuleBreaks(`${t} „érdekel”`), t).toEqual(["az ügyfél foglal (mi foglalunk, soha az ügyfél)"]);
+    expect(copyRuleBreaks("Mi lefoglaljuk a napot. „érdekel”")).toEqual([]);
+  });
   it("Vanda #195-6: the CTA is kept verbatim, $ sequences included", () => {
     const r = parseSegmentCopy(MD, "Írjon: „érdekel” $& $'");
     expect(r.items[0].body).toContain("Írjon: „érdekel” $& $'");

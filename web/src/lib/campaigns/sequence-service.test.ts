@@ -28,6 +28,7 @@ vi.mock("@/lib/db", () => {
 });
 
 import { setSteps, updateCampaign, recordOutcome, loadLeadAudience, draftEmailStep, advanceOnSent, campaignSendBlock } from "./service";
+import { approvalHash } from "./rules";
 
 type M = ReturnType<typeof vi.fn>;
 const d = db as unknown as Record<string, Record<string, M>> & { $transaction: M };
@@ -163,6 +164,25 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
     d.lead.findMany.mockResolvedValue([]);
     d.contact.findMany.mockResolvedValue([]);
     expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 0, noAsset: 1 });
+    expect(d.emailDraft.createMany).not.toHaveBeenCalled();
+  });
+  it("Vanda #195 r2-1: a variant archived at approval and restored later is never drafted (the approval hash no longer matches)", async () => {
+    const steps = [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }];
+    // Approved while the variant was archived: no variants in the hash.
+    const approvedHash = approvalHash({ memberCompanyIds: [7], steps, dailyCap: 15, outboundAutomations: false });
+    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null, senderUserId: null, outboundAutomations: false, audience: null,
+      approvedAt: new Date("2026-11-12T08:00:00Z"), approvedHash, steps });
+    d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: null }]);
+    d.campaignMember.findMany.mockResolvedValue([
+      { id: 1, companyId: 7, personId: 8, stepPosition: 1, nextEligibleOn: null, person: { email: "a@p.example.test", firstName: "-", lastName: "-" }, company: CO, segment: "drillers", lane: null, city: null },
+    ]);
+    // Restored to live after the approval; created long before it.
+    d.contentItem.findMany.mockResolvedValue([live(60, "Visszaállított", "Szöveg", { campaignStep: 1, segment: "D" })]);
+    d.emailDraft.findMany.mockResolvedValue([]);
+    d.emailDraft.count.mockResolvedValue(0);
+    d.lead.findMany.mockResolvedValue([]);
+    d.contact.findMany.mockResolvedValue([]);
+    expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ status: 409 });
     expect(d.emailDraft.createMany).not.toHaveBeenCalled();
   });
   it("a draft campaign drafts nothing (approval first)", async () => {
