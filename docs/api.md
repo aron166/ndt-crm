@@ -990,6 +990,7 @@ approval pipeline: e-mail copy, call script, ad), a `daily_cap` (default 15) and
 | `PATCH /api/campaigns/:slug` with `outbound_automations` | **session only, Áron only** |
 | `PUT /api/campaigns/:slug/steps` | **session only** |
 | `POST /api/campaigns/:slug/specify` (proposals) | key or session |
+| `GET /api/campaigns/:slug/members` (loads with member and touched counts) | key or session |
 | `POST /api/campaigns/:slug/members` with `dry_run: true`, `DELETE ...?batch=` dry run | key or session |
 | `POST /api/campaigns/:slug/members` with `dry_run: false` (apply), `DELETE ...&dry_run=0` (undo) | **session only, role `admin` or `manager`** (an app key gets `403`; it may dry-run and propose) |
 | `POST /api/campaigns/:slug/approve` (launch) | **session only, Áron only** (`tenants.settings.demoHosts.aron`) |
@@ -1057,6 +1058,9 @@ kind takes no members (`409`). Applying (`dry_run: false`) needs a logged-in `ad
 
 `200` dry run / `201` written: `{ summary: { total, add, refresh, skip, matchedCompanies, newCompanies, newPersons,
 needsContact, needsEmail, skipped: {...} }, rows: [...] }` (dry run lists every row's plan).
+
+`GET /api/campaigns/:slug/members` lists the loads: `{ batches: [{ batch, members, touched, createdAt }] }`; a batch
+with `touched: 0` can be undone whole. The Campaigns hub's Tagok tab uses the same reads and writes.
 
 `DELETE /api/campaigns/:slug/members?batch=<id>&dry_run=0` removes the batch's members that were never touched and
 soft-deletes the companies and persons that batch created when nothing else points at them (no lead, deal, quote,

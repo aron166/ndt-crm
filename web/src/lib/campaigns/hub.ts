@@ -60,6 +60,22 @@ export function summarize(rows: readonly HubRow[]) {
   };
 }
 
+/** Each load (import_batch) of a campaign with how many of its members were touched; untouched batches can be undone. */
+export async function memberBatches(tenantId: number, campaignId: number) {
+  const [batches, touched] = await Promise.all([
+    db.campaignMember.groupBy({ by: ["importBatch"], where: { tenantId, campaignId }, _count: { _all: true }, _min: { createdAt: true } }),
+    db.campaignMember.groupBy({
+      by: ["importBatch"],
+      where: { tenantId, campaignId, OR: [{ attempts: { gt: 0 } }, { lastTouchedAt: { not: null } }, { leadId: { not: null } }] },
+      _count: { _all: true },
+    }),
+  ]);
+  return batches.filter((b) => b.importBatch != null).map((b) => ({
+    batch: b.importBatch!, members: b._count._all, createdAt: b._min.createdAt,
+    touched: touched.find((t) => t.importBatch === b.importBatch)?._count._all ?? 0,
+  }));
+}
+
 export interface AssetState { id: number; title: string; status: string; version: number | null }
 
 /** Everything the campaign page shows; null when the slug is not in the tenant. */
@@ -78,17 +94,12 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
       orderBy: { id: "asc" },
     }),
     db.campaignMember.groupBy({ by: ["state"], where: { tenantId, campaignId: c.id }, _count: { _all: true } }),
-    db.campaignMember.groupBy({ by: ["importBatch"], where: { tenantId, campaignId: c.id }, _count: { _all: true }, _min: { createdAt: true } }),
+    memberBatches(tenantId, c.id),
     db.user.findFirst({ where: { tenantId, id: userId }, select: { role: true } }),
     resolveDemoHost(tenantId, "aron"),
     campaignAnalytics(tenantId, { slug }),
     c.ownerUserId != null ? db.user.findFirst({ where: { tenantId, id: c.ownerUserId }, select: { name: true } }) : null,
   ]);
-  const touchedByBatch = await db.campaignMember.groupBy({
-    by: ["importBatch"],
-    where: { tenantId, campaignId: c.id, OR: [{ attempts: { gt: 0 } }, { lastTouchedAt: { not: null } }, { leadId: { not: null } }] },
-    _count: { _all: true },
-  });
   const assets: AssetState[] = items.map((i) => ({ id: i.id, title: i.title, status: i.status, version: i.currentVersion?.number ?? null }));
   return {
     campaign: c,
@@ -97,10 +108,7 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
     assets,
     metrics: items.map((i) => ({ id: i.id, title: i.title, metrics: (i.metrics ?? null) as Record<string, number> | null })),
     members: Object.fromEntries(counts.map((x) => [x.state, x._count._all])) as Record<string, number>,
-    batches: batches.filter((b) => b.importBatch != null).map((b) => ({
-      batch: b.importBatch!, members: b._count._all, createdAt: b._min.createdAt,
-      touched: touchedByBatch.find((t) => t.importBatch === b.importBatch)?._count._all ?? 0,
-    })),
+    batches,
     stats: stats[0]?.stats ?? null,
     isAron: aron != null && aron === userId,
     canOperate: me != null && OPERATOR_ROLES.includes(me.role),
