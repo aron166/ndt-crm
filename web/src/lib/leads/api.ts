@@ -119,6 +119,8 @@ export const leadInteractionWireSchema = z.object({
   assigned_to_id: optInt,
   script_variant: z.preprocess(emptyToUndef, z.string().optional()),
   call_type: z.preprocess(emptyToUndef, z.enum(CALL_TYPE_KEYS).optional()),
+  /** Idempotency key, unique per tenant: a repeated POST with the same call_id writes nothing (409). */
+  call_id: z.preprocess(emptyToUndef, z.string().trim().max(200).optional()),
 });
 export function toCallOutcomeInput(w: z.infer<typeof leadInteractionWireSchema>) {
   return {
@@ -132,6 +134,7 @@ export function toCallOutcomeInput(w: z.infer<typeof leadInteractionWireSchema>)
     ...(w.assigned_to_id ? { assignedToId: w.assigned_to_id } : {}),
     ...(w.script_variant ? { scriptVariant: w.script_variant } : {}),
     ...(w.call_type ? { callType: w.call_type } : {}),
+    ...(w.call_id ? { callId: w.call_id } : {}),
   };
 }
 

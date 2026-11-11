@@ -28,6 +28,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { success: _s, ...rest } = res;
     return json({ ok: true, ...rest }, 201);
   } catch (err) {
+    // call_id already logged: the insert failed inside the transaction, nothing was written.
+    if ((err as { code?: string } | null)?.code === "P2002" && wire.data.call_id) {
+      return json({ error: "Duplicate call_id", duplicate: true }, 409);
+    }
     reportError("api.leads.interactions", err, { leadId: id, sourceApp: auth.ctx.actorAgentId });
     return json({ error: "Internal error" }, 500);
   }
