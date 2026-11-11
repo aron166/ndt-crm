@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import {
-  TRIGGER_TYPES, ACTION_TYPES,
+  TRIGGER_TYPES, ACTION_TYPES, isCampaignTrigger, OUTBOUND_ACTION_TYPES,
   type TriggerType, type ActionType,
 } from "@/lib/automations/types";
 import { getLeadStatuses } from "@/lib/leads/queries";
@@ -80,6 +80,10 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
     const user = await db.user.findFirst({ where: { id: assignedToId, tenantId: TENANT_ID }, select: { id: true } });
     if (!user) return { error: "Ismeretlen felelős" };
     actionConfig.assignedToId = assignedToId;
+  } else if (actionType === "add_note") {
+    const text = typeof actionConfig.textTemplate === "string" ? actionConfig.textTemplate.trim() : "";
+    if (!text) return { error: "A jegyzet szövege kötelező" };
+    actionConfig.textTemplate = text.slice(0, 2000);
   } else if (actionType === "webhook_out") {
     // HTTPS only: the payload carries CRM identifiers, and webhook_out sends no
     // auth header by design — the secret lives IN the URL, so cleartext leaks it.
@@ -125,6 +129,18 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
   const triggerConfig =
     trigParsed.value && typeof trigParsed.value === "object" &&
     Object.keys(trigParsed.value).length > 0 ? trigParsed.value : null;
+  if (isCampaignTrigger(triggerType)) {
+    // A campaign rule is scoped to one campaign of this tenant (item 5).
+    const campaignId = Number(triggerConfig?.campaignId);
+    if (!Number.isInteger(campaignId) || campaignId <= 0) return { error: "Kampány szabályhoz kampány kell" };
+    const c = await db.campaign.findFirst({ where: { id: campaignId, tenantId: TENANT_ID }, select: { id: true, outboundAutomations: true } });
+    if (!c) return { error: "Ismeretlen kampány" };
+    // Outbound only while Áron's switch is on; the engine skips it too when the switch is off later.
+    if (OUTBOUND_ACTION_TYPES.includes(actionType) && !c.outboundAutomations) return { error: "Kimenő művelet csak bekapcsolt kimenő automatizmusú kampányban" };
+    triggerConfig!.campaignId = campaignId;
+  } else if (actionType === "add_note") {
+    return { error: "Jegyzet művelet csak kampány szabályban" };
+  }
 
   return {
     name,

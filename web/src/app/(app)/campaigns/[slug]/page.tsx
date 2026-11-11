@@ -14,6 +14,10 @@ import { SpecifyPanel, type Proposal } from "./SpecifyPanel";
 import { StepsSection } from "./StepsSection";
 import { LaunchPanel } from "./LaunchPanel";
 import { MemberLoad } from "./MemberLoad";
+import { CampaignAutomations } from "./CampaignAutomations";
+import { db } from "@/lib/db";
+import { getLeadStatuses } from "@/lib/leads/queries";
+import { CAMPAIGN_TRIGGERS } from "@/lib/automations/types";
 import { MetricsCells } from "./MetricsCells";
 import { METRIC_KEYS, METRIC_LABEL } from "@/lib/content/metrics";
 import s from "../campaigns.module.css";
@@ -33,7 +37,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   const contentOnly = isContentOnly(c.kind);
   const tabs = contentOnly
     ? [{ key: "overview", label: "Áttekintés" }]
-    : [{ key: "overview", label: "Áttekintés" }, { key: "members", label: "Tagok" }, { key: "launch", label: "Indítás" }];
+    : [{ key: "overview", label: "Áttekintés" }, { key: "members", label: "Tagok" }, { key: "launch", label: "Indítás" }, { key: "automations", label: "Automatizálás" }];
   const ymd = (v: Date | null) => (v ? v.toISOString().slice(0, 10) : null);
   const tab = tabs.some((t) => t.key === rawTab) ? rawTab! : "overview";
   const brief = (c.brief ?? {}) as Record<string, unknown>;
@@ -58,6 +62,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           steps: c.steps, assets: d.assets, members: d.members,
         }} />
       )}
+      {tab === "automations" && await automationsTab(c.id, c.outboundAutomations)}
       {tab === "members" && (
         <MemberLoad slug={c.slug} status={c.status} canOperate={d.canOperate} closed={c.status === "stopped" || c.status === "done"}
           batches={d.batches.map((b) => ({ ...b, createdAt: b.createdAt ? b.createdAt.toISOString() : null }))} />
@@ -109,5 +114,23 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         </div>
       </div>}
     </div>
+  );
+}
+
+/** Rules scoped to this campaign (trigger_config.campaignId), item 5. Loaded only on the open tab. */
+async function automationsTab(campaignId: number, outbound: boolean) {
+  const [rules, leadStatuses, users] = await Promise.all([
+    db.automationRule.findMany({
+      where: { tenantId: TENANT_ID, triggerType: { in: [...CAMPAIGN_TRIGGERS] }, triggerConfig: { path: ["campaignId"], equals: campaignId } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true, isActive: true, triggerType: true, actionType: true, triggerConfig: true, actionConfig: true, lastRunAt: true },
+    }),
+    getLeadStatuses(TENANT_ID),
+    db.user.findMany({ where: { tenantId: TENANT_ID, email: { not: { endsWith: "@system" } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]);
+  return (
+    <CampaignAutomations campaignId={campaignId} outbound={outbound} users={users}
+      leadStatuses={leadStatuses.map((x) => ({ key: x.key, label: x.label }))}
+      rules={rules.map((r) => ({ ...r, triggerConfig: r.triggerConfig as Record<string, unknown> | null, actionConfig: r.actionConfig as Record<string, unknown>, lastRunAt: r.lastRunAt ? r.lastRunAt.toISOString() : null }))} />
   );
 }

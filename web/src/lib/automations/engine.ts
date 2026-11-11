@@ -6,6 +6,7 @@ import type {
   AutomationEvent,
   Condition,
   ConditionOp,
+  AddNoteActionConfig,
   AssignLeadActionConfig,
   ChangeLeadStatusActionConfig,
   CreateTaskActionConfig,
@@ -91,6 +92,13 @@ export function triggerMatches(
       return cfg.toStatus == null || cfg.toStatus === "" || cfg.toStatus === event.toStatus;
     case "deal_stage_changed":
       return cfg.toStageId == null || cfg.toStageId === event.toStageId;
+    case "campaign_member_replied":
+    case "campaign_member_promoted":
+    case "campaign_step_completed":
+    case "campaign_call_outcome":
+      // Scoped only: a rule fires for its own campaign, never for another or for a rule without one.
+      if (cfg.campaignId == null || event.campaignId == null || Number(cfg.campaignId) !== event.campaignId) return false;
+      return event.type !== "campaign_call_outcome" || !cfg.outcome || cfg.outcome === event.outcome;
     case "deal_idle_in_stage":
     case "lead_idle":
       // Evaluated by the scheduled job, not the event-driven path.
@@ -225,6 +233,20 @@ export async function runLeadAction(
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) throw new Error(`webhook_out ${res.status}`);
+    return true;
+  }
+  if (actionType === "add_note") {
+    const cfg = actionConfig as AddNoteActionConfig;
+    const text = cfg?.textTemplate ? renderTemplate(cfg.textTemplate, ev, false) : "";
+    if (!text.trim() || !ev.companyId) return false;
+    // Append-only, like every interaction: a note, never an edit.
+    await db.interaction.create({
+      data: {
+        tenantId: ev.tenantId, companyId: ev.companyId, personId: ev.personId ?? null, leadId: ev.leadId ?? null,
+        type: "note", direction: null, notes: text.slice(0, 2000), occurredAt: new Date(),
+        ...(typeof ev.fields.campaign === "string" ? { campaign: ev.fields.campaign } : {}),
+      },
+    });
     return true;
   }
   if (!ev.leadId) return false;

@@ -207,6 +207,19 @@ export function planOutcome(
   }
 }
 
+/** The campaign automation triggers a touch raises (item 5), in order. Pure. */
+export function campaignAutomationEvents(
+  outcome: OutcomeKey,
+  r: { promoted: boolean; stepFrom: number; stepTo: number; done: boolean },
+): ("campaign_member_replied" | "campaign_member_promoted" | "campaign_call_outcome" | "campaign_step_completed")[] {
+  const out: ReturnType<typeof campaignAutomationEvents> = [];
+  if (outcome === "reply_positive" || outcome === "reply_negative") out.push("campaign_member_replied");
+  if (CALL_OUTCOME_KEYS.includes(outcome as CallOutcomeKey) && outcome !== "note_only") out.push("campaign_call_outcome");
+  if (outcome === "email_sent" && (r.stepTo !== r.stepFrom || r.done)) out.push("campaign_step_completed");
+  if (r.promoted) out.push("campaign_member_promoted");
+  return out;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Today's list
 
