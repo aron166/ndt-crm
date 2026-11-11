@@ -459,6 +459,7 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
             tenantId, campaignId: c.id, companyId, personId, state: p.state, stepPosition: p.stepPosition,
             priority: r.priority ?? 100, tier: r.tier ?? null, lane: r.lane ?? null,
             why: r.why ?? null, city: r.city ?? null, importBatch: input.batch, createdCompany, createdPerson,
+            segment: r.segment ?? null, source: r.source ?? null, contactSource: r.contact_source ?? null,
           },
         });
         added++;

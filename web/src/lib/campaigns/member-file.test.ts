@@ -13,6 +13,9 @@ describe("parseMemberFile", () => {
     expect(r.rows).toHaveLength(1);
     expect(memberRowSchema.parse(r.rows[0])).toMatchObject({ company_name: "Minta Kft.", vat: "12345678", priority: 4 });
     expect(r.rows[0]).not.toHaveProperty("phone_only");
+    const p = parseMemberFile(JSON.stringify([{ company: "P Kft.", crm_name: "", segment: "facility", sources: "leads_v1", enriched_from: "https://p.example" }]));
+    if ("error" in p) throw new Error(p.error);
+    expect(memberRowSchema.parse(p.rows[0])).toMatchObject({ segment: "facility", source: "leads_v1", contact_source: "https://p.example" });
     const w = parseMemberFile(JSON.stringify({ rows: [{ company_name: "Wire Kft.", phone: "1" }] }));
     expect(w).toEqual({ rows: [{ company_name: "Wire Kft.", phone: "1" }] });
   });

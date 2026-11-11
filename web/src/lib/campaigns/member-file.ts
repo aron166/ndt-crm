@@ -29,6 +29,9 @@ export function mapBuilderRow(r: Raw): Raw {
     tier: clip(r.tier, 2),
     lane: clip(r.lane, 40),
     why: clip(r.why, 300),
+    segment: clip(r.segment, 60),
+    source: clip(r.sources, 200),
+    contact_source: clip(r.enriched_from, 300),
     ...(Number.isInteger(rank) && rank >= 0 ? { priority: Math.min(1000, rank) } : {}),
   };
 }
