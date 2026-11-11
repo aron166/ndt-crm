@@ -231,6 +231,7 @@ describe("specify: proposals only", () => {
   it("an empty proposal is a 400 and closes no request (Vanda #192-3)", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
     expect(await specifyCampaign(APP, "bp", {})).toMatchObject({ status: 400 });
+    expect(await specifyCampaign(APP, "bp", { brief: {} })).toMatchObject({ status: 400 });
     expect(d.task.updateMany).not.toHaveBeenCalled();
   });
   it("closing a request is audited with the agent as actor (Vanda #192-2)", async () => {
