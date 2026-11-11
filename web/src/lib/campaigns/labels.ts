@@ -108,3 +108,7 @@ export function outreachStatsHref(params: URLSearchParams | Record<string, strin
   }
   return `/campaigns?${out.toString()}`;
 }
+
+/** Type tab label: the folded-in old views (Marketing (régi), Kiküldés) carry no count, their lists count differently. */
+export const typeTabLabel = (key: string, label: string, count: number) =>
+  key === "marketing" || key === "outreach" ? label : `${label} ${count}`;
