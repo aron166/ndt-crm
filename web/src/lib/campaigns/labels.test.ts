@@ -68,3 +68,13 @@ describe("hub type tab labels", () => {
     expect(typeTabLabel("sequence", "Sorozat", 2)).toBe("Sorozat 2");
   });
 });
+
+describe("what an agent is asked for (item 6, specification request)", () => {
+  it("names a missing offer, audience, steps and step assets; nothing when all is there", async () => {
+    const { missingForSpec } = await import("./labels");
+    expect(missingForSpec({ kind: "sequence", brief: null, steps: [] })).toEqual(["cél, ajánlat", "célközönség", "lépések"]);
+    expect(missingForSpec({ kind: "sequence", brief: { offer: "x", audience: "y" }, steps: [{ position: 1, channel: "email", contentItemId: null }, { position: 2, channel: "call", contentItemId: 7 }] }))
+      .toEqual(["1. lépés anyaga (E-mail)"]);
+    expect(missingForSpec({ kind: "ad", brief: { offer: "x", audience: "y" }, steps: [] })).toEqual([]);
+  });
+});
