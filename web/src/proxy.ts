@@ -52,7 +52,10 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/cron/weekly-report" ||
     pathname === "/api/reports/weekly" ||
     pathname === "/api/assistant/callnote" ||
-    pathname === "/api/health"
+    pathname === "/api/health" ||
+    // W9 nurture: signed-link routes for recipients, who have no session.
+    pathname === "/api/nurture/unsubscribe" ||
+    pathname === "/api/nurture/click"
   );
 }
 

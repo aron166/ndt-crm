@@ -45,6 +45,9 @@ model Tenant {
   leadStatuses           LeadStatus[]
   leadStatusTransitions  LeadStatusTransition[]
   leadStatusHistory      LeadStatusHistory[]
+  nurtureTemplates       NurtureTemplate[]
+  nurtureSequences       NurtureSequence[]
+  nurtureEnrollments     NurtureEnrollment[]
   leadDocuments          LeadDocument[]
   automationRules        AutomationRule[]
   automationFirings      AutomationFiring[]
@@ -371,17 +374,18 @@ model Lead {
   demoCreditUntil DateTime? @map("demo_credit_until")
   createdAt       DateTime  @default(now()) @map("created_at")
 
-  tenant        Tenant              @relation(fields: [tenantId], references: [id])
-  company       Company?            @relation(fields: [companyId], references: [id])
-  contact       Contact?            @relation(fields: [contactId], references: [id])
-  assignedTo    User?               @relation("LeadAssignee", fields: [assignedToId], references: [id])
-  convertedDeal Deal?               @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
-  interactions  Interaction[]
-  tasks         Task[]              @relation("TaskLead")
-  firings       AutomationFiring[]
-  quotes        Quote[]
-  statusHistory LeadStatusHistory[]
-  documents     LeadDocument[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  company            Company?            @relation(fields: [companyId], references: [id])
+  contact            Contact?            @relation(fields: [contactId], references: [id])
+  assignedTo         User?               @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  convertedDeal      Deal?               @relation("LeadConvertedDeal", fields: [convertedDealId], references: [id], onDelete: SetNull)
+  interactions       Interaction[]
+  tasks              Task[]              @relation("TaskLead")
+  firings            AutomationFiring[]
+  quotes             Quote[]
+  statusHistory      LeadStatusHistory[]
+  nurtureEnrollments NurtureEnrollment[]
+  documents          LeadDocument[]
 
   @@unique([tenantId, threadKey])
   @@index([tenantId, nextDue])
@@ -1636,4 +1640,81 @@ model LeadDocument {
   @@unique([quoteId, kind])
   @@index([tenantId, leadId])
   @@map("lead_documents")
+}
+
+// W9 nurture (lib/nurture). Sequences are data; nothing sends unless the template is
+// approved_by_aron AND tenants.settings.nurture_enabled is true.
+model NurtureTemplate {
+  id             Int       @id @default(autoincrement())
+  tenantId       Int       @map("tenant_id")
+  key            String // topic-NN | service-summary | subscribe-invite
+  subject        String
+  preview        String?
+  bodyMd         String    @map("body_md")
+  status         String    @default("proposal") // proposal | approved | retired
+  approvedByAron Boolean   @default(false) @map("approved_by_aron")
+  approvedAt     DateTime? @map("approved_at")
+  requiresAsset  String?   @map("requires_asset") // skip while this asset is missing (W9 section 4)
+  sourcePath     String?   @map("source_path")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, key])
+  @@map("nurture_templates")
+}
+
+model NurtureSequence {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  segment   String // service | device | info | lost
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant                @relation(fields: [tenantId], references: [id])
+  steps       NurtureSequenceStep[]
+  enrollments NurtureEnrollment[]
+
+  @@unique([tenantId, segment])
+  @@map("nurture_sequences")
+}
+
+model NurtureSequenceStep {
+  id          Int    @id @default(autoincrement())
+  sequenceId  Int    @map("sequence_id")
+  position    Int
+  delayDays   Int    @map("delay_days")
+  templateKey String @map("template_key")
+  audience    String @default("all") // all | opt_in | non_opt_in
+
+  sequence NurtureSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, position])
+  @@map("nurture_sequence_steps")
+}
+
+model NurtureEnrollment {
+  id            Int       @id @default(autoincrement())
+  tenantId      Int       @map("tenant_id")
+  leadId        Int       @map("lead_id")
+  sequenceId    Int       @map("sequence_id")
+  status        String    @default("active") // active | paused | stopped | completed
+  nextPosition  Int       @default(1) @map("next_position")
+  enrolledAt    DateTime  @default(now()) @map("enrolled_at")
+  pausedAt      DateTime? @map("paused_at")
+  resumedAt     DateTime? @map("resumed_at") // activity after this (or enrolment) pauses again
+  pauseReason   String?   @map("pause_reason")
+  stoppedReason String?   @map("stopped_reason")
+  lastSentAt    DateTime? @map("last_sent_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id])
+  lead     Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sequence NurtureSequence @relation(fields: [sequenceId], references: [id], onDelete: Restrict)
+
+  @@unique([leadId, sequenceId])
+  @@index([tenantId, status])
+  @@map("nurture_enrollments")
 }

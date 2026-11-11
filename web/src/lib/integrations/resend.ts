@@ -55,6 +55,10 @@ export interface SendEmailInput {
   skipLog?: boolean;
   /** Display name on the From line instead of the tenant's (e.g. the lead's owner). Address unchanged. */
   fromName?: string | null;
+  /** Optional HTML part next to the text (nurture). */
+  html?: string;
+  /** Extra headers (nurture: List-Unsubscribe, List-Unsubscribe-Post). */
+  headers?: Record<string, string>;
   /** Files to attach (Resend: base64 content). */
   attachments?: { filename: string; content: string }[];
 }
@@ -75,7 +79,8 @@ export async function sendTestEmail(tenantId: number): Promise<SendEmailResult> 
 export type SendEmailResult =
   /** `warning` is set when the email went out but logging it failed (reported). */
   | { ok: true; id: string; warning?: string }
-  | { ok: false; error: string };
+  /** `uncertain`: Resend may have accepted the mail (timeout, network, 5xx, no id); a retry could send twice. */
+  | { ok: false; error: string; uncertain?: true };
 
 /**
  * Send an email via Resend and record it as an append-only Interaction
@@ -118,16 +123,18 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         text: input.text,
         ...(input.replyTo ? { reply_to: input.replyTo } : {}),
         ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+        ...(input.html ? { html: input.html } : {}),
+        ...(input.headers ? { headers: input.headers } : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, error: data?.message || `Resend hiba (${res.status}).` };
+      return { ok: false, error: data?.message || `Resend hiba (${res.status}).`, ...(res.status >= 500 ? { uncertain: true as const } : {}) };
     }
     id = data?.id ?? "";
-    if (!id) return { ok: false, error: "A Resend nem adott vissza üzenetazonosítót." };
+    if (!id) return { ok: false, error: "A Resend nem adott vissza üzenetazonosítót.", uncertain: true };
   } catch {
-    return { ok: false, error: "Nem sikerült kapcsolódni a Resendhez." };
+    return { ok: false, error: "Nem sikerült kapcsolódni a Resendhez.", uncertain: true };
   }
 
   if (input.skipLog) return { ok: true, id };

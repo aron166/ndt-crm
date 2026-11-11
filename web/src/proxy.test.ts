@@ -30,6 +30,8 @@ describe("isServiceApiPath", () => {
     "/api/reports/weekly",
     "/api/assistant/callnote",
     "/api/health",
+    "/api/nurture/unsubscribe",
+    "/api/nurture/click",
   ];
   for (const path of bypassed) {
     it(`bypasses the session gate: ${path}`, () => {
@@ -55,6 +57,7 @@ describe("isServiceApiPath", () => {
     "/api/content/queue/x",
     "/api/calls/pending/x", // no item route for apps
     "/content",
+    "/api/nurture/anything-else",
   ];
   for (const path of sessionGated) {
     it(`stays behind the session gate: ${path}`, () => {
