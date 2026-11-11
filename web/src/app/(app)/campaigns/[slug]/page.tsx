@@ -12,6 +12,8 @@ import type { CampaignKind } from "@/lib/campaigns/rules";
 import { RunningStrip } from "@/components/campaigns/RunningStrip";
 import { SpecifyPanel, type Proposal } from "./SpecifyPanel";
 import { StepsSection } from "./StepsSection";
+import { LaunchPanel } from "./LaunchPanel";
+import { MemberLoad } from "./MemberLoad";
 import s from "../campaigns.module.css";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +31,10 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   if (!d) notFound();
   const c = d.campaign;
   const contentOnly = isContentOnly(c.kind);
-  const tabs = [{ key: "overview", label: "Áttekintés" }];
+  const tabs = contentOnly
+    ? [{ key: "overview", label: "Áttekintés" }]
+    : [{ key: "overview", label: "Áttekintés" }, { key: "members", label: "Tagok" }, { key: "launch", label: "Indítás" }];
+  const ymd = (v: Date | null) => (v ? v.toISOString().slice(0, 10) : null);
   const tab = tabs.some((t) => t.key === rawTab) ? rawTab! : "overview";
   const brief = (c.brief ?? {}) as Record<string, unknown>;
 
@@ -46,7 +51,18 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         <RunningStrip title="Futás" rows={[{ campaign: { slug: c.slug, name: c.name, kind: c.kind }, stats: d.stats }]} />
       )}
 
-      <div className={k.split}>
+      {tab === "launch" && (
+        <LaunchPanel isAron={d.isAron} d={{
+          slug: c.slug, status: c.status, dailyCap: c.dailyCap, startsOn: ymd(c.startsOn), endsOn: ymd(c.endsOn),
+          outboundAutomations: c.outboundAutomations, previewHash: d.previewHash, approvedAt: c.approvedAt ? c.approvedAt.toISOString() : null,
+          steps: c.steps, assets: d.assets, members: d.members,
+        }} />
+      )}
+      {tab === "members" && (
+        <MemberLoad slug={c.slug} status={c.status} canOperate={d.canOperate} closed={c.status === "stopped" || c.status === "done"}
+          batches={d.batches.map((b) => ({ ...b, createdAt: b.createdAt ? b.createdAt.toISOString() : null }))} />
+      )}
+      {tab === "overview" && <div className={k.split}>
         <div>
           {(brief.offer || brief.audience) ? (
             <section className={k.section} aria-label="Brief">
@@ -90,7 +106,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         <div>
           <SpecifyPanel slug={c.slug} proposal={d.proposal as Proposal | null} assets={d.assets} editable={c.status !== "stopped" && c.status !== "done"} canAdoptSteps={c.status === "draft" && !contentOnly} />
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

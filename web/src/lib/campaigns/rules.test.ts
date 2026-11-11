@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { localDay } from "@/lib/booking/time";
 import {
-  approvalHash, canApprove, canSetStatus, isForwardMove, planOutcome, selectDailyList, startFor, stepsFitKind,
+  approvalHash, canApprove, canSetStatus, isForwardMove, planOutcome, selectDailyList, startFor, stepsFitKind, inWindow,
   MAX_NO_ANSWER, type StepDef,
 } from "./rules";
 import { MAIN_STAGES } from "@/lib/leads/lifecycle";
@@ -33,6 +33,15 @@ describe("startFor: e-mail first for everyone (Áron 2026-11-11)", () => {
   it("a pure cold-call campaign starts on the call; no phone is needs_contact", () => {
     expect(startFor(CALL_ONLY, { hasEmail: false, hasPhone: true })).toEqual({ stepPosition: 1, state: "queued" });
     expect(startFor(CALL_ONLY, { hasEmail: true, hasPhone: false }).state).toBe("needs_contact");
+  });
+});
+
+describe("inWindow: the campaign's dates gate the daily list", () => {
+  it("before the start and after the end nobody is listed; open ends are no limit", () => {
+    expect(inWindow("2026-11-26", null, "2026-11-25")).toBe(false);
+    expect(inWindow("2026-11-26", null, "2026-11-26")).toBe(true);
+    expect(inWindow(null, "2026-11-27", "2026-11-28")).toBe(false);
+    expect(inWindow(null, null, "2026-11-11")).toBe(true);
   });
 });
 

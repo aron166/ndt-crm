@@ -40,6 +40,7 @@ textarea.input { min-height: 72px; resize: vertical; }
 .code { font-family: var(--ui-font-mono, monospace); font-size: 13px; color: var(--ui-text-muted); overflow-wrap: anywhere; }
 
 .counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 16px; }
+.blockers { margin: 0; padding-inline-start: 20px; }
 .confirm { font-size: 14px; color: var(--ui-text); padding: 12px 0; border-top: 1px solid var(--ui-border); }
 .err { color: var(--ui-danger-text); font-size: 14px; }
 .ok { color: var(--ui-success-text); font-size: 14px; }

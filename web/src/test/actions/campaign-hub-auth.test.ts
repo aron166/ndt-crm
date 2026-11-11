@@ -20,7 +20,7 @@ const calls: [string, () => Promise<unknown>][] = [
   ["adopt", () => A.adoptProposedStepsAction("bp")],
   ["load", () => A.loadMembersAction("bp", { fileText: "[]", batch: "b", dryRun: true })],
   ["undo", () => A.undoBatchAction("bp", "b", true)],
-  ["approve", () => A.approveCampaignAction("bp")],
+  ["approve", () => A.approveCampaignAction("bp", "0000000000000000000000000000000000000000000000000000000000000000")],
   ["status", () => A.setCampaignStatusAction("bp", "paused")],
   ["outcome", () => A.recordCampaignOutcomeAction("bp", { member_id: 1, outcome: "no_answer" })],
 ];
@@ -37,8 +37,12 @@ describe("role checks pass through from the service with the session user", () =
   beforeEach(() => getActor.mockResolvedValue({ userId: 5 }));
   it("approve: another user gets the service's 403 text", async () => {
     svc.approveCampaign.mockResolvedValue({ error: "Kampányt csak Áron indíthat", status: 403 });
-    expect(await A.approveCampaignAction("bp")).toEqual({ error: "Kampányt csak Áron indíthat" });
-    expect(svc.approveCampaign).toHaveBeenCalledWith({ tenantId: 1, userId: 5 }, "bp");
+    expect(await A.approveCampaignAction("bp", "0000000000000000000000000000000000000000000000000000000000000000")).toEqual({ error: "Kampányt csak Áron indíthat" });
+    expect(svc.approveCampaign).toHaveBeenCalledWith({ tenantId: 1, userId: 5 }, "bp", { hash: "0000000000000000000000000000000000000000000000000000000000000000" });
+  });
+  it("approve without a valid seen hash never reaches the service", async () => {
+    expect(await A.approveCampaignAction("bp", "nope")).toHaveProperty("error");
+    expect(svc.approveCampaign).not.toHaveBeenCalled();
   });
   it("apply and undo go to the service as the session user, never as a key", async () => {
     svc.addMembers.mockResolvedValue({ error: "Ehhez admin vagy manager szerep kell", status: 403 });

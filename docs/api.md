@@ -990,6 +990,7 @@ approval pipeline: e-mail copy, call script, ad), a `daily_cap` (default 15) and
 | `PATCH /api/campaigns/:slug` with `outbound_automations` | **session only, Áron only** |
 | `PUT /api/campaigns/:slug/steps` | **session only** |
 | `POST /api/campaigns/:slug/specify` (proposals) | key or session |
+| `GET /api/campaigns/:slug/members` (loads with member and touched counts) | key or session |
 | `POST /api/campaigns/:slug/members` with `dry_run: true`, `DELETE ...?batch=` dry run | key or session |
 | `POST /api/campaigns/:slug/members` with `dry_run: false` (apply), `DELETE ...&dry_run=0` (undo) | **session only, role `admin` or `manager`** (an app key gets `403`; it may dry-run and propose) |
 | `POST /api/campaigns/:slug/approve` (launch) | **session only, Áron only** (`tenants.settings.demoHosts.aron`) |
@@ -1058,10 +1059,14 @@ kind takes no members (`409`). Applying (`dry_run: false`) needs a logged-in `ad
 `200` dry run / `201` written: `{ summary: { total, add, refresh, skip, matchedCompanies, newCompanies, newPersons,
 needsContact, needsEmail, skipped: {...} }, rows: [...] }` (dry run lists every row's plan).
 
+`GET /api/campaigns/:slug/members` lists the loads: `{ batches: [{ batch, members, touched, createdAt }] }`; a batch
+with `touched: 0` can be undone whole. The Campaigns hub's Tagok tab uses the same reads and writes.
+
 `DELETE /api/campaigns/:slug/members?batch=<id>&dry_run=0` removes the batch's members that were never touched and
 soft-deletes the companies and persons that batch created when nothing else points at them (no lead, deal, quote,
 proposal, invoice, task, interaction, e-mail draft, other campaign, or a contact the batch did not create). `dry_run` defaults to
-true. Touched members stay. The undo itself (`dry_run=0`) is session only, `admin` or `manager`; a key gets `403`.
+true. Touched members stay; an undo that removes members of a running or paused campaign sends it back to
+`draft`. The undo itself (`dry_run=0`) is session only, `admin` or `manager`; a key gets `403`.
 
 Script: `web/scripts/load-campaign-members.mjs --file <builder json> --campaign <slug> --batch <id> [--undo]` dry-runs
 with `CRM_KEY` (reads the builder's file from the given path; contact data never enters this repo; prints counts
@@ -1071,7 +1076,9 @@ not yet live), or until then by the script with
 
 ### `POST /api/campaigns/:slug/approve`, `/pause`, `/stop`
 
-Approve: Áron's session only; from `draft` or `paused`; needs at least one step, at least one `queued` member, and
+Approve: Áron's session only; from `draft` or `paused`; optional body `{ "expect": { "hash": "<64 hex>" } }`, the approval hash of
+what the approver saw (members, steps with assets, cap, outbound switch): a mismatch is `409` and nothing launches,
+a malformed `expect` is `400`; the hub's Indítás tab always sends it; needs at least one step, at least one `queued` member, and
 every e-mail step's asset (and any step's asset that is set) LIVE in the approval pipeline. Stores `approved_by_id`,
 `approved_at` and `approved_hash` (SHA-256 of member companies, steps, cap and the outbound switch). The kind's
 step shape is re-checked (`409`); a content-only kind cannot be approved. `403` for an app key or any other
@@ -1081,7 +1088,8 @@ user. Pause: from `running` (an agent may, for a bounce or a suppression hit). S
 
 Today's call list, computed on read (no cron, no tasks made in advance): `queued` members on a call step whose
 `next_eligible_on` is today or earlier (Budapest), priority then city, at most `daily_cap` minus the members already
-touched today; members whose company has an open lead are left out. Returns `items` (member with company and person
+touched today; members whose company has an open lead are left out. Outside `starts_on` .. `ends_on` (Budapest
+days, open ends allowed) the list is empty. Returns `items` (member with company and person
 contact), `touchedToday`, `remaining`, and `script` (the first call step's LIVE content item: title and body) for
 Hívás mód. Empty unless the campaign is `running`.
 
