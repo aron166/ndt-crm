@@ -267,3 +267,132 @@ Do NOT build yet:
 4. **Which call outcomes turn a prospect into a lead?** (a) Érdeklődik and Kéri (recommended); (b) only Kéri; (c) any real conversation, Nem érdekli included as a lost lead.
 5. **First campaign: start calls now or wait for e-mail first?** (a) Budapest phone-only next week, e-mail step added after the 11-23 warm-up (recommended); (b) wait and run e-mail first from day one; (c) e-mail by hand from the mailbox now, calls 3 working days after.
 6. **The 261 launch-list rows with no phone or e-mail?** (a) load as prospects marked "needs contact", enrichment fills them (recommended); (b) leave them out until a contact is found; (c) load only the 221 contactable rows and drop the rest.
+
+---
+
+# v2: one Campaigns concept (2026-11-11 afternoon)
+
+Áron approved the build of slice 1 and widened the frame: one Campaigns concept for marketing and sales, typed at
+creation (ad, organic, cold call, cold e-mail, or a sequence of those), specified with AI help, with sequences,
+per-campaign automations, connectors later, analytics, and engagement promoted to a lead. v1 above stays as the
+history of this file. Everything below was checked against `dev` @ `23e9168`.
+
+## v2.1 What exists today (from the code)
+
+| Thing | Tables | Pages | What it drives |
+|---|---|---|---|
+| Marketing campaign | `campaigns` (slug, name, project, `audience_view_id`, `sender_user_id`, `current_wave`, `is_archived`) | `/marketing/campaigns` (list, create, archive), `/marketing/campaigns/<id>` (audience segment with live count, content items, sender, wave, export) | Groups `content_items` (`campaign_id`) in the approval pipeline; the audience segment is also the outreach target list (`/api/outreach/targets`) |
+| Outreach campaign | no table of its own: the **same `campaigns.slug`**, stored as a string in `email_drafts.campaign`, `leads.campaign`, `interactions.campaign`, `content_items.outreach_campaign` | `/outreach` (draft queue, due today), `/outreach/campaigns` (funnel dashboard per key, sender and wave filters) | 4-touch e-mail drafts per company, manual or Resend send behind the footer and suppression gates; a reply becomes a lead (`markDraftReplied`, SLA call) |
+| Phone round | none: a saved company segment | Hívás mód `/calls` | Company-level calls, `pipeline_status` move, optional follow-up task. No campaign tag, no cap, no script, no lead |
+| Call script | `tenants.settings.scriptVariants` (A/B, tenant-wide) | `/leads/setup` | Shown on the lead page only. Hívás mód shows no script |
+| Assets in review | `content_items` (+ versions, checks, reviews; category `script`, `email`, `ad`, `landing`, ...; format `phone_script`, `meta_ad`, ...) | `/marketing` (Anyagok, Élő anyagok, Döntések) | `POST /api/content` (app key) already lets an agent propose any asset into a campaign, as a draft that a human approves |
+| Automations | `automation_rules` (triggers lead_created, lead_status_changed, deal stage, idle; conditions on event fields, `campaign` included) | `/automations` | Tasks, e-mails, assignment, webhooks |
+| Analytics | computed on read | `/analytics` (pipeline status, revenue, top companies), `/reports/weekly` (sales engine), `/outreach/campaigns` (funnel per key) | No running-campaign view anywhere |
+
+## v2.2 Where the brief's reading is wrong or needs a correction
+
+- The merge is already half done in the data: since 2026-09-20 one `campaigns` row IS both the marketing content
+  queue and the cold-email batch (comment on `model Campaign`). What is split is the UI: two pages over one
+  table, and `/outreach/campaigns` also lists bare slug strings with no row. v2 merges by adding columns and
+  tables to `campaigns`, not by migrating one store into another.
+- The AI specification endpoint mostly exists: `POST /api/content` with `campaign_slug` already lands any asset
+  (e-mail copy, call script, ad) in the approval pipeline as a proposal. What is new is a brief and a step plan
+  for the campaign itself, also as a proposal.
+- "Hívás mód shows the right script per campaign": no script is shown in Hívás mód today; scripts are tenant-wide
+  A/B variants for the lead page. A per-campaign script is new: the campaign points at one LIVE content item
+  (category `script`, format `phone_script`).
+- Ad and organic campaigns have nothing to launch into: no ad platform or post scheduler is connected
+  (`content_items.scheduled_for` and manual `metrics` only). In slice 1 they are content campaigns: assets through
+  approval, results typed in by hand. The connector interface (v2.8) is where an ad platform plugs in later.
+- Automations need no new engine for slice 1: a promotion fires the existing `lead_created` event with
+  `campaign = <slug>`, so a per-campaign rule is a rule with the condition `campaign eq <slug>`. Member-level
+  triggers (replied, no answer three times) come with sequences beyond two steps.
+
+## v2.3 Merge map
+
+| Merges cleanly | Does not merge (stays where it is) |
+|---|---|
+| Campaign identity: `campaigns` row, slug as the shared key | `email_drafts` keeps the e-mail mechanics (touches, waves, send gates); a campaign step points at it, it is not rewritten |
+| Audience: the saved segment becomes one audience recipe of three (segment, import batch, lead filter) | #165 nurture sequences keep their tables; listed read-only on the campaign page until a later merge |
+| Assets: `content_items.campaign_id` already; steps link to approved items | Tenant A/B scripts on the lead page stay; a campaign script overrides them only inside that campaign's calls |
+| Funnel numbers: `/outreach/campaigns` counts plus the member counts | Hívás mód segment rounds keep working with no campaign |
+
+## v2.4 Data model (additive migrations only)
+
+`campaigns`, new nullable or defaulted columns (the existing row keeps working unchanged):
+`kind` (CHECK `content`, `ad`, `organic`, `cold_call`, `cold_email`, `sequence`; NULL = a pre-v2 row),
+`status` (CHECK `draft`, `running`, `paused`, `stopped`, `done`; default `draft`), `daily_cap` (default 15,
+1 to 200), `owner_user_id`, `starts_on`, `ends_on`, `brief` jsonb (audience, offer, angle, notes: the spec),
+`audience` jsonb (recipe), `call_script_item_id` (FK `content_items`, SET NULL), `approved_by_id`, `approved_at`,
+`approved_hash`.
+
+`campaign_steps` (new): `campaign_id`, `position`, `channel` (CHECK `email`, `call`, `ad`, `post`, `dm`),
+`wait_days` (working days after the previous step), `audience_rule` (CHECK `all`, `no_reply`, `no_answer`),
+`content_item_id` (the asset: e-mail copy, script, ad), unique (`campaign_id`, `position`).
+
+`campaign_members` (new): `campaign_id`, `company_id`, `person_id?`, `lead_id?`, `step_position`, `state` (CHECK
+`queued`, `needs_contact`, `promoted`, `declined`, `unreachable`, `excluded`, `done`), `attempts`,
+`next_eligible_on`, `priority`, `tier`, `lane`, `phone_only`, `why`, `city`, `import_batch`, `created_company`,
+`created_person`, `last_outcome`, `last_touched_at`, `created_at`, `state_changed_at`; unique (`campaign_id`,
+`company_id`). Rollback: drop the two tables and the columns (written in the migration header).
+
+Launch rule: only Áron's session (`demoHosts.aron`) moves `draft` or `paused` to `running`; the approval stores a
+hash of members, steps and cap. Any edit to members, steps or cap of a running campaign returns it to `draft`
+(the daily list empties until Áron approves again). No app key can approve, launch, raise a cap or send.
+
+## v2.5 AI specification endpoint
+
+`POST /api/campaigns/<slug>/specify`, app key (`validateAppKey`), tenant from the key, rate-limited like
+`/api/content`. It may write ONLY: the `brief` (stored as a proposal next to the current one, never over a
+human edit), proposed steps on a `draft` campaign, and assets through the existing `createItem` path (status
+`draft` in the approval pipeline, `campaign_id` set). It refuses on a running campaign, never touches members
+by itself (members go through the dry-run loader), and can never approve, launch, change the cap or send. The
+in-app assistant can call the same service later; nothing in it changes in slice 1.
+
+## v2.6 Promotion rules (prospect to lead)
+
+| Engagement | Result |
+|---|---|
+| Call: Érdeklődik | Lead created on the company, stage `contacting`, owner Péter, next action = follow-up in 7 days (or the date the caller set), `campaign = <slug>`. No SLA task: the call already happened |
+| Call: Kéri / akarja | Lead created, stage `qualified`, next action in 2 days |
+| Call: Nem vették fel | Stays a prospect: attempts + 1, back on the list after 2 working days, `unreachable` after 3 |
+| Call: Nem érdekli / Rossz szám | Member `declined` / `excluded`, no lead |
+| E-mail: positive reply | Lead through the existing reply intake, stage `new` WITH the SLA call (one task per real reply) |
+| E-mail: negative reply / unsubscribe | `declined`; unsubscribe also writes a suppression |
+| E-mail sent, no reply after `wait_days` | Member moves to the call step and enters the capped list |
+| Company already has an open lead | Member linked to it, the call is logged on it, its stage moves forward only through the tenant's transition table |
+| Later: form fill, DM reply | Same promotion through the connector's inbound event |
+
+Who gets which first step: Péter's own past clients (`phone_only`, the builder's warm lane) start at the call
+step; unknown firms start at the e-mail step; a member with no e-mail skips to the call step; no phone and no
+e-mail = `needs_contact`, never on a list. The daily list is computed on read: running campaign, members on a
+call step, `next_eligible_on` today or earlier, priority then city, at most `daily_cap` minus those already
+touched today.
+
+## v2.7 Analytics additions
+
+One query layer (`lib/campaigns/analytics.ts`), pure aggregation tested on fixtures: per campaign audience,
+needs contact, touched, replied, promoted to lead, booked (lead reached `discovery_booked` or `demo_booked`),
+declined, unreachable; split by step and by day. Shown as a "Futó kampányok" strip on `/analytics` and on the
+campaign page (after Áron's mockup pick). `/outreach/campaigns` and `/reports/weekly` stay as they are.
+
+## v2.8 Connector interface (description only, nothing built)
+
+A connector is a registered app key with a `kind` (ad platform, DM bot, form) that may: read a running campaign's
+approved assets and audience size, post engagement events (`POST /api/campaigns/<slug>/outcome` with
+`kind: dm_reply | form_fill | ad_lead`, deduped by an external id), and post spend and reach numbers. It never
+reads contact data of members it did not create and never launches. Outbound sends through a connector sit
+behind the same per-campaign approval and a per-connector switch, off by default.
+
+## v2.9 Mockups
+
+`docs/proposals/mockups/campaigns-a-hub.html` and `docs/proposals/mockups/campaigns-b-two-homes.html`:
+
+- **A, one Campaigns hub**: a new "Kampányok" nav item; marketing and sales campaigns in one list with the type as
+  filter tabs; create, specify, launch and analytics on one campaign page. Marketing and Outreach keep their
+  pages; their own campaign tabs link into the hub.
+- **B, two homes, one shared layer**: no new nav item. Marketing campaigns stay under Marketing > Kampányok, sales
+  campaigns live under Outreach > Kampányok; both open the same shared campaign page (specify, launch, analytics),
+  and running campaigns show on `/analytics`.
+
+Both show the call view in Hívás mód with the campaign script. Áron picks before any UI is built.

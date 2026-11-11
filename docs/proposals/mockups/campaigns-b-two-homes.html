@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campaigns two homes (B)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Astryx theme-neutral values (light), mapped to the CRM's --ui-* names (web/src/styles/tokens.css). */
+:root {
+  --ui-page: #f1f1f1; --ui-surface: #ffffff; --ui-surface-muted: #f6f6f6;
+  --ui-text: #000000; --ui-text-muted: #474747; --ui-text-disabled: #919191;
+  --ui-border: #00000014; --ui-border-strong: #d4d4d4;
+  --ui-accent: #1b1b1b; --ui-on-accent: #ffffff; --ui-accent-surface: #e6e6e6;
+  --ui-success-text: #2f7d33; --ui-success-surface: #dff0de;
+  --ui-warning-text: #836700; --ui-warning-surface: #fbeec8;
+  --ui-radius-control: 0.625rem; --ui-radius-surface: 0.75rem; --ui-radius-pill: 999px;
+  --ui-shadow-raised: 0 2px 4px #0000000d, 0 4px 8px #0000001a;
+  --ui-font: Figtree, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ui-page); color: var(--ui-text); font: 14px/1.45 var(--ui-font); }
+.app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+.nav { background: var(--ui-surface); border-right: 1px solid var(--ui-border); padding: 16px 10px; }
+.brand { font-weight: 700; padding: 4px 10px 14px; }
+.nav a { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; border-radius: var(--ui-radius-control); color: var(--ui-text-muted); text-decoration: none; }
+.nav a.on { background: var(--ui-accent-surface); color: var(--ui-text); font-weight: 600; }
+.nav .sep { height: 1px; background: var(--ui-border); margin: 10px 6px; }
+.nav .new { font-size: 11px; color: var(--ui-text-muted); border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-pill); padding: 0 6px; }
+main { padding: 24px 32px 40px; min-width: 0; }
+.crumb { color: var(--ui-text-muted); font-size: 13px; margin-bottom: 4px; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+h1 { font-size: 22px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+h2 { font-size: 15px; margin: 0 0 10px; font-weight: 600; }
+.sub { color: var(--ui-text-muted); font-size: 13px; }
+.btn { font: inherit; border: 1px solid var(--ui-border-strong); background: var(--ui-surface); color: var(--ui-text); padding: 8px 14px; border-radius: var(--ui-radius-control); cursor: pointer; }
+.btn.primary { background: var(--ui-accent); color: var(--ui-on-accent); border-color: var(--ui-accent); font-weight: 600; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ui-text-muted); }
+.btn:disabled { opacity: .45; }
+.card { background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-surface); padding: 16px 18px; }
+.grid2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.seg { display: inline-flex; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-control); padding: 3px; gap: 2px; }
+.seg span { padding: 5px 12px; border-radius: 8px; color: var(--ui-text-muted); font-size: 13px; }
+.seg span.on { background: var(--ui-accent-surface); color: var(--ui-text); font-weight: 600; }
+.seg b { font-weight: 500; color: var(--ui-text-disabled); margin-left: 4px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 500; font-size: 12px; color: var(--ui-text-muted); padding: 8px 10px; border-bottom: 1px solid var(--ui-border); }
+td { padding: 11px 10px; border-bottom: 1px solid var(--ui-border); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.name { font-weight: 600; }
+.muted { color: var(--ui-text-muted); }
+.small { font-size: 12px; }
+.pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: var(--ui-radius-pill); border: 1px solid var(--ui-border-strong); color: var(--ui-text-muted); white-space: nowrap; }
+.pill.run { background: var(--ui-success-surface); border-color: transparent; color: var(--ui-success-text); }
+.pill.wait { background: var(--ui-warning-surface); border-color: transparent; color: var(--ui-warning-text); }
+.type { font-size: 12px; color: var(--ui-text-muted); }
+.stats { display: flex; gap: 28px; }
+.stat .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 12px; color: var(--ui-text-muted); }
+.bar { height: 6px; background: var(--ui-surface-muted); border-radius: 3px; overflow: hidden; display: flex; }
+.bar i { display: block; height: 100%; background: var(--ui-accent); }
+.bar i.b { background: #8a8a8a; } .bar i.c { background: #c9c9c9; }
+.screen { margin-top: 48px; }
+.screen > .label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ui-text-disabled); margin-bottom: 10px; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 12px; color: var(--ui-text-muted); margin-bottom: 4px; }
+.input { border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); padding: 8px 10px; background: var(--ui-surface); min-height: 36px; }
+.types { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.types div { border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); padding: 10px; font-size: 13px; }
+.types div.on { border: 2px solid var(--ui-accent); padding: 9px; font-weight: 600; }
+.types div span { display: block; font-weight: 400; color: var(--ui-text-muted); font-size: 12px; margin-top: 2px; }
+.ai { background: var(--ui-surface-muted); border: 1px dashed var(--ui-border-strong); border-radius: var(--ui-radius-surface); padding: 14px 16px; }
+.ai li { margin: 6px 0; }
+.steps { list-style: none; margin: 0; padding: 0; }
+.steps li { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--ui-border); align-items: center; }
+.steps li:last-child { border-bottom: 0; }
+.steps .n { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--ui-border-strong); display: grid; place-items: center; font-size: 12px; }
+.approve { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ui-border); margin-top: 14px; padding-top: 14px; }
+.call { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; }
+.row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--ui-border); }
+.row.sel { background: var(--ui-accent-surface); margin: 0 -10px; padding: 9px 10px; border-radius: 8px; border-bottom-color: transparent; }
+.grp { font-size: 12px; color: var(--ui-text-muted); margin: 12px 0 2px; }
+.script { white-space: pre-line; font-size: 13.5px; line-height: 1.55; border-left: 3px solid var(--ui-accent); padding: 4px 0 4px 12px; margin: 8px 0 12px; }
+.outcomes { display: flex; flex-wrap: wrap; gap: 6px; }
+.note { font-size: 12px; color: var(--ui-text-muted); margin-top: 8px; }
+.strip { display: grid; grid-template-columns: 1.6fr repeat(5, 1fr) 1.4fr; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--ui-border); }
+.strip.h { font-size: 12px; color: var(--ui-text-muted); }
+.legend { font-size: 12px; color: var(--ui-text-muted); }
+.tag { font-size: 11px; color: var(--ui-text-disabled); }
+@media (max-width: 800px) { .app { grid-template-columns: 1fr; } .nav { display: none; } main { padding: 16px; } .grid2, .grid3, .call, .types { grid-template-columns: 1fr; } table, .strip { font-size: 12px; } }
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="nav"><div class="brand">Helm CRM</div>
+<a href="#" >Leadek</a>
+<a href="#" >Hívás mód</a>
+
+<a href="#">Feladatok</a><a href="#">Áttekintés</a><div class="sep"></div>
+<a href="#">Cégek</a><a href="#">Személyek</a><a href="#">Pipeline</a><a href="#">Árajánlatok</a><a href="#">Számlák</a>
+<a href="#" class="on">Outreach</a>
+<a href="#" >Marketing</a>
+<div class="sep"></div><a href="#">Továbbiak</a><a href="#">Beállítások</a></aside>
+<main>
+<section>
+  <div class="crumb">Változat B: nincs új menüpont. Az értékesítési kampányok az Outreach alatt, a marketing kampányok a Marketing alatt; mindkettő ugyanazt a kampányoldalt nyitja.</div>
+  <div class="crumb">Outreach &gt; Kampányok</div>
+  <div class="head"><div><h1>Outreach kampányok</h1><div class="sub">Hidegtelefon, hideg e-mail és sorozatok. Marketing kampányok: Marketing &gt; Kampányok.</div></div><button class="btn primary">Új értékesítési kampány</button></div>
+  <div class="card" style="padding:4px 8px"><table><tr><th>Kampány</th><th>Típus</th><th>Állapot</th><th class="num">Közönség</th><th class="num">Ma</th><th class="num">Lead lett</th><th>Felelős</th></tr>
+<tr><td><span class="name">Budapest indulás</span><div class="small muted">e-mail, majd hívás 3 munkanap után</div></td><td class="type">Sorozat</td><td><span class="pill run">Fut</span></td><td class="num">76</td><td class="num">ma 15</td><td class="num">5</td><td>Péter</td></tr>
+<tr><td><span class="name">Gépvevők</span><div class="small muted">Gépeladás pipeline, bemutatóra</div></td><td class="type">Hidegtelefon</td><td><span class="pill wait">Jóváhagyásra vár</span></td><td class="num">40</td><td class="num muted">0</td><td class="num">0</td><td>Péter</td></tr>
+<tr><td><span class="name">Elveszett, időzítés</span><div class="small muted">leadek, 60 napnál régebben elveszett</div></td><td class="type">Sorozat (leadek)</td><td><span class="pill">Piszkozat</span></td><td class="num">12</td><td class="num muted">0</td><td class="num">0</td><td>Áron</td></tr>
+  </table></div>
+  <div class="grid2" style="margin-top:16px">
+    <div class="card"><h2>Ugyanaz a kampányoldal mindkét helyről</h2>
+      <div class="seg" style="margin-bottom:10px"><span class="on">Áttekintés</span><span>Specifikáció</span><span>Tagok</span><span>Indítás</span></div>
+      <div class="sub">A Marketing &gt; Kampányok sorai (BirdsView Q3, Meta, felújítók) ugyanezt az oldalt nyitják, Hirdetés vagy Organikus típussal. A típus dönti el, mely fülek látszanak: telefonos kampánynál Tagok és napi keret, hirdetésnél anyagok és kézi számok.</div></div>
+    <div class="card"><h2>Marketing &gt; Kampányok (marad, ahol van)</h2>
+      <table><tr><th>Kampány</th><th>Típus</th><th>Állapot</th><th class="num">Közönség</th><th class="num">Ma</th><th class="num">Lead lett</th><th>Felelős</th></tr>
+<tr><td><span class="name">BirdsView Q3</span><div class="small muted">Construction szegmens, 4 élő anyag</div></td><td class="type">Organikus</td><td><span class="pill run">Fut</span></td><td class="num">312</td><td class="num muted">n/a</td><td class="num">1</td><td>Áron</td></tr>
+<tr><td><span class="name">Meta, felújítók</span><div class="small muted">2 hirdetés anyag felülvizsgálatra</div></td><td class="type">Hirdetés</td><td><span class="pill">Piszkozat</span></td><td class="num muted">n/a</td><td class="num muted">n/a</td><td class="num">0</td><td>Áron</td></tr>
+      </table></div>
+  </div>
+</section>
+<section class="screen">
+  <div class="label">Létrehozás és specifikáció (a kampányoldal Specifikáció füle)</div>
+  <div class="crumb">Outreach &gt; Kampányok &gt; Új értékesítési kampány</div>
+  <div class="head"><div><h1>Új kampány</h1><div class="sub">Piszkozat. Semmi nem megy ki, amíg Áron el nem indítja.</div></div>
+    <button class="btn primary">Piszkozat mentése</button></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="field"><label>Típus</label>
+        <div class="types">
+          <div>Hirdetés<span>Meta, Google</span></div>
+          <div>Organikus<span>poszt, blog</span></div>
+          <div>Hidegtelefon<span>Hívás mód</span></div>
+          <div>Hideg e-mail<span>Outreach</span></div>
+          <div class="on">Sorozat<span>e-mail, majd hívás</span></div>
+        </div></div>
+      <div class="field"><label>Név</label><div class="input">Budapest indulás</div></div>
+      <div class="field"><label>Cél, ajánlat</label><div class="input">Betonszkennelés kivitelezőknek, első bemutató kedvezménnyel</div></div>
+      <div class="field"><label>Célközönség</label><div class="input">Indulási lista, Budapest (betöltve: 147 cég, 76 elérhető)</div></div>
+      <div class="field"><label>Lépések</label>
+        <ol class="steps">
+          <li><span class="n">1</span><span>E-mail, 1. érintés <span class="muted small">ismeretlen cégeknek</span></span><span class="pill wait">anyag jóváhagyásra vár</span></li>
+          <li><span class="n">2</span><span>Hívás 3 munkanap után <span class="muted small">akik nem válaszoltak, és Péter régi ügyfelei rögtön</span></span><span class="pill">hívásszkript v1</span></li>
+        </ol></div>
+    </div>
+    <div class="ai">
+      <h2>Specifikáció AI-val</h2>
+      <div class="sub" style="margin-bottom:8px">Egy ügynök kitölti a briefet és megírja az anyagokat. Minden javaslat az Anyagok jóváhagyási sorba kerül, indítani nem tud.</div>
+      <ul>
+        <li>Brief: célcsoport, ajánlat, szög <span class="pill">javaslat</span></li>
+        <li>E-mail, 1. érintés <span class="pill">Anyagok: felülvizsgálatra</span></li>
+        <li>Hívásszkript, 2. lépés <span class="pill">Anyagok: felülvizsgálatra</span></li>
+        <li>Szükséges anyagok: esettanulmány PDF <span class="pill">hiányzik</span></li>
+      </ul>
+      <button class="btn">Ügynök kérése a briefhez</button>
+      <div class="note">API: POST /api/campaigns/budapest-indulas/specify (app kulcs, csak javaslat)</div>
+    </div>
+  </div>
+</section>
+<section class="screen">
+  <div class="label">Indítás jóváhagyással és kerettel (közös réteg, mindkét otthonból)</div>
+  <div class="crumb">Outreach &gt; Kampányok &gt; Budapest indulás &gt; Indítás</div>
+  <div class="head"><div><h1>Budapest indulás</h1><div class="sub">Sorozat · Piszkozat · felelős: Péter</div></div></div>
+  <div class="grid2">
+    <div class="card">
+      <h2>Célközönség</h2>
+      <div class="stats" style="margin-bottom:12px">
+        <div class="stat"><div class="v">76</div><div class="l">elérhető cég</div></div>
+        <div class="stat"><div class="v">23</div><div class="l">csak telefon (Péter ügyfelei)</div></div>
+        <div class="stat"><div class="v">71</div><div class="l">nincs elérhetőség</div></div>
+      </div>
+      <div class="sub">Kihagyva: 4 nyitott lead, 1 tiltólistás. 66 lehetséges duplikátum embernek hagyva.</div>
+      <h2 style="margin-top:16px">Lépések</h2>
+      <ol class="steps">
+        <li><span class="n">1</span><span>E-mail, 1. érintés</span><span class="pill run">sablon v3 jóváhagyva</span></li>
+        <li><span class="n">2</span><span>Hívás 3 munkanap után, akik nem válaszoltak</span><span class="pill run">szkript v1 jóváhagyva</span></li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2>Napi keret</h2>
+      <div style="display:flex;align-items:center;gap:10px"><div class="input" style="width:72px;text-align:right">15</div><span>hívás naponta, Péter</span></div>
+      <div class="sub" style="margin-top:8px">Becsült futás: 6 munkanap. A lista minden reggel számolódik, előre nem készül feladat.</div>
+      <h2 style="margin-top:16px">Időszak</h2>
+      <div class="sub">2026-11-16 és 2026-11-27 között</div>
+    </div>
+  </div>
+  <div class="card approve">
+    <div><b>Ezt hagyod jóvá:</b> 76 cég, 2 lépés, napi 15, sablon v3, szkript v1.<div class="sub">Bármely módosítás után a kampány visszaáll piszkozatra.</div></div>
+    <div style="text-align:right"><button class="btn primary">Jóváhagyás és indítás</button><div class="tag" style="margin-top:4px">csak Áron</div></div>
+  </div>
+</section>
+<section class="screen">
+  <div class="label">Hívás mód, kampány fül (a név és az oldal marad)</div>
+  <div class="head"><div><h1>Hívás mód</h1></div>
+    <div class="seg"><span class="on">Budapest indulás <b>ma 15</b></span><span>Gépvevők <b>ma 8</b></span><span>Szegmensek</span></div></div>
+  <div class="call">
+    <div class="card">
+      <div class="sub" style="margin-bottom:6px">Ma 4 / 15 · hátra 61 · lead lett 3 · elérhetetlen 2</div>
+      <div class="grp">XI. kerület</div>
+      <div class="row sel"><span><span class="name">Példa Építő Kft.</span> <span class="muted small">ügyvezető · B</span></span><span class="small muted">e-mail 11-16, nincs válasz</span></div>
+      <div class="row"><span><span class="name">Minta Generál Zrt.</span> <span class="muted small">műszaki vezető · A</span></span><span class="small muted">1. próba</span></div>
+      <div class="grp">XIII. kerület</div>
+      <div class="row"><span><span class="name">Teszt Mélyépítő Kft.</span> <span class="muted small">ügyvezető · B</span></span><span class="small muted">Péter ügyfele, csak telefon</span></div>
+      <div class="row"><span><span class="name">Próba Beton Bt.</span> <span class="muted small">tulajdonos · C</span></span><span class="small muted">2. próba</span></div>
+    </div>
+    <div class="card">
+      <h2>Példa Építő Kft.</h2>
+      <div class="sub">Miért: 2025 díjazott projekt, Budapest XI. · e-mail elment 11-16</div>
+      <div class="small muted" style="margin-top:12px">Kampányszkript v1 (Anyagok, élő)</div>
+      <div class="script">Jó napot, Nagy Péter vagyok a Controllabortól. Múlt héten írtunk a betonszkennelésről.
+Van most olyan munkájuk, ahol fúrás vagy vésés előtt tudni kell, mi van a betonban?
+Ha igen: egy bemutatót tudok ajánlani a helyszínen, az első alkalom kedvezményes.</div>
+      <div class="outcomes">
+        <button class="btn">Nem vették fel</button><button class="btn">Érdeklődik</button><button class="btn primary">Kéri / akarja</button>
+        <button class="btn">Nem érdekli</button><button class="btn">Rossz szám</button>
+      </div>
+      <div class="note">Érdeklődik vagy Kéri után a cég lead lesz a Leadek oldalon, a megfelelő oszlopban, SLA feladat nélkül.</div>
+    </div>
+  </div>
+</section>
+<section class="screen">
+  <div class="label">Közös analitika: "Futó kampányok" sáv az Analytics oldalon, mindkét otthon kampányaival</div>
+  <div class="card">
+    <div class="head" style="margin-bottom:4px"><h2 style="margin:0">Futó kampányok</h2><div class="seg"><span class="on">Lépés szerint</span><span>Nap szerint</span></div></div>
+    <div class="strip h"><span>Kampány</span><span class="num">Közönség</span><span class="num">Érintve</span><span class="num">Válaszolt</span><span class="num">Lead lett</span><span class="num">Foglalt</span><span>Haladás</span></div>
+    <div class="strip"><span><span class="name">Budapest indulás</span> <span class="type">sorozat</span></span><span class="num">76</span><span class="num">38</span><span class="num">6</span><span class="num">5</span><span class="num">2</span><span><div class="bar"><i style="width:50%"></i><i class="b" style="width:8%"></i></div></span></div>
+    <div class="strip"><span><span class="name">Gépvevők</span> <span class="type">hidegtelefon</span></span><span class="num">40</span><span class="num">12</span><span class="num">0</span><span class="num">3</span><span class="num">1</span><span><div class="bar"><i style="width:30%"></i></div></span></div>
+    <div class="strip"><span><span class="name">BirdsView Q3</span> <span class="type">organikus</span></span><span class="num">n/a</span><span class="num">4 poszt</span><span class="num">n/a</span><span class="num">1</span><span class="num">0</span><span><div class="bar"><i class="c" style="width:60%"></i></div></span></div>
+    <div class="legend" style="margin-top:8px">Minden szám soronként számolódik a kampánytagokból és a leadekből. A hirdetés és organikus számok kézzel rögzítettek, amíg nincs csatoló.</div>
+  </div>
+</section>
+</main></div></body></html>
