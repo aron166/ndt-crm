@@ -6,6 +6,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import k from "@/components/astryx/page.module.css";
+import s from "@/app/(app)/campaigns/campaigns.module.css";
 import { kindLabel, isContentOnly } from "@/lib/campaigns/labels";
 import type { CampaignStatsV2 } from "@/lib/campaigns/analytics";
 
@@ -23,7 +24,7 @@ export function RunningStrip({ rows, title = "Futó kampányok" }: { rows: Strip
         <div className={k.seg} role="group" aria-label="Bontás">
           {VIEWS.map((v) => (
             <button key={v.key} type="button" aria-pressed={view === v.key} onClick={() => setView(v.key)}
-              className={`${k.segItem} ${view === v.key ? k.segItemOn : ""}`} style={{ border: 0, font: "inherit", cursor: "pointer" }}>
+              className={`${k.segItem} ${s.segBtn} ${view === v.key ? k.segItemOn : ""}`}>
               {v.label}
             </button>
           ))}

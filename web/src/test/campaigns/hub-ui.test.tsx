@@ -75,12 +75,17 @@ describe("Futó kampányok", () => {
 
 describe("Specifikáció AI-val", () => {
   it("shows each proposed asset's state in the approval pipeline and the agent endpoint", () => {
-    render(<SpecifyPanel slug="bp" editable proposal={{ brief: { offer: "x" }, steps: [{ channel: "email" }], assets: [{ item_id: 5, step_position: 1 }, { item_id: 6, step_position: 2 }], proposed_by: "corvid" }}
+    render(<SpecifyPanel slug="bp" editable canAdoptSteps proposal={{ brief: { offer: "x" }, steps: [{ channel: "email" }], assets: [{ item_id: 5, step_position: 1 }, { item_id: 6, step_position: 2 }], proposed_by: "corvid" }}
       assets={[{ id: 5, title: "E-mail 1", status: "in_review", version: 1 }, { id: 6, title: "Szkript", status: "live", version: 2 }]} />);
     expect(screen.getByText(/Anyagok: felülvizsgálatra/)).toBeTruthy();
     expect(screen.getByText(/Anyagok: jóváhagyva/)).toBeTruthy();
     expect(screen.getByText(/POST \/api\/campaigns\/bp\/specify/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Lépések átvétele" })).toBeTruthy();
+  });
+  it("steps are adoptable only on a draft with per-member steps (not running, not content only)", () => {
+    render(<SpecifyPanel slug="bp" editable proposal={{ brief: { offer: "x" }, steps: [{ channel: "email" }] }} assets={[]} />);
+    expect(screen.queryByRole("button", { name: "Lépések átvétele" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Brief átvétele" })).toBeTruthy();
   });
   it("with no proposal there is nothing to adopt", () => {
     render(<SpecifyPanel slug="bp" editable proposal={null} assets={[]} />);

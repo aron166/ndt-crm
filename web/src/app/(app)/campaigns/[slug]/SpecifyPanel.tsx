@@ -25,7 +25,11 @@ export interface Proposal {
   proposed_at?: string;
 }
 
-export function SpecifyPanel({ slug, proposal, assets, editable }: { slug: string; proposal: Proposal | null; assets: AssetState[]; editable: boolean }) {
+/**
+ * `editable`: the brief can be adopted (not part of the approval). `canAdoptSteps`: only on a draft
+ * with per-member steps, since adopting steps on a running campaign silently resets it (Vanda #189-1, -2).
+ */
+export function SpecifyPanel({ slug, proposal, assets, editable, canAdoptSteps = false }: { slug: string; proposal: Proposal | null; assets: AssetState[]; editable: boolean; canAdoptSteps?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -33,10 +37,15 @@ export function SpecifyPanel({ slug, proposal, assets, editable }: { slug: strin
 
   async function run(fn: () => Promise<{ ok: true } | { error: string }>, done: string) {
     setBusy(true);
-    const r = await fn();
-    setBusy(false);
-    setMsg("error" in r ? { ok: false, text: r.error } : { ok: true, text: done });
-    if (!("error" in r)) router.refresh();
+    try {
+      const r = await fn();
+      setMsg("error" in r ? { ok: false, text: r.error } : { ok: true, text: done });
+      if (!("error" in r)) router.refresh();
+    } catch {
+      setMsg({ ok: false, text: "Hálózati hiba, próbáld újra" });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -45,7 +54,7 @@ export function SpecifyPanel({ slug, proposal, assets, editable }: { slug: strin
         <h2 className={k.groupTitle}>Specifikáció AI-val</h2>
         {proposal?.proposed_by && <span className={k.muted}>javasolta: {proposal.proposed_by}{proposal.proposed_at ? `, ${proposal.proposed_at.slice(0, 10)}` : ""}</span>}
       </div>
-      <p className={k.muted}>Egy ügynök kitölti a briefet és megírja az anyagokat. Minden anyag az Anyagok jóváhagyási sorába kerül; indítani nem tud.</p>
+      <p className={k.muted}>Egy ügynök az alábbi végponton javasolhat briefet, lépéseket és anyagokat. Minden anyag az Anyagok jóváhagyási sorába kerül; indítani nem tud.</p>
       {!proposal ? (
         <p className={k.muted}>Még nincs javaslat.</p>
       ) : (
@@ -81,7 +90,7 @@ export function SpecifyPanel({ slug, proposal, assets, editable }: { slug: strin
           {editable && (
             <div className={k.actions}>
               {proposal.brief && <button type="button" className={k.btn} disabled={busy} onClick={() => run(() => updateCampaignAction(slug, { adopt_brief_proposal: true }), "A brief átvéve")}>Brief átvétele</button>}
-              {proposal.steps && proposal.steps.length > 0 && <button type="button" className={k.btn} disabled={busy} onClick={() => run(() => adoptProposedStepsAction(slug), "A lépések átvéve; a kampány piszkozat")}>Lépések átvétele</button>}
+              {canAdoptSteps && proposal.steps && proposal.steps.length > 0 && <button type="button" className={k.btn} disabled={busy} onClick={() => run(() => adoptProposedStepsAction(slug), "A lépések átvéve; a kampány piszkozat")}>Lépések átvétele</button>}
             </div>
           )}
         </>
