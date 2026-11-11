@@ -379,6 +379,7 @@ export async function runAutomations(event: AutomationEvent): Promise<void> {
     for (const rule of rules) {
       // Per-rule isolation: one rule failing must not stop the others.
       try {
+        if (event.skipActionTypes?.includes(rule.actionType)) continue;
         if (!triggerMatches(rule.triggerType as TriggerType, rule.triggerConfig, ev)) continue;
         if (!conditionsPass(rule.conditions, ev.fields)) continue;
 

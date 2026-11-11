@@ -97,4 +97,6 @@ export interface AutomationEvent {
   /** deal_stage_changed: the stage the deal just entered. */
   toStageId?: number;
   fields: Record<string, string | number | null | undefined>;
+  /** Action types this event must not run (a campaign promotion skips outbound actions unless the campaign opts in). */
+  skipActionTypes?: readonly string[];
 }

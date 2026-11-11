@@ -8,12 +8,15 @@ import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
+const sendEmail = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/integrations/resend", () => ({ sendEmail }));
 
 vi.mock("@/lib/db", () => ({
   db: {
     automationRule: { findMany: vi.fn(), update: vi.fn() },
     task: { create: vi.fn() },
     company: { findFirst: vi.fn() },
+    person: { findFirst: vi.fn() },
   },
 }));
 
@@ -273,6 +276,27 @@ describe("runAutomations (orchestrator)", () => {
     ]);
     await runAutomations(leadCreated()); // source is "web" → condition fails
     expect(mockDb.task.create).not.toHaveBeenCalled();
+  });
+
+  it("an active send_email rule on lead_created does not fire on a campaign promotion by default (Vanda #188-8)", async () => {
+    (db as unknown as { person: { findFirst: ReturnType<typeof vi.fn> } }).person.findFirst.mockResolvedValue({ email: "anna@pelda.example.test" });
+    sendEmail.mockResolvedValue({ ok: true });
+    mockDb.automationRule.findMany.mockResolvedValue([
+      dbRule({ id: 7, actionType: "send_email", actionConfig: { subjectTemplate: "Hi", bodyTemplate: "Hello {company}" } }),
+      dbRule({ id: 8 }),
+    ]);
+    mockDb.task.create.mockResolvedValue({ id: 1 });
+    mockDb.automationRule.update.mockResolvedValue({});
+    // Control: the same rule DOES send on an ordinary lead_created, so the skip below is what stops it.
+    await runAutomations(leadCreated());
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    vi.clearAllMocks();
+    mockDb.task.create.mockResolvedValue({ id: 1 });
+    // The event as lib/campaigns/service recordOutcome builds it for a campaign without the opt-in.
+    const { OUTBOUND_ACTIONS } = await import("@/lib/campaigns/service");
+    await runAutomations(leadCreated({ fields: { source: "campaign", campaign: "bp" }, skipActionTypes: OUTBOUND_ACTIONS }));
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(mockDb.task.create).toHaveBeenCalledTimes(1); // other rules still run
   });
 
   it("never throws even if the rule query fails", async () => {
