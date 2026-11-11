@@ -151,3 +151,10 @@ export function unfoldSteps(steps: readonly StepDraft[]): SeqRow[] {
     return s.wait_days > 0 ? [{ kind: "wait", days: s.wait_days }, touch] : [touch];
   });
 }
+
+/** Member states as the member list and the quick view name them (same words as the launch tab). */
+const MEMBER_STATE: Record<string, string> = {
+  queued: "elérhető", needs_email: "e-mailre vár (nincs e-mail)", needs_contact: "nincs elérhetőség", promoted: "lead lett",
+  declined: "elutasította", unreachable: "elérhetetlen", excluded: "kizárva", done: "végigment",
+};
+export const memberStateLabel = (st: string) => MEMBER_STATE[st] ?? st;

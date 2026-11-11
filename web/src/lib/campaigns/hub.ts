@@ -10,6 +10,7 @@ import { campaignAnalytics } from "./analytics";
 import { approvalHash, type StepDef } from "./rules";
 import { dailyList, getCampaign, listCampaigns, OPERATOR_ROLES } from "./service";
 import { campaignVariants } from "./preview";
+import { segmentOf } from "./email-preview";
 
 /** Monday 00:00 Budapest of the week `now` is in. */
 export function weekStart(now: Date): Date {
@@ -128,4 +129,14 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
     isAron: aron != null && aron === userId,
     canOperate: me != null && OPERATOR_ROLES.includes(me.role),
   };
+}
+
+/** The member list of the Tagok tab: one light row per member, the quick view loads the rest. */
+export async function memberRows(tenantId: number, campaignId: number) {
+  const rows = await db.campaignMember.findMany({
+    where: { tenantId, campaignId },
+    orderBy: [{ priority: "asc" }, { id: "asc" }],
+    select: { id: true, state: true, stepPosition: true, tier: true, lane: true, segment: true, city: true, company: { select: { name: true, city: true } } },
+  });
+  return rows.map((r) => ({ id: r.id, company: r.company.name, city: r.city ?? r.company.city, tier: r.tier, lane: r.lane, segment: segmentOf(r), state: r.state, stepPosition: r.stepPosition }));
 }

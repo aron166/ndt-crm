@@ -91,7 +91,7 @@ async function needsOperator(ctx: CampaignCtx): Promise<Fail | null> {
 // Read
 
 const CAMPAIGN_SELECT = {
-  id: true, slug: true, name: true, kind: true, status: true, dailyCap: true, ownerUserId: true,
+  id: true, slug: true, name: true, kind: true, status: true, dailyCap: true, ownerUserId: true, senderUserId: true,
   startsOn: true, endsOn: true, brief: true, briefProposal: true, audience: true, project: true,
   approvedById: true, approvedAt: true, approvedHash: true, outboundAutomations: true, isArchived: true, createdAt: true,
   steps: {
@@ -949,7 +949,7 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   const room = Math.max(0, c.dailyCap - madeToday);
   const today = localDay(now).key;
   const ymdKey = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
-  if (!inWindow(ymdKey(c.startsOn), ymdKey(c.endsOn), today)) return { ok: true as const, drafted: 0, noAddress: 0, noAsset: 0 };
+  if (!inWindow(ymdKey(c.startsOn), ymdKey(c.endsOn), today)) return { ok: true as const, drafted: 0, noAddress: 0, noAsset: 0, unresolved: 0 };
   const emailSteps = new Map(c.steps.filter((x) => x.channel === "email").map((x) => [x.position, x]));
   const members = (await db.campaignMember.findMany({
     where: { tenantId, campaignId: c.id, state: "queued", stepPosition: { in: [...emailSteps.keys()] }, company: { deletedAt: null } },

@@ -14,6 +14,10 @@ import { SpecifyPanel, type Proposal } from "./SpecifyPanel";
 import { StepsSection } from "./StepsSection";
 import { LaunchPanel } from "./LaunchPanel";
 import { MemberLoad } from "./MemberLoad";
+import { MemberList } from "./MemberList";
+import { EmailCheck } from "./EmailCheck";
+import { campaignEmailCheck } from "@/lib/campaigns/preview";
+import { memberRows } from "@/lib/campaigns/hub";
 import { CampaignAutomations } from "./CampaignAutomations";
 import { AudiencePanel } from "./AudiencePanel";
 import { audienceOf } from "@/lib/campaigns/rules";
@@ -28,9 +32,9 @@ export const dynamic = "force-dynamic";
 const TENANT_ID = 1;
 
 
-export default async function CampaignPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ tab?: string }> }) {
+export default async function CampaignPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ tab?: string; m?: string }> }) {
   const { slug } = await params;
-  const { tab: rawTab } = await searchParams;
+  const { tab: rawTab, m: rawMember } = await searchParams;
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) notFound(); // the (app) layout already refuses; keeps the type narrow
   const d = await campaignPage(TENANT_ID, slug, userId);
@@ -62,10 +66,14 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         <LaunchPanel isAron={d.isAron} d={{
           slug: c.slug, status: c.status, dailyCap: c.dailyCap, startsOn: ymd(c.startsOn), endsOn: ymd(c.endsOn),
           outboundAutomations: c.outboundAutomations, previewHash: d.previewHash, approvedAt: c.approvedAt ? c.approvedAt.toISOString() : null,
-          steps: c.steps, assets: d.assets, members: d.members,
+          steps: c.steps, assets: d.assets, members: d.members, variants: d.variants,
         }} />
       )}
+      {tab === "launch" && <EmailCheck slug={c.slug} c={await campaignEmailCheck(TENANT_ID, c.id, c.senderUserId)} />}
       {tab === "automations" && await automationsTab(c.id, c.outboundAutomations)}
+      {tab === "members" && (
+        <MemberList slug={c.slug} rows={await memberRows(TENANT_ID, c.id)} openId={Number(rawMember) > 0 ? Number(rawMember) : null} />
+      )}
       {tab === "members" && (
         <MemberLoad slug={c.slug} status={c.status} canOperate={d.canOperate} closed={c.status === "stopped" || c.status === "done"}
           batches={d.batches.map((b) => ({ ...b, createdAt: b.createdAt ? b.createdAt.toISOString() : null }))} />
