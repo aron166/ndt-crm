@@ -5,7 +5,7 @@ import { UI } from "@/lib/content/labels";
 const TABS = [
   { key: "inbox" as const, href: "/marketing", label: "Anyagok" },
   { key: "live" as const, href: "/marketing/live", label: "Élő anyagok" },
-  { key: "campaigns" as const, href: "/marketing/campaigns", label: "Kampányok" },
+  { key: "campaigns" as const, href: "/campaigns", label: "Kampányok" },
   { key: "decisions" as const, href: "/marketing/decisions", label: UI.decisionsTab },
 ];
 

@@ -102,7 +102,7 @@ export function CrmSideNav({
       </SideNavSection>
       <SideNavSection title="Rendszer">
         <SideNavItem
-          label="Marketing" href="/marketing" icon={Megaphone} isSelected={on("/marketing")}
+          label="Marketing" href="/marketing" icon={Megaphone} isSelected={on("/marketing") || on("/campaigns")}
           endContent={counts.marketingReview > 0 ? <Badge variant="info" label={String(counts.marketingReview)} /> : undefined}
         />
         <SideNavItem
