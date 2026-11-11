@@ -4,9 +4,8 @@
 // Érdeklődik and Kéri promote the company to a lead without an SLA task (lib/campaigns/rules).
 // Built for Péter's phone first: one column under 760 px. Hungarian copy is PROPOSAL.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import k from "@/components/astryx/page.module.css";
 import { groupByCity } from "@/lib/campaigns/labels";
 import { recordCampaignOutcomeAction } from "@/app/actions/campaign-hub";
@@ -36,7 +35,7 @@ export const CAMPAIGN_OUTCOMES = [
 const LAST: Record<string, string> = { no_answer: "nem vették fel", email_sent: "e-mail elment" };
 
 export function CampaignCallView({ slug, data }: { slug: string; data: CallViewData }) {
-  const router = useRouter();
+  const card = useRef<HTMLElement>(null);
   const [done, setDone] = useState<Set<number>>(new Set());
   const items = useMemo(() => data.items.filter((i) => !done.has(i.id)), [data.items, done]);
   const [selected, setSelected] = useState<number | null>(data.items[0]?.id ?? null);
@@ -51,8 +50,14 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
     if (!current || busy) return;
     setBusy(true);
     setMsg(null);
-    const r = await recordCampaignOutcomeAction(slug, { member_id: current.id, outcome, ...(notes.trim() ? { notes: notes.trim() } : {}) });
-    setBusy(false);
+    let r: Awaited<ReturnType<typeof recordCampaignOutcomeAction>>;
+    try {
+      r = await recordCampaignOutcomeAction(slug, { member_id: current.id, outcome, ...(notes.trim() ? { notes: notes.trim() } : {}) });
+    } catch {
+      return setMsg({ ok: false, text: "Hálózati hiba, próbáld újra" });
+    } finally {
+      setBusy(false);
+    }
     if ("error" in r) return setMsg({ ok: false, text: r.error ?? "Hiba" });
     // Next in the order shown (grouped by city), wrapping to the top.
     const ordered = groups.flatMap((g) => g.items);
@@ -64,14 +69,20 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
     setMsg(r.lead
       ? { ok: true, text: `${current.company.name}: lead lett, a Leadek oldalon a megfelelő oszlopban, SLA feladat nélkül.`, leadId: r.lead.id }
       : { ok: true, text: `${current.company.name}: rögzítve.` });
-    router.refresh();
+    // No router.refresh(): the action's revalidatePath("/calls") already returns the fresh list (Vanda #191-4).
+  }
+
+  function pick(id: number) {
+    setSelected(id);
+    // On a phone the card sits above the list: bring it into view (Vanda #191-5).
+    if (typeof window !== "undefined" && window.matchMedia?.("(max-width: 760px)").matches) card.current?.scrollIntoView({ block: "start" });
   }
 
   return (
     <div>
-      <h1 className={k.title} style={{ marginBottom: 8 }}>Hívás mód</h1>
+      <h1 className={`${k.title} ${s.callTitle}`}>Hívás mód</h1>
       <p className={k.muted}>
-        <span className={k.strong}>{data.campaign.name}</span> · Ma {data.touchedToday + done.size} / {data.campaign.dailyCap} · hátra {Math.max(0, data.remaining)}
+        <span className={k.strong}>{data.campaign.name}</span> · Ma {data.touchedToday} / {data.campaign.dailyCap} · hátra {Math.max(0, data.remaining)}
       </p>
       {msg && (
         <p className={msg.ok ? s.ok : s.err} role="status">
@@ -87,7 +98,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
               <div key={g.city}>
                 <div className={s.cityHead}>{g.city}</div>
                 {g.items.map((it) => (
-                  <button key={it.id} type="button" className={s.callRow} aria-current={current?.id === it.id ? "true" : undefined} onClick={() => { setSelected(it.id); setNotes(""); }}>
+                  <button key={it.id} type="button" className={s.callRow} aria-current={current?.id === it.id ? "true" : undefined} onClick={() => pick(it.id)}>
                     <b>{it.company.name}</b>
                     <span className={k.muted}>
                       {[personName(it.person), it.tier, it.attempts > 0 ? `${it.attempts + 1}. próba` : null, it.lastOutcome ? LAST[it.lastOutcome] ?? null : null].filter(Boolean).join(" · ")}
@@ -98,7 +109,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
             ))}
           </nav>
           {current && (
-            <section className={`${k.card} ${s.callCard}`} aria-label="Kiválasztott cég" style={{ gap: 16 }}>
+            <section ref={card} className={`${k.card} ${s.callCard}`} aria-label="Kiválasztott cég">
               <div>
                 <h2 className={k.groupTitle}>{current.company.name}</h2>
                 {current.why && <p className={k.muted} style={{ margin: "4px 0 0" }}>Miért: {current.why}</p>}
@@ -107,7 +118,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
                 <div>
                   <div className={k.strong}>{personName(current.person)}</div>
                   {current.person.phone
-                    ? <a href={`tel:${current.person.phone.replace(/\s+/g, "")}`} className={k.time} style={{ textDecoration: "none" }}>{current.person.phone}</a>
+                    ? <a href={`tel:${current.person.phone.replace(/\s+/g, "")}`} className={s.callPhone}>{current.person.phone}</a>
                     : <span className={k.muted}>Nincs telefonszám</span>}
                 </div>
               )}
@@ -123,7 +134,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
               </div>
               <label className={s.field}>
                 <span>Jegyzet</span>
-                <textarea className={s.input} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} />
+                <textarea className={s.input} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} disabled={busy} />
               </label>
               <div className={s.outcomes} role="group" aria-label="Kimenetel">
                 {CAMPAIGN_OUTCOMES.map((o) => (

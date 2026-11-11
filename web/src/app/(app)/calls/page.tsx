@@ -5,6 +5,7 @@ import { dailyList } from "@/lib/campaigns/service";
 import { serializeDates } from "@/lib/serialize";
 import CallCockpit from "./CallCockpit";
 import { CampaignCallView, type CallViewData } from "./CampaignCallView";
+import s from "../campaigns/campaigns.module.css";
 
 // The queue is live (pipeline status + freshness change as you work it).
 export const dynamic = "force-dynamic";
@@ -19,26 +20,27 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
     select: { slug: true, name: true },
     orderBy: { createdAt: "asc" },
   });
-  const lists = await Promise.all(running.map((c) => dailyList(TENANT_ID, c.slug)));
-  const tabs = running.map((c, i) => {
-    const l = lists[i];
-    return { key: c.slug, label: `${c.name} ma ${"error" in l ? 0 : l.items.length}`, href: `/calls?campaign=${encodeURIComponent(c.slug)}` };
-  });
-  const active = tabs.find((t) => t.key === campaign)?.key ?? null;
+  // Only the open tab computes its list (Vanda #191-4); the others show their name.
+  const wanted = running.find((c) => c.slug === campaign) ?? null;
+  const list = wanted ? await dailyList(TENANT_ID, wanted.slug) : null;
+  const active = list && !("error" in list) ? wanted!.slug : null;
+  const tabs = running.map((c) => ({
+    key: c.slug,
+    label: c.slug === active && list && !("error" in list) ? `${c.name} ma ${list.items.length}` : c.name,
+    href: `/calls?campaign=${encodeURIComponent(c.slug)}`,
+  }));
   const seg = tabs.length > 0
-    ? <div style={{ marginBlockEnd: 16 }}><Seg label="Hívólista" current={active ?? "segments"} items={[...tabs, { key: "segments", label: "Szegmensek", href: "/calls" }]} /></div>
+    ? <div className={s.tabs}><Seg label="Hívólista" current={active ?? "segments"} items={[...tabs, { key: "segments", label: "Szegmensek", href: "/calls" }]} /></div>
     : null;
 
-  if (active) {
-    const l = lists[running.findIndex((c) => c.slug === active)];
-    if (!("error" in l)) {
-      return (
-        <div className="mount">
-          {seg}
-          <CampaignCallView slug={active} data={serializeDates(l) as unknown as CallViewData} />
-        </div>
-      );
-    }
+  if (active && list && !("error" in list)) {
+    return (
+      <div className="mount">
+        {seg}
+        {/* key: a tab switch starts a fresh view, never the previous campaign's note or message (Vanda #191-2). */}
+        <CampaignCallView key={active} slug={active} data={serializeDates(list) as unknown as CallViewData} />
+      </div>
+    );
   }
   const [queue, segments] = await Promise.all([getCallQueue(), getCallSegments()]);
   return (

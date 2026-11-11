@@ -48,6 +48,20 @@ describe("Hívás mód, campaign tab", () => {
     render(<CampaignCallView slug="bp" data={{ ...DATA, script: null }} />);
     expect(screen.getByText(/Nincs jóváhagyott hívásszkript/)).toBeTruthy();
   });
+  it("the counter is the server's touched-today, never local plus server (Vanda #191-1)", async () => {
+    recordCampaignOutcomeAction.mockResolvedValue({ ok: true, member: { id: 1 }, lead: null });
+    const { rerender } = render(<CampaignCallView slug="bp" data={DATA} />);
+    await userEvent.click(screen.getByRole("button", { name: "Nem vették fel" }));
+    rerender(<CampaignCallView slug="bp" data={{ ...DATA, touchedToday: 5, items: DATA.items.slice(1) }} />);
+    expect(screen.getByText(/Ma 5 \/ 15/)).toBeTruthy();
+  });
+  it("a thrown action shows a network error and re-enables the taps (Vanda #191-3)", async () => {
+    recordCampaignOutcomeAction.mockRejectedValue(new Error("offline"));
+    render(<CampaignCallView slug="bp" data={DATA} />);
+    await userEvent.click(screen.getByRole("button", { name: "Érdeklődik" }));
+    expect(screen.getByRole("status").textContent).toMatch(/Hálózati hiba/);
+    expect((screen.getByRole("button", { name: "Érdeklődik" }) as HTMLButtonElement).disabled).toBe(false);
+  });
   it("a refused tap shows the server's reason and keeps the company", async () => {
     recordCampaignOutcomeAction.mockResolvedValue({ error: "Ez a tag most nem hívható" });
     render(<CampaignCallView slug="bp" data={DATA} />);

@@ -43,6 +43,11 @@ textarea.input { min-height: 72px; resize: vertical; }
 .ok { color: var(--ui-success-text); font-size: 14px; }
 
 /* Hívás mód, campaign tab: list | selected company with the script */
+.tabs { margin-block-end: 16px; }
+.callTitle { margin-block-end: 8px; }
+.callCard { gap: 16px; scroll-margin-top: 16px; }
+.callPhone { font-size: 20px; font-weight: 600; color: var(--ui-text); font-variant-numeric: tabular-nums; text-decoration: none; }
+.callPhone:hover { text-decoration: underline; }
 .callSplit { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 24px; align-items: start; }
 .cityHead { font-size: 13px; font-weight: 600; color: var(--ui-text-muted); padding: 16px 0 4px; }
 .callRow { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; font: inherit; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--ui-border); background: transparent; cursor: pointer; color: var(--ui-text); }
