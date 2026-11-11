@@ -15,6 +15,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     automationRule: { findMany: vi.fn(), update: vi.fn() },
     task: { create: vi.fn() },
+    interaction: { create: vi.fn() },
     company: { findFirst: vi.fn() },
     person: { findFirst: vi.fn() },
   },
@@ -367,5 +368,18 @@ describe("campaign-scoped triggers (item 5)", () => {
     expect(triggerMatches("campaign_call_outcome", { campaignId: 1, outcome: "interested" }, call)).toBe(true);
     expect(triggerMatches("campaign_call_outcome", { campaignId: 1, outcome: "no_answer" }, call)).toBe(false);
     expect(triggerMatches("campaign_call_outcome", { campaignId: 1 }, call)).toBe(true);
+  });
+});
+
+describe("add_note (item 5, Vanda #193-3)", () => {
+  it("writes one append-only note interaction on the company with the campaign key", async () => {
+    const ok = await runLeadAction("add_note", { textTemplate: "Válaszolt: {company}" }, {
+      type: "campaign_member_replied", tenantId: 1, companyId: 7, personId: 8, leadId: 30, campaignId: 3, companyName: "Példa Kft.",
+      fields: { company: "Példa Kft.", campaign: "bp" },
+    });
+    expect(ok).toBe(true);
+    expect((db as unknown as { interaction: { create: ReturnType<typeof vi.fn> } }).interaction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tenantId: 1, companyId: 7, personId: 8, leadId: 30, type: "note", direction: null, notes: "Válaszolt: Példa Kft.", campaign: "bp" }),
+    });
   });
 });

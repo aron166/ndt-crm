@@ -41,3 +41,19 @@ describe("Kampány > Automatizálás (item 5)", () => {
     expect(opts).toContain("webhook_out");
   });
 });
+
+describe("outbound e-mail rule (Vanda #193-1)", () => {
+  it("has its own subject and a multi-line body; the rule name is never the subject", async () => {
+    createAutomation.mockResolvedValue({ success: true });
+    render(<CampaignAutomations {...base} outbound rules={[]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Új szabály" }));
+    await userEvent.type(screen.getByLabelText("Név"), "Belső név");
+    await userEvent.selectOptions(screen.getByLabelText("Akkor"), "send_email");
+    await userEvent.type(screen.getByLabelText("E-mail tárgya"), "Köszönjük a választ");
+    expect(screen.getByLabelText("E-mail szövege").tagName).toBe("TEXTAREA");
+    await userEvent.type(screen.getByLabelText("E-mail szövege"), "Sor egy{enter}Sor kettő");
+    await userEvent.click(screen.getByRole("button", { name: "Mentés" }));
+    const cfg = JSON.parse(String((createAutomation.mock.calls[0][0] as FormData).get("actionConfig")));
+    expect(cfg).toMatchObject({ subjectTemplate: "Köszönjük a választ", bodyTemplate: "Sor egy\nSor kettő" });
+  });
+});
