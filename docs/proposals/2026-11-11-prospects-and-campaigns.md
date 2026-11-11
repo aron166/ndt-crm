@@ -396,3 +396,11 @@ behind the same per-campaign approval and a per-connector switch, off by default
   and running campaigns show on `/analytics`.
 
 Both show the call view in Hívás mód with the campaign script. Áron picks before any UI is built.
+
+## v2.10 Decisions for Áron (replace v1 section f; recommendation first)
+
+1. **Which Campaigns area?** (a) A: one Kampányok hub, new nav item, types as tabs (recommended: it is the "merge them together" you asked for, and no existing page is renamed); (b) B: campaigns stay in Marketing and Outreach, one shared campaign page and analytics.
+2. **Deploy the slice 1 backend (#188) now?** (a) yes: apply the migration, verify, then merge; nothing visible changes and the API is ready for agents (recommended); (b) wait and ship it with the UI.
+3. **First campaign: calls now or e-mail first?** (a) Budapest phone-only from next week, e-mail step added after the 11-23 warm-up (recommended); (b) wait and run e-mail first from day one.
+4. **Daily call cap for Péter?** (a) 15 (recommended); (b) 10; (c) 25.
+5. **The 261 launch-list rows with no phone or e-mail?** (a) load as "needs contact", enrichment fills them, never on a list until then (recommended); (b) leave them out.
