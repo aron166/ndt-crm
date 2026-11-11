@@ -5,7 +5,7 @@
 // which closes the campaign's open requests.
 
 import { db } from "@/lib/db";
-import { audit } from "@/lib/audit";
+import { audit, type AuditOptions } from "@/lib/audit";
 
 export const SPEC_SET = "campaign_spec_request";
 const CAMPAIGN_TAG = "campaign:";
@@ -19,7 +19,10 @@ export function slugFromTags(tags: readonly string[]): string | null {
   return t ? t.slice(CAMPAIGN_TAG.length) : null;
 }
 
-/** One open request per campaign: a second press returns the open one (with its text refreshed). */
+/**
+ * One open request per campaign: a second press returns the open one (with its text refreshed).
+ * shortcut: check-then-create without a lock, two tabs at once can open two requests; the next proposal closes both, lock if it matters.
+ */
 export async function requestSpecification(
   ctx: { tenantId: number; userId: number }, slug: string, missing: string,
 ): Promise<{ ok: true; taskId: number; created: boolean } | { error: string; status: 400 | 404 | 409 }> {
@@ -66,10 +69,10 @@ export async function listSpecRequests(tenantId: number) {
 }
 
 /** After a proposal landed: the campaign's open requests are done. */
-export async function closeSpecRequests(tenantId: number, slug: string) {
-  const now = new Date();
-  await db.task.updateMany({
-    where: { tenantId, status: { in: OPEN }, setMembership: { hasEvery: specRequestTags(slug) } },
-    data: { status: "done", completedAt: now },
-  });
+export async function closeSpecRequests(tenantId: number, slug: string, opts: AuditOptions, by: string) {
+  const where = { tenantId, status: { in: OPEN }, setMembership: { hasEvery: specRequestTags(slug) } };
+  const open = await db.task.findMany({ where, select: { id: true } });
+  if (open.length === 0) return;
+  await db.task.updateMany({ where: { ...where, id: { in: open.map((t) => t.id) } }, data: { status: "done", completedAt: new Date() } });
+  for (const t of open) audit("task", t.id, "update", { status: "open" }, { status: "done", by }, opts);
 }

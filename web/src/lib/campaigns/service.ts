@@ -278,6 +278,8 @@ export async function specifyCampaign(ctx: CampaignCtx, slug: string, input: Spe
   if (!c) return fail(404, "Kampány nem található");
   if (c.status === "running") return fail(409, "Futó kampányhoz nem írható javaslat; előbb álljon meg vagy legyen piszkozat");
   if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampány");
+  // An empty proposal answers nothing: it would wipe the last one and close open requests (Vanda #192-3).
+  if (!input.brief && !input.steps?.length && !input.assets?.length && !input.note?.trim()) return fail(400, "Üres javaslat: brief, lépések vagy anyag kell");
   if (input.steps) {
     const misfit = stepsFitKind(c.kind as CampaignKind | null, input.steps.map((st, i) => ({ channel: st.channel, position: i + 1 })));
     if (misfit) return fail(400, misfit);
@@ -311,7 +313,7 @@ export async function specifyCampaign(ctx: CampaignCtx, slug: string, input: Spe
   if ("error" in result) return result;
   audit("campaign", c.id, "update", null, { briefProposal: { by: source, assets: result.assets.length } }, auditOpts(ctx));
   // The proposal answers the campaign's open specification requests (item 6).
-  await closeSpecRequests(ctx.tenantId, slug);
+  await closeSpecRequests(ctx.tenantId, slug, auditOpts(ctx), source);
   return { ok: true as const, proposal: result };
 }
 
