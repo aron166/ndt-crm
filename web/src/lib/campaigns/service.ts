@@ -498,7 +498,12 @@ export async function dailyList(tenantId: number, slug: string, now: Date = new 
     select: { companyId: true },
   })).map((l) => l.companyId));
   const sel = selectDailyList(
-    all.filter((m) => !open.has(m.companyId)).map((m) => ({ ...m, nextEligibleOn: m.nextEligibleOn ? m.nextEligibleOn.toISOString().slice(0, 10) : null })),
+    // Still counted for "touched today" (the cap), never listed.
+    all.map((m) => ({
+      ...m,
+      state: open.has(m.companyId) && m.state === "queued" ? "has_open_lead" : m.state,
+      nextEligibleOn: m.nextEligibleOn ? m.nextEligibleOn.toISOString().slice(0, 10) : null,
+    })),
     callSteps, c.dailyCap, now,
   );
   const rows = await db.campaignMember.findMany({
@@ -590,18 +595,6 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
       const newStatus = nextStatusFor(input.outcome, m.company.pipelineStatus);
       await tx.company.updateMany({ where: { id: m.companyId, tenantId }, data: { lastInteractionDate: now, ...(newStatus !== null ? { pipelineStatus: newStatus } : {}) } });
     }
-    // Guarded on the state we planned from: a double tap finds 0 rows and rolls back.
-    const { count } = await tx.campaignMember.updateMany({
-      where: { id: m.id, tenantId, state: m.state, attempts: m.attempts, stepPosition: m.stepPosition },
-      data: {
-        state: plan.member.state, stepPosition: plan.member.stepPosition, attempts: plan.member.attempts,
-        nextEligibleOn: plan.member.nextEligibleOn ? new Date(`${plan.member.nextEligibleOn}T00:00:00Z`) : null,
-        lastOutcome: plan.member.lastOutcome, lastTouchedAt: now,
-        ...(plan.member.state !== m.state ? { stateChangedAt: now } : {}),
-      },
-    });
-    if (count === 0) throw Object.assign(new Error("A tag időközben változott, frissíts"), { status: 409 });
-
     let leadId: number | null = existingLead?.id ?? null;
     let created = false;
     if (plan.promote && !existingLead) {
@@ -626,9 +619,22 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
       leadId = lead.id;
       created = true;
     }
-    if (plan.promote && leadId != null) {
-      await tx.campaignMember.updateMany({ where: { id: m.id, tenantId }, data: { leadId } });
-      if (interactionId != null && !existingLead) await tx.interaction.updateMany({ where: { id: interactionId, tenantId }, data: { leadId } });
+    // Guarded on the state we planned from: a double tap finds 0 rows and rolls the whole touch back
+    // (lead included). After the lead insert: a promoted member must carry its lead_id (CHECK).
+    const { count } = await tx.campaignMember.updateMany({
+      where: { id: m.id, tenantId, state: m.state, attempts: m.attempts, stepPosition: m.stepPosition },
+      data: {
+        state: plan.member.state, stepPosition: plan.member.stepPosition, attempts: plan.member.attempts,
+        nextEligibleOn: plan.member.nextEligibleOn ? new Date(`${plan.member.nextEligibleOn}T00:00:00Z`) : null,
+        lastOutcome: plan.member.lastOutcome, lastTouchedAt: now,
+        ...(plan.promote && leadId != null ? { leadId } : {}),
+        ...(plan.member.state !== m.state ? { stateChangedAt: now } : {}),
+      },
+    });
+    if (count === 0) throw Object.assign(new Error("A tag időközben változott, frissíts"), { status: 409 });
+
+    if (plan.promote && leadId != null && interactionId != null && !existingLead) {
+      await tx.interaction.updateMany({ where: { id: interactionId, tenantId }, data: { leadId } });
     }
     await tx.campaignEvent.create({
       data: {

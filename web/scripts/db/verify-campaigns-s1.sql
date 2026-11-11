@@ -8,7 +8,7 @@ SELECT 'campaigns has 12 new columns', count(*) = 12
   FROM information_schema.columns WHERE table_name = 'campaigns' AND column_name IN
   ('kind','status','daily_cap','owner_user_id','starts_on','ends_on','brief','brief_proposal','audience','approved_by_id','approved_at','approved_hash')
 UNION ALL
-SELECT 'existing campaigns unchanged in meaning (draft, cap 15, kind null)', bool_and("status" = 'draft' AND "daily_cap" = 15 AND "kind" IS NULL)
+SELECT 'existing campaigns unchanged in meaning (draft, cap 15, kind null)', coalesce(bool_and("status" = 'draft' AND "daily_cap" = 15 AND "kind" IS NULL), true)
   FROM "campaigns"
 UNION ALL
 SELECT 'campaign_steps exists and is empty', (SELECT count(*) FROM "campaign_steps") = 0
