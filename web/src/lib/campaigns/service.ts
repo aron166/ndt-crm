@@ -202,7 +202,7 @@ export async function createCampaign(
 const BACK_TO_DRAFT = { status: "draft", approvedById: null, approvedAt: null, approvedHash: null } as const;
 
 async function loadForWrite(tenantId: number, slug: string) {
-  return db.campaign.findFirst({ where: { tenantId, slug }, select: { id: true, status: true, dailyCap: true, kind: true, audience: true } });
+  return db.campaign.findFirst({ where: { tenantId, slug }, select: { id: true, slug: true, status: true, dailyCap: true, kind: true, audience: true } });
 }
 
 export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[]) {
@@ -217,6 +217,15 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
   if (bad) return bad;
   await db.$transaction(async (tx) => {
     await lockCampaign(tx, c.id);
+    // Queued drafts of a removed step, or of a step whose asset changed, carry text Áron did not approve: retire them (Vanda #194 r2).
+    const before = await tx.campaignStep.findMany({ where: { tenantId: ctx.tenantId, campaignId: c.id }, select: { position: true, contentItemId: true } });
+    const stale = before.filter((b) => (steps[b.position - 1]?.content_item_id ?? null) !== b.contentItemId || b.position > steps.length).map((b) => b.position);
+    if (stale.length) {
+      await tx.emailDraft.updateMany({
+        where: { tenantId: ctx.tenantId, campaign: c.slug, step: { in: stale }, status: { in: ["draft", "approved", "failed"] } },
+        data: { status: "cancelled", lastError: "A kampány lépései változtak" },
+      });
+    }
     await tx.campaignStep.deleteMany({ where: { tenantId: ctx.tenantId, campaignId: c.id } });
     if (steps.length) await tx.campaignStep.createMany({ data: stepRows(ctx.tenantId, c.id, steps) });
     // A member keeps its place in line; one past the new end has finished the sequence (item 4, remapAfterEdit).

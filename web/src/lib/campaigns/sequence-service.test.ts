@@ -38,6 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   d.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
   d.user.findFirst.mockResolvedValue({ role: "admin" });
+  d.campaignStep.findMany.mockResolvedValue([]);
 });
 
 describe("edits", () => {
@@ -189,6 +190,7 @@ describe("Vanda #194 r2: a step edit retires its stale drafts", () => {
     d.campaignStep.findMany.mockResolvedValue([
       { position: 1, contentItemId: 50 }, { position: 2, contentItemId: 51 }, { position: 3, contentItemId: 52 },
     ]);
+    d.contentItem.findMany.mockResolvedValue([{ id: 50, campaignId: 3 }, { id: 61, campaignId: null }]);
     await setSteps(SESSION, "bp", [{ channel: "email", content_item_id: 50 }, { channel: "email", wait_days: 2, content_item_id: 61 }]);
     expect(d.emailDraft.updateMany).toHaveBeenCalledWith({
       where: { tenantId: 1, campaign: "bp", step: { in: [2, 3] }, status: { in: ["draft", "approved", "failed"] } },
