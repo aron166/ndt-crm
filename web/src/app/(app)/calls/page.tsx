@@ -37,7 +37,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
     return (
       <div className="mount">
         {seg}
-        {/* key: a tab switch starts a fresh view, never the previous campaign's note or message (Vanda #191-2). */}
+        {/* key: a tab switch starts a fresh view, never the previous campaign's note or message (Vanda, PR 191 item 2). */}
         <CampaignCallView key={active} slug={active} data={serializeDates(list) as unknown as CallViewData} />
       </div>
     );
