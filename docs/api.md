@@ -250,7 +250,35 @@ curl "$CRM/api/leads?status=recall&outcome=open&assigned_to=2&page=1&page_size=2
 ```
 
 Filters: `status` (column key), `outcome` (`open|won|lost`), `assigned_to` (user id),
-`page` (1-based), `page_size` (≤100, default 25). Sorted newest first.
+`campaign` (exact campaign / import batch tag, e.g. `launch-2026-11`), `q` (2 to 100 chars:
+contains, case-insensitive, over company name, person first or last name, email and phone
+on the contact or the person, and subject), `page` (1-based), `page_size` (≤100, default 25). Sorted newest first.
+
+### `GET /api/leads/queue?limit=&assigned_to=` (2026-11-11)
+
+The hívólista in the CRM's own order (the `/leads` call-list view): open, unconverted leads
+outside the side stages, `next_due` ascending (no due date last), then oldest first.
+`limit` 1 to 200 (default 50). Each item: `id, name, personName, role, town, phone, tier,
+attempts, nextAction, nextDue, status, group` where `group` is
+`overdue | today | tomorrow | later | none` (Budapest calendar days).
+
+### `GET /api/leads/:id/slots?days=&count=&kind=&wanted=` (2026-11-11)
+
+Read only, books nothing. The same ranked, feasible slots the booking drawer shows
+(`POST /api/booking/slots`, session auth), for the lead's site: its stated postcode, else
+the company address (then every slot carries the `site_assumed` flag and `siteSource` is
+`company_address_assumed`). `days` 1 to 60 (default 21), `count` 1 to 20 (default 3), `kind`
+a booking kind, `wanted` the customer's preferred day. Times are Budapest wall-clock by
+construction (`lib/booking/time.ts`), independent of the server timezone. 404 for a lead of
+another tenant. To book, a human uses the lead page drawer.
+
+### `GET /api/bookings?from=&to=&assigned_to=` (2026-11-11)
+
+Open bookings (tasks with `starts_at`, not done or cancelled) starting in `[from, to)`,
+oldest first, at most 500 (`truncated: true` when the cap was hit). `from` and `to` are ISO dates or instants, range at most 62 days.
+Each item: `id, title, description, type, status, startsAt, estimatedMinutes, bookingKind,
+siteAddress, siteSource, siteSettlement { id, name, county }, equipment { id, name },
+assignedTo { id, name }, company { id, name, city, address }, lead { id, message, nextAction }`.
 
 ### `GET /api/leads/:id` — detail
 
@@ -297,6 +325,18 @@ curl -X POST $CRM/api/leads/12/interactions \
   -d '{ "outcome": "callback_requested", "note": "Kedden 10-kor hívjuk vissza", "callback_at": "2026-09-08T08:00:00Z", "assigned_to_id": 2 }'
 # → 201 { "ok": true, "interactionId": 91, "status": "recall", "outcome": "open", "taskId": 40 }
 ```
+
+`call_id` (optional, ≤200 chars, unique per tenant) makes the POST idempotent: a repeat with the
+same `call_id` writes nothing and returns `200 { "ok": true, "deduped": true, "interactionId": <first> }`,
+the same answer `/api/calls/result` gives. A `call_id` already used on a different lead is a `409`
+(nothing written): a `call_id` is unique per tenant, not per lead.
+
+**Which route logs a confirmed voice call** (the cockpit, after Péter presses "Igen"): this one,
+with `call_id` = the confirmation's id. It is the human-confirmed path, the same function as the
+modal, so `meeting_booked` and `not_interested` apply directly. `POST /api/calls/result` is for an
+UNconfirmed machine parse: by design it holds those two outcomes back as a confirm task, which after
+a confirmation would only ask Péter twice. Put "megerősítve Telegramon" in `note`: the API records
+the app key as the actor, not Péter.
 
 #### Booking a demo (2026-09-17) — optional for API callers, NOT a breaking change
 
