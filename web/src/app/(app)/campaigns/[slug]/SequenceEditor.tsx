@@ -73,7 +73,7 @@ export function SequenceEditor({ rows, onChange, touchKinds, assets, emailFirst 
       </ol>
       <div className={k.actions} style={{ marginTop: 12 }}>
         {touchKinds.map((t) => (
-          <button key={t} type="button" className={k.btn} disabled={rows.length >= 40}
+          <button key={t} type="button" className={k.btn} disabled={rows.filter((x) => x.kind !== "wait").length >= 20}
             onClick={() => onChange([...rows, { kind: t, condition: rows.some((x) => x.kind !== "wait") ? "no_reply" : "all", content_item_id: null }])}>
             + {KIND_LABEL[t]}
           </button>

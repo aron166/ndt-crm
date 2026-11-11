@@ -558,7 +558,7 @@ export async function approveCampaign(ctx: CampaignCtx, slug: string, expect?: {
   if (c.steps.some((st) => st.contentItemId != null && st.contentItem?.status !== "live")) return fail(409, "Egy lépés anyaga még nincs jóváhagyva (élő)");
   const members = await tx.campaignMember.findMany({ where: { tenantId: ctx.tenantId, campaignId: c.id }, select: { companyId: true, state: true } });
   if (!members.some((m) => m.state === "queued")) return fail(409, "Nincs hívható vagy írható tag");
-  const hash = approvalHash({ memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations });
+  const hash = approvalHash({ memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations, audience: audienceOf(c.audience) });
   if (expect && expect.hash !== hash) return fail(409, "A kampány változott, mióta megnyitottad; frissíts és nézd át újra");
   const now = new Date();
   // Guard on the status we read: a concurrent edit that sent it back to draft is fine, a
@@ -916,10 +916,13 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   const tenantId = ctx.tenantId;
   const c = await db.campaign.findFirst({
     where: { tenantId, slug },
-    select: { id: true, slug: true, status: true, dailyCap: true, startsOn: true, endsOn: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true } } },
+    select: { id: true, slug: true, status: true, dailyCap: true, startsOn: true, endsOn: true, audience: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true } } },
   });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status !== "running") return fail(409, "Csak jóváhagyott, futó kampány e-mail lépése készít piszkozatot");
+  // The cap is per day, not per click (Vanda #194-5).
+  const madeToday = await db.emailDraft.count({ where: { tenantId, campaign: c.slug, createdAt: { gte: atLocal(localDay(now), 0) } } });
+  const room = Math.max(0, c.dailyCap - madeToday);
   const today = localDay(now).key;
   const ymdKey = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
   if (!inWindow(ymdKey(c.startsOn), ymdKey(c.endsOn), today)) return { ok: true as const, drafted: 0, noAddress: 0, noAsset: 0 };
@@ -931,20 +934,38 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   })).filter((m) => m.nextEligibleOn == null || m.nextEligibleOn.toISOString().slice(0, 10) <= today);
   const itemIds = [...new Set([...emailSteps.values()].map((x) => x.contentItemId).filter((v): v is number => v != null))];
   const live = itemIds.length ? await db.contentItem.findMany({ where: { tenantId, id: { in: itemIds }, status: "live" }, select: { id: true, title: true, body: true } }) : [];
-  const done = await db.emailDraft.findMany({ where: { tenantId, campaign: c.slug, companyId: { in: members.map((m) => m.companyId) } }, select: { companyId: true, step: true } });
+  const companyIds = members.map((m) => m.companyId);
+  const [done, leads, contacts] = await Promise.all([
+    db.emailDraft.findMany({ where: { tenantId, campaign: c.slug, companyId: { in: companyIds } }, select: { companyId: true, step: true, status: true } }),
+    db.lead.findMany({ where: { tenantId, outcome: "open", convertedDealId: null, companyId: { in: companyIds } }, select: { companyId: true } }),
+    db.contact.findMany({ where: { tenantId, endedAt: null, companyId: { in: companyIds } }, select: { companyId: true, personId: true, email: true, person: { select: { email: true } } } }),
+  ]);
   const seen = new Set(done.map((x) => `${x.companyId}:${x.step}`));
+  // A reply on any touch of this campaign, or (prospects) an open lead, ends the cold e-mails; a stage audience needs its lead open (Vanda #194-1).
+  const repliedCo = new Set(done.filter((x) => x.status === "replied").map((x) => x.companyId));
+  const openLead = new Set(leads.map((l) => l.companyId));
+  const leadsAudience = audienceOf(c.audience).source === "leads_by_stage";
+  const addressOf = (m: { companyId: number; personId: number | null; person: { email: string | null } | null }) => {
+    if (isEmailAddress(m.person?.email)) return m.person!.email!;
+    const own = contacts.filter((k) => k.companyId === m.companyId && (m.personId == null || k.personId === m.personId));
+    for (const k of own.length ? own : contacts.filter((x) => x.companyId === m.companyId)) {
+      for (const e of [k.email, k.person?.email]) if (isEmailAddress(e)) return e;
+    }
+    return null;
+  };
   let noAddress = 0, noAsset = 0;
   const data: Prisma.EmailDraftCreateManyInput[] = [];
   for (const m of members) {
-    if (data.length >= c.dailyCap) break;
-    if (seen.has(`${m.companyId}:${m.stepPosition}`)) continue;
+    if (data.length >= room) break;
+    if (seen.has(`${m.companyId}:${m.stepPosition}`) || repliedCo.has(m.companyId)) continue;
+    if (leadsAudience ? !openLead.has(m.companyId) : openLead.has(m.companyId)) continue;
     const asset = live.find((i) => i.id === emailSteps.get(m.stepPosition)?.contentItemId);
     if (!asset) { noAsset++; continue; }
-    const to = m.person?.email;
-    if (!isEmailAddress(to)) { noAddress++; continue; }
+    const to = addressOf(m);
+    if (!to) { noAddress++; continue; }
     data.push({ tenantId, companyId: m.companyId, personId: m.personId, campaign: c.slug, step: m.stepPosition, subject: asset.title, body: asset.body, toEmail: to.trim(), status: "draft", createdById: ctx.userId });
   }
-  if (data.length) await db.emailDraft.createMany({ data });
+  if (data.length) await db.emailDraft.createMany({ data, skipDuplicates: true });
   audit("campaign", c.id, "update", null, { emailDrafts: data.length, noAddress, noAsset }, auditOpts(ctx));
   return { ok: true as const, drafted: data.length, noAddress, noAsset };
 }
@@ -958,5 +979,18 @@ export async function advanceOnSent(ctx: CampaignCtx, campaignSlug: string, comp
   if (!c) return null;
   const m = await db.campaignMember.findFirst({ where: { tenantId: ctx.tenantId, campaignId: c.id, companyId, stepPosition: step, state: "queued" }, select: { id: true } });
   if (!m) return null;
-  return recordOutcome(ctx, campaignSlug, { member_id: m.id, outcome: "email_sent" }, now);
+  const r = await recordOutcome(ctx, campaignSlug, { member_id: m.id, outcome: "email_sent" }, now);
+  // A refused advance (a race) is not thrown; report it so the member is not silently left behind (Vanda #194-9).
+  if ("error" in r) reportError("campaigns.advanceOnSent", new Error(r.error), { campaignSlug, companyId, step });
+  return r;
+}
+
+/**
+ * Sending a draft of a member campaign needs that campaign running: one sent back to draft (an edit),
+ * paused or stopped sends nothing from its queue (Vanda #194-2). Other campaign keys are untouched.
+ */
+export async function campaignSendBlock(tenantId: number, slug: string): Promise<string | null> {
+  const c = await db.campaign.findFirst({ where: { tenantId, slug }, select: { kind: true, status: true } });
+  if (!c || !MEMBER_KINDS.includes(c.kind as CampaignKind) || c.status === "running") return null;
+  return `A kampány most nem fut (${c.status}); a piszkozata indítás után küldhető`;
 }

@@ -10,7 +10,7 @@ import { gateDraft, gateOn, templatesForCampaign, templatesForCampaigns, templat
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
-import { advanceOnSent } from "@/lib/campaigns/service";
+import { advanceOnSent, campaignSendBlock } from "@/lib/campaigns/service";
 import { threadKeyFor, MAX_STEP, type DraftStatus } from "@/lib/outreach/drafts";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import { runAutomations } from "@/lib/automations/engine";
@@ -122,6 +122,8 @@ export async function markDraftSentManually(
   if (typeof footer !== "string" || !footer.trim()) {
     return { ok: false, error: "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban" };
   }
+  const blocked = await campaignSendBlock(TENANT_ID, row.campaign);
+  if (blocked) return { ok: false, error: blocked };
 
   const now = new Date();
   const lead = await db.lead.findFirst({

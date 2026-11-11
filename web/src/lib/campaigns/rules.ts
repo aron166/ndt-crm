@@ -214,8 +214,8 @@ export function planOutcome(
     case "no_answer": {
       const attempts = m.attempts + 1;
       if (attempts >= MAX_NO_ANSWER) {
-        // A sequence with a follow-up for non-answerers moves them on instead of giving up (item 4).
-        const next = nextApplicable(steps, m.stepPosition, { replied: Boolean(m.replied), lastCallOutcome: "no_answer" });
+        // Only an explicit follow-up for non-answerers takes them on; otherwise three unanswered calls stay unreachable (Vanda #194-3).
+        const next = sortSteps(steps).find((s) => s.position > m.stepPosition && s.audienceRule === "no_answer") ?? null;
         if (next && (next.channel !== "call" || m.hasPhone)) {
           return plan({ attempts: 0, stepPosition: next.position, nextEligibleOn: addWorkingDays(today, next.waitDays).key });
         }
@@ -333,14 +333,18 @@ export function approvalHash(input: {
   dailyCap: number;
   /** Whether promoted leads may fire send_email / webhook_out rules; omitted = false. */
   outboundAutomations?: boolean;
+  /** Who is touched; only a leads-by-stage audience joins the payload (Vanda #194-7). */
+  audience?: { source: AudienceSource; stages: string[] };
 }): string {
   const payload = JSON.stringify({
     m: [...input.memberCompanyIds].sort((a, b) => a - b),
-    // A condition joins the tuple only when set, so plans hashed before conditions existed still match.
+    // A condition other than "all" joins the tuple. Slice-1 plans already stored no_reply on the default
+    // call step, so their hashes change once with this release (an open approval screen gets a 409, re-open it).
     s: sortSteps(input.steps).map((s) => (s.audienceRule && s.audienceRule !== "all" ? [s.position, s.channel, s.waitDays, s.contentItemId, s.audienceRule] : [s.position, s.channel, s.waitDays, s.contentItemId])),
     c: input.dailyCap,
     // Only in the payload when on, so every hash computed before this flag existed still matches.
     ...(input.outboundAutomations ? { o: 1 } : {}),
+    ...(input.audience?.source === "leads_by_stage" ? { a: [...input.audience.stages].sort() } : {}),
   });
   return createHash("sha256").update(payload).digest("hex");
 }

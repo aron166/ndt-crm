@@ -1,6 +1,7 @@
 // Campaigns hub reads for the pages (server only). Every query is scoped by tenantId; the
 // callers are pages under the (app) layout, which already refuses a non-CRM user.
 
+import { audienceOf } from "./rules";
 import { specRequestTags } from "./spec-requests";
 import { db } from "@/lib/db";
 import { resolveDemoHost } from "@/lib/booking/queries";
@@ -107,7 +108,7 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
   const previewHash = approvalHash({
     memberCompanyIds: memberIds.map((m) => m.companyId),
     steps: c.steps as (StepDef & { contentItemId: number | null })[],
-    dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations,
+    dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations, audience: audienceOf(c.audience),
   });
   const assets: AssetState[] = items.map((i) => ({ id: i.id, title: i.title, status: i.status, version: i.currentVersion?.number ?? null }));
   return {
