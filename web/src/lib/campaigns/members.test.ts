@@ -84,3 +84,18 @@ describe("planMembers: dedupe against existing companies, leads and suppressions
     expect(row({ company_name: "A", email: "", phone: "  " })).toMatchObject({ email: undefined, phone: undefined });
   });
 });
+
+describe("reach from existing contacts (item 6: no @, no e-mail)", () => {
+  it("an address without @ never counts as an e-mail; a real one does; a suppressed one does not", async () => {
+    const { reachFromContacts } = await import("./members");
+    const supp = { emails: new Set(["gone@x.hu"]), domains: new Set<string>() };
+    const r = reachFromContacts([
+      { companyId: 1, personId: 5, email: "nincs", phone: null, person: { email: "-", phone: null } },
+      { companyId: 2, personId: 6, email: null, phone: "+36 1", person: { email: "ok@x.hu", phone: null } },
+      { companyId: 3, personId: 7, email: "gone@x.hu", phone: null, person: { email: null, phone: null } },
+    ], supp);
+    expect(r.get(1)).toEqual({ phone: false, email: false, personId: 5 });
+    expect(r.get(2)).toEqual({ phone: true, email: true, personId: 6 });
+    expect(r.get(3)?.email).toBe(false);
+  });
+});
