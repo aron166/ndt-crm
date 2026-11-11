@@ -989,6 +989,8 @@ approval pipeline: e-mail copy, call script, ad), a `daily_cap` (default 15) and
 | `PATCH /api/campaigns/:slug` (name, cap, owner, dates, brief, `adopt_brief_proposal`) | **session only** |
 | `PATCH /api/campaigns/:slug` with `outbound_automations` | **session only, Áron only** |
 | `PUT /api/campaigns/:slug/steps` | **session only** |
+| `POST /api/campaigns/:slug/lead-audience` with `dry_run: true` | key or session |
+| `POST /api/campaigns/:slug/lead-audience` with `dry_run: false`, `POST /api/campaigns/:slug/email-drafts` | **session only, role `admin` or `manager`** |
 | `POST /api/campaigns/:slug/specify` (proposals) | key or session |
 | `GET /api/specification-requests` (open requests from the campaign page) | key or session |
 | `GET /api/campaigns/:slug/members` (loads with member and touched counts) | key or session |
@@ -1051,6 +1053,32 @@ Writes only `brief_proposal` (never `brief` or the real steps) and, for an app k
 approval pipeline (version 1, `in_review`, `campaign_id` set; they appear in Marketing, Anyagok). A human adopts the
 brief with `PATCH {"adopt_brief_proposal": true}` and the steps with `PUT .../steps`. `409` on a running, stopped
 or done campaign. An agent can never touch members, cap, status or approval through this route.
+
+### Sequences: steps, conditions, audiences (item 4)
+
+Steps (`PUT /api/campaigns/:slug/steps`, session only) are an ordered list of `email` and `call` touches. A wait is
+`wait_days` on the step it precedes, counted in Budapest working days (weekends and holidays skipped). Each touch
+has a condition, `audience_rule`, from a fixed set: `all`, `no_reply` (has not replied yet), `replied` (replied
+earlier: the call step for repliers), `no_answer` (the previous call was not answered). "Opened" is not available:
+opens are not tracked. A member advances to the next step whose condition holds; a step that does not apply is
+skipped. A positive reply stops the later e-mail steps: with a `replied` call step the member moves there, callable
+the same day; without one it is promoted (first call within the hour, as before). After the third unanswered call
+a `no_answer` follow-up step takes the member instead of `unreachable`. A bounce sets `needs_email` (never called
+instead). A promoted member has left the sequence. Editing the steps of a running or paused campaign sends it back
+to draft; members keep their position and one past the new end is `done`. Conditions are part of the approval hash.
+
+Audience (`PATCH ... {"audience": {"source": "prospect_list" | "leads_by_stage", "stages": ["contacting"]}}`,
+session only): prospects from a list (the members load below; e-mail first is enforced) or the open leads in chosen
+stages (retargeting, nurture; any step order, `cold_call` stays call only). A changed audience on a running campaign
+sends it back to draft. `POST /api/campaigns/:slug/lead-audience` `{ "dry_run": true, "batch": "leads-1" }` loads
+the leads (key or session for the dry run; applying is session only, admin or manager; undo is the batch DELETE
+below). On the daily list a lead audience keeps members whose lead is open and drops the rest.
+
+`POST /api/campaigns/:slug/email-drafts` (session only, admin or manager; running campaigns): today's e-mail step
+work as DRAFTS in the Outreach queue (subject and body from the step's live asset, once per member and step, at
+most `daily_cap` per run). Nothing is sent by this route: the drafts go through the existing gated sender (approval,
+footer, suppression, the template gate). When such a draft is sent (Resend or marked sent by hand) the member
+advances as with `email_sent`.
 
 ### `POST /api/campaigns/:slug/members` (load prospects, dry run by default)
 
