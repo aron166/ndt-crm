@@ -29,6 +29,9 @@ vi.mock("@/lib/db", () => {
     suppression: { upsert: m() },
     task: { create: m() },
     contentItem: { findMany: m() },
+    deal: { findMany: m() },
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    $executeRaw: vi.fn().mockResolvedValue(1),
     $transaction: vi.fn(),
   };
   return { db };
@@ -45,7 +48,7 @@ function member(over: Record<string, unknown> = {}) {
   return {
     id: 44, state: "queued", stepPosition: 2, attempts: 0, companyId: 7, personId: 8,
     company: { name: "Példa Kft.", pipelineStatus: "1" },
-    person: { email: "anna@pelda.hu", phone: "+3611", firstName: "Anna", lastName: "Kiss" },
+    person: { email: "anna@pelda.example.test", phone: "+3611", firstName: "Anna", lastName: "Kiss" },
     ...over,
   };
 }
@@ -117,10 +120,24 @@ describe("recordOutcome: promotion without an SLA task flood", () => {
     expect(await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "interested" }, NOW)).toMatchObject({ status: 409 });
   });
 
+  it("unsubscribe suppresses the address the event names, even when the person has none", async () => {
+    d.campaignMember.findFirst.mockResolvedValue(member({ stepPosition: 1, person: { email: null, phone: "+3611", firstName: "A", lastName: "B" } }));
+    const r = await recordOutcome(APP, "bp", { member_id: 44, outcome: "unsubscribe", email: "Info@Pelda.example.test" }, NOW);
+    expect(r).toMatchObject({ suppressed: true });
+    expect(d.suppression.upsert.mock.calls[0][0].create).toMatchObject({ email: "info@pelda.example.test" });
+  });
+
+  it("a lead created meanwhile by another flow is found under the company lock and linked, not duplicated", async () => {
+    d.lead.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 260, status: "new" });
+    const r = await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "interested" }, NOW);
+    expect(d.lead.create).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ lead: { id: 260, created: false } });
+  });
+
   it("unsubscribe writes a suppression", async () => {
     d.campaignMember.findFirst.mockResolvedValue(member({ stepPosition: 1 }));
     await recordOutcome(APP, "bp", { member_id: 44, outcome: "unsubscribe" }, NOW);
-    expect(d.suppression.upsert.mock.calls[0][0].create).toMatchObject({ email: "anna@pelda.hu", source: "bp" });
+    expect(d.suppression.upsert.mock.calls[0][0].create).toMatchObject({ email: "anna@pelda.example.test", source: "bp" });
   });
 });
 
@@ -152,6 +169,12 @@ describe("only Áron launches", () => {
     expect(await setCampaignStatus(APP, "bp", "paused")).toMatchObject({ ok: true, status: "paused" });
     expect(await setCampaignStatus(APP, "bp", "stopped")).toMatchObject({ status: 403 });
   });
+  it("approve takes the campaign row lock before reading what it hashes", async () => {
+    await approveCampaign({ tenantId: 1, userId: 2 }, "bp");
+    expect(d.$queryRaw).toHaveBeenCalled();
+    const order = (f: M) => (f.mock as unknown as { invocationCallOrder: number[] }).invocationCallOrder[0];
+    expect(order(d.$queryRaw as unknown as M)).toBeLessThan(order(d.campaignMember.findMany));
+  });
   it("editing steps of a running campaign sends it back to draft", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "running", dailyCap: 15, kind: "cold_call" });
     const r = await setSteps(SESSION, "bp", [{ channel: "call" }]);
@@ -173,8 +196,21 @@ describe("specify: proposals only", () => {
     expect(Object.keys(data)).toEqual(["briefProposal"]);
     expect(d.campaignStep.createMany).not.toHaveBeenCalled();
   });
+  it("a session user's assets are refused (they go through Marketing with their author)", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft" });
+    expect(await specifyCampaign(SESSION, "bp", { assets: [{ title: "x", body: "y", category: "script", channel: "other", content_type: "other" }] })).toMatchObject({ status: 400 });
+  });
   it("refuses on a running campaign", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "running" });
     expect(await specifyCampaign(APP, "bp", { brief: {} })).toMatchObject({ status: 409 });
+  });
+});
+
+describe("stop is final", () => {
+  it("a PATCH cannot bring a stopped campaign back to draft", async () => {
+    const { updateCampaign } = await import("./service");
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "stopped", dailyCap: 15, briefProposal: null });
+    expect(await updateCampaign(SESSION, "bp", { daily_cap: 20 })).toMatchObject({ status: 409 });
+    expect(d.campaign.update).not.toHaveBeenCalled();
   });
 });

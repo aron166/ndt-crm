@@ -121,7 +121,9 @@ export function planMembers(rows: readonly MemberRow[], idx: MemberIndex, steps:
     const start = startFor(steps, { phoneOnly: r.phone_only ?? false, hasEmail, hasPhone });
     const person: number | "create" | null =
       (email ? idx.personByEmail.get(email) : undefined) ??
-      (r.person_name || email || r.phone ? "create" : reach?.personId ?? null);
+      // A matched company keeps its existing contact person; never a second copy of them (Vanda #188-7).
+      reach?.personId ??
+      (r.person_name || email || r.phone ? "create" : null);
 
     const existing = companyId != null ? idx.members.get(companyId) : undefined;
     if (existing !== undefined) {

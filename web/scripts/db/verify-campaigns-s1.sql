@@ -17,7 +17,7 @@ SELECT 'campaign_members exists and is empty', (SELECT count(*) FROM "campaign_m
 UNION ALL
 SELECT 'campaign_events exists and is empty', (SELECT count(*) FROM "campaign_events") = 0
 UNION ALL
-SELECT 'check constraints present (4 + 4 + 4 + 1)', count(*) = 13
+SELECT 'check constraints present (3 + 4 + 3 + 1)', count(*) = 11
   FROM pg_constraint WHERE contype = 'c' AND conrelid IN ('campaigns'::regclass, 'campaign_steps'::regclass, 'campaign_members'::regclass, 'campaign_events'::regclass)
   AND conname LIKE 'campaign%';
 ROLLBACK;

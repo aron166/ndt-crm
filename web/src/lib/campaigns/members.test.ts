@@ -14,8 +14,8 @@ function idx(over: Partial<MemberIndex> = {}): MemberIndex {
     byName: new Map([["peldaepito", 12]]),
     openLeadCompanyIds: new Set([13]),
     members: new Map(),
-    suppressions: { emails: new Set(["no@x.hu"]), domains: new Set(["blocked.hu"]) },
-    personByEmail: new Map([["anna@pelda.hu", 501]]),
+    suppressions: { emails: new Set(["no@x.example.test"]), domains: new Set(["blocked.example.test"]) },
+    personByEmail: new Map([["anna@pelda.example.test", 501]]),
     companyReach: new Map([[12, { phone: true, email: false, personId: 77 }]]),
     ...over,
   };
@@ -26,9 +26,9 @@ describe("planMembers: dedupe against existing companies, leads and suppressions
   it("matches by crm_company_id, then VAT, then name key; else creates", () => {
     const p = planMembers([
       row({ crm_company_id: 10, company_name: "Bármi", phone: "+361" }),
-      row({ company_name: "Más név", vat: "12345678-2-41", email: "a@b.hu" }),
+      row({ company_name: "Más név", vat: "12345678-2-41", email: "a@b.example.test" }),
       row({ company_name: "Példa Építő Kft.", phone: "+362" }),
-      row({ company_name: "Új Cég Kft.", email: "uj@uj.hu" }),
+      row({ company_name: "Új Cég Kft.", email: "uj@uj.example.test" }),
     ], idx(), STEPS);
     expect(p.rows.map((r) => r.companyId)).toEqual([10, 11, 12, null]);
     expect(p.summary).toMatchObject({ add: 4, matchedCompanies: 3, newCompanies: 1 });
@@ -36,8 +36,8 @@ describe("planMembers: dedupe against existing companies, leads and suppressions
   it("skips a company with an open lead, a suppressed address or domain, and an unknown id", () => {
     const p = planMembers([
       row({ crm_company_id: 13, company_name: "Nyitott", phone: "1" }),
-      row({ company_name: "A", email: "no@x.hu" }),
-      row({ company_name: "B", email: "anyone@blocked.hu" }),
+      row({ company_name: "A", email: "no@x.example.test" }),
+      row({ company_name: "B", email: "anyone@blocked.example.test" }),
       row({ crm_company_id: 999, company_name: "C" }),
     ], idx(), STEPS);
     expect(p.summary.skipped).toMatchObject({ open_lead: 1, suppressed: 2, unknown_company_id: 1 });
@@ -53,7 +53,7 @@ describe("planMembers: dedupe against existing companies, leads and suppressions
   });
   it("reuses a person by e-mail; existing contacts count as reach", () => {
     const p = planMembers([
-      row({ company_name: "Új", email: "Anna@Pelda.hu", person_name: "Anna Kiss" }),
+      row({ company_name: "Új", email: "Anna@Pelda.example.test", person_name: "Anna Kiss" }),
       row({ crm_company_id: 12, company_name: "Példa" }),
     ], idx(), STEPS);
     const [a, b] = p.rows;
@@ -62,7 +62,7 @@ describe("planMembers: dedupe against existing companies, leads and suppressions
     expect(b).toMatchObject({ action: "add", person: 77, stepPosition: 2, state: "queued" });
   });
   it("phone_only rows (Péter's own clients) start on the call step", () => {
-    const p = planMembers([row({ company_name: "Régi ügyfél", phone: "1", email: "r@r.hu", phone_only: true })], idx(), STEPS);
+    const p = planMembers([row({ company_name: "Régi ügyfél", phone: "1", email: "r@r.example.test", phone_only: true })], idx(), STEPS);
     expect(p.rows[0]).toMatchObject({ stepPosition: 2 });
   });
   it("no contact at all loads as needs_contact", () => {

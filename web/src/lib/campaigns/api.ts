@@ -104,4 +104,5 @@ export const outcomeSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
   duration_sec: z.number().int().min(0).max(4 * 3600).optional(),
   followup_date: ymd.optional(),
+  email: z.string().trim().email().max(200).optional(),
 });

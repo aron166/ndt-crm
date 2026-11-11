@@ -29,9 +29,9 @@ ALTER TABLE "campaigns" ADD COLUMN "kind" TEXT,
 ALTER TABLE "campaigns"
     ADD CONSTRAINT "campaigns_kind_check" CHECK ("kind" IN ('content', 'ad', 'organic', 'cold_call', 'cold_email', 'sequence')),
     ADD CONSTRAINT "campaigns_status_check" CHECK ("status" IN ('draft', 'running', 'paused', 'stopped', 'done')),
-    ADD CONSTRAINT "campaigns_daily_cap_check" CHECK ("daily_cap" BETWEEN 1 AND 200),
-    -- running always carries who approved it and when
-    ADD CONSTRAINT "campaigns_running_approved_check" CHECK ("status" <> 'running' OR ("approved_by_id" IS NOT NULL AND "approved_at" IS NOT NULL AND "approved_hash" IS NOT NULL));
+    ADD CONSTRAINT "campaigns_daily_cap_check" CHECK ("daily_cap" BETWEEN 1 AND 200);
+-- No CHECK tying running to approved_by_id: the FK is ON DELETE SET NULL, so removing a user would
+-- break every campaign they approved (Vanda #188-1). The service guarantees it on the way in.
 ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_owner_user_id_fkey" FOREIGN KEY ("owner_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_approved_by_id_fkey" FOREIGN KEY ("approved_by_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -84,8 +84,8 @@ CREATE TABLE "campaign_members" (
     CONSTRAINT "campaign_members_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "campaign_members_state_check" CHECK ("state" IN ('queued', 'needs_contact', 'promoted', 'declined', 'unreachable', 'excluded', 'done')),
     CONSTRAINT "campaign_members_attempts_check" CHECK ("attempts" BETWEEN 0 AND 20),
-    CONSTRAINT "campaign_members_step_position_check" CHECK ("step_position" BETWEEN 1 AND 20),
-    CONSTRAINT "campaign_members_promoted_lead_check" CHECK ("state" <> 'promoted' OR "lead_id" IS NOT NULL)
+    CONSTRAINT "campaign_members_step_position_check" CHECK ("step_position" BETWEEN 1 AND 20)
+    -- No CHECK "promoted implies lead_id": lead_id is ON DELETE SET NULL, and a lead may be deleted (Vanda #188-1).
 );
 CREATE UNIQUE INDEX "campaign_members_campaign_id_company_id_key" ON "campaign_members"("campaign_id", "company_id");
 CREATE INDEX "campaign_members_tenant_id_campaign_id_state_next_eligible__idx" ON "campaign_members"("tenant_id", "campaign_id", "state", "next_eligible_on");

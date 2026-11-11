@@ -1049,7 +1049,8 @@ re-run refreshes a `needs_contact` member whose row now has a phone or an e-mail
 needsContact, skipped: {...} }, rows: [...] }` (dry run lists every row's plan).
 
 `DELETE /api/campaigns/:slug/members?batch=<id>&dry_run=0` removes the batch's members that were never touched and
-soft-deletes the companies and persons that batch created when nothing else points at them. `dry_run` defaults to
+soft-deletes the companies and persons that batch created when nothing else points at them (no lead, deal, quote,
+proposal, invoice, task, interaction, e-mail draft, other campaign, or a contact the batch did not create). `dry_run` defaults to
 true. Touched members stay.
 
 Script: `web/scripts/load-campaign-members.mjs --file <builder json> --campaign <slug> --batch <id> [--apply] [--undo]`
@@ -1075,6 +1076,8 @@ Hívás mód. Empty unless the campaign is `running`.
 ```json
 { "member_id": 44, "outcome": "interested", "notes": "visszahívás jövő héten", "duration_sec": 180, "followup_date": "2026-11-18" }
 ```
+
+For e-mail events, `email` names the address the event came from; `unsubscribe` suppresses it (else the person's e-mail).
 
 `outcome`: the Hívás mód taps `no_answer`, `interested`, `wants`, `not_interested`, `bad_number`, `note_only`, or an
 e-mail event `email_sent`, `reply_positive`, `reply_negative`, `unsubscribe`, `bounce`. The promotion rule:
