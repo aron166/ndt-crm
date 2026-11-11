@@ -7,33 +7,35 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import k from "@/components/astryx/page.module.css";
-import { assetStateLabel, stepLine, type StepDraft } from "@/lib/campaigns/labels";
+import { assetStateLabel, channelsFor, foldRows, stepLine, unfoldSteps, type SeqRow, type StepDraft } from "@/lib/campaigns/labels";
 import type { CampaignKind } from "@/lib/campaigns/rules";
 import type { AssetState } from "@/lib/campaigns/hub";
 import { saveStepsAction } from "@/app/actions/campaign-hub";
-import { StepsEditor } from "../StepsEditor";
+import { SequenceEditor } from "./SequenceEditor";
 import s from "../campaigns.module.css";
 
 export interface StepRow { position: number; channel: string; waitDays: number; audienceRule: string; contentItemId: number | null }
 
-export function StepsSection({ slug, kind, status, steps, assets }: { slug: string; kind: CampaignKind; status: string; steps: StepRow[]; assets: AssetState[] }) {
+export function StepsSection({ slug, kind, status, steps, assets, emailFirst = true }: { slug: string; kind: CampaignKind; status: string; steps: StepRow[]; assets: AssetState[]; emailFirst?: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<StepDraft[]>([]);
+  const [draft, setDraft] = useState<SeqRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const byId = new Map(assets.map((a) => [a.id, a]));
   const closed = status === "stopped" || status === "done";
 
   function start() {
-    setDraft(steps.map((st) => ({ channel: st.channel as StepDraft["channel"], wait_days: st.waitDays, audience_rule: st.audienceRule as StepDraft["audience_rule"], content_item_id: st.contentItemId })));
+    setDraft(unfoldSteps(steps.map((st) => ({ channel: st.channel as StepDraft["channel"], wait_days: st.waitDays, audience_rule: st.audienceRule as StepDraft["audience_rule"], content_item_id: st.contentItemId }))));
     setEditing(true);
   }
   async function save() {
     setBusy(true);
     setError(null);
     try {
-      const r = await saveStepsAction(slug, draft);
+      const folded = foldRows(draft);
+      if ("error" in folded) return setError(folded.error);
+      const r = await saveStepsAction(slug, folded.steps);
       if ("error" in r) return setError(r.error);
       setEditing(false);
       router.refresh();
@@ -52,7 +54,7 @@ export function StepsSection({ slug, kind, status, steps, assets }: { slug: stri
       </div>
       {editing ? (
         <>
-          <StepsEditor kind={kind} steps={draft} onChange={setDraft} assets={assets} />
+          <SequenceEditor rows={draft} onChange={setDraft} touchKinds={channelsFor(kind).filter((c): c is "email" | "call" => c === "email" || c === "call")} assets={assets} emailFirst={emailFirst && kind === "sequence"} />
           {status !== "draft" && <p className={k.muted}>Mentés után a kampány visszaáll piszkozatra; Áronnak újra jóvá kell hagynia.</p>}
           {error && <p className={s.err} role="alert">{error}</p>}
           <div className={k.actions}>

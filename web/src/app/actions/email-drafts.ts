@@ -6,6 +6,7 @@ import { gateDraft, gateOn, templatesForCampaigns } from "@/lib/outreach/templat
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
+import { advanceOnSent, campaignSendBlock } from "@/lib/campaigns/service";
 import { sendEmail } from "@/lib/integrations/resend";
 import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
@@ -320,6 +321,8 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   // §6b: same template gate as the copy and the manual-send paths.
   const gate = await gateDraft(TENANT_ID, row.campaign, row.step);
   if (!gate.ok) return { ok: false, error: gate.error };
+  const blocked = await campaignSendBlock(TENANT_ID, row.campaign);
+  if (blocked) return { ok: false, error: blocked };
 
   // The consent/unsubscribe line is not optional. Without this guard a tenant
   // who never opened the settings panel cold-emails with no opt-out at all —
@@ -402,6 +405,10 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
       return { ok: false, error: "Elküldve, de a rögzítés nem sikerült: ellenőrizd a Resend naplót" };
     }
     await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sent", providerMessageId: result.id });
+    // A campaign e-mail step's draft went out: its member moves on in the sequence (item 4).
+    const { userId } = await getActor(TENANT_ID);
+    await advanceOnSent({ tenantId: TENANT_ID, userId }, row.campaign, row.companyId, row.step)
+      .catch((err) => reportError("outreach.sendDraft.campaignAdvance", err, { draftId: id }));
     revalidatePath("/outreach");
     return { ok: true };
   }

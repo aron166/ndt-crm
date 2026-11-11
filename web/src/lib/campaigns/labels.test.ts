@@ -78,3 +78,30 @@ describe("what an agent is asked for (item 6, specification request)", () => {
     expect(missingForSpec({ kind: "ad", brief: { offer: "x", audience: "y" }, steps: [] })).toEqual([]);
   });
 });
+
+describe("sequence editor rows (item 4): a wait is its own row, stored as the next step's wait", () => {
+  it("folds waits into the next touch and unfolds them back", async () => {
+    const { foldRows, unfoldSteps } = await import("./labels");
+    const rows = [
+      { kind: "email" as const, condition: "all" as const, content_item_id: 5 },
+      { kind: "wait" as const, days: 2 },
+      { kind: "wait" as const, days: 1 },
+      { kind: "call" as const, condition: "no_reply" as const, content_item_id: null },
+    ];
+    const steps = foldRows(rows);
+    expect(steps).toEqual({ steps: [
+      { channel: "email", wait_days: 0, audience_rule: "all", content_item_id: 5 },
+      { channel: "call", wait_days: 3, audience_rule: "no_reply", content_item_id: null },
+    ] });
+    expect(unfoldSteps((steps as { steps: never[] }).steps)).toEqual([
+      { kind: "email", condition: "all", content_item_id: 5 },
+      { kind: "wait", days: 3 },
+      { kind: "call", condition: "no_reply", content_item_id: null },
+    ]);
+  });
+  it("a trailing wait or waits past 60 working days are refused", async () => {
+    const { foldRows } = await import("./labels");
+    expect(foldRows([{ kind: "email", condition: "all" }, { kind: "wait", days: 2 }])).toEqual({ error: "A sorozat végén álló várakozás nem csinál semmit" });
+    expect(foldRows([{ kind: "wait", days: 40 }, { kind: "wait", days: 30 }, { kind: "call", condition: "all" }])).toEqual({ error: "Egy lépés előtt legfeljebb 60 munkanap várakozás lehet" });
+  });
+});

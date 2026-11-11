@@ -56,7 +56,7 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/reports/weekly" ||
     // Campaigns (slice 1): app keys read, create drafts, propose, load members, pause, log
     // outcomes. approve, stop and steps are NOT here: they are session routes (Áron launches).
-    /^\/api\/campaigns(\/[A-Za-z0-9_-]{1,80}(\/(specify|members|pause|today|outcome|analytics))?)?$/.test(pathname) ||
+    /^\/api\/campaigns(\/[A-Za-z0-9_-]{1,80}(\/(specify|members|lead-audience|pause|today|outcome|analytics))?)?$/.test(pathname) ||
     pathname === "/api/reports/campaigns" ||
     // Open campaign specification requests: an outside agent polls them with its app key (item 6).
     pathname === "/api/specification-requests" ||

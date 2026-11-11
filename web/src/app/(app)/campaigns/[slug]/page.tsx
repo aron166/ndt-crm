@@ -15,6 +15,8 @@ import { StepsSection } from "./StepsSection";
 import { LaunchPanel } from "./LaunchPanel";
 import { MemberLoad } from "./MemberLoad";
 import { CampaignAutomations } from "./CampaignAutomations";
+import { AudiencePanel } from "./AudiencePanel";
+import { audienceOf } from "@/lib/campaigns/rules";
 import { db } from "@/lib/db";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { CAMPAIGN_TRIGGERS } from "@/lib/automations/types";
@@ -41,6 +43,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   const ymd = (v: Date | null) => (v ? v.toISOString().slice(0, 10) : null);
   const tab = tabs.some((t) => t.key === rawTab) ? rawTab! : "overview";
   const brief = (c.brief ?? {}) as Record<string, unknown>;
+  const aud = audienceOf(c.audience);
 
   return (
     <div className="mount">
@@ -105,7 +108,11 @@ export default async function CampaignPage({ params, searchParams }: { params: P
               {c.kind == null && <p className={k.muted}>Régi marketing kampány: a beállításai a <Link href={`/marketing/campaigns/${c.id}`} className={k.link}>Marketing kampányoldalon</Link> maradnak.</p>}
             </section>
           ) : (
-            <StepsSection slug={c.slug} kind={c.kind as CampaignKind} status={c.status} steps={c.steps} assets={d.assets} />
+            <>
+              <AudiencePanel slug={c.slug} status={c.status} source={aud.source} stages={aud.stages} canOperate={d.canOperate}
+                hasEmailStep={c.steps.some((x) => x.channel === "email")} leadStatuses={(await getLeadStatuses(TENANT_ID)).map((x) => ({ key: x.key, label: x.label }))} />
+              <StepsSection slug={c.slug} kind={c.kind as CampaignKind} status={c.status} steps={c.steps} assets={d.assets} emailFirst={aud.source === "prospect_list"} />
+            </>
           )}
         </div>
         <div>
