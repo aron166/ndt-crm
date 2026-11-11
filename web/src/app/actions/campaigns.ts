@@ -75,7 +75,7 @@ async function existingOutreachKey(typed: string): Promise<string | null> {
 }
 
 function revalidate(id?: number) {
-  revalidatePath("/marketing/campaigns");
+  revalidatePath("/campaigns");
   if (id) revalidatePath(`/marketing/campaigns/${id}`);
 }
 
