@@ -89,7 +89,6 @@ export default function CampaignDashboard({
   return (
     <div>
       <div className={s.embeddedFilters} aria-label="Kiküldés szűrők">
-          <>
             <select
               className={s.field}
               // PROPOSAL copy
@@ -124,7 +123,6 @@ export default function CampaignDashboard({
                 <option key={w} value={w}>{w}. hullám</option>
               ))}
             </select>
-          </>
       </div>
 
       <div className={s.stack}>

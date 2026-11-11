@@ -59,3 +59,12 @@ describe("hub summary", () => {
     expect(weekStart(new Date("2026-11-09T00:30:00+01:00")).toISOString()).toBe("2026-11-08T23:00:00.000Z");
   });
 });
+
+describe("hub type tab labels", () => {
+  it("the folded-in views show no count (the old list keeps archived rows the hub count skips)", async () => {
+    const { typeTabLabel } = await import("./labels");
+    expect(typeTabLabel("marketing", "Marketing (régi)", 0)).toBe("Marketing (régi)");
+    expect(typeTabLabel("outreach", "Kiküldés", 3)).toBe("Kiküldés");
+    expect(typeTabLabel("sequence", "Sorozat", 2)).toBe("Sorozat 2");
+  });
+});
