@@ -349,3 +349,23 @@ describe("runLeadAction / runAutomationAction (v2 actions)", () => {
     expect(mockDb.automationRule.update).not.toHaveBeenCalled();
   });
 });
+
+describe("campaign-scoped triggers (item 5)", () => {
+  const ev = (over: Partial<AutomationEvent> = {}): AutomationEvent => ({
+    type: "campaign_member_replied", tenantId: 1, companyId: 7, personId: null, campaignId: 1, fields: { outcome: "reply_positive" }, ...over,
+  });
+  it("a rule scoped to campaign A does not fire for campaign B", () => {
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1 }, ev())).toBe(true);
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1 }, ev({ campaignId: 2 }))).toBe(false);
+  });
+  it("a campaign trigger without a campaign never fires (scoped only)", () => {
+    expect(triggerMatches("campaign_member_replied", null, ev())).toBe(false);
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1 }, ev({ campaignId: null }))).toBe(false);
+  });
+  it("call outcome rules can name the outcome", () => {
+    const call = ev({ type: "campaign_call_outcome", outcome: "interested" });
+    expect(triggerMatches("campaign_call_outcome", { campaignId: 1, outcome: "interested" }, call)).toBe(true);
+    expect(triggerMatches("campaign_call_outcome", { campaignId: 1, outcome: "no_answer" }, call)).toBe(false);
+    expect(triggerMatches("campaign_call_outcome", { campaignId: 1 }, call)).toBe(true);
+  });
+});

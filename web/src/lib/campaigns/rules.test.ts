@@ -230,3 +230,15 @@ describe("call script per step (item 6)", () => {
     expect(scriptItemFor(steps, 1)).toBeNull();
   });
 });
+
+describe("campaign automation events per outcome (item 5)", () => {
+  it("names the events a touch raises", async () => {
+    const { campaignAutomationEvents } = await import("./rules");
+    expect(campaignAutomationEvents("reply_positive", { promoted: true, stepFrom: 1, stepTo: 1, done: false })).toEqual(["campaign_member_replied", "campaign_member_promoted"]);
+    expect(campaignAutomationEvents("interested", { promoted: true, stepFrom: 2, stepTo: 2, done: false })).toEqual(["campaign_call_outcome", "campaign_member_promoted"]);
+    expect(campaignAutomationEvents("no_answer", { promoted: false, stepFrom: 2, stepTo: 2, done: false })).toEqual(["campaign_call_outcome"]);
+    expect(campaignAutomationEvents("email_sent", { promoted: false, stepFrom: 1, stepTo: 2, done: false })).toEqual(["campaign_step_completed"]);
+    expect(campaignAutomationEvents("email_sent", { promoted: false, stepFrom: 2, stepTo: 2, done: true })).toEqual(["campaign_step_completed"]);
+    expect(campaignAutomationEvents("note_only", { promoted: false, stepFrom: 2, stepTo: 2, done: false })).toEqual([]);
+  });
+});
