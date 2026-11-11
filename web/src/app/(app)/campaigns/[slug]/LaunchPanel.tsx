@@ -47,7 +47,9 @@ const AUDIENCE: { key: string; label: string }[] = [
 
 export function LaunchPanel({ d, isAron }: { d: LaunchData; isAron: boolean }) {
   const router = useRouter();
-  const [cap, setCap] = useState(d.dailyCap);
+  // The cap is typed as text and clamped on save, so clearing the field does not turn "20" into "120" (Vanda #190-1).
+  const [capText, setCapText] = useState(String(d.dailyCap));
+  const cap = Math.max(1, Math.min(200, Number(capText) || 1));
   const [from, setFrom] = useState(d.startsOn ?? "");
   const [to, setTo] = useState(d.endsOn ?? "");
   const [busy, setBusy] = useState(false);
@@ -60,13 +62,18 @@ export function LaunchPanel({ d, isAron }: { d: LaunchData; isAron: boolean }) {
   async function run(fn: () => Promise<{ ok: true } | { error: string }>, done: string) {
     setBusy(true);
     setMsg(null);
-    const r = await fn();
-    setBusy(false);
-    setMsg("error" in r ? { ok: false, text: r.error } : { ok: true, text: done });
-    if (!("error" in r)) router.refresh();
+    try {
+      const r = await fn();
+      setMsg("error" in r ? { ok: false, text: r.error } : { ok: true, text: done });
+      if (!("error" in r)) router.refresh();
+    } catch {
+      setMsg({ ok: false, text: "Hálózati hiba, próbáld újra" });
+    } finally {
+      setBusy(false);
+    }
   }
 
-  const settingsChanged = cap !== d.dailyCap || from !== (d.startsOn ?? "") || to !== (d.endsOn ?? "");
+  const settingsChanged = capText !== String(d.dailyCap) || from !== (d.startsOn ?? "") || to !== (d.endsOn ?? "");
   const assetsLine = d.steps.map((st) => {
     const a = st.contentItemId != null ? byId.get(st.contentItemId) : undefined;
     return a ? `${a.title}${a.version ? ` v${a.version}` : ""}` : null;
@@ -104,16 +111,16 @@ export function LaunchPanel({ d, isAron }: { d: LaunchData; isAron: boolean }) {
         <section className={k.section} aria-label="Keret és időszak">
           <h2 className={k.groupTitle}>Napi keret és időszak</h2>
           <label className={s.field}><span>Napi keret (hívás)</span>
-            <input className={s.input} type="number" min={1} max={200} value={cap} onChange={(e) => setCap(Math.max(1, Math.min(200, Number(e.target.value) || 1)))} />
+            <input className={s.input} type="number" min={1} max={200} value={capText} onChange={(e) => setCapText(e.target.value)} />
           </label>
           <div className={k.filters}>
             <label className={s.field}><span>Kezdés</span><input className={s.input} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
             <label className={s.field}><span>Vége</span><input className={s.input} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
           </div>
-          <p className={k.muted}>A lista minden reggel számolódik, előre nem készül feladat. Kimenő automatizmusok (e-mail, webhook) a promóciónál: {d.outboundAutomations ? "bekapcsolva" : "kikapcsolva"}.</p>
+          <p className={k.muted}>A lista minden reggel számolódik, előre nem készül feladat; a kezdés előtt és a vége után üres. Kimenő automatizmusok (e-mail, webhook) a promóciónál: {d.outboundAutomations ? "bekapcsolva" : "kikapcsolva"}.</p>
           {settingsChanged && (
             <button type="button" className={k.btn} disabled={busy}
-              onClick={() => run(() => updateCampaignAction(d.slug, { daily_cap: cap, starts_on: from || null, ends_on: to || null }), d.status === "draft" ? "Mentve" : "Mentve; a kampány visszaállt piszkozatra")}>
+              onClick={() => run(() => updateCampaignAction(d.slug, { daily_cap: cap, starts_on: from || null, ends_on: to || null }), d.status !== "draft" && cap !== d.dailyCap ? "Mentve; a kampány visszaállt piszkozatra" : "Mentve")}>
               Keret és időszak mentése
             </button>
           )}
@@ -122,7 +129,7 @@ export function LaunchPanel({ d, isAron }: { d: LaunchData; isAron: boolean }) {
           <p className={s.confirm}>
             Ezt hagyod jóvá: {total} cég ({d.members.queued ?? 0} elérhető), {d.steps.length} lépés, napi {d.dailyCap}{assetsLine ? `, ${assetsLine}` : ""}. Bármely módosítás után a kampány visszaáll piszkozatra.
           </p>
-          {blockers.length > 0 && <ul className={k.muted} style={{ margin: 0, paddingLeft: 20 }}>{blockers.map((b) => <li key={b}>{b}</li>)}</ul>}
+          {blockers.length > 0 && <ul className={`${k.muted} ${s.blockers}`}>{blockers.map((b) => <li key={b}>{b}</li>)}</ul>}
           {live ? (
             <div className={k.actions}>
               <button type="button" className={k.btn} disabled={busy} onClick={() => run(() => setCampaignStatusAction(d.slug, "paused"), "Szünetel")}>Szüneteltetés</button>
@@ -130,14 +137,15 @@ export function LaunchPanel({ d, isAron }: { d: LaunchData; isAron: boolean }) {
             </div>
           ) : (
             <div className={k.actions}>
+              {d.status === "paused" && <button type="button" className={k.btn} disabled={busy} onClick={() => run(() => setCampaignStatusAction(d.slug, "stopped"), "Leállítva")}>Leállítás</button>}
               <button type="button" className={`${k.btn} ${k.btnPrimary}`} disabled={busy || !isAron || blockers.length > 0 || settingsChanged}
-                onClick={() => run(() => approveCampaignAction(d.slug), "Elindítva")}>
+                onClick={() => run(() => approveCampaignAction(d.slug, { members: total, steps: d.steps.length, dailyCap: d.dailyCap }), "Elindítva")}>
                 Jóváhagyás és indítás
               </button>
               {!isAron && <span className={k.muted}>csak Áron</span>}
             </div>
           )}
-          {d.approvedAt && <p className={k.muted}>Utoljára jóváhagyva: {d.approvedAt.slice(0, 16).replace("T", " ")}</p>}
+          {d.approvedAt && <p className={k.muted}>Utoljára jóváhagyva: {new Date(d.approvedAt).toLocaleString("hu-HU", { timeZone: "Europe/Budapest" })}</p>}
           {msg && <p className={msg.ok ? s.ok : s.err} role="status">{msg.text}</p>}
         </section>
       </div>

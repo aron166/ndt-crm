@@ -26,7 +26,7 @@ import { nextStatusFor, outcomeMeta } from "@/lib/outreach/queue";
 import { createItem } from "@/lib/content/service";
 import type { ContentCategory } from "@/lib/content/types";
 import {
-  approvalHash, canApprove, canSetStatus, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
+  approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
   MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel,
 } from "./rules";
 import { planMembers, type MemberRow, type MembersPlan } from "./members";
@@ -450,7 +450,7 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
  * stay (their interactions are append-only).
  */
 export async function undoBatch(ctx: CampaignCtx, slug: string, batch: string, dryRun: boolean) {
-  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true } });
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, status: true } });
   if (!c) return fail(404, "Kampány nem található");
   if (!dryRun) {
     const s = await needsOperator(ctx);
@@ -491,7 +491,9 @@ export async function undoBatch(ctx: CampaignCtx, slug: string, batch: string, d
   await db.$transaction(async (tx) => {
     await lockCampaign(tx, c.id);
     // Only members still untouched at commit time (an outcome may have landed since the read).
-    await tx.campaignMember.deleteMany({ where: { tenantId, id: { in: untouched.map((m) => m.id) }, attempts: 0, lastTouchedAt: null, leadId: null } });
+    const { count: removed } = await tx.campaignMember.deleteMany({ where: { tenantId, id: { in: untouched.map((m) => m.id) }, attempts: 0, lastTouchedAt: null, leadId: null } });
+    // Members are part of what Áron approved: an undo on a running or paused campaign needs a new approval (Vanda #190-4).
+    if (removed > 0 && (c.status === "running" || c.status === "paused")) await tx.campaign.update({ where: { id: c.id }, data: BACK_TO_DRAFT });
     if (dropCompanies.length) {
       await tx.contact.updateMany({ where: { tenantId, companyId: { in: dropCompanies }, endedAt: null }, data: { endedAt: now } });
       await tx.company.updateMany({ where: { tenantId, id: { in: dropCompanies } }, data: { deletedAt: now } });
@@ -510,7 +512,11 @@ export async function undoBatch(ctx: CampaignCtx, slug: string, batch: string, d
 // ---------------------------------------------------------------------------------------------
 // Approve (Áron only), pause, stop
 
-export async function approveCampaign(ctx: CampaignCtx, slug: string) {
+/**
+ * `expect`: what the approver saw (member count, step count, cap). When given and the campaign
+ * changed since, 409 instead of launching something nobody looked at (Vanda #190-8).
+ */
+export async function approveCampaign(ctx: CampaignCtx, slug: string, expect?: { members: number; steps: number; dailyCap: number }) {
   const s = needsSession(ctx);
   if (s) return s;
   if (!(await isAron(ctx))) return fail(403, "Kampányt csak Áron indíthat");
@@ -533,6 +539,9 @@ export async function approveCampaign(ctx: CampaignCtx, slug: string) {
   if (c.steps.some((st) => st.contentItemId != null && st.contentItem?.status !== "live")) return fail(409, "Egy lépés anyaga még nincs jóváhagyva (élő)");
   const members = await tx.campaignMember.findMany({ where: { tenantId: ctx.tenantId, campaignId: c.id }, select: { companyId: true, state: true } });
   if (!members.some((m) => m.state === "queued")) return fail(409, "Nincs hívható vagy írható tag");
+  if (expect && (expect.members !== members.length || expect.steps !== c.steps.length || expect.dailyCap !== c.dailyCap)) {
+    return fail(409, "A kampány változott, mióta megnyitottad; frissíts és nézd át újra");
+  }
   const hash = approvalHash({ memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations });
   const now = new Date();
   // Guard on the status we read: a concurrent edit that sent it back to draft is fine, a
@@ -569,13 +578,17 @@ export async function dailyList(tenantId: number, slug: string, now: Date = new 
   const c = await db.campaign.findFirst({
     where: { tenantId, slug },
     select: {
-      id: true, slug: true, name: true, status: true, dailyCap: true,
+      id: true, slug: true, name: true, status: true, dailyCap: true, startsOn: true, endsOn: true,
       steps: { orderBy: { position: "asc" }, select: { position: true, channel: true, contentItemId: true } },
     },
   });
   if (!c) return fail(404, "Kampány nem található");
   const callSteps = new Set(c.steps.filter((s) => s.channel === "call").map((s) => s.position));
-  if (c.status !== "running") return { ok: true as const, campaign: { slug: c.slug, name: c.name, status: c.status, dailyCap: c.dailyCap }, items: [], touchedToday: 0, remaining: 0, script: null };
+  // Outside its dates a running campaign lists nobody: Kezdés 11-26 means no call before 11-26 (Vanda #190-3).
+  const ymdKey = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+  if (c.status !== "running" || !inWindow(ymdKey(c.startsOn), ymdKey(c.endsOn), localDay(now).key)) {
+    return { ok: true as const, campaign: { slug: c.slug, name: c.name, status: c.status, dailyCap: c.dailyCap }, items: [], touchedToday: 0, remaining: 0, script: null };
+  }
   const all = await db.campaignMember.findMany({
     where: { tenantId, campaignId: c.id, company: { deletedAt: null } },
     select: { id: true, state: true, stepPosition: true, nextEligibleOn: true, priority: true, city: true, lastTouchedAt: true, companyId: true },

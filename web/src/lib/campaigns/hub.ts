@@ -69,7 +69,7 @@ export async function memberBatches(tenantId: number, campaignId: number) {
       _count: { _all: true },
     }),
   ]);
-  return batches.filter((b) => b.importBatch != null).map((b) => ({
+  return batches.filter((b) => b.importBatch != null).sort((a, b) => (b._min.createdAt?.getTime() ?? 0) - (a._min.createdAt?.getTime() ?? 0)).map((b) => ({
     batch: b.importBatch!, members: b._count._all, createdAt: b._min.createdAt,
     touched: touched.find((t) => t.importBatch === b.importBatch)?._count._all ?? 0,
   }));

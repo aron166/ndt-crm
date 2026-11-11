@@ -269,6 +269,11 @@ export function approvalHash(input: {
   return createHash("sha256").update(payload).digest("hex");
 }
 
+/** Whether `today` (YYYY-MM-DD, Budapest) is inside the campaign's dates; an open end is no limit. */
+export function inWindow(startsOn: string | null, endsOn: string | null, today: string): boolean {
+  return (startsOn == null || startsOn <= today) && (endsOn == null || today <= endsOn);
+}
+
 /** Status moves a caller may ask for. `running` is only reached through approve. */
 export function canSetStatus(from: CampaignStatus, to: "paused" | "stopped" | "done"): boolean {
   if (to === "paused") return from === "running";

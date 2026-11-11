@@ -19,17 +19,24 @@ type Summary = {
 /** The five counts Áron asked for, from a dry-run summary. */
 export function loadCounts(sm: Summary) {
   return [
-    { k: "Új tag", v: sm.add + sm.refresh },
+    { k: "Új tag", v: sm.add },
+    { k: "Frissített (most lett elérhetőség)", v: sm.refresh },
     { k: "Már lead (kihagyva)", v: sm.skipped.open_lead ?? 0 },
     { k: "Tiltólistás (kihagyva)", v: sm.skipped.suppressed ?? 0 },
     { k: "Duplikátum (kihagyva)", v: (sm.skipped.duplicate_in_payload ?? 0) + (sm.skipped.already_member ?? 0) },
+    { k: "Ismeretlen CRM azonosító (kihagyva)", v: sm.skipped.unknown_company_id ?? 0 },
     { k: "Nincs e-mail (e-mailre vár)", v: sm.needsEmail },
+    { k: "Nincs elérhetőség", v: sm.needsContact },
   ];
 }
 
 export interface BatchRow { batch: string; members: number; touched: number; createdAt: string | Date | null }
 
-export function MemberLoad({ slug, canOperate, closed, batches }: { slug: string; canOperate: boolean; closed: boolean; batches: BatchRow[] }) {
+/** Above Next's 1 MB server-action body limit the action would fail; refuse it in the browser. */
+const MAX_FILE_BYTES = 900_000;
+
+export function MemberLoad({ slug, status, canOperate, closed, batches }: { slug: string; status: string; canOperate: boolean; closed: boolean; batches: BatchRow[] }) {
+  const live = status === "running" || status === "paused";
   const router = useRouter();
   const [fileText, setFileText] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
@@ -43,6 +50,10 @@ export function MemberLoad({ slug, canOperate, closed, batches }: { slug: string
     setDry(null);
     setMsg(null);
     if (!f) return setFileText(null);
+    if (f.size > MAX_FILE_BYTES) {
+      setFileText(null);
+      return setMsg({ ok: false, text: "A fájl túl nagy (legfeljebb kb. 900 KB); bontsd több betöltésre" });
+    }
     setFileName(f.name);
     setFileText(await f.text());
   }
@@ -51,11 +62,17 @@ export function MemberLoad({ slug, canOperate, closed, batches }: { slug: string
     if (!fileText) return;
     setBusy(true);
     setMsg(null);
-    const r = await loadMembersAction(slug, { fileText, batch, dryRun });
-    setBusy(false);
+    let r: Awaited<ReturnType<typeof loadMembersAction>>;
+    try {
+      r = await loadMembersAction(slug, { fileText, batch, dryRun });
+    } catch {
+      return setMsg({ ok: false, text: "Hálózati hiba, próbáld újra" });
+    } finally {
+      setBusy(false);
+    }
     if ("error" in r) return setMsg({ ok: false, text: r.error });
     if (dryRun) return setDry(r.summary as Summary);
-    setMsg({ ok: true, text: `Betöltve: ${r.added} új tag (${batch}).` });
+    setMsg({ ok: true, text: `Betöltve: ${r.added} új tag, ${r.summary.refresh} frissítve (${batch}).${live ? " A kampány visszaállt piszkozatra." : ""}` });
     setDry(null);
     setFileText(null);
     setFileName("");
@@ -66,8 +83,14 @@ export function MemberLoad({ slug, canOperate, closed, batches }: { slug: string
   async function startUndo(b: string, dryRun: boolean) {
     setBusy(true);
     setMsg(null);
-    const r = await undoBatchAction(slug, b, dryRun);
-    setBusy(false);
+    let r: Awaited<ReturnType<typeof undoBatchAction>>;
+    try {
+      r = await undoBatchAction(slug, b, dryRun);
+    } catch {
+      return setMsg({ ok: false, text: "Hálózati hiba, próbáld újra" });
+    } finally {
+      setBusy(false);
+    }
     if ("error" in r) return setMsg({ ok: false, text: r.error ?? "Hiba" });
     if (dryRun) return setUndo({ batch: b, summary: r.summary });
     setUndo(null);
@@ -101,6 +124,7 @@ export function MemberLoad({ slug, canOperate, closed, batches }: { slug: string
             )}
           </div>
           {dry && !canOperate && <p className={k.muted}>Betölteni admin vagy manager szereppel lehet.</p>}
+          {dry && live && <p className={k.muted}>A kampány fut: betöltés után visszaáll piszkozatra, és a napi lista Áron új jóváhagyásáig üres.</p>}
           {dry && (
             <div className={s.counts} aria-label="Próba eredménye">
               {loadCounts(dry).map((c) => (
@@ -135,7 +159,7 @@ export function MemberLoad({ slug, canOperate, closed, batches }: { slug: string
       )}
       {undo && (
         <div className={s.confirm} role="group" aria-label="Visszavonás megerősítése">
-          <p>{undo.batch}: {undo.summary.remove} tag törlődik, {undo.summary.softDeleteCompanies} cég és {undo.summary.softDeletePersons} személy archiválódik, amit ez a betöltés hozott létre. {undo.summary.keptTouched} érintett tag marad.</p>
+          <p>{undo.batch}: {undo.summary.remove} tag törlődik, {undo.summary.softDeleteCompanies} cég és {undo.summary.softDeletePersons} személy archiválódik, amit ez a betöltés hozott létre. {undo.summary.keptTouched} érintett tag marad.{live ? " A kampány visszaáll piszkozatra." : ""}</p>
           <div className={k.actions}>
             <button type="button" className={k.btn} disabled={busy} onClick={() => startUndo(undo.batch, false)}>Visszavonás megerősítése</button>
             <button type="button" className={k.btn} disabled={busy} onClick={() => setUndo(null)}>Mégse</button>

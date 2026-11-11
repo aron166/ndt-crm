@@ -38,7 +38,7 @@ describe("role checks pass through from the service with the session user", () =
   it("approve: another user gets the service's 403 text", async () => {
     svc.approveCampaign.mockResolvedValue({ error: "Kampányt csak Áron indíthat", status: 403 });
     expect(await A.approveCampaignAction("bp")).toEqual({ error: "Kampányt csak Áron indíthat" });
-    expect(svc.approveCampaign).toHaveBeenCalledWith({ tenantId: 1, userId: 5 }, "bp");
+    expect(svc.approveCampaign).toHaveBeenCalledWith({ tenantId: 1, userId: 5 }, "bp", undefined);
   });
   it("apply and undo go to the service as the session user, never as a key", async () => {
     svc.addMembers.mockResolvedValue({ error: "Ehhez admin vagy manager szerep kell", status: 403 });

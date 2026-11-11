@@ -99,10 +99,11 @@ export async function undoBatchAction(slug: string, batch: string, dryRun: boole
   return { ok: true as const, summary: r.summary };
 }
 
-export async function approveCampaignAction(slug: string): Promise<{ ok: true } | Err> {
+export async function approveCampaignAction(slug: string, seen?: { members: number; steps: number; dailyCap: number }): Promise<{ ok: true } | Err> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
-  const r = await svc.approveCampaign({ tenantId: TENANT_ID, userId }, slug);
+  const ok = seen && [seen.members, seen.steps, seen.dailyCap].every((n) => Number.isInteger(n) && n >= 0);
+  const r = await svc.approveCampaign({ tenantId: TENANT_ID, userId }, slug, ok ? seen : undefined);
   if ("error" in r) return { error: r.error };
   touch(slug);
   revalidatePath("/calls");

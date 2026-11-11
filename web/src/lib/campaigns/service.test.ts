@@ -168,6 +168,11 @@ describe("only Áron launches", () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence", dailyCap: 15, steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 5, contentItem: { status: "in_review" } }] });
     expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp")).toMatchObject({ status: 409 });
   });
+  it("approve refuses when the campaign changed since the approver looked", async () => {
+    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp", { members: 2, steps: 1, dailyCap: 15 })).toMatchObject({ status: 409 });
+    expect(d.campaign.updateMany).not.toHaveBeenCalled();
+    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp", { members: 1, steps: 1, dailyCap: 15 })).toMatchObject({ ok: true });
+  });
   it("a sequence whose call comes before the e-mail cannot launch", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence", dailyCap: 15, steps: [
       { position: 1, channel: "call", waitDays: 0, contentItemId: null, contentItem: null },
@@ -263,6 +268,14 @@ describe("member loads and undo are session only with an operator role (Kai, Van
     expect(await undoBatch(APP, "bp", "b1", false)).toMatchObject({ status: 403 });
     expect(d.campaignMember.deleteMany).not.toHaveBeenCalled();
     expect(await undoBatch(APP, "bp", "b1", true)).toMatchObject({ ok: true, dry_run: true });
+  });
+  it("an undo that removes members of a running campaign sends it back to draft", async () => {
+    d.campaign.findFirst.mockResolvedValue({ ...SEQ, status: "running" });
+    d.user.findFirst.mockResolvedValue({ role: "admin" });
+    d.campaignMember.findMany.mockResolvedValue([{ id: 9, companyId: 70, personId: null, attempts: 0, lastTouchedAt: null, leadId: null, createdCompany: false, createdPerson: false }]);
+    d.campaignMember.deleteMany.mockResolvedValue({ count: 1 });
+    expect(await undoBatch(SESSION, "bp", "b1", false)).toMatchObject({ ok: true });
+    expect(d.campaign.update.mock.calls[0][0].data).toMatchObject({ status: "draft", approvedHash: null });
   });
   it("a content-only campaign takes no members", async () => {
     d.campaign.findFirst.mockResolvedValue({ ...SEQ, kind: "organic" });
