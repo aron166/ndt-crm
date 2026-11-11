@@ -10,7 +10,7 @@ import k from "@/components/astryx/page.module.css";
 import { stepLine } from "@/lib/campaigns/labels";
 import type { AssetState } from "@/lib/campaigns/hub";
 import { approveCampaignAction, setCampaignStatusAction, updateCampaignAction } from "@/app/actions/campaign-hub";
-import { assetStateLabel } from "./SpecifyPanel";
+import { assetStateLabel } from "@/lib/campaigns/labels";
 import type { StepRow } from "./StepsSection";
 import s from "../campaigns.module.css";
 

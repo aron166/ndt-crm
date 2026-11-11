@@ -83,3 +83,10 @@ export function uiBatchId(now: Date): string {
 export function filterByType<T extends { kind: string | null }>(rows: readonly T[], type: string): T[] {
   return type === "all" ? [...rows] : rows.filter((r) => r.kind === type);
 }
+
+/** Content approval pipeline states (lib/content/types), as the campaign pages name them. */
+const ASSET_STATE: Record<string, string> = {
+  draft: "piszkozat", in_review: "felülvizsgálatra", changes_requested: "javítást kértek", rewrite_requested: "újraírást kértek",
+  ai_working: "az ügynök dolgozik rajta", live: "jóváhagyva (élő)", archived: "archivált",
+};
+export const assetStateLabel = (st: string) => ASSET_STATE[st] ?? st;

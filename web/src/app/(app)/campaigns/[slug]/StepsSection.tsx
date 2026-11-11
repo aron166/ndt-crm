@@ -7,12 +7,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import k from "@/components/astryx/page.module.css";
-import { stepLine, type StepDraft } from "@/lib/campaigns/labels";
+import { assetStateLabel, stepLine, type StepDraft } from "@/lib/campaigns/labels";
 import type { CampaignKind } from "@/lib/campaigns/rules";
 import type { AssetState } from "@/lib/campaigns/hub";
 import { saveStepsAction } from "@/app/actions/campaign-hub";
 import { StepsEditor } from "../StepsEditor";
-import { assetStateLabel } from "./SpecifyPanel";
 import s from "../campaigns.module.css";
 
 export interface StepRow { position: number; channel: string; waitDays: number; audienceRule: string; contentItemId: number | null }
