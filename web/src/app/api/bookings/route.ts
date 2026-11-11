@@ -4,6 +4,7 @@ import { json, leadApiCtx } from "@/lib/leads/api";
 import { serializeDates } from "@/lib/serialize";
 
 const MAX_RANGE_DAYS = 62;
+const MAX_ROWS = 500;
 const querySchema = z
   .object({
     from: z.coerce.date(),
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
       lead: { select: { id: true, message: true, nextAction: true } },
     },
     orderBy: { startsAt: "asc" },
-    take: 500,
+    take: MAX_ROWS,
   });
-  return json({ ok: true, items: serializeDates(rows) });
+  return json({ ok: true, items: serializeDates(rows), truncated: rows.length === MAX_ROWS });
 }

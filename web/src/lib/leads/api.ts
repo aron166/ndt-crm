@@ -42,7 +42,7 @@ export const leadListQuerySchema = z.object({
   status: z.preprocess(emptyToUndef, z.string().trim().max(64).optional()),
   outcome: z.preprocess(emptyToUndef, z.enum(LEAD_OUTCOMES).optional()),
   assigned_to: optInt,
-  /** Name search: company name, contact person name, contact email or phone (contains, case-insensitive). */
+  /** Name search: company name, contact person name, email or phone (contact or person), subject (contains, case-insensitive). */
   q: z.preprocess(emptyToUndef, z.string().trim().min(2).max(100).optional()),
   /** Campaign / import batch tag, exact (e.g. launch-2026-11). */
   campaign: z.preprocess(emptyToUndef, z.string().trim().max(200).optional()),
@@ -56,7 +56,7 @@ export function leadSearchWhere(q: string) {
   return {
     OR: [
       { company: { name: c } },
-      { contact: { person: { OR: [{ firstName: c }, { lastName: c }] } } },
+      { contact: { person: { OR: [{ firstName: c }, { lastName: c }, { email: c }, { phone: c }] } } },
       { contact: { email: c } },
       { contact: { phone: c } },
       { subject: c },

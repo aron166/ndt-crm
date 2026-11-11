@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { db } from "@/lib/db";
 import { json, leadApiCtx, parseLeadId } from "@/lib/leads/api";
 import { serializeDates } from "@/lib/serialize";
 import { leadSite, proposeSlotsFor } from "@/lib/booking/route-service";
@@ -27,15 +26,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const q = querySchema.safeParse(raw);
   if (!q.success) return json({ error: "Validation failed", details: q.error.flatten() }, 400);
   const { tenantId } = auth.ctx;
-  const lead = await db.lead.findFirst({ where: { id, tenantId }, select: { id: true } });
-  if (!lead) return json({ error: "Not found" }, 404);
+  // leadSite is tenant scoped: null = no such lead for this key's tenant.
   const site = await leadSite(tenantId, id);
+  if (!site) return json({ error: "Not found" }, 404);
   const r = await proposeSlotsFor(tenantId, {
-    settlementId: site?.settlement?.id ?? null,
-    ...(site?.source ? { siteSource: site.source } : {}),
+    settlementId: site.settlement?.id ?? null,
+    ...(site.source ? { siteSource: site.source } : {}),
     kind: q.data.kind ?? null,
     days: q.data.days, count: q.data.count, wanted: q.data.wanted,
   });
   if ("error" in r) return json({ error: r.error }, r.status);
-  return json({ ok: true, siteSource: site?.source ?? null, ...serializeDates(r) });
+  return json({ ok: true, siteSource: site.source, ...serializeDates(r) });
 }

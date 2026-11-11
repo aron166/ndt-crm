@@ -17,6 +17,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     task: { findMany: vi.fn() },
     lead: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    interaction: { findFirst: vi.fn() },
   },
 }));
 vi.mock("@/lib/booking/route-service", () => ({ leadSite: vi.fn(), proposeSlotsFor: vi.fn() }));
@@ -86,14 +87,13 @@ describe("GET /api/leads/queue", () => {
 
 describe("GET /api/leads/:id/slots", () => {
   it("404 for a lead of another tenant, without proposing", async () => {
-    m.lead.findFirst.mockResolvedValue(null);
+    mock(leadSite).mockResolvedValue(null);
     expect((await getSlots(get("/api/leads/5/slots"), ctx("5"))).status).toBe(404);
-    expect(m.lead.findFirst.mock.calls[0][0].where).toEqual({ id: 5, tenantId: 4 });
+    expect(mock(leadSite).mock.calls[0]).toEqual([4, 5]);
     expect(proposeSlotsFor).not.toHaveBeenCalled();
   });
 
   it("proposes for the lead's site, passing the assumed-site source", async () => {
-    m.lead.findFirst.mockResolvedValue({ id: 5 });
     mock(leadSite).mockResolvedValue({ settlement: { id: 77 }, address: null, source: "company_address_assumed" });
     mock(proposeSlotsFor).mockResolvedValue({ site: null, kind: null, minutes: 60, from: new Date(), machines: [], slots: [] });
     const r = await getSlots(get("/api/leads/5/slots?days=7&count=2"), ctx("5"));
@@ -109,7 +109,10 @@ describe("GET /api/leads q= and campaign=", () => {
   });
 
   it("searches company, person names, contact email and phone, subject", () => {
-    expect(JSON.stringify(leadSearchWhere("kiss"))).toContain('"company":{"name"');
+    const w = JSON.stringify(leadSearchWhere("kiss"));
+    expect(w).toContain('"company":{"name"');
+    // Phone and email also on the person: the queue falls back to person.phone, so search must too.
+    expect(w).toContain('{"email":{"contains":"kiss","mode":"insensitive"}},{"phone":');
     expect(leadSearchWhere("kiss").OR).toHaveLength(5);
   });
 
@@ -122,16 +125,28 @@ describe("POST /api/leads/:id/interactions call_id (the confirmed voice-log rout
   const post = (body: unknown) => new Request("http://x/api/leads/5/interactions", { method: "POST", body: JSON.stringify(body) });
 
   it("passes call_id through as the idempotency key", async () => {
+    m.interaction.findFirst.mockResolvedValue(null);
     mock(logLeadCallOutcome).mockResolvedValue({ success: true, interactionId: 9 });
     const r = await postInteraction(post({ outcome: "no_answer", note: "x", call_id: "tg-123" }), ctx("5"));
     expect(r.status).toBe(201);
     expect(mock(logLeadCallOutcome).mock.calls[0][1]).toMatchObject({ callId: "tg-123" });
   });
 
-  it("a repeated call_id is a 409, not a 500 and not a second log", async () => {
-    mock(logLeadCallOutcome).mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002" }));
+  it("a repeated call_id returns the first interaction (200 deduped) and logs nothing", async () => {
+    m.interaction.findFirst.mockResolvedValue({ id: 9 });
     const r = await postInteraction(post({ outcome: "no_answer", note: "x", call_id: "tg-123" }), ctx("5"));
-    expect(r.status).toBe(409);
-    expect(await r.json()).toMatchObject({ duplicate: true });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ ok: true, deduped: true, interactionId: 9 });
+    expect(m.interaction.findFirst.mock.calls[0][0].where).toEqual({ tenantId: 4, callId: "tg-123" });
+    expect(logLeadCallOutcome).not.toHaveBeenCalled();
+  });
+
+  it("a lost race on call_id (P2002 on call_id) answers deduped too; another unique error is a 500", async () => {
+    m.interaction.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 9 });
+    mock(logLeadCallOutcome).mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002", meta: { target: ["tenant_id", "call_id"] } }));
+    expect((await postInteraction(post({ outcome: "no_answer", note: "x", call_id: "tg-123" }), ctx("5"))).status).toBe(200);
+    m.interaction.findFirst.mockResolvedValue(null);
+    mock(logLeadCallOutcome).mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002", meta: { target: ["other"] } }));
+    expect((await postInteraction(post({ outcome: "no_answer", note: "x", call_id: "tg-124" }), ctx("5"))).status).toBe(500);
   });
 });

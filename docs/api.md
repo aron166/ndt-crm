@@ -251,8 +251,8 @@ curl "$CRM/api/leads?status=recall&outcome=open&assigned_to=2&page=1&page_size=2
 
 Filters: `status` (column key), `outcome` (`open|won|lost`), `assigned_to` (user id),
 `campaign` (exact campaign / import batch tag, e.g. `launch-2026-11`), `q` (2 to 100 chars:
-contains, case-insensitive, over company name, contact first or last name, contact email,
-contact phone and subject), `page` (1-based), `page_size` (≤100, default 25). Sorted newest first.
+contains, case-insensitive, over company name, person first or last name, email and phone
+on the contact or the person, and subject), `page` (1-based), `page_size` (≤100, default 25). Sorted newest first.
 
 ### `GET /api/leads/queue?limit=&assigned_to=` (2026-11-11)
 
@@ -275,7 +275,7 @@ another tenant. To book, a human uses the lead page drawer.
 ### `GET /api/bookings?from=&to=&assigned_to=` (2026-11-11)
 
 Open bookings (tasks with `starts_at`, not done or cancelled) starting in `[from, to)`,
-oldest first, at most 500. `from` and `to` are ISO dates or instants, range at most 62 days.
+oldest first, at most 500 (`truncated: true` when the cap was hit). `from` and `to` are ISO dates or instants, range at most 62 days.
 Each item: `id, title, description, type, status, startsAt, estimatedMinutes, bookingKind,
 siteAddress, siteSource, siteSettlement { id, name, county }, equipment { id, name },
 assignedTo { id, name }, company { id, name, city, address }, lead { id, message, nextAction }`.
@@ -327,7 +327,8 @@ curl -X POST $CRM/api/leads/12/interactions \
 ```
 
 `call_id` (optional, ≤200 chars, unique per tenant) makes the POST idempotent: a repeat with the
-same `call_id` writes nothing and returns `409 { "error": "Duplicate call_id", "duplicate": true }`.
+same `call_id` writes nothing and returns `200 { "ok": true, "deduped": true, "interactionId": <first> }`,
+the same answer `/api/calls/result` gives.
 
 **Which route logs a confirmed voice call** (the cockpit, after Péter presses "Igen"): this one,
 with `call_id` = the confirmation's id. It is the human-confirmed path, the same function as the

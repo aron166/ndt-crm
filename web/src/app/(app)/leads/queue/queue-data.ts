@@ -55,7 +55,7 @@ export function groupQueue<T extends { nextDue: Date | null }>(
 }
 
 /** Pure: the one where shared by the queue rows and the queue total. null = everyone. */
-export function queueWhere(assignedToId: number | null, tenantId: number = TENANT_ID) {
+export function queueWhere(assignedToId: number | null, tenantId: number) {
   return {
     tenantId, outcome: "open", convertedDealId: null,
     OR: [{ status: null }, { status: { notIn: [...SIDE_STAGES] } }],
@@ -64,11 +64,11 @@ export function queueWhere(assignedToId: number | null, tenantId: number = TENAN
 }
 
 export function getQueueTotal(assignedToId: number | null) {
-  return db.lead.count({ where: queueWhere(assignedToId) });
+  return db.lead.count({ where: queueWhere(assignedToId, TENANT_ID) });
 }
 
 /** Also served as GET /api/leads/queue (app key), which passes the key's tenant. */
-export async function getQueueRows(assignedToId: number | null, tenantId: number = TENANT_ID, limit = QUEUE_LIMIT): Promise<QueueRow[]> {
+export async function getQueueRows(assignedToId: number | null, tenantId: number, limit = QUEUE_LIMIT): Promise<QueueRow[]> {
   const leads = await db.lead.findMany({
     where: queueWhere(assignedToId, tenantId),
     select: {
@@ -80,7 +80,7 @@ export async function getQueueRows(assignedToId: number | null, tenantId: number
       },
     },
     orderBy: [{ nextDue: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
-    take: Math.min(limit, QUEUE_LIMIT),
+    take: limit,
   });
   return leads.map((l) => {
     const cf = (l.customFields ?? {}) as Record<string, unknown>;
