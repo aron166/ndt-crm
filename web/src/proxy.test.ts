@@ -22,6 +22,9 @@ describe("isServiceApiPath", () => {
     "/api/calls/pending",
     "/api/companies/42",
     "/api/persons/7",
+    "/api/leads/queue",
+    "/api/leads/12/slots",
+    "/api/bookings",
     "/api/outreach/targets",
     "/api/outreach/drafts",
     "/api/cron/automations",
@@ -45,6 +48,8 @@ describe("isServiceApiPath", () => {
     "/api/companies/42/notes", // a future nested route must not inherit the bypass
     "/api/persons/7/enrichment",
     "/api/companies/abc",
+    "/api/bookings/12", // list only
+    "/api/booking/slots", // the booking drawer's session route stays gated
     "/companies/42",
     "/leads",
     "/api/suppressions/anything", // exact match only
