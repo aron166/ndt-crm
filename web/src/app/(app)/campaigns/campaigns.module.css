@@ -71,3 +71,4 @@ textarea.input { min-height: 72px; resize: vertical; }
 .metric { width: 6ch; text-align: right; }
 .ruleList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .ruleForm { display: grid; gap: 12px; max-width: 520px; margin-top: 12px; }
+.stageSet { display: flex; flex-wrap: wrap; gap: 8px 16px; border: 0; padding: 0; margin: 8px 0; }

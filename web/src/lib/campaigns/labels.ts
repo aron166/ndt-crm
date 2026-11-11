@@ -124,3 +124,30 @@ export function missingForSpec(c: { kind: string | null; brief: unknown; steps: 
   for (const s of c.steps) if ((s.channel === "email" || s.channel === "call") && s.contentItemId == null) out.push(`${s.position}. lépés anyaga (${CHANNEL_LABEL[s.channel as StepChannel]})`);
   return out;
 }
+
+/** Sequence editor rows (item 4): e-mail, call, or a wait in working days before the next touch. */
+export type SeqRow =
+  | { kind: "email" | "call"; condition: StepDraft["audience_rule"]; content_item_id?: number | null }
+  | { kind: "wait"; days: number };
+
+/** Rows to stored steps: each wait adds to the next touch's wait_days. */
+export function foldRows(rows: readonly SeqRow[]): { steps: StepDraft[] } | { error: string } {
+  const steps: StepDraft[] = [];
+  let wait = 0;
+  for (const r of rows) {
+    if (r.kind === "wait") { wait += Math.max(0, Math.floor(r.days || 0)); continue; }
+    if (wait > 60) return { error: "Egy lépés előtt legfeljebb 60 munkanap várakozás lehet" };
+    steps.push({ channel: r.kind, wait_days: wait, audience_rule: r.condition, content_item_id: r.content_item_id ?? null });
+    wait = 0;
+  }
+  if (wait > 0) return { error: "A sorozat végén álló várakozás nem csinál semmit" };
+  return { steps };
+}
+
+/** Stored steps to rows: a step with wait_days gets its wait row in front. */
+export function unfoldSteps(steps: readonly StepDraft[]): SeqRow[] {
+  return steps.flatMap((s): SeqRow[] => {
+    const touch: SeqRow = { kind: s.channel === "call" ? "call" : "email", condition: s.audience_rule, content_item_id: s.content_item_id ?? null };
+    return s.wait_days > 0 ? [{ kind: "wait", days: s.wait_days }, touch] : [touch];
+  });
+}
