@@ -78,6 +78,6 @@ export async function deleteSavedView(id: number): Promise<{ error?: string; suc
   revalidatePath("/persons");
   revalidatePath("/deals");
   revalidatePath("/tasks");
-  revalidatePath("/marketing/campaigns");
+  revalidatePath("/campaigns");
   return { success: true };
 }

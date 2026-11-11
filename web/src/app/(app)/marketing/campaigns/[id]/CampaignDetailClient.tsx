@@ -92,7 +92,7 @@ export function CampaignDetailClient({
 
   return (
     <div className="mount">
-      <Link href="/marketing/campaigns" className={k.back}>
+      <Link href="/campaigns?type=marketing" className={k.back}>
         <ArrowLeft style={{ width: 14, height: 14 }} />
         Vissza a kampányokhoz
       </Link>
@@ -169,7 +169,7 @@ export function CampaignDetailClient({
           {campaign.slug && (
             <div className={k.meta}>
               {/* PROPOSAL (unreviewed HU) */}
-              <Link href={`/outreach/campaigns?campaign=${campaign.slug}`} className={k.link}>
+              <Link href={`/campaigns?type=outreach&campaign=${encodeURIComponent(campaign.slug)}`} className={k.link}>
                 Outreach dashboard
               </Link>
               {/* PROPOSAL (unreviewed HU) */}

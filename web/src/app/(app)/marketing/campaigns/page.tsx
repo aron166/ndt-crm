@@ -1,42 +1,6 @@
-import { db } from "@/lib/db";
-import { CampaignsClient } from "./CampaignsClient";
-import { listSenders } from "@/app/actions/outreach-campaigns";
+import { redirect } from "next/navigation";
 
-const TENANT_ID = 1;
-
-export const dynamic = "force-dynamic";
-
-export default async function CampaignsPage() {
-  const [campaigns, senders] = await Promise.all([
-    db.campaign.findMany({
-      where: { tenantId: TENANT_ID },
-      orderBy: [{ isArchived: "asc" }, { name: "asc" }],
-      select: {
-        id: true, name: true, description: true, isArchived: true, slug: true, currentWave: true,
-        audienceView: { select: { id: true, name: true } },
-        sender: { select: { name: true } },
-        _count: { select: { contentItems: true } },
-      },
-    }),
-    listSenders(),
-  ]);
-
-  return (
-    <div className="mount">
-      <CampaignsClient
-        campaigns={campaigns.map((c) => ({
-          id: c.id,
-          name: c.name,
-          description: c.description,
-          isArchived: c.isArchived,
-          slug: c.slug,
-          senderName: c.sender?.name ?? null,
-          currentWave: c.currentWave,
-          audienceName: c.audienceView?.name ?? null,
-          contentCount: c._count.contentItems,
-        }))}
-        senders={senders}
-      />
-    </div>
-  );
+// One campaigns page (Áron 2026-11-11): the older segment campaigns list lives in the hub by type.
+export default function MarketingCampaignsRedirect() {
+  redirect("/campaigns?type=marketing");
 }

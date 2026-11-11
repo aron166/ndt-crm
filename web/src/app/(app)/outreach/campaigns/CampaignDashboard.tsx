@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { REPLY_TYPE_LABEL } from "@/lib/outreach/labels";
 import { STATUS_LABELS } from "@/lib/marketing/types";
-import { PageHeader } from "@/components/astryx/PageHeader";
+import { outreachStatsHref } from "@/lib/campaigns/labels";
 import k from "@/components/astryx/page.module.css";
 import s from "../outreach.module.css";
 import type { CampaignStats, CampaignStepTemplate } from "@/app/actions/outreach-campaigns";
@@ -82,21 +82,13 @@ export default function CampaignDashboard({
     if (c) params.set("campaign", c);
     if (s != null) params.set("sender", String(s));
     if (w != null) params.set("wave", String(w));
-    router.push(`/outreach/campaigns?${params.toString()}`);
+    router.push(outreachStatsHref(params));
   }
 
+  // Rendered inside the Kampányok hub (type=outreach), which owns the page header.
   return (
     <div>
-      <PageHeader
-        title="Kampány dashboard"
-        eyebrow={<Link href="/outreach" className={k.back} style={{ marginBottom: 0 }}>← Outreach</Link>}
-        actions={
-          // PROPOSAL (unreviewed HU)
-          <Link href="/campaigns" className={k.btn}>
-            Kampányok kezelése
-          </Link>
-        }
-        filters={
+      <div className={s.embeddedFilters} aria-label="Kiküldés szűrők">
           <>
             <select
               className={s.field}
@@ -133,8 +125,7 @@ export default function CampaignDashboard({
               ))}
             </select>
           </>
-        }
-      />
+      </div>
 
       <div className={s.stack}>
         <section className={k.group}>
