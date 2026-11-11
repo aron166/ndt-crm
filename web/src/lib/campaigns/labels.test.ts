@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { channelsFor, defaultSteps, filterByType, groupByCity, isContentOnly, stepLine, uiBatchId } from "./labels";
+import { channelsFor, defaultSteps, filterByType, groupByCity, isContentOnly, outreachStatsHref, stepLine, uiBatchId } from "./labels";
 import { stepsFitKind } from "./rules";
 import { summarize, weekStart } from "./hub";
 
@@ -17,10 +17,16 @@ describe("campaign kinds in the UI", () => {
     expect(channelsFor("organic")).toEqual([]);
     expect(channelsFor("cold_call")).toEqual(["call"]);
   });
-  it("type tabs filter by kind; a pre-v2 row shows under Mind only", () => {
-    const rows = [{ kind: "sequence" }, { kind: null }, { kind: "ad" }];
-    expect(filterByType(rows, "all")).toHaveLength(3);
+  it("type tabs filter by kind; pre-v2 rows (null, content) show under Mind and Marketing (régi)", () => {
+    const rows = [{ kind: "sequence" }, { kind: null }, { kind: "ad" }, { kind: "content" }];
+    expect(filterByType(rows, "all")).toHaveLength(4);
     expect(filterByType(rows, "ad")).toEqual([{ kind: "ad" }]);
+    expect(filterByType(rows, "marketing")).toEqual([{ kind: null }, { kind: "content" }]);
+  });
+  it("the old dashboard URL lands on the hub Kiküldés view with its filters", () => {
+    expect(outreachStatsHref({ campaign: "corvid-w1", sender: "2", wave: undefined })).toBe("/campaigns?type=outreach&campaign=corvid-w1&sender=2");
+    expect(outreachStatsHref(new URLSearchParams("wave=3&x=1"))).toBe("/campaigns?type=outreach&wave=3");
+    expect(outreachStatsHref({})).toBe("/campaigns?type=outreach");
   });
   it("step lines read like the mockup", () => {
     expect(stepLine({ channel: "call", waitDays: 3, audienceRule: "no_reply" })).toBe("Hívás, 3 munkanap után, akik nem válaszoltak");

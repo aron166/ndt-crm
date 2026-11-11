@@ -13,7 +13,7 @@ import { Kbd } from "@astryxdesign/core/Kbd";
 import {
   Inbox, Headset, ClipboardList, LayoutDashboard, Building2, Users, KanbanSquare, FileText, Receipt, Mail,
   Megaphone, Settings, MoreHorizontal, Zap, BarChart3, CalendarDays, ScrollText, Sparkles, Wallet, Upload,
-  Search, Plus, LogOut, Flag,
+  Search, Plus, LogOut,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -86,7 +86,6 @@ export function CrmSideNav({
           endContent={counts.overdueLeads > 0 ? <Badge variant="error" label={`${counts.overdueLeads} késik`} /> : undefined}
         />
         <SideNavItem label="Hívás mód" href="/calls" icon={Headset} isSelected={on("/calls")} />
-        <SideNavItem label="Kampányok" href="/campaigns" icon={Flag} isSelected={on("/campaigns")} />
         <SideNavItem
           label="Feladatok" href="/tasks" icon={ClipboardList} isSelected={on("/tasks")}
           endContent={counts.overdueTasks > 0 ? <Badge variant="warning" label={`${counts.overdueTasks} lejárt`} /> : undefined}
@@ -103,7 +102,7 @@ export function CrmSideNav({
       </SideNavSection>
       <SideNavSection title="Rendszer">
         <SideNavItem
-          label="Marketing" href="/marketing" icon={Megaphone} isSelected={on("/marketing")}
+          label="Marketing" href="/marketing" icon={Megaphone} isSelected={on("/marketing") || on("/campaigns")}
           endContent={counts.marketingReview > 0 ? <Badge variant="info" label={String(counts.marketingReview)} /> : undefined}
         />
         <SideNavItem

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Users, FileText, Megaphone } from "lucide-react";
+import { Plus, Users, FileText, Megaphone } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -13,7 +13,6 @@ import { createCampaign } from "@/app/actions/campaigns";
 import { FormField } from "@/components/ui/FormField";
 import k from "@/components/astryx/page.module.css";
 import s from "../marketing.module.css";
-import { MarketingHeader } from "../MarketingTabs";
 
 interface CampaignRow {
   id: number;
@@ -27,6 +26,7 @@ interface CampaignRow {
   contentCount: number;
 }
 
+/** The pre-v2 segment campaigns list, rendered inside the Kampányok hub (type=marketing). */
 export function CampaignsClient({
   campaigns, senders,
 }: {
@@ -81,26 +81,14 @@ export function CampaignsClient({
   }
 
   return (
-    <div className="mount">
-      <Link href="/marketing" className={k.back}>
-        <ArrowLeft style={{ width: 14, height: 14 }} />
-        Vissza a marketinghez
-      </Link>
-
-      <MarketingHeader
-        active="campaigns"
-        title="Kampányok"
-        eyebrow="Kampányok és célközönségük: szegmensből kimenő lista."
-        actions={
-          <>
-          {/* PROPOSAL copy: the hub is where every campaign type now lives (Áron 2026-11-11, variant A). */}
-          <Link href="/campaigns" className={k.btn}>Kampányok központ</Link>
-          <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={() => setOpen(true)}>
-            <Plus className="size-4" /> Új kampány
-          </button>
-          </>
-        }
-      />
+    <div>
+      <div className={k.groupHead}>
+        <span className={k.muted}>Kampányok és célközönségük: szegmensből kimenő lista.</span>
+        {/* PROPOSAL copy */}
+        <button type="button" className={k.btn} onClick={() => setOpen(true)}>
+          <Plus className="size-4" /> Új szegmens-kampány
+        </button>
+      </div>
 
       {campaigns.length === 0 ? (
         <div className={`${k.empty} ${s.emptyC}`}>

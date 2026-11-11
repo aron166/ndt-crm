@@ -23,7 +23,7 @@ export default async function OutreachPage() {
         title="Outreach piszkozatok"
         eyebrow="Kampányonként megírt emailek jóváhagyása és küldése"
         actions={
-          <Link href="/outreach/campaigns" className={k.btn}>
+          <Link href="/campaigns?type=outreach" className={k.btn}>
             Kampány-áttekintés →
           </Link>
         }

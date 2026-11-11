@@ -22,3 +22,4 @@ textarea.field { resize: vertical; line-height: 1.6; }
 .replyForm { display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
 .nameShrink { min-width: 0; }
 .emptyC { align-items: center; text-align: center; }
+.embeddedFilters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }

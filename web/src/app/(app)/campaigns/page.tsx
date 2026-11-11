@@ -1,9 +1,14 @@
 // Kampányok: one hub for marketing and sales campaigns (mockup A, Áron 2026-11-11).
 // Hungarian copy is PROPOSAL until Áron approves it.
 import Link from "next/link";
-import { PageHeader, Seg } from "@/components/astryx/PageHeader";
+import { Seg } from "@/components/astryx/PageHeader";
 import k from "@/components/astryx/page.module.css";
+import { db } from "@/lib/db";
 import { hubList } from "@/lib/campaigns/hub";
+import { MarketingHeader } from "../marketing/MarketingTabs";
+import { CampaignsClient } from "../marketing/campaigns/CampaignsClient";
+import CampaignDashboard from "../outreach/campaigns/CampaignDashboard";
+import { listCampaignKeys, listSenders, getCampaignStats, getCampaignStepTemplates } from "@/app/actions/outreach-campaigns";
 import { filterByType, kindLabel, statusLabel, isContentOnly } from "@/lib/campaigns/labels";
 import s from "./campaigns.module.css";
 
@@ -17,10 +22,19 @@ const TABS = [
   { key: "sequence", label: "Sorozat" },
   { key: "ad", label: "Hirdetés" },
   { key: "organic", label: "Organikus" },
+  // The two older campaign screens, folded in so there is one campaigns page (Áron 2026-11-11).
+  { key: "marketing", label: "Marketing (régi)" },
+  { key: "outreach", label: "Kiküldés" },
 ] as const;
 
-export default async function CampaignsHubPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
-  const { type: raw } = await searchParams;
+const intOrNull = (v: string | undefined) => {
+  const n = v ? parseInt(v, 10) : NaN;
+  return Number.isFinite(n) ? n : null;
+};
+
+export default async function CampaignsHubPage({ searchParams }: { searchParams: Promise<{ type?: string; campaign?: string; sender?: string; wave?: string }> }) {
+  const sp = await searchParams;
+  const raw = sp.type;
   const type = TABS.some((t) => t.key === raw) ? raw! : "all";
   const { rows, summary } = await hubList(TENANT_ID);
   const shown = filterByType(rows, type);
@@ -28,11 +42,12 @@ export default async function CampaignsHubPage({ searchParams }: { searchParams:
 
   return (
     <div className="mount">
-      <PageHeader
+      <MarketingHeader
+        active="campaigns"
         title="Kampányok"
         help="Marketing és értékesítés egy helyen. Indítani csak Áron tud."
         actions={<Link href="/campaigns/new" className={`${k.btn} ${k.btnPrimary}`}>Új kampány</Link>}
-        filters={<Seg label="Típus" current={type} items={TABS.map((t) => ({ key: t.key, label: `${t.label} ${count(t.key)}`, href: t.key === "all" ? "/campaigns" : `/campaigns?type=${t.key}` }))} />}
+        filters={<Seg label="Típus" current={type} items={TABS.map((t) => ({ key: t.key, label: t.key === "outreach" ? t.label : `${t.label} ${count(t.key)}`, href: t.key === "all" ? "/campaigns" : `/campaigns?type=${t.key}` }))} />}
       />
       <div className={s.strip} aria-label="Összesítő">
         <span className={s.stripItem}><b>{summary.running}</b> fut</span>
@@ -41,7 +56,7 @@ export default async function CampaignsHubPage({ searchParams }: { searchParams:
         <span className={s.stripItem}><b>{summary.leadsThisWeek}</b> lead lett ezen a héten</span>
         <Link href="/marketing" className={s.stripItem}><b>{summary.assetsInReview}</b> anyag vár jóváhagyásra</Link>
       </div>
-      {shown.length === 0 ? (
+      {type === "marketing" ? await legacyList() : type === "outreach" ? await outreachStats(sp) : shown.length === 0 ? (
         <div className={k.empty}>Nincs ilyen típusú kampány. <Link href="/campaigns/new" className={k.link}>Új kampány</Link></div>
       ) : (
         <div className={k.tableWrap}>
@@ -67,4 +82,46 @@ export default async function CampaignsHubPage({ searchParams }: { searchParams:
       )}
     </div>
   );
+}
+
+/** The old /marketing/campaigns list: pre-v2 segment campaigns with their audience, sender and wave. */
+async function legacyList() {
+  const [campaigns, senders] = await Promise.all([
+    db.campaign.findMany({
+      where: { tenantId: TENANT_ID, OR: [{ kind: null }, { kind: "content" }] },
+      orderBy: [{ isArchived: "asc" }, { name: "asc" }],
+      select: {
+        id: true, name: true, description: true, isArchived: true, slug: true, currentWave: true,
+        audienceView: { select: { id: true, name: true } },
+        sender: { select: { name: true } },
+        _count: { select: { contentItems: true } },
+      },
+    }),
+    listSenders(),
+  ]);
+  return (
+    <CampaignsClient
+      campaigns={campaigns.map((c) => ({
+        id: c.id, name: c.name, description: c.description, isArchived: c.isArchived, slug: c.slug,
+        senderName: c.sender?.name ?? null, currentWave: c.currentWave, audienceName: c.audienceView?.name ?? null,
+        contentCount: c._count.contentItems,
+      }))}
+      senders={senders}
+    />
+  );
+}
+
+/** The old /outreach/campaigns dashboard: sends, replies and step templates per outbound key. */
+async function outreachStats(sp: { campaign?: string; sender?: string; wave?: string }) {
+  const [campaigns, senders] = await Promise.all([listCampaignKeys(), listSenders()]);
+  const campaign = sp.campaign || campaigns[0];
+  if (!campaign) return <div className={k.empty}>Nincs adat ehhez a kampányhoz.</div>;
+  const senderUserId = intOrNull(sp.sender);
+  const wave = intOrNull(sp.wave);
+  const [result, stepTemplates] = await Promise.all([
+    getCampaignStats({ campaign, senderUserId, wave }),
+    getCampaignStepTemplates(campaign),
+  ]);
+  const stats = result && !("ok" in result) ? result : null;
+  return <CampaignDashboard campaigns={campaigns} senders={senders} campaign={campaign} senderUserId={senderUserId} wave={wave} stats={stats} stepTemplates={stepTemplates} />;
 }

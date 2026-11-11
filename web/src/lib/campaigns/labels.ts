@@ -85,7 +85,10 @@ export function uiBatchId(now: Date, rand: () => number = Math.random): string {
 
 /** The hub's type tab: "all" or one kind (pre-v2 rows with no kind show under all only). */
 export function filterByType<T extends { kind: string | null }>(rows: readonly T[], type: string): T[] {
-  return type === "all" ? [...rows] : rows.filter((r) => r.kind === type);
+  if (type === "all") return [...rows];
+  // Marketing (régi): the pre-v2 segment campaigns the old /marketing/campaigns list showed.
+  if (type === "marketing") return rows.filter((r) => r.kind == null || r.kind === "content");
+  return rows.filter((r) => r.kind === type);
 }
 
 /** Content approval pipeline states (lib/content/types), as the campaign pages name them. */
@@ -94,3 +97,14 @@ const ASSET_STATE: Record<string, string> = {
   ai_working: "az ügynök dolgozik rajta", live: "jóváhagyva (élő)", archived: "archivált",
 };
 export const assetStateLabel = (st: string) => ASSET_STATE[st] ?? st;
+
+/** The hub's Kiküldés view (the old /outreach/campaigns dashboard), keeping campaign, sender and wave. */
+export function outreachStatsHref(params: URLSearchParams | Record<string, string | undefined>): string {
+  const src = params instanceof URLSearchParams ? params : new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => !!e[1]));
+  const out = new URLSearchParams({ type: "outreach" });
+  for (const key of ["campaign", "sender", "wave"]) {
+    const v = src.get(key);
+    if (v) out.set(key, v);
+  }
+  return `/campaigns?${out.toString()}`;
+}
