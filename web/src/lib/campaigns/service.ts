@@ -7,6 +7,7 @@
 // Nothing here sends a message, and nothing here creates an SLA task except the one the
 // existing reply intake creates for a positive e-mail reply.
 
+import { getLeadStatuses } from "@/lib/leads/queries";
 import { OUTBOUND_ACTION_TYPES } from "@/lib/automations/types";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -249,6 +250,10 @@ export async function updateCampaign(
   }
   // Cap and outbound switch are part of the approval hash: changing either needs a new approval.
   // Who is touched is part of what Áron approves: a new audience needs a new approval too (item 4).
+  if (patch.audience?.source === "leads_by_stage") {
+    const known = new Set((await getLeadStatuses(ctx.tenantId)).map((x) => x.key));
+    if (!patch.audience.stages?.length || patch.audience.stages.some((x) => !known.has(x) || x === "won" || x === "lost")) return fail(400, "Válassz legalább egy nyitott lead szakaszt");
+  }
   const audience = patch.audience ? { source: patch.audience.source, stages: patch.audience.source === "leads_by_stage" ? [...new Set(patch.audience.stages ?? [])] : [] } : undefined;
   const audienceChanged = audience !== undefined && JSON.stringify(audience) !== JSON.stringify(audienceOf(c.audience));
   const capChanged = (patch.daily_cap !== undefined && patch.daily_cap !== c.dailyCap) || outboundChanged || audienceChanged;

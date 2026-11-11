@@ -10,6 +10,7 @@ import { gateDraft, gateOn, templatesForCampaign, templatesForCampaigns, templat
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { reportError } from "@/lib/report-error";
+import { advanceOnSent } from "@/lib/campaigns/service";
 import { threadKeyFor, MAX_STEP, type DraftStatus } from "@/lib/outreach/drafts";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import { runAutomations } from "@/lib/automations/engine";
@@ -165,6 +166,9 @@ export async function markDraftSentManually(
   audit("email_draft", draftId, "update", { status: row.status },
     { status: "sent", sentVia: "manual", externalThreadId: externalThreadId ?? null, nextDueAt: nextDueAt?.toISOString() ?? null },
     auditOpts);
+  // A campaign e-mail step's draft went out by hand: its member moves on in the sequence (item 4).
+  await advanceOnSent({ tenantId: TENANT_ID, userId: me.userId }, row.campaign, row.companyId, row.step)
+    .catch((err) => reportError("outreach.markSent.campaignAdvance", err, { draftId }));
   revalidatePath("/outreach");
   return { ok: true, nextDueAt: nextDueAt?.toISOString() ?? null };
 }

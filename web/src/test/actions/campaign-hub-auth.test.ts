@@ -5,7 +5,7 @@ const getActor = vi.fn();
 vi.mock("@/lib/actor", () => ({ getActor: (...a: unknown[]) => getActor(...a), NOT_A_CRM_USER: "not a CRM user" }));
 const svc = vi.hoisted(() => ({
   createCampaign: vi.fn(), setSteps: vi.fn(), updateCampaign: vi.fn(), getCampaign: vi.fn(), addMembers: vi.fn(),
-  undoBatch: vi.fn(), approveCampaign: vi.fn(), setCampaignStatus: vi.fn(), recordOutcome: vi.fn(), requestSpecification: vi.fn(),
+  undoBatch: vi.fn(), approveCampaign: vi.fn(), setCampaignStatus: vi.fn(), recordOutcome: vi.fn(), requestSpecification: vi.fn(), loadLeadAudience: vi.fn(), draftEmailStep: vi.fn(),
 }));
 vi.mock("@/lib/campaigns/service", () => svc);
 
@@ -24,6 +24,8 @@ const calls: [string, () => Promise<unknown>][] = [
   ["status", () => A.setCampaignStatusAction("bp", "paused")],
   ["outcome", () => A.recordCampaignOutcomeAction("bp", { member_id: 1, outcome: "no_answer" })],
   ["specification request", () => A.requestSpecificationAction("bp", "Hiányzik: ajánlat")],
+  ["lead audience", () => A.loadLeadAudienceAction("bp", "lb1", true)],
+  ["e-mail drafts", () => A.draftEmailStepAction("bp")],
 ];
 
 describe("campaign hub actions: a CRM user first", () => {

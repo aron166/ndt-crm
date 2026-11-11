@@ -44,6 +44,7 @@ describe("isServiceApiPath", () => {
     "/api/campaigns/bp/outcome",
     "/api/campaigns/bp/analytics",
     "/api/reports/campaigns",
+    "/api/campaigns/bp/lead-audience", // item 4: an agent may dry-run a lead load
     "/api/specification-requests", // Vanda #192-1: the agent polls with an app key, no cookie
   ];
   for (const path of bypassed) {
@@ -54,6 +55,7 @@ describe("isServiceApiPath", () => {
 
   const sessionGated = [
     "/api/search/companies", // session-auth'd UI route, must NOT be bypassed
+    "/api/campaigns/bp/email-drafts", // item 4: session only, an operator drafts
     "/api/search/persons",
     "/api/companies", // no handler, and a collection route would need its own review
     "/api/persons",

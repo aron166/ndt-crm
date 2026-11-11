@@ -7,7 +7,7 @@ import { z } from "zod";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { CONTENT_CATEGORIES } from "@/lib/content/types";
-import { AUDIENCE_RULES, CAMPAIGN_KINDS, DAILY_CAP_MAX, OUTCOME_KEYS, STEP_CHANNELS } from "./rules";
+import { AUDIENCE_RULES, AUDIENCE_SOURCES, CAMPAIGN_KINDS, DAILY_CAP_MAX, OUTCOME_KEYS, STEP_CHANNELS } from "./rules";
 import type { CampaignCtx, Fail } from "./service";
 
 // Single tenant for sessions today (decisions.md #12); app keys carry their own tenant.
@@ -81,6 +81,8 @@ export const patchSchema = z.object({
   brief: json_.optional(),
   adopt_brief_proposal: z.boolean().optional(),
   outbound_automations: z.boolean().optional(),
+  /** Who the campaign touches (item 4): prospects from a list, or open leads in chosen stages. */
+  audience: z.object({ source: z.enum(AUDIENCE_SOURCES), stages: z.array(z.string().trim().min(1).max(40)).max(20).optional() }).optional(),
 }).refine((p) => Object.keys(p).length > 0, "empty patch");
 
 export const specifySchema = z.object({

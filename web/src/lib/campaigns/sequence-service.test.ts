@@ -9,6 +9,7 @@ vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolve
 vi.mock("@/lib/leads/lifecycle-sweep", () => ({ startLeadLifecycle: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/leads/service", () => ({ changeLeadStatus: vi.fn().mockResolvedValue({ success: true }) }));
 vi.mock("@/lib/booking/queries", () => ({ resolveDemoHost: vi.fn() }));
+vi.mock("@/lib/leads/queries", () => ({ getLeadStatuses: vi.fn().mockResolvedValue(["new", "contacting", "qualified", "won", "lost"].map((key) => ({ key, label: key }))) }));
 vi.mock("@/lib/suppression", () => ({ loadSuppressionSet: vi.fn().mockResolvedValue({ emails: new Set(), domains: new Set() }) }));
 vi.mock("@/lib/content/service", () => ({ createItem: vi.fn() }));
 vi.mock("@/lib/integrations/resend", () => ({ sendEmail: vi.fn(() => { throw new Error("never send from the campaign engine"); }) }));
@@ -26,7 +27,7 @@ vi.mock("@/lib/db", () => {
   } };
 });
 
-import { setSteps, updateCampaign, recordOutcome, loadLeadAudience, draftEmailStep } from "./service";
+import { setSteps, updateCampaign, recordOutcome, loadLeadAudience, draftEmailStep, advanceOnSent } from "./service";
 
 type M = ReturnType<typeof vi.fn>;
 const d = db as unknown as Record<string, Record<string, M>> & { $transaction: M };
@@ -52,6 +53,11 @@ describe("edits", () => {
     expect(await setSteps(SESSION, "bp", [{ channel: "call" }, { channel: "email", wait_days: 5 }])).toMatchObject({ ok: true });
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", dailyCap: 15, kind: "sequence", audience: null });
     expect(await setSteps(SESSION, "bp", [{ channel: "call" }, { channel: "email" }])).toMatchObject({ status: 400 });
+  });
+  it("leads by stage needs at least one known open stage", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", dailyCap: 15, briefProposal: null, outboundAutomations: false, audience: null });
+    expect(await updateCampaign(SESSION, "bp", { audience: { source: "leads_by_stage", stages: ["won"] } })).toMatchObject({ status: 400 });
+    expect(await updateCampaign(SESSION, "bp", { audience: { source: "leads_by_stage", stages: [] } })).toMatchObject({ status: 400 });
   });
   it("changing the audience of a running campaign needs a new approval", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "running", dailyCap: 15, briefProposal: null, outboundAutomations: false, audience: null });
@@ -116,5 +122,16 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
   it("a draft campaign drafts nothing (approval first)", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "draft", dailyCap: 15, startsOn: null, endsOn: null, steps: [] });
     expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ status: 409 });
+  });
+});
+
+describe("a sent draft advances its member (item 4)", () => {
+  it("only a draft of a running campaign whose member sits on that e-mail step", async () => {
+    d.campaign.findFirst.mockResolvedValueOnce(null);
+    expect(await advanceOnSent(SESSION, "corvid-betonscan-w1", 7, 1, NOW)).toBeNull();
+    d.campaign.findFirst.mockResolvedValueOnce({ id: 3 });
+    d.campaignMember.findFirst.mockResolvedValueOnce(null);
+    expect(await advanceOnSent(SESSION, "bp", 7, 2, NOW)).toBeNull();
+    expect(d.campaignMember.updateMany).not.toHaveBeenCalled();
   });
 });

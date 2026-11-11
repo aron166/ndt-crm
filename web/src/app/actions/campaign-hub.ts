@@ -142,3 +142,25 @@ export async function requestSpecificationAction(slug: string, missing: string):
   touch(slug);
   return { ok: true, created: r.created };
 }
+
+/** Leads by stage (item 4): dry run or apply the lead loader. */
+export async function loadLeadAudienceAction(slug: string, batch: string, dryRun: boolean): Promise<{ ok: true; summary: Record<string, number> } | Err> {
+  const { userId } = await getActor(TENANT_ID);
+  if (userId == null) return { error: NOT_A_CRM_USER };
+  if (typeof slug !== "string" || typeof batch !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(batch)) return { error: "Érvénytelen adat" };
+  const r = await svc.loadLeadAudience({ tenantId: TENANT_ID, userId }, slug, { dry_run: dryRun !== false, batch });
+  if ("error" in r) return { error: r.error };
+  if (!r.dry_run) touch(slug);
+  return { ok: true, summary: r.summary };
+}
+
+/** The e-mail step's drafts for today (item 4): into the Outreach queue, never sent from here. */
+export async function draftEmailStepAction(slug: string): Promise<{ ok: true; drafted: number; noAddress: number; noAsset: number } | Err> {
+  const { userId } = await getActor(TENANT_ID);
+  if (userId == null) return { error: NOT_A_CRM_USER };
+  if (typeof slug !== "string") return { error: "Érvénytelen adat" };
+  const r = await svc.draftEmailStep({ tenantId: TENANT_ID, userId }, slug);
+  if ("error" in r) return { error: r.error };
+  touch(slug);
+  return { ok: true, drafted: r.drafted, noAddress: r.noAddress, noAsset: r.noAsset };
+}
