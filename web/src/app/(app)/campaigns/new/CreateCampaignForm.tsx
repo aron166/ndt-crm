@@ -32,13 +32,19 @@ export function CreateCampaignForm({ users }: { users: { id: number; name: strin
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const r = await createCampaignAction({
+    let r: Awaited<ReturnType<typeof createCampaignAction>>;
+    try {
+      r = await createCampaignAction({
       name, kind,
       ...(owner !== "" ? { owner_user_id: owner } : {}),
       brief: { ...(offer.trim() ? { offer: offer.trim() } : {}), ...(audience.trim() ? { audience: audience.trim() } : {}) },
       steps,
-    });
-    setBusy(false);
+      });
+    } catch {
+      return setError("Hálózati hiba, próbáld újra");
+    } finally {
+      setBusy(false);
+    }
     if ("error" in r) return setError(r.error);
     router.push(`/campaigns/${r.slug}`);
   }
@@ -70,7 +76,7 @@ export function CreateCampaignForm({ users }: { users: { id: number; name: strin
       <label className={s.field}>
         <span>Felelős</span>
         <select className={s.input} value={owner} onChange={(e) => setOwner(e.target.value ? Number(e.target.value) : "")}>
-          <option value="">Nincs megadva (Péter hív)</option>
+          <option value="">{isContentOnly(kind) ? "Nincs megadva" : "Nincs megadva (Péter hív)"}</option>
           {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
       </label>

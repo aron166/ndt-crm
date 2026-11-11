@@ -40,15 +40,23 @@ describe("Indítás", () => {
     render(<LaunchPanel d={READY} isAron />);
     expect(screen.getByText(/Ezt hagyod jóvá: 80 cég \(76 elérhető\), 2 lépés, napi 15, E-mail v3, Szkript v1/)).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Jóváhagyás és indítás" }));
-    expect(A.approveCampaignAction).toHaveBeenCalledWith("bp");
+    expect(A.approveCampaignAction).toHaveBeenCalledWith("bp", { members: 80, steps: 2, dailyCap: 15 });
   });
   it("an unsaved cap change blocks the launch until it is saved (a save resets to draft)", async () => {
     render(<LaunchPanel d={READY} isAron />);
     const cap = screen.getByLabelText("Napi keret (hívás)");
     await userEvent.clear(cap);
     await userEvent.type(cap, "20");
+    expect((cap as HTMLInputElement).value).toBe("20");
     expect((screen.getByRole("button", { name: "Jóváhagyás és indítás" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("button", { name: "Keret és időszak mentése" })).toBeTruthy();
+  });
+  it("a thrown action re-enables the launch button with an error", async () => {
+    A.approveCampaignAction.mockRejectedValue(new Error("offline"));
+    render(<LaunchPanel d={READY} isAron />);
+    await userEvent.click(screen.getByRole("button", { name: "Jóváhagyás és indítás" }));
+    expect(screen.getByRole("status").textContent).toMatch(/Hálózati hiba/);
+    expect((screen.getByRole("button", { name: "Jóváhagyás és indítás" }) as HTMLButtonElement).disabled).toBe(false);
   });
   it("a running campaign shows pause and stop, no launch", () => {
     render(<LaunchPanel d={{ ...READY, status: "running" }} isAron />);
@@ -61,11 +69,11 @@ const SUMMARY = { total: 10, add: 6, refresh: 1, skip: 3, newCompanies: 2, newPe
 
 describe("Tagok betöltése", () => {
   it("counts new, already a lead, suppressed, duplicate and no e-mail", () => {
-    expect(loadCounts(SUMMARY).map((c) => c.v)).toEqual([7, 1, 1, 1, 2]);
+    expect(loadCounts(SUMMARY).map((c) => c.v)).toEqual([6, 1, 1, 1, 1, 0, 2, 0]);
   });
   async function dryRun(canOperate: boolean) {
     A.loadMembersAction.mockResolvedValue({ ok: true, dryRun: true, summary: SUMMARY, added: 0 });
-    render(<MemberLoad slug="bp" canOperate={canOperate} closed={false} batches={[]} />);
+    render(<MemberLoad slug="bp" status="draft" canOperate={canOperate} closed={false} batches={[]} />);
     const file = new File([JSON.stringify([{ company_name: "A" }])], "lista.json", { type: "application/json" });
     await userEvent.upload(screen.getByLabelText("Fájl"), file);
     await userEvent.click(screen.getByRole("button", { name: "Próba" }));
@@ -76,6 +84,13 @@ describe("Tagok betöltése", () => {
     expect(screen.getByText("Nincs e-mail (e-mailre vár)")).toBeTruthy();
     expect((screen.getByRole("button", { name: "Betöltés (7)" }) as HTMLButtonElement).disabled).toBe(true);
   });
+  it("on a running campaign the dry run warns that applying sends it back to draft", async () => {
+    A.loadMembersAction.mockResolvedValue({ ok: true, dryRun: true, summary: SUMMARY, added: 0 });
+    render(<MemberLoad slug="bp" status="running" canOperate closed={false} batches={[]} />);
+    await userEvent.upload(screen.getByLabelText("Fájl"), new File(["[{}]"], "l.json", { type: "application/json" }));
+    await userEvent.click(screen.getByRole("button", { name: "Próba" }));
+    expect(screen.getByText(/visszaáll piszkozatra/)).toBeTruthy();
+  });
   it("an operator applies the same file and batch", async () => {
     await dryRun(true);
     A.loadMembersAction.mockResolvedValue({ ok: true, dryRun: false, summary: SUMMARY, added: 6 });
@@ -85,7 +100,7 @@ describe("Tagok betöltése", () => {
   });
   it("undo is offered only for a batch nobody touched, after its own dry run", async () => {
     A.undoBatchAction.mockResolvedValue({ ok: true, summary: { members: 3, remove: 3, keptTouched: 0, softDeleteCompanies: 1, softDeletePersons: 1 } });
-    render(<MemberLoad slug="bp" canOperate closed={false} batches={[
+    render(<MemberLoad slug="bp" status="draft" canOperate closed={false} batches={[
       { batch: "ui-1", members: 3, touched: 0, createdAt: null }, { batch: "ui-2", members: 5, touched: 2, createdAt: null },
     ]} />);
     expect(screen.getAllByRole("button", { name: "Visszavonás" })).toHaveLength(1);

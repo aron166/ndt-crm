@@ -73,10 +73,14 @@ export function groupByCity<T extends { city: string | null; company?: { city: s
   return [...groups.entries()].map(([city, list]) => ({ city, items: list }));
 }
 
-/** The default batch id for a load started from the UI: ui-YYYYMMDD-HHMM (Budapest wall clock is close enough for a label). */
-export function uiBatchId(now: Date): string {
+/**
+ * The default batch id for a load started from the UI: ui-YYYYMMDD-HHMMSS-xxxx. The random tail keeps
+ * two loads in the same second apart, so one undo never removes both (Vanda #190-6).
+ */
+export function uiBatchId(now: Date, rand: () => number = Math.random): string {
   const p = (n: number) => String(n).padStart(2, "0");
-  return `ui-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}`;
+  const tail = Math.floor(rand() * 36 ** 4).toString(36).padStart(4, "0");
+  return `ui-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}-${tail}`;
 }
 
 /** The hub's type tab: "all" or one kind (pre-v2 rows with no kind show under all only). */

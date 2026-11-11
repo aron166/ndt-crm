@@ -59,7 +59,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         }} />
       )}
       {tab === "members" && (
-        <MemberLoad slug={c.slug} canOperate={d.canOperate} closed={c.status === "stopped" || c.status === "done"}
+        <MemberLoad slug={c.slug} status={c.status} canOperate={d.canOperate} closed={c.status === "stopped" || c.status === "done"}
           batches={d.batches.map((b) => ({ ...b, createdAt: b.createdAt ? b.createdAt.toISOString() : null }))} />
       )}
       {tab === "overview" && <div className={k.split}>
@@ -104,7 +104,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           )}
         </div>
         <div>
-          <SpecifyPanel slug={c.slug} proposal={d.proposal as Proposal | null} assets={d.assets} editable={c.status !== "stopped" && c.status !== "done"} />
+          <SpecifyPanel slug={c.slug} proposal={d.proposal as Proposal | null} assets={d.assets} editable={c.status !== "stopped" && c.status !== "done"} canAdoptSteps={c.status === "draft" && !contentOnly} />
         </div>
       </div>}
     </div>

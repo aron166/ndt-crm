@@ -81,7 +81,7 @@ export async function loadMembersAction(slug: string, input: { fileText: string;
   const file = parseMemberFile(String(input?.fileText ?? ""));
   if ("error" in file) return file;
   if (file.rows.length > 1000) return { error: "Egyszerre legfeljebb 1000 sor tölthető be" };
-  const p = addMembersSchema.safeParse({ dry_run: input.dryRun !== false, batch: input.batch, rows: file.rows });
+  const p = addMembersSchema.safeParse({ dry_run: input?.dryRun !== false, batch: input?.batch, rows: file.rows });
   if (!p.success) return bad(p.error);
   const r = await svc.addMembers({ tenantId: TENANT_ID, userId }, slug, p.data);
   if ("error" in r) return { error: r.error };
@@ -99,10 +99,11 @@ export async function undoBatchAction(slug: string, batch: string, dryRun: boole
   return { ok: true as const, summary: r.summary };
 }
 
-export async function approveCampaignAction(slug: string): Promise<{ ok: true } | Err> {
+export async function approveCampaignAction(slug: string, seen?: { members: number; steps: number; dailyCap: number }): Promise<{ ok: true } | Err> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
-  const r = await svc.approveCampaign({ tenantId: TENANT_ID, userId }, slug);
+  const ok = seen && [seen.members, seen.steps, seen.dailyCap].every((n) => Number.isInteger(n) && n >= 0);
+  const r = await svc.approveCampaign({ tenantId: TENANT_ID, userId }, slug, ok ? seen : undefined);
   if ("error" in r) return { error: r.error };
   touch(slug);
   revalidatePath("/calls");
