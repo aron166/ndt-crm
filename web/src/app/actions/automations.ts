@@ -9,7 +9,9 @@ import {
   type TriggerType, type ActionType,
 } from "@/lib/automations/types";
 import { getLeadStatuses } from "@/lib/leads/queries";
-import { requireCrmUser } from "@/lib/actor";
+import { getActor, requireCrmUser } from "@/lib/actor";
+import { resolveDemoHost } from "@/lib/booking/queries";
+import { CALL_OUTCOME_KEYS } from "@/lib/campaigns/rules";
 
 const TENANT_ID = 1;
 
@@ -136,7 +138,15 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
     const c = await db.campaign.findFirst({ where: { id: campaignId, tenantId: TENANT_ID }, select: { id: true, outboundAutomations: true } });
     if (!c) return { error: "Ismeretlen kampány" };
     // Outbound only while Áron's switch is on; the engine skips it too when the switch is off later.
-    if (OUTBOUND_ACTION_TYPES.includes(actionType) && !c.outboundAutomations) return { error: "Kimenő művelet csak bekapcsolt kimenő automatizmusú kampányban" };
+    if (OUTBOUND_ACTION_TYPES.includes(actionType)) {
+      if (!c.outboundAutomations) return { error: "Kimenő művelet csak bekapcsolt kimenő automatizmusú kampányban" };
+      // The switch is Áron's; so is what goes out under it: rule content is not in the approval hash (Vanda #193-2).
+      const { userId } = await getActor(TENANT_ID);
+      if (userId == null || userId !== (await resolveDemoHost(TENANT_ID, "aron"))) return { error: "Kimenő kampány szabályt csak Áron menthet" };
+    }
+    if (triggerType === "campaign_call_outcome" && triggerConfig?.outcome != null && triggerConfig.outcome !== "") {
+      if (!CALL_OUTCOME_KEYS.includes(triggerConfig.outcome as never) || triggerConfig.outcome === "note_only") return { error: "Ismeretlen hívás eredmény" };
+    }
     triggerConfig!.campaignId = campaignId;
   } else if (actionType === "add_note") {
     return { error: "Jegyzet művelet csak kampány szabályban" };
