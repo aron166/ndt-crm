@@ -21,7 +21,7 @@ vi.mock("@/lib/db", () => {
     campaignMember: { findFirst: m(), findMany: m(), updateMany: m(), createMany: m() },
     campaignEvent: { findFirst: m(), create: m() },
     contact: { findFirst: m(), findMany: m() }, lead: { findFirst: m(), findMany: m(), create: m() }, interaction: { create: m(), updateMany: m() },
-    contentItem: { findMany: m() }, emailDraft: { findMany: m(), createMany: m(), count: m(), updateMany: m() }, user: { findFirst: m() }, task: { findMany: m(), updateMany: m() },
+    contentItem: { findMany: m() }, emailDraft: { findMany: m(), createMany: m(), count: m(), updateMany: m(), deleteMany: m() }, user: { findFirst: m() }, task: { findMany: m(), updateMany: m() },
     suppression: { upsert: m() }, company: { updateMany: m() }, leadStatusHistory: { create: m() },
     $queryRaw: vi.fn().mockResolvedValue([]), $executeRaw: vi.fn().mockResolvedValue(1), $transaction: vi.fn(),
   } };
@@ -188,13 +188,21 @@ describe("Vanda #194 r2: a step edit retires its stale drafts", () => {
   it("drafts of a removed step or a step whose asset changed are cancelled; unchanged steps keep theirs", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, kind: "sequence", audience: null });
     d.campaignStep.findMany.mockResolvedValue([
-      { position: 1, contentItemId: 50 }, { position: 2, contentItemId: 51 }, { position: 3, contentItemId: 52 },
+      { position: 1, channel: "email", contentItemId: 50 }, { position: 2, channel: "email", contentItemId: 51 }, { position: 3, channel: "email", contentItemId: 52 },
     ]);
+    d.emailDraft.findMany.mockResolvedValueOnce([{ id: 900 }, { id: 901 }]);
     d.contentItem.findMany.mockResolvedValue([{ id: 50, campaignId: 3 }, { id: 61, campaignId: null }]);
     await setSteps(SESSION, "bp", [{ channel: "email", content_item_id: 50 }, { channel: "email", wait_days: 2, content_item_id: 61 }]);
-    expect(d.emailDraft.updateMany).toHaveBeenCalledWith({
-      where: { tenantId: 1, campaign: "bp", step: { in: [2, 3] }, status: { in: ["draft", "approved", "failed"] } },
-      data: { status: "cancelled", lastError: "A kampány lépései változtak" },
-    });
+    // Deleted, not cancelled: a kept row would block the re-draft (unique key, seen set) and strand the member (Vanda #194 r3).
+    expect(d.emailDraft.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 1, id: { in: [900, 901] } } });
+    expect(d.emailDraft.updateMany).not.toHaveBeenCalled();
+  });
+  it("a step that switches channel retires its drafts even with the same asset", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "draft", dailyCap: 15, kind: "sequence", audience: null });
+    d.campaignStep.findMany.mockResolvedValue([{ position: 1, channel: "email", contentItemId: null }, { position: 2, channel: "email", contentItemId: 54 }]);
+    d.contentItem.findMany.mockResolvedValue([{ id: 54, campaignId: 3 }]);
+    d.emailDraft.findMany.mockResolvedValueOnce([{ id: 902 }]);
+    await setSteps(SESSION, "bp", [{ channel: "email" }, { channel: "call", wait_days: 2, content_item_id: 54 }]);
+    expect(d.emailDraft.findMany.mock.calls[0][0].where).toMatchObject({ step: { in: [2] } });
   });
 });
