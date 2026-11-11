@@ -213,6 +213,7 @@ describe("only Áron launches", () => {
 describe("specify: proposals only", () => {
   it("writes brief_proposal and in-review assets, never the brief, steps or status", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
+    d.task.findMany.mockResolvedValue([{ id: 91 }]);
     const r = await specifyCampaign(APP, "bp", {
       brief: { offer: "x" }, steps: [{ channel: "email" }, { channel: "call", wait_days: 3 }],
       assets: [{ title: "Szkript", body: "Jó napot", category: "script", channel: "other", content_type: "other", format: "phone_script", step_position: 2 }],
@@ -223,7 +224,7 @@ describe("specify: proposals only", () => {
     expect(d.campaignStep.createMany).not.toHaveBeenCalled();
     // The proposal answers this campaign's open specification requests, and only this campaign's (item 6).
     expect(d.task.updateMany.mock.calls[0][0]).toMatchObject({
-      where: { tenantId: 1, status: { in: ["created", "in_progress"] }, setMembership: { hasEvery: ["campaign_spec_request", "campaign:bp"] } },
+      where: { tenantId: 1, status: { in: ["created", "in_progress"] }, setMembership: { hasEvery: ["campaign_spec_request", "campaign:bp"] }, id: { in: [91] } },
       data: { status: "done" },
     });
   });

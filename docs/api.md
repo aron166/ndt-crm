@@ -1032,7 +1032,7 @@ An agent with an app key polls and answers:
 1. `GET /api/specification-requests` returns
    `{ "ok": true, "items": [ { "task_id": 91, "slug": "budapest-indulas", "campaign": "Budapest indulás", "kind": "sequence", "status": "draft", "missing": "Hiányzik: ...", "created_at": "..." } ] }`,
    oldest first, open requests only. Poll at most once a minute (the key's 30 req/min limit covers every route).
-2. `POST /api/campaigns/:slug/specify` (below) with the proposal. A successful proposal marks every open request
+2. `POST /api/campaigns/:slug/specify` (below) with the proposal (an empty one is a `400` and closes nothing). A successful proposal marks every open request
    of that campaign `done`, so the next poll no longer lists it. A `409` (the campaign started running meanwhile)
    leaves the request open; skip it until it is a draft or paused again.
 3. Nothing else: the agent cannot adopt its own proposal, touch members or launch.
@@ -1109,7 +1109,7 @@ Today's call list, computed on read (no cron, no tasks made in advance): `queued
 touched today; members whose company has an open lead are left out. Outside `starts_on` .. `ends_on` (Budapest
 days, open ends allowed) the list is empty. Returns `items` (member with company and person
 contact), `touchedToday`, `remaining`, and `scripts` (each call step's own LIVE content item, title and body, keyed by step position; a call step without
-a live script has no key, it never borrows another step's) and `script` (the first listed member's step script) for
+a live script has no key, it never borrows another step's) and `script` (the first listed member's step script; with nobody listed, the first call step's, which may be none) for
 Hívás mód. Empty unless the campaign is `running`.
 
 ### `POST /api/campaigns/:slug/outcome`
