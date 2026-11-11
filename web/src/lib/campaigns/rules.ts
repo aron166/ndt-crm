@@ -15,7 +15,15 @@ export const CAMPAIGN_STATUSES = ["draft", "running", "paused", "stopped", "done
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 export const STEP_CHANNELS = ["email", "call", "ad", "post", "dm"] as const;
 export type StepChannel = (typeof STEP_CHANNELS)[number];
-export const AUDIENCE_RULES = ["all", "no_reply", "no_answer"] as const;
+/**
+ * A step's condition (item 4), a small fixed set: everyone, no reply yet, replied, the previous call
+ * was not answered. "Opened" is NOT available: opens are not tracked.
+ */
+export const AUDIENCE_RULES = ["all", "no_reply", "replied", "no_answer"] as const;
+export type StepCondition = (typeof AUDIENCE_RULES)[number];
+/** Who a campaign touches: prospects from a list (companies with no open lead) or open leads in chosen stages. */
+export const AUDIENCE_SOURCES = ["prospect_list", "leads_by_stage"] as const;
+export type AudienceSource = (typeof AUDIENCE_SOURCES)[number];
 export const MEMBER_STATES = ["queued", "needs_contact", "needs_email", "promoted", "declined", "unreachable", "excluded", "done"] as const;
 export type MemberState = (typeof MEMBER_STATES)[number];
 
@@ -30,6 +38,32 @@ export interface StepDef {
   position: number;
   channel: StepChannel;
   waitDays: number;
+  /** The step's condition; absent = "all". */
+  audienceRule?: string;
+}
+
+export interface MemberHistory { replied: boolean; lastCallOutcome: string | null }
+
+/** Whether a member qualifies for a step. An unknown rule fails closed. */
+export function conditionHolds(rule: string | undefined, h: MemberHistory): boolean {
+  switch (rule ?? "all") {
+    case "all": return true;
+    case "no_reply": return !h.replied;
+    case "replied": return h.replied;
+    case "no_answer": return h.lastCallOutcome === "no_answer";
+    default: return false;
+  }
+}
+
+/** The first step after `position` whose condition holds for this member, or null (the sequence is over for them). */
+export function nextApplicable(steps: readonly StepDef[], position: number, h: MemberHistory): StepDef | null {
+  return sortSteps(steps).find((s) => s.position > position && conditionHolds(s.audienceRule, h)) ?? null;
+}
+
+/** After a mid-run edit a member keeps its place in line; one past the new end is done. */
+export function remapAfterEdit(position: number, steps: readonly StepDef[]): { stepPosition: number; done: boolean } {
+  const last = sortSteps(steps).at(-1)?.position ?? 1;
+  return position > last ? { stepPosition: last, done: true } : { stepPosition: position, done: false };
 }
 
 /** Steps in order. Positions are 1-based and unique (DB unique index). */
@@ -78,11 +112,12 @@ export function startFor(
  * cold_call: calls only (the pure cold-call type, chosen at creation); cold_email: e-mails
  * only; ad, organic, content and a pre-v2 row (kind null): content only, no per-member touch.
  */
-export function stepsFitKind(kind: CampaignKind | null, steps: readonly { channel: string; position: number }[]): string | null {
+export function stepsFitKind(kind: CampaignKind | null, steps: readonly { channel: string; position: number }[], audience: AudienceSource = "prospect_list"): string | null {
   const touches = [...steps].sort((a, b) => a.position - b.position).filter(isTouch);
   if (kind === "sequence") {
     if (touches.length === 0) return null; // steps not set yet
-    if (touches[0].channel !== "email") return "Sorozatban az e-mail lépés az első, a hívás csak utána jöhet";
+    // E-mail first is Áron's order for prospects; retargeting and nurture of existing leads may open with a call.
+    if (audience === "prospect_list" && touches[0].channel !== "email") return "Sorozatban az e-mail lépés az első, a hívás csak utána jöhet";
     return null;
   }
   if (kind === "cold_call") return touches.some((s) => s.channel !== "call") ? "Hideg hívás kampányban csak hívás lépés lehet" : null;
@@ -106,6 +141,8 @@ export interface MemberSnapshot {
   stepPosition: number;
   attempts: number;
   hasPhone: boolean;
+  /** The member replied earlier in this campaign (a campaign event). Absent = false. */
+  replied?: boolean;
 }
 
 /** What a promotion creates. `sla` true only for an e-mail reply: the replier gets the first call within the hour. */
@@ -169,7 +206,14 @@ export function planOutcome(
       return plan({});
     case "no_answer": {
       const attempts = m.attempts + 1;
-      if (attempts >= MAX_NO_ANSWER) return plan({ attempts, state: "unreachable" });
+      if (attempts >= MAX_NO_ANSWER) {
+        // A sequence with a follow-up for non-answerers moves them on instead of giving up (item 4).
+        const next = nextApplicable(steps, m.stepPosition, { replied: Boolean(m.replied), lastCallOutcome: "no_answer" });
+        if (next && (next.channel !== "call" || m.hasPhone)) {
+          return plan({ attempts: 0, stepPosition: next.position, nextEligibleOn: addWorkingDays(today, next.waitDays).key });
+        }
+        return plan({ attempts, state: "unreachable" });
+      }
       return plan({ attempts, nextEligibleOn: addWorkingDays(today, NO_ANSWER_RETRY_WORKING_DAYS).key });
     }
     case "interested":
@@ -185,16 +229,21 @@ export function planOutcome(
     case "bad_number":
       return plan({ attempts: m.attempts + 1, state: "excluded" });
     case "email_sent": {
-      // The e-mail went out: move to the next step, eligible after its wait.
-      const next = nextStep(steps, m.stepPosition);
+      // The e-mail went out: move to the next step whose condition holds, eligible after its wait in working days.
+      const next = nextApplicable(steps, m.stepPosition, { replied: Boolean(m.replied), lastCallOutcome: null });
       if (!next) return plan({ state: "done" });
       if (next.channel === "call" && !m.hasPhone) return plan({ state: "done" });
       return plan({ stepPosition: next.position, nextEligibleOn: addWorkingDays(today, next.waitDays).key });
     }
-    case "reply_positive":
+    case "reply_positive": {
+      // A reply stops the e-mail steps: a sequence with a call step for repliers moves the member there,
+      // callable today (item 4). Without one the reply promotes, as before (first call within the hour).
+      const call = sortSteps(steps).find((s) => s.position > m.stepPosition && s.channel === "call" && s.audienceRule === "replied");
+      if (call && m.hasPhone) return plan({ stepPosition: call.position, nextEligibleOn: today.key });
       return plan({ state: "promoted" }, {
         promote: { stage: "new", nextAction: "Első hívás (SLA)", dueInWorkingDays: 0, sla: true },
       });
+    }
     case "reply_negative":
       return plan({ state: "declined" });
     case "unsubscribe":
@@ -280,7 +329,8 @@ export function approvalHash(input: {
 }): string {
   const payload = JSON.stringify({
     m: [...input.memberCompanyIds].sort((a, b) => a - b),
-    s: sortSteps(input.steps).map((s) => [s.position, s.channel, s.waitDays, s.contentItemId]),
+    // A condition joins the tuple only when set, so plans hashed before conditions existed still match.
+    s: sortSteps(input.steps).map((s) => (s.audienceRule && s.audienceRule !== "all" ? [s.position, s.channel, s.waitDays, s.contentItemId, s.audienceRule] : [s.position, s.channel, s.waitDays, s.contentItemId])),
     c: input.dailyCap,
     // Only in the payload when on, so every hash computed before this flag existed still matches.
     ...(input.outboundAutomations ? { o: 1 } : {}),

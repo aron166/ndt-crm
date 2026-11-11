@@ -38,7 +38,7 @@ export function channelsFor(kind: CampaignKind): StepChannel[] {
   return [];
 }
 
-export interface StepDraft { channel: StepChannel; wait_days: number; audience_rule: "all" | "no_reply" | "no_answer"; content_item_id?: number | null }
+export interface StepDraft { channel: StepChannel; wait_days: number; audience_rule: "all" | "no_reply" | "replied" | "no_answer"; content_item_id?: number | null }
 
 /** The step plan a new campaign of this kind starts with; the launch list default is the sequence. */
 export function defaultSteps(kind: CampaignKind): StepDraft[] {
@@ -52,7 +52,7 @@ export function defaultSteps(kind: CampaignKind): StepDraft[] {
 }
 
 const AUDIENCE_LABEL: Record<StepDraft["audience_rule"], string> = {
-  all: "mindenkinek", no_reply: "akik nem válaszoltak", no_answer: "akik nem vették fel",
+  all: "mindenkinek", no_reply: "akik nem válaszoltak", replied: "akik válaszoltak", no_answer: "akik nem vették fel",
 };
 export function stepLine(s: { channel: string; waitDays?: number; wait_days?: number; audienceRule?: string; audience_rule?: string }): string {
   const wait = s.waitDays ?? s.wait_days ?? 0;

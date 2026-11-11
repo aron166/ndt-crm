@@ -27,7 +27,7 @@ import { createItem } from "@/lib/content/service";
 import type { ContentCategory } from "@/lib/content/types";
 import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
-  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor, campaignAutomationEvents } from "./rules";
+  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor, campaignAutomationEvents, type StepCondition } from "./rules";
 import { closeSpecRequests } from "./spec-requests";
 export { requestSpecification } from "./spec-requests";
 import { planMembers, type MemberRow, type MembersPlan, reachFromContacts } from "./members";
@@ -134,7 +134,7 @@ async function uniqueSlug(tenantId: number, base: string): Promise<string> {
 export interface StepInput {
   channel: StepChannel;
   wait_days?: number;
-  audience_rule?: "all" | "no_reply" | "no_answer";
+  audience_rule?: StepCondition;
   content_item_id?: number | null;
 }
 
