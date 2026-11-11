@@ -13,10 +13,10 @@ import {
 
 /** The segment variants of a campaign's e-mail steps, with their pipeline state. */
 export async function campaignVariants(tenantId: number, campaignId: number, client: Pick<typeof db, "contentItem"> = db) {
-  const rows = await client.contentItem.findMany({ where: { tenantId, campaignId, category: "email", status: { not: "archived" } }, select: { id: true, status: true, sourceMeta: true } });
+  const rows = await client.contentItem.findMany({ where: { tenantId, campaignId, category: "email", status: { not: "archived" } }, select: { id: true, status: true, sourceMeta: true, createdAt: true } });
   return rows.flatMap((r) => {
     const tag = variantTag(r.sourceMeta);
-    return tag ? [{ step: tag.step, segment: tag.segment, itemId: r.id, status: r.status }] : [];
+    return tag ? [{ step: tag.step, segment: tag.segment, itemId: r.id, status: r.status, createdAt: r.createdAt }] : [];
   });
 }
 
@@ -61,7 +61,7 @@ export async function emailContext(tenantId: number, campaignId: number, senderU
     getResendConfig(tenantId),
   ]);
   const variants = new Map<number, StepVariant[]>();
-  for (const t of tagged) variants.set(t.step, [...(variants.get(t.step) ?? []), { itemId: t.itemId, segment: t.segment, status: t.status }]);
+  for (const t of tagged) variants.set(t.step, [...(variants.get(t.step) ?? []), { itemId: t.itemId, segment: t.segment, status: t.status, createdAt: t.createdAt }]);
   const ids = [...new Set([...steps.map((s) => s.contentItemId), ...tagged.map((t) => t.itemId)].filter((v): v is number => v != null))];
   const items = ids.length ? await db.contentItem.findMany({
     where: { tenantId, id: { in: ids } },
@@ -154,7 +154,8 @@ export async function memberQuickView(tenantId: number, slug: string, memberId: 
   const address = memberAddress(m, contacts);
   const personContact = contacts.find((k) => k.personId === m.personId) ?? null;
   const emails = stepEmails(ctx, segment, valuesFor(m, segment, ctx));
-  const phone = m.person?.phone ?? personContact?.phone ?? contacts.find((k) => k.phone || k.person.phone)?.phone ?? null;
+  const anyPhone = contacts.find((k) => k.phone || k.person.phone);
+  const phone = m.person?.phone ?? personContact?.phone ?? personContact?.person.phone ?? anyPhone?.phone ?? anyPhone?.person.phone ?? null;
   return {
     member: {
       id: m.id, state: m.state, stepPosition: m.stepPosition, stepChannel: c.steps.find((s) => s.position === m.stepPosition)?.channel ?? null,

@@ -75,6 +75,8 @@ textarea.input { min-height: 72px; resize: vertical; }
 
 /* Prospect quick view: a side sheet on a native modal dialog (focus trap, Esc, inert page). */
 .sheet { margin: 0 0 0 auto; height: 100dvh; max-height: 100dvh; width: min(560px, 100vw); max-width: 100vw; box-sizing: border-box; padding: 0; border: 0; background: var(--ui-surface); color: var(--ui-text); box-shadow: var(--ui-shadow-overlay); }
+.sheetInner { min-height: 100%; display: flex; flex-direction: column; }
+.sheetInner > .sheetBody { flex: 1; }
 .sheet::backdrop { background: var(--ui-scrim); }
 .sheetHead { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 20px 20px 14px; background: var(--ui-surface); border-bottom: 1px solid var(--ui-border); }
 .sheetHead h2 { margin: 0; font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }

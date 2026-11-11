@@ -146,7 +146,7 @@ export function renderedText(parts: readonly Part[]): string | null {
   return parts.every((p) => "t" in p) ? parts.map((p) => (p as { t: string }).t).join("") : null;
 }
 
-export interface StepVariant { itemId: number; segment: SegmentKey; status: string }
+export interface StepVariant { itemId: number; segment: SegmentKey; status: string; createdAt?: Date }
 
 /**
  * The asset one member gets on an e-mail step: the variant tagged for its segment, else the step's

@@ -35,7 +35,7 @@ const SESSION = { tenantId: 1, userId: 5 };
 const NOW = new Date("2026-11-13T09:00:00Z");
 const CO = { name: "Minta Kft.", city: null };
 /** A live content item as the preview context loads it: the draft uses the LIVE version's text. */
-const live = (id: number, title: string, body: string, meta: unknown = null) => ({ id, title, status: "live", sourceMeta: meta, liveVersion: { id: id * 10, number: 1, body }, currentVersion: { id: id * 10 + 1, number: 2, body: "UNAPPROVED NEWER TEXT" } });
+const live = (id: number, title: string, body: string, meta: unknown = null) => ({ id, title, status: "live", sourceMeta: meta, createdAt: new Date("2026-11-01T00:00:00Z"), liveVersion: { id: id * 10, number: 1, body }, currentVersion: { id: id * 10 + 1, number: 2, body: "UNAPPROVED NEWER TEXT" } });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -131,7 +131,7 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
   });
   it("drafts what the preview shows: the segment's variant, merge fields filled, live text only; an unresolved field is counted, never drafted", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null, senderUserId: null,
-      steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }] });
+      approvedAt: new Date("2026-11-12T08:00:00Z"), steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }] });
     d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: null }]);
     d.campaignMember.findMany.mockResolvedValue([
       { id: 1, companyId: 7, personId: 8, stepPosition: 1, nextEligibleOn: null, person: { email: "a@p.example.test", firstName: "Anna", lastName: "Kovács" }, company: CO, segment: "drillers", lane: null, city: "Győr" },

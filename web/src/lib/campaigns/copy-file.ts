@@ -15,12 +15,12 @@ const fence = (s: string) => s.match(/```[a-z]*\n([\s\S]*?)\n```/)?.[1] ?? null;
 export function copyRuleBreaks(text: string): string[] {
   const t = text.toLowerCase();
   const out: string[] = [];
-  if (/\d\s*(ft|forint|huf|eur|€)(?!\p{L})|(?<!\p{L})(ár|ára|árak|áraink|árunk|díj\p{L}*)(?!\p{L})/u.test(t)) out.push("ár vagy díj");
+  if (/\d\s*(ft|huf|eur|€)(?!\p{L})|(?<!\p{L})forint|(?<!\p{L})ár(?:a|ak|at|on|ban|ról|ért|ainkat|aink|unk|akat|akról|akon)?(?!\p{L})|(?<!\p{L})díj/u.test(t)) out.push("ár vagy díj");
   if (/engedély/.test(t)) out.push("„engedély”");
   if (/garanci/.test(t)) out.push("„garancia”");
   if (/(?<!\p{L})első(?!\p{L})/u.test(t)) out.push("„első” (minősítés nélkül tilos)");
   if (/±|\+\/-|\+-\s*\d|plusz-mínusz/.test(t)) out.push("plusz-mínusz pontosság");
-  if (/foglaljon|foglalj\b|foglaljanak|naptár|calendly|időpontot választ/.test(t)) out.push("az ügyfél foglal (mi foglalunk, soha az ügyfél)");
+  if (/(?<!\p{L})foglal(?:jon|janak|hat|hatnak|j)(?!\p{L})|naptár|calendly|időpontot válasszon|válasszon időpontot|időpontot választ/u.test(t)) out.push("az ügyfél foglal (mi foglalunk, soha az ügyfél)");
   if (!/„érdekel”|"érdekel"/.test(text)) out.push("nincs „érdekel” válasz kérés");
   return out;
 }
@@ -33,7 +33,7 @@ export function parseSegmentCopy(md: string, cta: string): { items: CopyItem[]; 
   const closing = closeAt >= 0 ? fence(md.slice(closeAt)) : null;
   if (!closing) return { items, refused: [{ what: "fájl", reason: "nincs közös záró blokk" }] };
   if (!cta.trim()) return { items, refused: [{ what: "fájl", reason: "nincs CTA szöveg" }] };
-  const tail = closing.replace("{{CTA}}", cta.trim());
+  const tail = closing.replace("{{CTA}}", () => cta.trim()); // a function: "$&" in the CTA stays verbatim
   const sections = md.split(/^## /m).slice(1);
   for (const sec of sections) {
     const head = sec.slice(0, sec.indexOf("\n")).trim();
@@ -44,6 +44,10 @@ export function parseSegmentCopy(md: string, cta: string): { items: CopyItem[]; 
       continue;
     }
     const [, key, label] = m;
+    if (items.some((i) => i.segment === key)) {
+      refused.push({ what: `${key} szegmens`, reason: "kétszer szerepel a fájlban: csak az első töltődik" });
+      continue;
+    }
     const block = fence(sec);
     const subject = sec.match(/^Tárgy:\s*(.+)$/m)?.[1]?.trim();
     if (!isSegmentKey(key) || !block || !subject) {

@@ -940,7 +940,7 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   const tenantId = ctx.tenantId;
   const c = await db.campaign.findFirst({
     where: { tenantId, slug },
-    select: { id: true, slug: true, status: true, dailyCap: true, startsOn: true, endsOn: true, audience: true, senderUserId: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true } } },
+    select: { id: true, slug: true, status: true, dailyCap: true, startsOn: true, endsOn: true, audience: true, senderUserId: true, approvedAt: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true } } },
   });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status !== "running") return fail(409, "Csak jóváhagyott, futó kampány e-mail lépése készít piszkozatot");
@@ -980,7 +980,9 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
     if (leadsAudience ? !openLead.has(m.companyId) : openLead.has(m.companyId)) continue;
     const segment = segmentOf(m);
     const step = ec.steps.find((x) => x.position === m.stepPosition);
-    const itemId = step ? pickAsset(step, ec.variants.get(m.stepPosition) ?? [], segment, true) : null;
+    // Only variants that existed when Áron approved: one attached later (an app key can tag one) waits for a re-approval (Vanda #195-1).
+    const approved = (ec.variants.get(m.stepPosition) ?? []).filter((v) => c.approvedAt != null && v.createdAt != null && v.createdAt <= c.approvedAt);
+    const itemId = step ? pickAsset(step, approved, segment, true) : null;
     const asset = itemId != null ? ec.items.find((i) => i.id === itemId && i.status === "live" && i.liveVersion) : undefined;
     if (!asset) { noAsset++; continue; }
     const to = memberAddress(m, contacts);

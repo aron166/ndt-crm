@@ -144,6 +144,8 @@ export function MemberQuickView({ slug, memberId, onClose }: { slug: string; mem
   return (
     <dialog ref={ref} className={s.sheet} aria-labelledby="qv-title" aria-describedby={v ? "qv-sub" : undefined} onClose={onClose}
       onClick={(e) => { if (e.target === e.currentTarget) ref.current?.close(); }}>
+      {/* Fills the sheet, so only a click on the backdrop has the dialog itself as its target (Vanda #195-7). */}
+      <div className={s.sheetInner}>
       <div className={s.sheetHead}>
         <div>
           <h2 id="qv-title">{v ? v.company.name : "Tag"}</h2>
@@ -167,6 +169,7 @@ export function MemberQuickView({ slug, memberId, onClose }: { slug: string; mem
           {v.history.leadId && <Link href={`/leads/${v.history.leadId}`} className={k.btn}>Lead megnyitása</Link>}
         </div>
       )}
+      </div>
     </dialog>
   );
 }
