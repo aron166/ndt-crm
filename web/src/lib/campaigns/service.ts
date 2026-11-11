@@ -215,16 +215,25 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
   if (misfit) return fail(400, misfit);
   const bad = await checkStepItems(ctx.tenantId, steps, c.id);
   if (bad) return bad;
+  let retired: number[] = [];
   await db.$transaction(async (tx) => {
     await lockCampaign(tx, c.id);
-    // Queued drafts of a removed step, or of a step whose asset changed, carry text Áron did not approve: retire them (Vanda #194 r2).
-    const before = await tx.campaignStep.findMany({ where: { tenantId: ctx.tenantId, campaignId: c.id }, select: { position: true, contentItemId: true } });
-    const stale = before.filter((b) => (steps[b.position - 1]?.content_item_id ?? null) !== b.contentItemId || b.position > steps.length).map((b) => b.position);
+    // Unsent drafts of a removed step, or of a step whose asset or channel changed, carry text Áron did not
+    // approve. Deleted, not cancelled: a kept row would block the re-draft and strand the member (Vanda #194 r2, r3).
+    const before = await tx.campaignStep.findMany({ where: { tenantId: ctx.tenantId, campaignId: c.id }, select: { position: true, channel: true, contentItemId: true } });
+    const stale = before.filter((b) => {
+      const n = steps[b.position - 1];
+      return !n || (n.content_item_id ?? null) !== b.contentItemId || n.channel !== b.channel;
+    }).map((b) => b.position);
     if (stale.length) {
-      await tx.emailDraft.updateMany({
+      const gone = await tx.emailDraft.findMany({
         where: { tenantId: ctx.tenantId, campaign: c.slug, step: { in: stale }, status: { in: ["draft", "approved", "failed"] } },
-        data: { status: "cancelled", lastError: "A kampány lépései változtak" },
+        select: { id: true },
       });
+      if (gone.length) {
+        await tx.emailDraft.deleteMany({ where: { tenantId: ctx.tenantId, id: { in: gone.map((g) => g.id) } } });
+        retired = gone.map((g) => g.id);
+      }
     }
     await tx.campaignStep.deleteMany({ where: { tenantId: ctx.tenantId, campaignId: c.id } });
     if (steps.length) await tx.campaignStep.createMany({ data: stepRows(ctx.tenantId, c.id, steps) });
@@ -237,7 +246,7 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
     }
     if (c.status !== "draft") await tx.campaign.update({ where: { id: c.id }, data: BACK_TO_DRAFT });
   });
-  audit("campaign", c.id, "update", { status: c.status }, { steps: steps.length, status: "draft" }, auditOpts(ctx));
+  audit("campaign", c.id, "update", { status: c.status }, { steps: steps.length, status: "draft", ...(retired.length ? { retiredDrafts: retired } : {}) }, auditOpts(ctx));
   return { ok: true as const, status: "draft" as const };
 }
 
