@@ -27,8 +27,7 @@ import { createItem } from "@/lib/content/service";
 import type { ContentCategory } from "@/lib/content/types";
 import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
-  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel,
-} from "./rules";
+  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor } from "./rules";
 import { planMembers, type MemberRow, type MembersPlan, reachFromContacts } from "./members";
 
 export interface CampaignCtx {
@@ -581,7 +580,7 @@ export async function dailyList(tenantId: number, slug: string, now: Date = new 
   // Outside its dates a running campaign lists nobody: Kezdés 11-26 means no call before 11-26 (Vanda #190-3).
   const ymdKey = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
   if (c.status !== "running" || !inWindow(ymdKey(c.startsOn), ymdKey(c.endsOn), localDay(now).key)) {
-    return { ok: true as const, campaign: { slug: c.slug, name: c.name, status: c.status, dailyCap: c.dailyCap }, items: [], touchedToday: 0, remaining: 0, script: null };
+    return { ok: true as const, campaign: { slug: c.slug, name: c.name, status: c.status, dailyCap: c.dailyCap }, items: [], touchedToday: 0, remaining: 0, script: null, scripts: {} };
   }
   const all = await db.campaignMember.findMany({
     where: { tenantId, campaignId: c.id, company: { deletedAt: null } },
@@ -611,15 +610,23 @@ export async function dailyList(tenantId: number, slug: string, now: Date = new 
   });
   const order = new Map(sel.ids.map((id, i) => [id, i]));
   rows.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
-  // The campaign's call script: the first call step's LIVE content item (current version body).
-  const scriptStep = c.steps.find((s) => s.channel === "call" && s.contentItemId != null);
-  const script = scriptStep
-    ? await db.contentItem.findFirst({ where: { tenantId, id: scriptStep.contentItemId!, status: "live" }, select: { id: true, title: true, body: true } })
-    : null;
+  // Each call step's own script: its LIVE content item (current version body), by step position (item 6).
+  const scriptIds = c.steps.map((s) => scriptItemFor(c.steps, s.position)).filter((v): v is number => v != null);
+  const live = scriptIds.length
+    ? await db.contentItem.findMany({ where: { tenantId, id: { in: scriptIds }, status: "live" }, select: { id: true, title: true, body: true } })
+    : [];
+  const scripts: Record<number, { id: number; title: string; body: string }> = {};
+  for (const s of c.steps) {
+    const hit = live.find((i) => i.id === scriptItemFor(c.steps, s.position));
+    if (hit) scripts[s.position] = hit;
+  }
+  // `script` (pre item 6 field): the first listed member's step script, else the first call step's.
+  const firstCall = c.steps.find((s) => s.channel === "call");
+  const script = scripts[rows[0]?.stepPosition ?? firstCall?.position ?? 0] ?? null;
   return {
     ok: true as const,
     campaign: { slug: c.slug, name: c.name, status: c.status, dailyCap: c.dailyCap },
-    items: rows, touchedToday: sel.touchedToday, remaining: sel.remaining, script,
+    items: rows, touchedToday: sel.touchedToday, remaining: sel.remaining, script, scripts,
   };
 }
 

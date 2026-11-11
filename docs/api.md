@@ -1090,7 +1090,8 @@ Today's call list, computed on read (no cron, no tasks made in advance): `queued
 `next_eligible_on` is today or earlier (Budapest), priority then city, at most `daily_cap` minus the members already
 touched today; members whose company has an open lead are left out. Outside `starts_on` .. `ends_on` (Budapest
 days, open ends allowed) the list is empty. Returns `items` (member with company and person
-contact), `touchedToday`, `remaining`, and `script` (the first call step's LIVE content item: title and body) for
+contact), `touchedToday`, `remaining`, and `scripts` (each call step's own LIVE content item, title and body, keyed by step position; a call step without
+a live script has no key, it never borrows another step's) and `script` (the first listed member's step script) for
 Hívás mód. Empty unless the campaign is `running`.
 
 ### `POST /api/campaigns/:slug/outcome`

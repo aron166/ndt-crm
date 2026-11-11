@@ -41,6 +41,12 @@ export function firstCallStep(steps: readonly StepDef[]): StepDef | null {
   return sortSteps(steps).find((s) => s.channel === "call") ?? null;
 }
 
+/** The call script (content item) of the call step at `position`; none for another step, never a different step's (item 6). */
+export function scriptItemFor(steps: readonly { position: number; channel: string; contentItemId: number | null }[], position: number): number | null {
+  const s = steps.find((x) => x.position === position);
+  return s?.channel === "call" ? s.contentItemId : null;
+}
+
 /** The step after `position`, or null at the end of the sequence. */
 export function nextStep(steps: readonly StepDef[], position: number): StepDef | null {
   return sortSteps(steps).find((s) => s.position > position) ?? null;

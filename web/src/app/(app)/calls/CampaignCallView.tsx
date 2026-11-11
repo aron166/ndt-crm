@@ -21,6 +21,8 @@ export interface CallViewData {
   campaign: { slug: string; name: string; status: string; dailyCap: number };
   items: CallItem[]; touchedToday: number; remaining: number;
   script: { id: number; title: string; body: string } | null;
+  /** Each call step's own live script, by step position (item 6). */
+  scripts?: Record<number, { id: number; title: string; body: string }>;
 }
 
 /** The five taps of the mockup, same keys and labels as Hívás mód (lib/outreach/queue CALL_OUTCOMES). */
@@ -44,6 +46,8 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string; leadId?: number } | null>(null);
   const current = items.find((i) => i.id === selected) ?? items[0] ?? null;
+  // The selected company's own step script; `scripts` absent (older payload) falls back to the one script.
+  const script = data.scripts && current ? data.scripts[current.stepPosition] ?? null : data.script;
   const notes = current ? notesBy[current.id] ?? "" : "";
   const groups = groupByCity(items);
   const personName = (p: CallItem["person"]) => (p ? `${p.lastName} ${p.firstName}`.replace(/^- | -$/g, "").trim() : null);
@@ -125,10 +129,10 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
                 </div>
               )}
               <div className={s.panel}>
-                {data.script ? (
+                {script ? (
                   <>
-                    <div className={k.strong}>{data.script.title} (Anyagok, élő)</div>
-                    <div className={s.script}>{data.script.body}</div>
+                    <div className={k.strong}>{script.title} (Anyagok, élő)</div>
+                    <div className={s.script}>{script.body}</div>
                   </>
                 ) : (
                   <p className={k.muted} style={{ margin: 0 }}>Nincs jóváhagyott hívásszkript ehhez a kampányhoz. A szkript az Anyagok jóváhagyási sorából jön.</p>
