@@ -166,6 +166,24 @@ describe("runNurture", () => {
     expect(ev.find((e) => e.eventType === "nurture_skipped")?.payload.reason).toBe("send_failed");
   });
 
+  it("keeps the claim when Resend may have accepted the mail (timeout, 5xx)", async () => {
+    setup({ nurture_enabled: true });
+    send.mockResolvedValue({ ok: false, error: "timeout", uncertain: true } as never);
+    await runNurture(1, now);
+    expect(d.nurtureEnrollment.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: { nextPosition: 1, lastSentAt: null } }));
+    const ev = d.appEvent.create.mock.calls.map((c) => c[0].data as { eventType: string; payload: { reason?: string } });
+    expect(ev.find((e) => e.eventType === "nurture_skipped")?.payload.reason).toBe("send_uncertain");
+  });
+
+  it("a paused (inactive) sequence keeps its enrolments: not stopped, not sent", async () => {
+    setup({ nurture_enabled: true });
+    d.nurtureSequence.findMany.mockResolvedValue(sequences.map((s) => (s.id === 10 ? { ...s, active: false } : s)) as never);
+    const r = await runNurture(1, now);
+    expect(send).not.toHaveBeenCalled();
+    expect(r.stopped).toBe(0);
+    expect(d.nurtureEnrollment.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "stopped" }) }));
+  });
+
   it("stops a live enrollment whose lead became won, without sending", async () => {
     setup({ nurture_enabled: true });
     const en = live();
@@ -179,11 +197,11 @@ describe("runNurture", () => {
     );
   });
 
-  it("passes a missing template when sending is on, but waits on an unapproved one", async () => {
+  it("waits on a missing template (imported later) and on an unapproved one (Vanda #165-5)", async () => {
     setup({ nurture_enabled: true }, []);
     await runNurture(1, now);
     expect(send).not.toHaveBeenCalled();
-    expect(d.nurtureEnrollment.updateMany).toHaveBeenCalledWith({ where: { id: 5, tenantId: 1 }, data: { nextPosition: 2 } });
+    expect(d.nurtureEnrollment.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: { nextPosition: 2 } }));
 
     vi.clearAllMocks();
     d.nurtureEnrollment.updateMany.mockResolvedValue({ count: 1 } as never);

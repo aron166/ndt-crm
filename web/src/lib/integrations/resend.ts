@@ -79,7 +79,8 @@ export async function sendTestEmail(tenantId: number): Promise<SendEmailResult> 
 export type SendEmailResult =
   /** `warning` is set when the email went out but logging it failed (reported). */
   | { ok: true; id: string; warning?: string }
-  | { ok: false; error: string };
+  /** `uncertain`: Resend may have accepted the mail (timeout, network, 5xx, no id); a retry could send twice. */
+  | { ok: false; error: string; uncertain?: true };
 
 /**
  * Send an email via Resend and record it as an append-only Interaction
@@ -128,12 +129,12 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, error: data?.message || `Resend hiba (${res.status}).` };
+      return { ok: false, error: data?.message || `Resend hiba (${res.status}).`, ...(res.status >= 500 ? { uncertain: true as const } : {}) };
     }
     id = data?.id ?? "";
-    if (!id) return { ok: false, error: "A Resend nem adott vissza üzenetazonosítót." };
+    if (!id) return { ok: false, error: "A Resend nem adott vissza üzenetazonosítót.", uncertain: true };
   } catch {
-    return { ok: false, error: "Nem sikerült kapcsolódni a Resendhez." };
+    return { ok: false, error: "Nem sikerült kapcsolódni a Resendhez.", uncertain: true };
   }
 
   if (input.skipLog) return { ok: true, id };

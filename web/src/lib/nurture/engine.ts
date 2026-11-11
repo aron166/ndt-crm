@@ -75,12 +75,15 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
   const assets = Array.isArray(settings.nurture_assets) ? settings.nurture_assets.filter((a): a is string => typeof a === "string") : [];
   const issuer = offerConfigFromSettings(tenant?.settings).issuer;
 
+  // All sequences: a paused (inactive) one keeps its enrolments untouched, it is only not advanced
+  // or enrolled into (Vanda #165-6).
   const sequences = await db.nurtureSequence.findMany({
-    where: { tenantId, active: true },
+    where: { tenantId },
     include: { steps: { orderBy: { position: "asc" } } },
   });
-  const bySegment = new Map(sequences.map((s) => [s.segment as Segment, s]));
-  if (sequences.length === 0) return out;
+  const inactive = new Set(sequences.filter((s) => !s.active).map((s) => s.id));
+  const bySegment = new Map(sequences.filter((s) => s.active).map((s) => [s.segment as Segment, s]));
+  if (bySegment.size === 0) return out;
 
   // 1. Enrol and re-segment. shortcut: scans up to 1000 leads per run; page it when the CRM grows past that.
   const leads = await db.lead.findMany({
@@ -102,7 +105,7 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
       const target = segment ? bySegment.get(segment) : undefined;
       // Any live enrollment in another sequence (or with no segment any more) stops.
       for (const en of lead.nurtureEnrollments) {
-        if ((en.status === "active" || en.status === "paused") && en.sequenceId !== target?.id) {
+        if ((en.status === "active" || en.status === "paused") && en.sequenceId !== target?.id && !inactive.has(en.sequenceId)) {
           await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { status: "stopped", stoppedReason: segment ? "segment_changed" : "not_eligible" } });
           await event(tenantId, "nurture_stopped", { leadId: lead.id, enrollmentId: en.id, reason: segment ? "segment_changed" : "not_eligible" });
           out.stopped++;
@@ -139,7 +142,7 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
   for (const en of live) {
     try {
       const seq = sequences.find((s) => s.id === en.sequenceId);
-      if (!seq) continue;
+      if (!seq || !seq.active) continue;
       const lead = en.lead;
       const cf = lead.customFields as Record<string, unknown> | null;
       // Re-check eligibility here too, so a lead outside the enrolment scan window
@@ -156,7 +159,7 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
       }
       const email = leadEmail(cf, lead.contact?.email);
       if (!email || (await isAddressSuppressed(tenantId, email))) {
-        await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { status: "stopped", stoppedReason: "unsubscribed" } });
+        await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { status: "stopped", stoppedReason: email ? "unsubscribed" : "no_email" } });
         await event(tenantId, "nurture_stopped", { leadId: lead.id, enrollmentId: en.id, reason: email ? "unsubscribed" : "no_email" });
         out.stopped++;
         continue;
@@ -205,8 +208,9 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
       if (block || !template) {
         // With sending on, a step whose template or asset does not exist is passed (W9: "skipped,
         // never sent with a placeholder"), so one missing piece does not stall the sequence
-        // (Vanda W9-3). An unapproved template, or sending off, waits.
-        const pass = enabled && (block === "template_missing" || (block ?? "").startsWith("asset_missing"));
+        // (Vanda W9-3). An unapproved or not yet imported template, or sending off, waits:
+        // a template that is imported later must still reach the leads (Vanda #165-5).
+        const pass = enabled && (block ?? "").startsWith("asset_missing");
         const to = pass ? step.position + 1 : passTo;
         if (to !== en.nextPosition) await db.nurtureEnrollment.updateMany({ where: { id: en.id, tenantId }, data: { nextPosition: to } });
         await skipOnce(tenantId, { leadId: lead.id, enrollmentId: en.id, templateKey: step.templateKey, position: step.position, reason: block ?? "template_missing" });
@@ -234,11 +238,14 @@ export async function runNurture(tenantId: number, now: Date = new Date()): Prom
         companyId: lead.companyId, personId: lead.contact?.personId ?? null,
       });
       if (!r.ok) {
-        await db.nurtureEnrollment.updateMany({
-          where: { id: en.id, tenantId, nextPosition: step.position + 1 },
-          data: { nextPosition: en.nextPosition, lastSentAt: en.lastSentAt },
-        });
-        await event(tenantId, "nurture_skipped", { leadId: lead.id, enrollmentId: en.id, templateKey: step.templateKey, position: step.position, reason: "send_failed", error: r.error });
+        // Resend may have accepted it (timeout, 5xx): keep the claim, a retry could send twice (Vanda #165-2).
+        if (!r.uncertain) {
+          await db.nurtureEnrollment.updateMany({
+            where: { id: en.id, tenantId, nextPosition: step.position + 1 },
+            data: { nextPosition: en.nextPosition, lastSentAt: en.lastSentAt },
+          });
+        }
+        await skipOnce(tenantId, { leadId: lead.id, enrollmentId: en.id, templateKey: step.templateKey, position: step.position, reason: r.uncertain ? "send_uncertain" : "send_failed", error: r.error });
         out.skipped++;
         continue;
       }
