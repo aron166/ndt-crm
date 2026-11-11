@@ -43,7 +43,7 @@ export async function GET(request: Request) {
       lead: { select: { id: true, message: true, nextAction: true } },
     },
     orderBy: { startsAt: "asc" },
-    take: MAX_ROWS,
+    take: MAX_ROWS + 1,
   });
-  return json({ ok: true, items: serializeDates(rows), truncated: rows.length === MAX_ROWS });
+  return json({ ok: true, items: serializeDates(rows.slice(0, MAX_ROWS)), truncated: rows.length > MAX_ROWS });
 }

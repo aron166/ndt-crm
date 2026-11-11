@@ -328,7 +328,8 @@ curl -X POST $CRM/api/leads/12/interactions \
 
 `call_id` (optional, ≤200 chars, unique per tenant) makes the POST idempotent: a repeat with the
 same `call_id` writes nothing and returns `200 { "ok": true, "deduped": true, "interactionId": <first> }`,
-the same answer `/api/calls/result` gives.
+the same answer `/api/calls/result` gives. A `call_id` already used on a different lead is a `409`
+(nothing written): a `call_id` is unique per tenant, not per lead.
 
 **Which route logs a confirmed voice call** (the cockpit, after Péter presses "Igen"): this one,
 with `call_id` = the confirmation's id. It is the human-confirmed path, the same function as the

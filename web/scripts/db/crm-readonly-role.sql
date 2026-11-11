@@ -7,7 +7,8 @@
 -- The password comes from the shell (-v), never from this file. -1 runs it as ONE transaction, so a re-run's
 -- revoke-then-grant is never visible half-done to a live read tool. Re-running is safe: the role is created once
 -- and the grants re-applied; it does NOT change the password. Rotate with:
---   psql "$DIRECT_URL" -v pw="$NEW_PASSWORD" -c "ALTER ROLE crm_ro PASSWORD :'pw'"
+--   echo "ALTER ROLE crm_ro PASSWORD :'pw'" | psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -v pw="$NEW_PASSWORD"
+-- (psql does not substitute variables inside -c, so the statement comes on stdin.)
 --
 -- Rollback:
 --   REVOKE ALL ON ALL TABLES IN SCHEMA public FROM crm_ro; REVOKE USAGE ON SCHEMA public FROM crm_ro; DROP ROLE crm_ro;

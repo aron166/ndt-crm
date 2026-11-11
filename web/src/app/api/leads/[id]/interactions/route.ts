@@ -22,9 +22,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // A repeat of a logged call_id is a no-op that still returns the id (same answer as /api/calls/result).
   const callId = wire.data.call_id;
+  // call_id is unique per tenant; reused on ANOTHER lead it is a caller bug, not a repeat (409, nothing written).
   const deduped = async () => {
-    const existing = callId ? await db.interaction.findFirst({ where: { tenantId: auth.ctx.tenantId, callId }, select: { id: true } }) : null;
-    return existing ? json({ ok: true, deduped: true, interactionId: existing.id }, 200) : null;
+    const existing = callId ? await db.interaction.findFirst({ where: { tenantId: auth.ctx.tenantId, callId }, select: { id: true, leadId: true } }) : null;
+    if (!existing) return null;
+    if (existing.leadId !== id) return json({ error: "call_id already used on another lead", interactionId: existing.id }, 409);
+    return json({ ok: true, deduped: true, interactionId: existing.id }, 200);
   };
   const first = await deduped();
   if (first) return first;
@@ -39,10 +42,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return json({ ok: true, ...rest }, 201);
   } catch (err) {
     // Lost a race on the same call_id: the insert failed inside the transaction, nothing was written.
-    const e = err as { code?: string; meta?: { target?: unknown } } | null;
-    const target = e?.meta?.target;
-    const onCallId = Array.isArray(target) ? target.includes("call_id") : String(target ?? "").includes("call_id");
-    if (e?.code === "P2002" && callId && onCallId) {
+    // No meta.target check: adapter-pg puts the fields elsewhere (Vanda #186 r2). The re-read IS the check:
+    // it only answers when that call_id really exists.
+    if ((err as { code?: string } | null)?.code === "P2002" && callId) {
       const again = await deduped();
       if (again) return again;
     }

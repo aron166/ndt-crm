@@ -133,7 +133,7 @@ describe("POST /api/leads/:id/interactions call_id (the confirmed voice-log rout
   });
 
   it("a repeated call_id returns the first interaction (200 deduped) and logs nothing", async () => {
-    m.interaction.findFirst.mockResolvedValue({ id: 9 });
+    m.interaction.findFirst.mockResolvedValue({ id: 9, leadId: 5 });
     const r = await postInteraction(post({ outcome: "no_answer", note: "x", call_id: "tg-123" }), ctx("5"));
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({ ok: true, deduped: true, interactionId: 9 });
@@ -141,12 +141,17 @@ describe("POST /api/leads/:id/interactions call_id (the confirmed voice-log rout
     expect(logLeadCallOutcome).not.toHaveBeenCalled();
   });
 
-  it("a lost race on call_id (P2002 on call_id) answers deduped too; another unique error is a 500", async () => {
-    m.interaction.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 9 });
-    mock(logLeadCallOutcome).mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002", meta: { target: ["tenant_id", "call_id"] } }));
+  it("a call_id already used on another lead is a 409 and logs nothing", async () => {
+    m.interaction.findFirst.mockResolvedValue({ id: 9, leadId: 6 });
+    expect((await postInteraction(post({ outcome: "no_answer", note: "x", call_id: "tg-123" }), ctx("5"))).status).toBe(409);
+    expect(logLeadCallOutcome).not.toHaveBeenCalled();
+  });
+
+  it("a lost race (real adapter-pg P2002 shape, no meta.target) answers deduped; P2002 with no such call_id is a 500", async () => {
+    m.interaction.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 9, leadId: 5 });
+    mock(logLeadCallOutcome).mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002", meta: { driverAdapterError: {} } }));
     expect((await postInteraction(post({ outcome: "no_answer", note: "x", call_id: "tg-123" }), ctx("5"))).status).toBe(200);
     m.interaction.findFirst.mockResolvedValue(null);
-    mock(logLeadCallOutcome).mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002", meta: { target: ["other"] } }));
     expect((await postInteraction(post({ outcome: "no_answer", note: "x", call_id: "tg-124" }), ctx("5"))).status).toBe(500);
   });
 });
