@@ -24,6 +24,9 @@ describe("isServiceApiPath", () => {
     "/api/persons/7",
     "/api/deals",
     "/api/deals/9",
+    "/api/leads/queue",
+    "/api/leads/12/slots",
+    "/api/bookings",
     "/api/outreach/targets",
     "/api/outreach/drafts",
     "/api/cron/automations",
@@ -49,6 +52,8 @@ describe("isServiceApiPath", () => {
     "/api/companies/abc",
     "/api/deals/9/stage", // only the item route is an app route
     "/api/deals/abc",
+    "/api/bookings/12", // list only
+    "/api/booking/slots", // the booking drawer's session route stays gated
     "/companies/42",
     "/leads",
     "/api/suppressions/anything", // exact match only

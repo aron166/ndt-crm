@@ -42,9 +42,27 @@ export const leadListQuerySchema = z.object({
   status: z.preprocess(emptyToUndef, z.string().trim().max(64).optional()),
   outcome: z.preprocess(emptyToUndef, z.enum(LEAD_OUTCOMES).optional()),
   assigned_to: optInt,
+  /** Name search: company name, contact person name, email or phone (contact or person), subject (contains, case-insensitive). */
+  q: z.preprocess(emptyToUndef, z.string().trim().min(2).max(100).optional()),
+  /** Campaign / import batch tag, exact (e.g. launch-2026-11). */
+  campaign: z.preprocess(emptyToUndef, z.string().trim().max(200).optional()),
   page: z.preprocess(emptyToUndef, z.coerce.number().int().positive().default(1)),
   page_size: z.preprocess(emptyToUndef, z.coerce.number().int().positive().max(PAGE_SIZE_MAX).default(25)),
 });
+
+/** The where-fragment for `q=`; pure so the matched columns are pinned by a test. */
+export function leadSearchWhere(q: string) {
+  const c = { contains: q, mode: "insensitive" as const };
+  return {
+    OR: [
+      { company: { name: c } },
+      { contact: { person: { OR: [{ firstName: c }, { lastName: c }, { email: c }, { phone: c }] } } },
+      { contact: { email: c } },
+      { contact: { phone: c } },
+      { subject: c },
+    ],
+  };
+}
 
 export const leadPatchSchema = z
   .object({
@@ -101,6 +119,8 @@ export const leadInteractionWireSchema = z.object({
   assigned_to_id: optInt,
   script_variant: z.preprocess(emptyToUndef, z.string().optional()),
   call_type: z.preprocess(emptyToUndef, z.enum(CALL_TYPE_KEYS).optional()),
+  /** Idempotency key, unique per tenant: a repeated POST with the same call_id writes nothing (409). */
+  call_id: z.preprocess(emptyToUndef, z.string().trim().max(200).optional()),
 });
 export function toCallOutcomeInput(w: z.infer<typeof leadInteractionWireSchema>) {
   return {
@@ -114,6 +134,7 @@ export function toCallOutcomeInput(w: z.infer<typeof leadInteractionWireSchema>)
     ...(w.assigned_to_id ? { assignedToId: w.assigned_to_id } : {}),
     ...(w.script_variant ? { scriptVariant: w.script_variant } : {}),
     ...(w.call_type ? { callType: w.call_type } : {}),
+    ...(w.call_id ? { callId: w.call_id } : {}),
   };
 }
 

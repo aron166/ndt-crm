@@ -47,6 +47,7 @@ export function isServiceApiPath(pathname: string): boolean {
     /^\/api\/(companies|persons)\/\d+$/.test(pathname) ||
     pathname === "/api/deals" ||
     /^\/api\/deals\/\d+$/.test(pathname) ||
+    pathname === "/api/bookings" ||
     pathname === "/api/outreach/targets" ||
     pathname === "/api/outreach/drafts" ||
     pathname === "/api/cron/automations" ||

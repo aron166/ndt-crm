@@ -38,12 +38,12 @@ describe("groupQueue on DST change days", () => {
 
 describe("queueWhere", () => {
   it("filters by owner only when given", () => {
-    expect(queueWhere(7)).toMatchObject({ tenantId: 1, assignedToId: 7 });
-    expect(queueWhere(null)).not.toHaveProperty("assignedToId");
-    expect(queueWhere(-1)).toMatchObject({ assignedToId: -1 });
+    expect(queueWhere(7, 1)).toMatchObject({ tenantId: 1, assignedToId: 7 });
+    expect(queueWhere(null, 1)).not.toHaveProperty("assignedToId");
+    expect(queueWhere(-1, 1)).toMatchObject({ assignedToId: -1 });
   });
   it("excludes recall and lost, keeps null status", () => {
-    const w = queueWhere(null);
+    const w = queueWhere(null, 1);
     expect(w.OR).toContainEqual({ status: null });
     const notIn = (w.OR[1] as { status: { notIn: string[] } }).status.notIn;
     expect(notIn).toEqual(expect.arrayContaining(["recall", "lost"]));

@@ -11,7 +11,7 @@ import { sendAutoReply, sendLeadPing } from "@/lib/leads/intake-notify";
 import { sendIntroMaterial, type IntroResult } from "@/lib/leads/intro";
 import { runAutomations } from "@/lib/automations/engine";
 import { serializeDates } from "@/lib/serialize";
-import { leadListQuerySchema, LEAD_API_SELECT } from "@/lib/leads/api";
+import { leadListQuerySchema, leadSearchWhere, LEAD_API_SELECT } from "@/lib/leads/api";
 
 // Public lead-intake endpoint (Platform Foundation #4).
 //
@@ -42,13 +42,15 @@ export async function GET(request: Request) {
 
   const q = leadListQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if (!q.success) return json({ error: "Validation failed", details: q.error.flatten() }, 400);
-  const { status, outcome, assigned_to, page, page_size } = q.data;
+  const { status, outcome, assigned_to, q: search, campaign, page, page_size } = q.data;
 
   const where = {
     tenantId: key.tenantId,
     ...(status ? { status } : {}),
     ...(outcome ? { outcome } : {}),
     ...(assigned_to ? { assignedToId: assigned_to } : {}),
+    ...(campaign ? { campaign } : {}),
+    ...(search ? leadSearchWhere(search) : {}),
   };
   const [items, total] = await Promise.all([
     db.lead.findMany({ where, select: LEAD_API_SELECT, orderBy: { createdAt: "desc" }, skip: (page - 1) * page_size, take: page_size }),

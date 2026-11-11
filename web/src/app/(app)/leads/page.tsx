@@ -89,7 +89,7 @@ export default async function LeadsPage({
   if (isQueue) {
     const now = new Date();
     const [statuses, rows, counts, queueTotal] = await Promise.all([
-      getLeadStatuses(TENANT_ID), getQueueRows(assignedToId), getFooterCounts(), openTotal,
+      getLeadStatuses(TENANT_ID), getQueueRows(assignedToId, TENANT_ID), getFooterCounts(), openTotal,
     ]);
     // Heading counts come from the loaded rows (at most 200, most urgent first), so
     // past the cap they undercount; the list footer says so.
