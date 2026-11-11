@@ -4,6 +4,7 @@
 -- reads status for content or outreach flows.
 --
 -- Rollback (in this order):
+--   DROP TABLE "campaign_events";
 --   DROP TABLE "campaign_members";
 --   DROP TABLE "campaign_steps";
 --   ALTER TABLE "campaigns" DROP CONSTRAINT "campaigns_owner_user_id_fkey", DROP CONSTRAINT "campaigns_approved_by_id_fkey",
@@ -95,3 +96,23 @@ ALTER TABLE "campaign_members" ADD CONSTRAINT "campaign_members_campaign_id_fkey
 ALTER TABLE "campaign_members" ADD CONSTRAINT "campaign_members_company_id_fkey" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "campaign_members" ADD CONSTRAINT "campaign_members_person_id_fkey" FOREIGN KEY ("person_id") REFERENCES "persons"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "campaign_members" ADD CONSTRAINT "campaign_members_lead_id_fkey" FOREIGN KEY ("lead_id") REFERENCES "leads"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- Append-only touch log (analytics by step and by day).
+CREATE TABLE "campaign_events" (
+    "id" SERIAL NOT NULL,
+    "tenant_id" INTEGER NOT NULL,
+    "campaign_id" INTEGER NOT NULL,
+    "member_id" INTEGER NOT NULL,
+    "step_position" INTEGER NOT NULL,
+    "outcome" TEXT NOT NULL,
+    "lead_id" INTEGER,
+    "actor_user_id" INTEGER,
+    "actor_agent_id" TEXT,
+    "at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "campaign_events_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "campaign_events_outcome_check" CHECK ("outcome" IN ('no_answer', 'interested', 'wants', 'not_interested', 'bad_number', 'note_only', 'email_sent', 'reply_positive', 'reply_negative', 'unsubscribe', 'bounce'))
+);
+CREATE INDEX "campaign_events_tenant_id_campaign_id_at_idx" ON "campaign_events"("tenant_id", "campaign_id", "at");
+ALTER TABLE "campaign_events" ADD CONSTRAINT "campaign_events_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "campaign_events" ADD CONSTRAINT "campaign_events_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaigns"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "campaign_events" ADD CONSTRAINT "campaign_events_member_id_fkey" FOREIGN KEY ("member_id") REFERENCES "campaign_members"("id") ON DELETE CASCADE ON UPDATE CASCADE;

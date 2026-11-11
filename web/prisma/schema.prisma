@@ -57,6 +57,7 @@ model Tenant {
   campaigns              Campaign[]
   campaignSteps          CampaignStep[]
   campaignMembers        CampaignMember[]
+  campaignEvents         CampaignEvent[]
   contentItems           ContentItem[]
   emailDrafts            EmailDraft[]
   contentAssets          ContentAsset[]
@@ -1239,6 +1240,7 @@ model Campaign {
   approvedBy   User?            @relation("CampaignApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   steps        CampaignStep[]
   members      CampaignMember[]
+  events       CampaignEvent[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -1301,12 +1303,35 @@ model CampaignMember {
   company  Company  @relation(fields: [companyId], references: [id])
   person   Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
   lead     Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  events   CampaignEvent[]
 
   @@unique([campaignId, companyId])
   @@index([tenantId, campaignId, state, nextEligibleOn])
   @@index([tenantId, campaignId, importBatch])
   @@index([companyId])
   @@map("campaign_members")
+}
+
+/// Append-only: one row per touch outcome on a member (never updated, never deleted
+/// except by the campaign cascade). The analytics by step and by day read this.
+model CampaignEvent {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  campaignId   Int      @map("campaign_id")
+  memberId     Int      @map("member_id")
+  stepPosition Int      @map("step_position")
+  outcome      String
+  leadId       Int?     @map("lead_id")
+  actorUserId  Int?     @map("actor_user_id")
+  actorAgentId String?  @map("actor_agent_id")
+  at           DateTime @default(now())
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  campaign Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  member   CampaignMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, campaignId, at])
+  @@map("campaign_events")
 }
 
 model ContentItem {

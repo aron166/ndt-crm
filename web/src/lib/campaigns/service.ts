@@ -630,6 +630,12 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
       await tx.campaignMember.updateMany({ where: { id: m.id, tenantId }, data: { leadId } });
       if (interactionId != null && !existingLead) await tx.interaction.updateMany({ where: { id: interactionId, tenantId }, data: { leadId } });
     }
+    await tx.campaignEvent.create({
+      data: {
+        tenantId, campaignId: c.id, memberId: m.id, stepPosition: m.stepPosition, outcome: input.outcome, leadId,
+        actorUserId: ctx.userId, actorAgentId: ctx.userId == null ? ctx.appSlug ?? null : null, at: now,
+      },
+    });
     if (plan.suppress && m.person?.email) {
       const email = normalizeEmail(m.person.email)!;
       await tx.suppression.upsert({
