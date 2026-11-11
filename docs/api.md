@@ -1076,8 +1076,9 @@ not yet live), or until then by the script with
 
 ### `POST /api/campaigns/:slug/approve`, `/pause`, `/stop`
 
-Approve: Áron's session only; from `draft` or `paused`; optional body `{ "expect": { "members": 80, "steps": 2,
-"daily_cap": 15 } }` (what the approver saw: a mismatch with the campaign now is `409`, nothing launches); needs at least one step, at least one `queued` member, and
+Approve: Áron's session only; from `draft` or `paused`; optional body `{ "expect": { "hash": "<64 hex>" } }`, the approval hash of
+what the approver saw (members, steps with assets, cap, outbound switch): a mismatch is `409` and nothing launches,
+a malformed `expect` is `400`; the hub's Indítás tab always sends it; needs at least one step, at least one `queued` member, and
 every e-mail step's asset (and any step's asset that is set) LIVE in the approval pipeline. Stores `approved_by_id`,
 `approved_at` and `approved_hash` (SHA-256 of member companies, steps, cap and the outbound switch). The kind's
 step shape is re-checked (`409`); a content-only kind cannot be approved. `403` for an app key or any other

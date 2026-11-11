@@ -99,11 +99,12 @@ export async function undoBatchAction(slug: string, batch: string, dryRun: boole
   return { ok: true as const, summary: r.summary };
 }
 
-export async function approveCampaignAction(slug: string, seen?: { members: number; steps: number; dailyCap: number }): Promise<{ ok: true } | Err> {
+/** `seenHash`: the approval hash of what the page showed; required, so a UI launch is always of what Áron looked at. */
+export async function approveCampaignAction(slug: string, seenHash: string): Promise<{ ok: true } | Err> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
-  const ok = seen && [seen.members, seen.steps, seen.dailyCap].every((n) => Number.isInteger(n) && n >= 0);
-  const r = await svc.approveCampaign({ tenantId: TENANT_ID, userId }, slug, ok ? seen : undefined);
+  if (typeof seenHash !== "string" || !/^[0-9a-f]{64}$/.test(seenHash)) return { error: "Frissítsd az oldalt, és nézd át újra" };
+  const r = await svc.approveCampaign({ tenantId: TENANT_ID, userId }, slug, { hash: seenHash });
   if ("error" in r) return { error: r.error };
   touch(slug);
   revalidatePath("/calls");

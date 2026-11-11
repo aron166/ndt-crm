@@ -4,7 +4,7 @@
 // can only dry-run). A batch nobody has touched can be undone, after its own dry run.
 // Hungarian copy is PROPOSAL until Áron approves it.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import k from "@/components/astryx/page.module.css";
 import { uiBatchId } from "@/lib/campaigns/labels";
@@ -40,7 +40,9 @@ export function MemberLoad({ slug, status, canOperate, closed, batches }: { slug
   const router = useRouter();
   const [fileText, setFileText] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
-  const [batch, setBatch] = useState(() => uiBatchId(new Date()));
+  // Filled on mount: a random id in the initializer would differ between server and browser (hydration).
+  const [batch, setBatch] = useState("");
+  useEffect(() => setBatch(uiBatchId(new Date())), []);
   const [dry, setDry] = useState<Summary | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -116,7 +118,7 @@ export function MemberLoad({ slug, status, canOperate, closed, batches }: { slug
           </div>
           {fileName && <p className={k.muted}>{fileName}</p>}
           <div className={k.actions}>
-            <button type="button" className={`${k.btn} ${dry ? "" : k.btnPrimary}`} disabled={!fileText || busy} onClick={() => run(true)}>Próba</button>
+            <button type="button" className={`${k.btn} ${dry ? "" : k.btnPrimary}`} disabled={!fileText || !batch || busy} onClick={() => run(true)}>Próba</button>
             {dry && (
               <button type="button" className={`${k.btn} ${k.btnPrimary}`} disabled={busy || !canOperate || dry.add + dry.refresh === 0} onClick={() => run(false)}>
                 Betöltés ({dry.add + dry.refresh})

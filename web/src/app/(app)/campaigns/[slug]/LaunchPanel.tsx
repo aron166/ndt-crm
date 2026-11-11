@@ -16,7 +16,7 @@ import s from "../campaigns.module.css";
 
 export interface LaunchData {
   slug: string; status: string; dailyCap: number; startsOn: string | null; endsOn: string | null;
-  outboundAutomations: boolean; approvedAt: string | null;
+  outboundAutomations: boolean; approvedAt: string | null; previewHash: string;
   steps: StepRow[]; assets: AssetState[]; members: Record<string, number>;
 }
 
@@ -139,7 +139,7 @@ export function LaunchPanel({ d, isAron }: { d: LaunchData; isAron: boolean }) {
             <div className={k.actions}>
               {d.status === "paused" && <button type="button" className={k.btn} disabled={busy} onClick={() => run(() => setCampaignStatusAction(d.slug, "stopped"), "Leállítva")}>Leállítás</button>}
               <button type="button" className={`${k.btn} ${k.btnPrimary}`} disabled={busy || !isAron || blockers.length > 0 || settingsChanged}
-                onClick={() => run(() => approveCampaignAction(d.slug, { members: total, steps: d.steps.length, dailyCap: d.dailyCap }), "Elindítva")}>
+                onClick={() => run(() => approveCampaignAction(d.slug, d.previewHash), "Elindítva")}>
                 Jóváhagyás és indítás
               </button>
               {!isAron && <span className={k.muted}>csak Áron</span>}
