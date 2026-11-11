@@ -69,6 +69,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
 
   return (
     <div>
+      <h1 className={k.title} style={{ marginBottom: 8 }}>Hívás mód</h1>
       <p className={k.muted}>
         <span className={k.strong}>{data.campaign.name}</span> · Ma {data.touchedToday + done.size} / {data.campaign.dailyCap} · hátra {Math.max(0, data.remaining)}
       </p>
@@ -97,7 +98,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
             ))}
           </nav>
           {current && (
-            <section className={k.card} aria-label="Kiválasztott cég" style={{ gap: 16 }}>
+            <section className={`${k.card} ${s.callCard}`} aria-label="Kiválasztott cég" style={{ gap: 16 }}>
               <div>
                 <h2 className={k.groupTitle}>{current.company.name}</h2>
                 {current.why && <p className={k.muted} style={{ margin: "4px 0 0" }}>Miért: {current.why}</p>}

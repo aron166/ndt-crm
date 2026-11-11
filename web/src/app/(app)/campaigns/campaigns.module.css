@@ -53,6 +53,8 @@ textarea.input { min-height: 72px; resize: vertical; }
 .outcomes button { min-height: 48px; }
 @media (max-width: 760px) {
   .callSplit { grid-template-columns: minmax(0, 1fr); }
+  /* On Péter's phone the selected company and its script come first, the list under it. */
+  .callCard { order: -1; }
   .outcomes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .step { grid-template-columns: 28px minmax(0, 1fr); }
   .step > :last-child { grid-column: 2; }
