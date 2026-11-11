@@ -30,10 +30,9 @@ export async function hubList(tenantId: number, now: Date = new Date()) {
   ]);
   const userName = new Map(users.map((u) => [u.id, u.name]));
   const today = new Map<number, number>();
-  for (const r of rows.filter((x) => x.status === "running" && x.steps.some((s) => s.channel === "call"))) {
-    const l = await dailyList(tenantId, r.slug, now);
-    if (!("error" in l)) today.set(r.id, l.items.length);
-  }
+  const callers = rows.filter((x) => x.status === "running" && x.steps.some((s) => s.channel === "call"));
+  const lists = await Promise.all(callers.map((r) => dailyList(tenantId, r.slug, now)));
+  callers.forEach((r, i) => { const l = lists[i]; if (!("error" in l)) today.set(r.id, l.items.length); });
   const out: HubRow[] = rows.map((r) => {
     const m = r.members as Record<string, number>;
     return {

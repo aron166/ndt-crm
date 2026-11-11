@@ -31,7 +31,8 @@ describe("campaign kinds in the UI", () => {
     expect(g.map((x) => [x.city, x.items.map((i) => i.id)])).toEqual([["XI. kerület", [1, 3]], ["Győr", [2]]]);
   });
   it("a UI batch id is a valid batch key", () => {
-    expect(uiBatchId(new Date(2026, 10, 11, 9, 5))).toBe("ui-20261111-0905");
+    expect(uiBatchId(new Date(2026, 10, 11, 9, 5, 7), () => 0)).toBe("ui-20261111-090507-0000");
+    expect(uiBatchId(new Date(), () => 0.1)).not.toBe(uiBatchId(new Date(), () => 0.2));
     expect(/^[A-Za-z0-9_-]{1,64}$/.test(uiBatchId(new Date()))).toBe(true);
   });
 });

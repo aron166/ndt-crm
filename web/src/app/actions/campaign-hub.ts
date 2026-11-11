@@ -81,7 +81,7 @@ export async function loadMembersAction(slug: string, input: { fileText: string;
   const file = parseMemberFile(String(input?.fileText ?? ""));
   if ("error" in file) return file;
   if (file.rows.length > 1000) return { error: "Egyszerre legfeljebb 1000 sor tölthető be" };
-  const p = addMembersSchema.safeParse({ dry_run: input.dryRun !== false, batch: input.batch, rows: file.rows });
+  const p = addMembersSchema.safeParse({ dry_run: input?.dryRun !== false, batch: input?.batch, rows: file.rows });
   if (!p.success) return bad(p.error);
   const r = await svc.addMembers({ tenantId: TENANT_ID, userId }, slug, p.data);
   if ("error" in r) return { error: r.error };

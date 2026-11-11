@@ -49,6 +49,15 @@ describe("role checks pass through from the service with the session user", () =
     expect(await A.undoBatchAction("bp", "b1", false)).toEqual({ error: "Ehhez admin vagy manager szerep kell" });
     expect(svc.undoBatch).toHaveBeenCalledWith({ tenantId: 1, userId: 5 }, "bp", "b1", false);
   });
+  it("adopting proposed steps ties each proposed asset to its step position", async () => {
+    svc.getCampaign.mockResolvedValue({ briefProposal: { steps: [{ channel: "email" }, { channel: "call", wait_days: 3 }], assets: [{ item_id: 41, step_position: 2 }] } });
+    svc.setSteps.mockResolvedValue({ ok: true, status: "draft" });
+    expect(await A.adoptProposedStepsAction("bp")).toEqual({ ok: true });
+    expect(svc.setSteps.mock.calls[0][2]).toEqual([
+      expect.objectContaining({ channel: "email", content_item_id: null }),
+      expect.objectContaining({ channel: "call", wait_days: 3, content_item_id: 41 }),
+    ]);
+  });
   it("a load defaults to a dry run unless dryRun is exactly false", async () => {
     svc.addMembers.mockResolvedValue({ ok: true, dry_run: true, summary: {} });
     await A.loadMembersAction("bp", { fileText: JSON.stringify([{ company_name: "A" }]), batch: "b1" } as never);

@@ -104,7 +104,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           )}
         </div>
         <div>
-          <SpecifyPanel slug={c.slug} proposal={d.proposal as Proposal | null} assets={d.assets} editable={c.status !== "stopped" && c.status !== "done"} />
+          <SpecifyPanel slug={c.slug} proposal={d.proposal as Proposal | null} assets={d.assets} editable={c.status !== "stopped" && c.status !== "done"} canAdoptSteps={c.status === "draft" && !contentOnly} />
         </div>
       </div>}
     </div>

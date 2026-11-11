@@ -32,11 +32,16 @@ export function StepsSection({ slug, kind, status, steps, assets }: { slug: stri
   async function save() {
     setBusy(true);
     setError(null);
-    const r = await saveStepsAction(slug, draft);
-    setBusy(false);
-    if ("error" in r) return setError(r.error);
-    setEditing(false);
-    router.refresh();
+    try {
+      const r = await saveStepsAction(slug, draft);
+      if ("error" in r) return setError(r.error);
+      setEditing(false);
+      router.refresh();
+    } catch {
+      setError("Hálózati hiba, próbáld újra");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
