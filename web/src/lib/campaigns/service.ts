@@ -29,7 +29,7 @@ import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
   MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel,
 } from "./rules";
-import { planMembers, type MemberRow, type MembersPlan } from "./members";
+import { planMembers, type MemberRow, type MembersPlan, reachFromContacts } from "./members";
 
 export interface CampaignCtx {
   tenantId: number;
@@ -361,16 +361,7 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
     where: { tenantId, endedAt: null, companyId: { in: resolvedIds } },
     select: { companyId: true, personId: true, email: true, phone: true, person: { select: { email: true, phone: true } } },
   });
-  const companyReach = new Map<number, { phone: boolean; email: boolean; personId: number | null }>();
-  for (const k of contacts) {
-    const prev = companyReach.get(k.companyId) ?? { phone: false, email: false, personId: null };
-    companyReach.set(k.companyId, {
-      phone: prev.phone || Boolean(k.phone || k.person.phone),
-      // A suppressed (unsubscribed or bounced) address is no e-mail: it never refreshes a needs_email member (Vanda #188 r2-1).
-      email: prev.email || [k.email, k.person.email].some((e) => e && !isSuppressed(normalizeEmail(e)!, suppressions)),
-      personId: prev.personId ?? k.personId,
-    });
-  }
+  const companyReach = reachFromContacts(contacts, suppressions);
 
   const plan: MembersPlan = planMembers(input.rows, {
     aliveCompanyIds: new Set(companies.map((x) => x.id)), byVat, byName,
