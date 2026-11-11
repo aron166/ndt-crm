@@ -4,7 +4,7 @@ import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
 import { changeLeadStatus } from "@/lib/leads/service";
 import { runAutomations } from "@/lib/automations/engine";
 import { resolveDemoHost } from "@/lib/booking/queries";
-import { approveCampaign, recordOutcome, setCampaignStatus, specifyCampaign, setSteps } from "./service";
+import { addMembers, approveCampaign, recordOutcome, setCampaignStatus, specifyCampaign, setSteps, undoBatch, updateCampaign } from "./service";
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
@@ -13,21 +13,25 @@ vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolve
 vi.mock("@/lib/leads/lifecycle-sweep", () => ({ startLeadLifecycle: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/leads/service", () => ({ changeLeadStatus: vi.fn().mockResolvedValue({ success: true, changed: true }) }));
 vi.mock("@/lib/booking/queries", () => ({ resolveDemoHost: vi.fn() }));
+vi.mock("@/lib/suppression", () => ({ loadSuppressionSet: vi.fn().mockResolvedValue({ emails: new Set(), domains: new Set() }) }));
 vi.mock("@/lib/content/service", () => ({ createItem: vi.fn().mockResolvedValue({ ok: true, itemId: 900, versionId: 1, existed: false, status: "in_review", ruleChecks: 0 }) }));
 vi.mock("@/lib/db", () => {
   const m = () => vi.fn();
   const db = {
     campaign: { findFirst: m(), update: m(), updateMany: m() },
-    campaignMember: { findFirst: m(), findMany: m(), updateMany: m() },
+    campaignMember: { findFirst: m(), findMany: m(), updateMany: m(), create: m(), deleteMany: m() },
+    user: { findFirst: m() },
+    person: { findMany: m(), create: m(), updateMany: m() },
+    emailDraft: { findMany: m() }, invoice: { findMany: m() }, proposal: { findMany: m() }, quote: { findMany: m() },
+    company: { findMany: m(), updateMany: m(), create: m() },
     campaignStep: { deleteMany: m(), createMany: m() },
     campaignEvent: { create: m() },
-    contact: { findFirst: m() },
-    lead: { findFirst: m(), create: m() },
+    contact: { findFirst: m(), findMany: m(), create: m(), updateMany: m() },
+    lead: { findFirst: m(), create: m(), findMany: m() },
     leadStatusHistory: { create: m() },
-    interaction: { create: m(), updateMany: m() },
-    company: { updateMany: m() },
+    interaction: { create: m(), updateMany: m(), findMany: m() },
     suppression: { upsert: m() },
-    task: { create: m() },
+    task: { create: m(), findMany: m() },
     contentItem: { findMany: m() },
     deal: { findMany: m() },
     $queryRaw: vi.fn().mockResolvedValue([]),
@@ -144,7 +148,7 @@ describe("recordOutcome: promotion without an SLA task flood", () => {
 describe("only Áron launches", () => {
   beforeEach(() => {
     (resolveDemoHost as M).mockResolvedValue(2);
-    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", dailyCap: 15, steps: [{ position: 1, channel: "call", waitDays: 0, contentItemId: null, contentItem: null }] });
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "cold_call", dailyCap: 15, outboundAutomations: false, steps: [{ position: 1, channel: "call", waitDays: 0, contentItemId: null, contentItem: null }] });
     d.campaignMember.findMany.mockResolvedValue([{ companyId: 7, state: "queued" }]);
     d.campaign.updateMany.mockResolvedValue({ count: 1 });
   });
@@ -161,7 +165,19 @@ describe("only Áron launches", () => {
     expect(d.campaign.updateMany.mock.calls[0][0].data).toMatchObject({ status: "running", approvedById: 2 });
   });
   it("an e-mail step whose copy is not live blocks the launch", async () => {
-    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", dailyCap: 15, steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 5, contentItem: { status: "in_review" } }] });
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence", dailyCap: 15, steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 5, contentItem: { status: "in_review" } }] });
+    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp")).toMatchObject({ status: 409 });
+  });
+  it("a sequence whose call comes before the e-mail cannot launch", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence", dailyCap: 15, steps: [
+      { position: 1, channel: "call", waitDays: 0, contentItemId: null, contentItem: null },
+      { position: 2, channel: "email", waitDays: 0, contentItemId: 5, contentItem: { status: "live" } },
+    ] });
+    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp")).toMatchObject({ status: 409 });
+    expect(d.campaign.updateMany).not.toHaveBeenCalled();
+  });
+  it("an ad or organic campaign is content only: no launch", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "ad", dailyCap: 15, steps: [{ position: 1, channel: "ad", waitDays: 0, contentItemId: null, contentItem: null }] });
     expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp")).toMatchObject({ status: 409 });
   });
   it("an agent may pause but not stop", async () => {
@@ -212,5 +228,65 @@ describe("stop is final", () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "stopped", dailyCap: 15, briefProposal: null });
     expect(await updateCampaign(SESSION, "bp", { daily_cap: 20 })).toMatchObject({ status: 409 });
     expect(d.campaign.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("member loads and undo are session only with an operator role (Kai, Vanda #188-3)", () => {
+  const SEQ = { id: 3, status: "draft", kind: "sequence", steps: STEPS };
+  const rows = [{ company_name: "Új Kft.", email: "a@uj.example.test" }];
+  beforeEach(() => {
+    d.campaign.findFirst.mockResolvedValue(SEQ);
+    for (const t of ["company", "lead", "campaignMember", "person", "contact", "deal", "emailDraft", "invoice", "proposal", "quote", "task", "interaction"]) d[t].findMany.mockResolvedValue([]);
+    d.person.create.mockResolvedValue({ id: 80 });
+  });
+  it("an app key may dry-run a load and gets the counts", async () => {
+    const r = await addMembers(APP, "bp", { dry_run: true, batch: "b1", rows });
+    expect(r).toMatchObject({ ok: true, dry_run: true, summary: { add: 1 } });
+  });
+  it("an app key gets 403 on apply and nothing is written", async () => {
+    expect(await addMembers(APP, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
+    expect(d.$transaction).not.toHaveBeenCalled();
+    expect(d.company.findMany).not.toHaveBeenCalled();
+  });
+  it("a member-role user gets 403 on apply; an admin applies", async () => {
+    d.user.findFirst.mockResolvedValue({ role: "member" });
+    expect(await addMembers(SESSION, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
+    d.user.findFirst.mockResolvedValue({ role: "admin" });
+    d.company.create.mockResolvedValue({ id: 70 });
+    expect(await addMembers(SESSION, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ ok: true, dry_run: false, added: 1 });
+  });
+  it("an app key gets 403 on undo; its dry run still answers", async () => {
+    expect(await undoBatch(APP, "bp", "b1", false)).toMatchObject({ status: 403 });
+    expect(d.campaignMember.deleteMany).not.toHaveBeenCalled();
+    expect(await undoBatch(APP, "bp", "b1", true)).toMatchObject({ ok: true, dry_run: true });
+  });
+  it("a content-only campaign takes no members", async () => {
+    d.campaign.findFirst.mockResolvedValue({ ...SEQ, kind: "organic" });
+    expect(await addMembers(APP, "bp", { dry_run: true, batch: "b1", rows })).toMatchObject({ status: 409 });
+  });
+});
+
+describe("a campaign promotion sends nothing by default (Vanda #188-8)", () => {
+  it("lead_created from a promotion skips send_email and webhook_out rules", async () => {
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "interested" }, NOW);
+    expect(runAutomations).toHaveBeenCalledWith(expect.objectContaining({ type: "lead_created", skipActionTypes: ["send_email", "webhook_out"] }));
+  });
+  it("moving an existing lead forward skips them too", async () => {
+    d.lead.findFirst.mockResolvedValue({ id: 250, status: "new" });
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "wants" }, NOW);
+    expect(changeLeadStatus).toHaveBeenCalledWith(250, "qualified", expect.anything(), expect.objectContaining({ skipAutomationActions: ["send_email", "webhook_out"] }));
+  });
+  it("only a campaign that opted in lets them run", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", ownerUserId: 9, outboundAutomations: true, steps: STEPS });
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "interested" }, NOW);
+    expect(runAutomations).toHaveBeenCalledWith(expect.objectContaining({ skipActionTypes: [] }));
+  });
+  it("only Áron switches outbound automations on, and it sends a running campaign back to draft", async () => {
+    (resolveDemoHost as M).mockResolvedValue(2);
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "running", dailyCap: 15, briefProposal: null, outboundAutomations: false });
+    expect(await updateCampaign(SESSION, "bp", { outbound_automations: true })).toMatchObject({ status: 403 });
+    expect(d.campaign.update).not.toHaveBeenCalled();
+    expect(await updateCampaign({ tenantId: 1, userId: 2 }, "bp", { outbound_automations: true })).toMatchObject({ ok: true, status: "draft" });
+    expect(d.campaign.update.mock.calls[0][0].data).toMatchObject({ outboundAutomations: true, status: "draft", approvedHash: null });
   });
 });

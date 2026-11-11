@@ -9,12 +9,14 @@ import { addWorkingDays, localDay, type LocalDay } from "@/lib/booking/time";
 
 export const CAMPAIGN_KINDS = ["content", "ad", "organic", "cold_call", "cold_email", "sequence"] as const;
 export type CampaignKind = (typeof CAMPAIGN_KINDS)[number];
+/** Kinds with per-member touches (members, a call list). ad, organic and content are content only for now. */
+export const MEMBER_KINDS: readonly CampaignKind[] = ["cold_call", "cold_email", "sequence"];
 export const CAMPAIGN_STATUSES = ["draft", "running", "paused", "stopped", "done"] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 export const STEP_CHANNELS = ["email", "call", "ad", "post", "dm"] as const;
 export type StepChannel = (typeof STEP_CHANNELS)[number];
 export const AUDIENCE_RULES = ["all", "no_reply", "no_answer"] as const;
-export const MEMBER_STATES = ["queued", "needs_contact", "promoted", "declined", "unreachable", "excluded", "done"] as const;
+export const MEMBER_STATES = ["queued", "needs_contact", "needs_email", "promoted", "declined", "unreachable", "excluded", "done"] as const;
 export type MemberState = (typeof MEMBER_STATES)[number];
 
 export const DEFAULT_DAILY_CAP = 15;
@@ -44,24 +46,42 @@ export function nextStep(steps: readonly StepDef[], position: number): StepDef |
   return sortSteps(steps).find((s) => s.position > position) ?? null;
 }
 
+/** Steps that touch one member (e-mail or call); ad, post and dm steps have no per-member touch. */
+const isTouch = (s: { channel: string }) => s.channel === "email" || s.channel === "call";
+
 /**
- * Where a new member starts (Áron 2026-11-03 and 2026-11-11): Péter's own past clients are
- * phone only and start on the first call step; unknown firms start at step 1 (the e-mail
- * first); a member without an e-mail address skips e-mail steps; no phone and no e-mail =
- * needs_contact, never on any list until enrichment adds one.
+ * Where a new member starts (Áron 2026-11-11, "E-mail first for everyone"): every member, warm
+ * or unknown, starts on the campaign's first touch step. No member skips an e-mail step: one
+ * without an e-mail address on an e-mail step is needs_email (listed as "needs an e-mail
+ * first", never called); one without a phone on a call step is needs_contact. stepsFitKind
+ * guarantees a sequence opens with an e-mail and a cold_call campaign has call steps only.
  */
 export function startFor(
   steps: readonly StepDef[],
-  m: { phoneOnly: boolean; hasEmail: boolean; hasPhone: boolean },
-): { stepPosition: number; state: "queued" | "needs_contact" } {
+  m: { hasEmail: boolean; hasPhone: boolean },
+): { stepPosition: number; state: "queued" | "needs_contact" | "needs_email" } {
   const ordered = sortSteps(steps);
-  const usable = ordered.find((s) => {
-    if (s.channel === "email") return m.hasEmail && !m.phoneOnly;
-    if (s.channel === "call") return m.hasPhone;
-    return false; // ad / post / dm steps have no per-member touch in slice 1
-  });
-  if (!usable) return { stepPosition: ordered[0]?.position ?? 1, state: "needs_contact" };
-  return { stepPosition: usable.position, state: "queued" };
+  const first = ordered.find(isTouch);
+  if (!first) return { stepPosition: ordered[0]?.position ?? 1, state: "needs_contact" };
+  if (first.channel === "email") return { stepPosition: first.position, state: m.hasEmail ? "queued" : "needs_email" };
+  return { stepPosition: first.position, state: m.hasPhone ? "queued" : "needs_contact" };
+}
+
+/**
+ * Which steps a campaign kind may have (null = fine). sequence: an e-mail before any call;
+ * cold_call: calls only (the pure cold-call type, chosen at creation); cold_email: e-mails
+ * only; ad, organic, content and a pre-v2 row (kind null): content only, no per-member touch.
+ */
+export function stepsFitKind(kind: CampaignKind | null, steps: readonly { channel: string; position: number }[]): string | null {
+  const touches = [...steps].sort((a, b) => a.position - b.position).filter(isTouch);
+  if (kind === "sequence") {
+    if (touches.length === 0) return null; // steps not set yet
+    if (touches[0].channel !== "email") return "Sorozatban az e-mail lépés az első, a hívás csak utána jöhet";
+    return null;
+  }
+  if (kind === "cold_call") return touches.some((s) => s.channel !== "call") ? "Hideg hívás kampányban csak hívás lépés lehet" : null;
+  if (kind === "cold_email") return touches.some((s) => s.channel !== "email") ? "Hideg e-mail kampányban csak e-mail lépés lehet" : null;
+  return touches.length ? "Ez a kampánytípus csak tartalom, nincs e-mail vagy hívás lépése" : null;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -107,7 +127,7 @@ export interface OutcomePlan {
   logCall: boolean;
 }
 
-export const OPEN_MEMBER_STATES: readonly MemberState[] = ["queued", "needs_contact"];
+export const OPEN_MEMBER_STATES: readonly MemberState[] = ["queued", "needs_contact", "needs_email"];
 
 export type PlanError = { error: string };
 
@@ -168,12 +188,9 @@ export function planOutcome(
     case "unsubscribe":
       return plan({ state: "declined" }, { suppress: true });
     case "bounce":
-      // A dead address: fall through to the call step if there is one, else out.
-      {
-        const call = sortSteps(steps).find((s) => s.channel === "call" && s.position > m.stepPosition);
-        if (call && m.hasPhone) return plan({ stepPosition: call.position, nextEligibleOn: today.key });
-        return plan({ state: "excluded" });
-      }
+      // A dead address is no e-mail: the member waits for a working one and is never called
+      // instead (Áron 2026-11-11, nobody is called before an e-mail went out).
+      return plan({ state: "needs_email" });
   }
 }
 
@@ -232,11 +249,15 @@ export function approvalHash(input: {
   memberCompanyIds: readonly number[];
   steps: readonly (StepDef & { contentItemId: number | null })[];
   dailyCap: number;
+  /** Whether promoted leads may fire send_email / webhook_out rules; omitted = false. */
+  outboundAutomations?: boolean;
 }): string {
   const payload = JSON.stringify({
     m: [...input.memberCompanyIds].sort((a, b) => a - b),
     s: sortSteps(input.steps).map((s) => [s.position, s.channel, s.waitDays, s.contentItemId]),
     c: input.dailyCap,
+    // Only in the payload when on, so every hash computed before this flag existed still matches.
+    ...(input.outboundAutomations ? { o: 1 } : {}),
   });
   return createHash("sha256").update(payload).digest("hex");
 }

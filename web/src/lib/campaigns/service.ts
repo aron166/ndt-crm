@@ -25,8 +25,8 @@ import { nextStatusFor, outcomeMeta } from "@/lib/outreach/queue";
 import { createItem } from "@/lib/content/service";
 import type { ContentCategory } from "@/lib/content/types";
 import {
-  approvalHash, canApprove, canSetStatus, isForwardMove, planOutcome, selectDailyList,
-  type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel,
+  approvalHash, canApprove, canSetStatus, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
+  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel,
 } from "./rules";
 import { planMembers, type MemberRow, type MembersPlan } from "./members";
 
@@ -56,13 +56,38 @@ async function lockCampaign(tx: Tx, id: number): Promise<void> {
 const needsSession = (ctx: CampaignCtx): Fail | null =>
   ctx.userId == null ? fail(403, "Ehhez bejelentkezett CRM felhasználó kell, app kulcs nem elég") : null;
 
+/** Áron's session: the only one that approves a launch or opens outbound automations. */
+async function isAron(ctx: CampaignCtx): Promise<boolean> {
+  if (ctx.userId == null) return false;
+  const aron = await resolveDemoHost(ctx.tenantId, "aron");
+  return aron != null && ctx.userId === aron;
+}
+
+/** Automation actions that reach outside the CRM (an e-mail, a webhook into n8n). */
+export const OUTBOUND_ACTIONS: readonly string[] = ["send_email", "webhook_out"];
+
+/** Roles that may write CRM records in bulk (apply a member load, undo one). */
+export const OPERATOR_ROLES: readonly string[] = ["admin", "manager"];
+
+/**
+ * Applying a member load and undoing one create and soft-delete CRM records, so they are
+ * SESSION ONLY with an operator role (Kai's ruling on Vanda #188-3): an app key may dry-run a
+ * load and propose, never apply.
+ */
+async function needsOperator(ctx: CampaignCtx): Promise<Fail | null> {
+  const s = needsSession(ctx);
+  if (s) return s;
+  const u = await db.user.findFirst({ where: { id: ctx.userId!, tenantId: ctx.tenantId }, select: { role: true } });
+  return u && OPERATOR_ROLES.includes(u.role) ? null : fail(403, "Ehhez admin vagy manager szerep kell");
+}
+
 // ---------------------------------------------------------------------------------------------
 // Read
 
 const CAMPAIGN_SELECT = {
   id: true, slug: true, name: true, kind: true, status: true, dailyCap: true, ownerUserId: true,
   startsOn: true, endsOn: true, brief: true, briefProposal: true, audience: true, project: true,
-  approvedById: true, approvedAt: true, approvedHash: true, isArchived: true, createdAt: true,
+  approvedById: true, approvedAt: true, approvedHash: true, outboundAutomations: true, isArchived: true, createdAt: true,
   steps: {
     orderBy: { position: "asc" as const },
     select: { position: true, channel: true, waitDays: true, audienceRule: true, contentItemId: true },
@@ -137,6 +162,8 @@ export async function createCampaign(
   },
 ) {
   const steps = input.steps ?? [];
+  const misfit = stepsFitKind(input.kind as CampaignKind, steps.map((st, i) => ({ channel: st.channel, position: i + 1 })));
+  if (misfit) return fail(400, misfit);
   const bad = await checkStepItems(ctx.tenantId, steps, null);
   if (bad) return bad;
   if (input.owner_user_id != null) {
@@ -180,6 +207,8 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
   const c = await loadForWrite(ctx.tenantId, slug);
   if (!c) return fail(404, "Kampány nem található");
   if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampány lépései nem módosíthatók");
+  const misfit = stepsFitKind(c.kind as CampaignKind | null, steps.map((st, i) => ({ channel: st.channel, position: i + 1 })));
+  if (misfit) return fail(400, misfit);
   const bad = await checkStepItems(ctx.tenantId, steps, c.id);
   if (bad) return bad;
   await db.$transaction(async (tx) => {
@@ -195,18 +224,21 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
 export async function updateCampaign(
   ctx: CampaignCtx,
   slug: string,
-  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean },
+  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean; outbound_automations?: boolean },
 ) {
   const s = needsSession(ctx);
   if (s) return s;
-  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, status: true, dailyCap: true, briefProposal: true } });
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, status: true, dailyCap: true, briefProposal: true, outboundAutomations: true } });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampány nem módosítható");
+  const outboundChanged = patch.outbound_automations !== undefined && patch.outbound_automations !== c.outboundAutomations;
+  if (outboundChanged && !(await isAron(ctx))) return fail(403, "A kimenő automatizmusokat csak Áron kapcsolhatja");
   if (patch.owner_user_id != null) {
     const u = await db.user.findFirst({ where: { id: patch.owner_user_id, tenantId: ctx.tenantId }, select: { id: true } });
     if (!u) return fail(400, "Ismeretlen felelős");
   }
-  const capChanged = patch.daily_cap !== undefined && patch.daily_cap !== c.dailyCap;
+  // Cap and outbound switch are part of the approval hash: changing either needs a new approval.
+  const capChanged = (patch.daily_cap !== undefined && patch.daily_cap !== c.dailyCap) || outboundChanged;
   const brief = patch.adopt_brief_proposal ? ((c.briefProposal as Prisma.JsonObject | null)?.brief as Prisma.InputJsonValue | undefined) : patch.brief;
   const data: Prisma.CampaignUpdateInput = {
     ...(patch.name !== undefined ? { name: patch.name } : {}),
@@ -215,6 +247,7 @@ export async function updateCampaign(
     ...(patch.starts_on !== undefined ? { startsOn: patch.starts_on ? new Date(`${patch.starts_on}T00:00:00Z`) : null } : {}),
     ...(patch.ends_on !== undefined ? { endsOn: patch.ends_on ? new Date(`${patch.ends_on}T00:00:00Z`) : null } : {}),
     ...(brief !== undefined ? { brief } : {}),
+    ...(outboundChanged ? { outboundAutomations: patch.outbound_automations } : {}),
     ...(capChanged && c.status !== "draft" ? BACK_TO_DRAFT : {}),
   };
   await db.campaign.update({ where: { id: c.id }, data });
@@ -282,9 +315,14 @@ export async function specifyCampaign(ctx: CampaignCtx, slug: string, input: Spe
 export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_run: boolean; batch: string; rows: MemberRow[] }) {
   const c = await db.campaign.findFirst({
     where: { tenantId: ctx.tenantId, slug },
-    select: { id: true, status: true, steps: { select: { position: true, channel: true, waitDays: true } } },
+    select: { id: true, status: true, kind: true, steps: { select: { position: true, channel: true, waitDays: true } } },
   });
   if (!c) return fail(404, "Kampány nem található");
+  if (!input.dry_run) {
+    const s = await needsOperator(ctx);
+    if (s) return s;
+  }
+  if (!MEMBER_KINDS.includes(c.kind as CampaignKind)) return fail(409, "Ez a kampánytípus csak tartalom, tagokat nem kap");
   if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampányhoz nem adható tag");
   if (c.steps.length === 0) return fail(409, "Előbb a lépéseket kell megadni (a tagok kezdő lépése ebből jön)");
   const steps = c.steps as StepDef[];
@@ -375,7 +413,7 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
       }
       if (p.action === "refresh") {
         await tx.campaignMember.updateMany({
-          where: { tenantId, campaignId: c.id, companyId, state: "needs_contact" },
+          where: { tenantId, campaignId: c.id, companyId, state: { in: ["needs_contact", "needs_email"] } },
           data: { state: p.state, stepPosition: p.stepPosition, personId, stateChangedAt: new Date() },
         });
         refreshed++;
@@ -383,7 +421,7 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
         await tx.campaignMember.create({
           data: {
             tenantId, campaignId: c.id, companyId, personId, state: p.state, stepPosition: p.stepPosition,
-            priority: r.priority ?? 100, tier: r.tier ?? null, lane: r.lane ?? null, phoneOnly: r.phone_only ?? false,
+            priority: r.priority ?? 100, tier: r.tier ?? null, lane: r.lane ?? null,
             why: r.why ?? null, city: r.city ?? null, importBatch: input.batch, createdCompany, createdPerson,
           },
         });
@@ -410,6 +448,10 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
 export async function undoBatch(ctx: CampaignCtx, slug: string, batch: string, dryRun: boolean) {
   const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true } });
   if (!c) return fail(404, "Kampány nem található");
+  if (!dryRun) {
+    const s = await needsOperator(ctx);
+    if (s) return s;
+  }
   const tenantId = ctx.tenantId;
   const rows = await db.campaignMember.findMany({
     where: { tenantId, campaignId: c.id, importBatch: batch },
@@ -467,8 +509,7 @@ export async function undoBatch(ctx: CampaignCtx, slug: string, batch: string, d
 export async function approveCampaign(ctx: CampaignCtx, slug: string) {
   const s = needsSession(ctx);
   if (s) return s;
-  const aron = await resolveDemoHost(ctx.tenantId, "aron");
-  if (aron == null || ctx.userId !== aron) return fail(403, "Kampányt csak Áron indíthat");
+  if (!(await isAron(ctx))) return fail(403, "Kampányt csak Áron indíthat");
   const head = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true } });
   if (!head) return fail(404, "Kampány nem található");
   // One transaction under the campaign row lock: what is hashed is exactly what launches (Vanda #188-2).
@@ -476,16 +517,19 @@ export async function approveCampaign(ctx: CampaignCtx, slug: string) {
   await lockCampaign(tx, head.id);
   const c = await tx.campaign.findFirst({
     where: { tenantId: ctx.tenantId, id: head.id },
-    select: { id: true, status: true, dailyCap: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true, contentItem: { select: { status: true } } } } },
+    select: { id: true, status: true, kind: true, dailyCap: true, outboundAutomations: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true, contentItem: { select: { status: true } } } } },
   });
   if (!c) return fail(404, "Kampány nem található");
   if (!canApprove(c.status as CampaignStatus)) return fail(409, `Ebből az állapotból nem indítható (${c.status})`);
+  if (!MEMBER_KINDS.includes(c.kind as CampaignKind)) return fail(409, "Ez a kampánytípus csak tartalom, nincs mit indítani");
   if (c.steps.length === 0) return fail(409, "Nincs lépés");
+  const misfit = stepsFitKind(c.kind as CampaignKind, c.steps);
+  if (misfit) return fail(409, misfit);
   if (c.steps.some((st) => st.channel === "email" && st.contentItem?.status !== "live")) return fail(409, "Az e-mail lépés anyaga még nincs jóváhagyva (élő)");
   if (c.steps.some((st) => st.contentItemId != null && st.contentItem?.status !== "live")) return fail(409, "Egy lépés anyaga még nincs jóváhagyva (élő)");
   const members = await tx.campaignMember.findMany({ where: { tenantId: ctx.tenantId, campaignId: c.id }, select: { companyId: true, state: true } });
   if (!members.some((m) => m.state === "queued")) return fail(409, "Nincs hívható vagy írható tag");
-  const hash = approvalHash({ memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap });
+  const hash = approvalHash({ memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations });
   const now = new Date();
   // Guard on the status we read: a concurrent edit that sent it back to draft is fine, a
   // concurrent stop is not overwritten.
@@ -549,7 +593,7 @@ export async function dailyList(tenantId: number, slug: string, now: Date = new 
   const rows = await db.campaignMember.findMany({
     where: { tenantId, id: { in: sel.ids } },
     select: {
-      id: true, attempts: true, lastOutcome: true, lastTouchedAt: true, why: true, tier: true, city: true, stepPosition: true, phoneOnly: true,
+      id: true, attempts: true, lastOutcome: true, lastTouchedAt: true, why: true, tier: true, city: true, stepPosition: true,
       company: { select: { id: true, name: true, city: true, website: true } },
       person: { select: { id: true, firstName: true, lastName: true, phone: true, email: true } },
     },
@@ -586,7 +630,7 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
   const tenantId = ctx.tenantId;
   const c = await db.campaign.findFirst({
     where: { tenantId, slug },
-    select: { id: true, slug: true, status: true, ownerUserId: true, steps: { select: { position: true, channel: true, waitDays: true } } },
+    select: { id: true, slug: true, status: true, ownerUserId: true, outboundAutomations: true, steps: { select: { position: true, channel: true, waitDays: true } } },
   });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status !== "running" && c.status !== "paused") return fail(409, `Nem futó kampány (${c.status})`);
@@ -711,10 +755,14 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
 
   // Post-commit, like every other lead intake: never roll the logged call back.
   if (plan.logCall) await recomputeCloseness({ tenantId, companyId: m.companyId, personId: m.personId });
+  // A promotion never sends anything by itself: send_email and webhook_out rules are skipped
+  // unless Áron switched the campaign's outbound automations on (Vanda #188-8).
+  const outboundSkip = c.outboundAutomations ? [] : OUTBOUND_ACTIONS;
   let moved: { ok: boolean; error?: string } | null = null;
   if (res.created && res.leadId != null) {
     if (plan.promote?.sla) await startLeadLifecycle(tenantId, res.leadId, now);
     await runAutomations({
+      skipActionTypes: outboundSkip,
       type: "lead_created", tenantId, leadId: res.leadId, companyId: m.companyId, personId: m.personId, companyName: m.company.name,
       fields: {
         company: m.company.name, source: "campaign", channel: input.outcome.startsWith("reply") ? "cold_email" : "cold_call",
@@ -725,7 +773,7 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
     // An existing open lead moves forward only through the tenant's transition table.
     const r = await changeLeadStatus(res.linked.id, plan.promote.stage, {
       tenantId, userId: ctx.userId, actor: ctx.userId != null ? "user" : "agent", actorAgentId: ctx.appSlug,
-    }, { nextAction: plan.promote.nextAction, ...(followup ? { nextDue: followup } : {}) });
+    }, { nextAction: plan.promote.nextAction, skipAutomationActions: outboundSkip, ...(followup ? { nextDue: followup } : {}) });
     moved = "error" in r ? { ok: false, error: r.error } : { ok: true };
   }
   audit("campaign", c.id, "update", { member: m.id, state: m.state }, { member: m.id, state: plan.member.state, outcome: input.outcome, leadId: res.leadId }, auditOpts(ctx));

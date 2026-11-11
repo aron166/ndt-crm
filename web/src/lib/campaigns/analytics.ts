@@ -18,7 +18,7 @@ export interface AggLead { id: number; status: string | null; outcome: string }
 export interface StepStats { step: number; touched: number; replied: number; promoted: number }
 export interface DayStats { day: string; touches: number; replies: number; promoted: number }
 export interface CampaignStatsV2 {
-  audience: number; needsContact: number; touched: number; replied: number; promoted: number; booked: number;
+  audience: number; needsContact: number; needsEmail: number; touched: number; replied: number; promoted: number; booked: number;
   declined: number; unreachable: number; byStep: StepStats[]; byDay: DayStats[];
 }
 
@@ -50,6 +50,7 @@ export function aggregate(members: readonly AggMember[], events: readonly AggEve
   return {
     audience: members.length,
     needsContact: members.filter((m) => m.state === "needs_contact").length,
+    needsEmail: members.filter((m) => m.state === "needs_email").length,
     touched: touched.size,
     replied: replied.size,
     promoted: promotedMembers.length,

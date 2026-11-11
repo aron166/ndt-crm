@@ -987,9 +987,11 @@ approval pipeline: e-mail copy, call script, ad), a `daily_cap` (default 15) and
 | `GET /api/campaigns`, `POST /api/campaigns` (always a draft) | key or session |
 | `GET /api/campaigns/:slug` | key or session |
 | `PATCH /api/campaigns/:slug` (name, cap, owner, dates, brief, `adopt_brief_proposal`) | **session only** |
+| `PATCH /api/campaigns/:slug` with `outbound_automations` | **session only, Áron only** |
 | `PUT /api/campaigns/:slug/steps` | **session only** |
 | `POST /api/campaigns/:slug/specify` (proposals) | key or session |
-| `POST /api/campaigns/:slug/members`, `DELETE ...?batch=` (undo) | key or session |
+| `POST /api/campaigns/:slug/members` with `dry_run: true`, `DELETE ...?batch=` dry run | key or session |
+| `POST /api/campaigns/:slug/members` with `dry_run: false` (apply), `DELETE ...&dry_run=0` (undo) | **session only, role `admin` or `manager`** (an app key gets `403`; it may dry-run and propose) |
 | `POST /api/campaigns/:slug/approve` (launch) | **session only, Áron only** (`tenants.settings.demoHosts.aron`) |
 | `POST /api/campaigns/:slug/pause` | key or session |
 | `POST /api/campaigns/:slug/stop` | **session only** |
@@ -998,7 +1000,7 @@ approval pipeline: e-mail copy, call script, ad), a `daily_cap` (default 15) and
 | `GET /api/campaigns/:slug/analytics`, `GET /api/reports/campaigns` | key or session |
 
 A session-only route ignores a bearer key entirely (`403` without a CRM session). Any edit of what Áron approved
-(members added, steps replaced, cap changed) on a running or paused campaign sends it back to `draft`: the daily
+(members added, steps replaced, cap or `outbound_automations` changed) on a running or paused campaign sends it back to `draft`: the daily
 list is empty until he approves again. Resuming a paused campaign is a new approval.
 
 ### `POST /api/campaigns`
@@ -1009,7 +1011,11 @@ list is empty until he approves again. Resuming a paused campaign is a new appro
   "steps": [ { "channel": "email" }, { "channel": "call", "wait_days": 3, "audience_rule": "no_reply", "content_item_id": 812 } ] }
 ```
 
-`201 { "ok": true, "id": 7, "slug": "budapest-indulas" }`. A step's `content_item_id` must be in the tenant and
+`201 { "ok": true, "id": 7, "slug": "budapest-indulas" }`. The kind is chosen at creation and fixes the step shape
+(`400` otherwise, re-checked at approval): `sequence` opens with an `email` step and its calls come after it (the
+default for the launch list: e-mail first for everyone, Áron 2026-11-11); `cold_call` has `call` steps only (the pure
+cold-call type); `cold_email` has `email` steps only; `ad`, `organic` and `content` are content only for now (assets
+and hand-entered numbers, no `email` or `call` step, no members, no launch). A step's `content_item_id` must be in the tenant and
 not another campaign's; an unclaimed item is attached to this campaign.
 
 ### `POST /api/campaigns/:slug/specify` (AI specification, proposals only)
@@ -1033,7 +1039,7 @@ or done campaign. An agent can never touch members, cap, status or approval thro
 { "dry_run": true, "batch": "launch-2026-11-bp",
   "rows": [ { "crm_company_id": 812, "company_name": "...", "vat": "12345678", "city": "Budapest",
               "person_name": "...", "role": "ügyvezető", "phone": "...", "email": "...",
-              "tier": "B", "lane": "contractor", "phone_only": false, "why": "...", "priority": 12 } ] }
+              "tier": "B", "lane": "contractor", "why": "...", "priority": 12 } ] }
 ```
 
 At most 1,000 rows per call. Dedupe: `crm_company_id`, then VAT, then the import name key. Skipped, with the reason
@@ -1041,26 +1047,33 @@ in `rows[]`: `open_lead` (the company already has an open lead: not a prospect),
 `already_member`, `duplicate_in_payload`, `unknown_company_id`. Existing companies are never edited; a new company
 is created as `account_type = Prospect`, a person per new e-mail (reused by e-mail), a contact linking them.
 
-First step per member: `phone_only` (Péter's own clients) starts on the first call step; an unknown firm with an
-e-mail starts at step 1; no e-mail skips e-mail steps; no phone and no e-mail = `needs_contact` (never listed). A
-re-run refreshes a `needs_contact` member whose row now has a phone or an e-mail. The steps must exist first (`409`).
+First step per member: every member, warm or unknown, Péter's past clients included, starts on the campaign's first
+`email` or `call` step; there is no phone-only exception (Áron 2026-11-11). On a sequence that is the e-mail: a
+member with no e-mail address is `needs_email` ("needs an e-mail first": never on a call list, never called
+instead). On a cold-call campaign a member with no phone is `needs_contact`. A re-run refreshes a `needs_email` or
+`needs_contact` member whose row now brings what was missing. The steps must exist first (`409`); a content-only
+kind takes no members (`409`). Applying (`dry_run: false`) needs a logged-in `admin` or `manager`; an app key gets
+`403` and may only dry-run.
 
 `200` dry run / `201` written: `{ summary: { total, add, refresh, skip, matchedCompanies, newCompanies, newPersons,
-needsContact, skipped: {...} }, rows: [...] }` (dry run lists every row's plan).
+needsContact, needsEmail, skipped: {...} }, rows: [...] }` (dry run lists every row's plan).
 
 `DELETE /api/campaigns/:slug/members?batch=<id>&dry_run=0` removes the batch's members that were never touched and
 soft-deletes the companies and persons that batch created when nothing else points at them (no lead, deal, quote,
 proposal, invoice, task, interaction, e-mail draft, other campaign, or a contact the batch did not create). `dry_run` defaults to
-true. Touched members stay.
+true. Touched members stay. The undo itself (`dry_run=0`) is session only, `admin` or `manager`; a key gets `403`.
 
-Script: `web/scripts/load-campaign-members.mjs --file <builder json> --campaign <slug> --batch <id> [--apply] [--undo]`
-(reads the builder's file from the given path; contact data never enters this repo; prints counts only).
+Script: `web/scripts/load-campaign-members.mjs --file <builder json> --campaign <slug> --batch <id> [--undo]` dry-runs
+with `CRM_KEY` (reads the builder's file from the given path; contact data never enters this repo; prints counts
+only). The apply is done by a logged-in person: from the campaign's member-load screen, or by the script with
+`--apply` and that person's session in `CRM_COOKIE` (the script refuses `--apply` without it). Never by key.
 
 ### `POST /api/campaigns/:slug/approve`, `/pause`, `/stop`
 
 Approve: Áron's session only; from `draft` or `paused`; needs at least one step, at least one `queued` member, and
 every e-mail step's asset (and any step's asset that is set) LIVE in the approval pipeline. Stores `approved_by_id`,
-`approved_at` and `approved_hash` (SHA-256 of member companies, steps and cap). `403` for an app key or any other
+`approved_at` and `approved_hash` (SHA-256 of member companies, steps, cap and the outbound switch). The kind's
+step shape is re-checked (`409`); a content-only kind cannot be approved. `403` for an app key or any other
 user. Pause: from `running` (an agent may, for a bounce or a suppression hit). Stop: final, session only.
 
 ### `GET /api/campaigns/:slug/today`
@@ -1091,17 +1104,19 @@ e-mail event `email_sent`, `reply_positive`, `reply_negative`, `unsubscribe`, `b
 | `not_interested` / `bad_number` | declined / excluded | none |
 | `email_sent` | moves to the next step, eligible after its `wait_days` | none |
 | `unsubscribe` | declined, suppression written | none |
-| `bounce` | jumps to the call step today, else excluded | none |
+| `bounce` | `needs_email` (a dead address is no e-mail; never called instead) | none |
 
 A company that already has an open lead is linked, not duplicated, and moves forward only through the tenant's
 transition table. Calls log an append-only `interactions` row stamped `campaign = <slug>` (and move the company's
 `pipeline_status` exactly as Hívás mód does). Every outcome appends a `campaign_events` row. A new lead fires the
 `lead_created` automations with `fields.campaign = <slug>`: a per-campaign automation is a rule with the condition
-`campaign eq <slug>`. `409` when the member changed meanwhile (double tap) or the campaign is not running or paused.
+`campaign eq <slug>`. **A promotion sends nothing by default:** `send_email` and `webhook_out` rules are skipped on
+the `lead_created` and `lead_status_changed` events a promotion fires, unless the campaign's `outbound_automations`
+is `true` (default `false`; only Áron switches it, and switching it needs a new approval). Task rules still run. `409` when the member changed meanwhile (double tap) or the campaign is not running or paused.
 
 ### `GET /api/campaigns/:slug/analytics`, `GET /api/reports/campaigns`
 
-`{ campaign, stats: { audience, needsContact, touched, replied, promoted, booked, declined, unreachable,
+`{ campaign, stats: { audience, needsContact, needsEmail, touched, replied, promoted, booked, declined, unreachable,
 byStep: [{ step, touched, replied, promoted }], byDay: [{ day, touches, replies, promoted }] } }`; the report route
 returns one per running campaign. Booked = the promoted lead is at `discovery_booked`, `demo_booked`, `demo_done`,
 `ordered` or won.

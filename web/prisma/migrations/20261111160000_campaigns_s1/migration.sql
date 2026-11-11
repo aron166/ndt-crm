@@ -1,6 +1,7 @@
 -- Campaigns slice 1 (docs/proposals/2026-11-11-prospects-and-campaigns.md v2.4, Áron approved the build 2026-11-11).
 -- Additive only: nullable or defaulted columns on campaigns, two new tables. No existing row changes meaning:
--- the one existing campaign gets status 'draft', daily_cap 15, kind NULL (= a pre-v2 marketing row), and nothing
+-- the one existing campaign gets status 'draft', daily_cap 15, kind NULL (= a pre-v2 marketing row),
+-- outbound_automations false, and nothing
 -- reads status for content or outreach flows.
 --
 -- Rollback (in this order):
@@ -10,7 +11,8 @@
 --   ALTER TABLE "campaigns" DROP CONSTRAINT "campaigns_owner_user_id_fkey", DROP CONSTRAINT "campaigns_approved_by_id_fkey",
 --     DROP COLUMN "kind", DROP COLUMN "status", DROP COLUMN "daily_cap", DROP COLUMN "owner_user_id",
 --     DROP COLUMN "starts_on", DROP COLUMN "ends_on", DROP COLUMN "brief", DROP COLUMN "brief_proposal",
---     DROP COLUMN "audience", DROP COLUMN "approved_by_id", DROP COLUMN "approved_at", DROP COLUMN "approved_hash";
+--     DROP COLUMN "audience", DROP COLUMN "approved_by_id", DROP COLUMN "approved_at", DROP COLUMN "approved_hash",
+--     DROP COLUMN "outbound_automations";
 --   DELETE FROM "_prisma_migrations" WHERE "migration_name" = '20261111160000_campaigns_s1';
 -- Post-apply check: web/scripts/db/verify-campaigns-s1.sql (read only).
 
@@ -25,7 +27,8 @@ ALTER TABLE "campaigns" ADD COLUMN "kind" TEXT,
     ADD COLUMN "audience" JSONB,
     ADD COLUMN "approved_by_id" INTEGER,
     ADD COLUMN "approved_at" TIMESTAMP(3),
-    ADD COLUMN "approved_hash" TEXT;
+    ADD COLUMN "approved_hash" TEXT,
+    ADD COLUMN "outbound_automations" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "campaigns"
     ADD CONSTRAINT "campaigns_kind_check" CHECK ("kind" IN ('content', 'ad', 'organic', 'cold_call', 'cold_email', 'sequence')),
     ADD CONSTRAINT "campaigns_status_check" CHECK ("status" IN ('draft', 'running', 'paused', 'stopped', 'done')),
@@ -71,7 +74,6 @@ CREATE TABLE "campaign_members" (
     "priority" INTEGER NOT NULL DEFAULT 100,
     "tier" TEXT,
     "lane" TEXT,
-    "phone_only" BOOLEAN NOT NULL DEFAULT false,
     "why" TEXT,
     "city" TEXT,
     "import_batch" TEXT,
@@ -82,7 +84,7 @@ CREATE TABLE "campaign_members" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "state_changed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "campaign_members_pkey" PRIMARY KEY ("id"),
-    CONSTRAINT "campaign_members_state_check" CHECK ("state" IN ('queued', 'needs_contact', 'promoted', 'declined', 'unreachable', 'excluded', 'done')),
+    CONSTRAINT "campaign_members_state_check" CHECK ("state" IN ('queued', 'needs_contact', 'needs_email', 'promoted', 'declined', 'unreachable', 'excluded', 'done')),
     CONSTRAINT "campaign_members_attempts_check" CHECK ("attempts" BETWEEN 0 AND 20),
     CONSTRAINT "campaign_members_step_position_check" CHECK ("step_position" BETWEEN 1 AND 20)
     -- No CHECK "promoted implies lead_id": lead_id is ON DELETE SET NULL, and a lead may be deleted (Vanda #188-1).

@@ -4,8 +4,8 @@
 // Dedupe order (v1 section c): the builder's crm_company_id, then VAT, then the import
 // name key (lib/import/normalize companyKey). A company with an open lead is not a
 // prospect (skipped "open_lead"); a suppressed address or domain is skipped; a company
-// already in the campaign is skipped, unless it was needs_contact and the row now brings a
-// phone or an e-mail (then its state is refreshed). Existing companies are never edited.
+// already in the campaign is skipped, unless it was needs_contact or needs_email and the row
+// now brings what was missing (then its state is refreshed). Existing companies are never edited.
 
 import { z } from "zod";
 import { companyKey, normalizeVat } from "@/lib/import/normalize";
@@ -29,7 +29,6 @@ export const memberRowSchema = z.object({
   email: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.string().trim().email().max(200).optional()),
   tier: optStr(2),
   lane: optStr(40),
-  phone_only: z.boolean().optional(),
   why: optStr(300),
   priority: z.number().int().min(0).max(1000).optional(),
 });
@@ -69,7 +68,7 @@ export type RowPlan =
       companyId: number | null;
       /** number = existing person, "create" = new person from the row, null = none. */
       person: number | "create" | null;
-      state: "queued" | "needs_contact";
+      state: "queued" | "needs_contact" | "needs_email";
       stepPosition: number;
     };
 
@@ -77,7 +76,7 @@ export interface MembersPlan {
   rows: RowPlan[];
   summary: {
     total: number; add: number; refresh: number; skip: number;
-    matchedCompanies: number; newCompanies: number; newPersons: number; needsContact: number;
+    matchedCompanies: number; newCompanies: number; newPersons: number; needsContact: number; needsEmail: number;
     skipped: Record<SkipReason, number>;
   };
 }
@@ -118,7 +117,7 @@ export function planMembers(rows: readonly MemberRow[], idx: MemberIndex, steps:
     const reach = companyId != null ? idx.companyReach.get(companyId) : undefined;
     const hasEmail = Boolean(email) || Boolean(reach?.email);
     const hasPhone = Boolean(r.phone) || Boolean(reach?.phone);
-    const start = startFor(steps, { phoneOnly: r.phone_only ?? false, hasEmail, hasPhone });
+    const start = startFor(steps, { hasEmail, hasPhone });
     const person: number | "create" | null =
       (email ? idx.personByEmail.get(email) : undefined) ??
       // A matched company keeps its existing contact person; never a second copy of them (Vanda #188-7).
@@ -127,7 +126,7 @@ export function planMembers(rows: readonly MemberRow[], idx: MemberIndex, steps:
 
     const existing = companyId != null ? idx.members.get(companyId) : undefined;
     if (existing !== undefined) {
-      if (existing === "needs_contact" && start.state === "queued") {
+      if ((existing === "needs_contact" || existing === "needs_email") && start.state === "queued") {
         out.push({ row, action: "refresh", name, companyId, person, ...start });
       } else {
         out.push({ row, action: "skip", reason: "already_member", companyId, name });
@@ -138,19 +137,20 @@ export function planMembers(rows: readonly MemberRow[], idx: MemberIndex, steps:
   });
 
   const skipped: Record<SkipReason, number> = { open_lead: 0, suppressed: 0, already_member: 0, duplicate_in_payload: 0, unknown_company_id: 0 };
-  let add = 0, refresh = 0, matched = 0, created = 0, persons = 0, needs = 0;
+  let add = 0, refresh = 0, matched = 0, created = 0, persons = 0, needs = 0, noEmail = 0;
   for (const p of out) {
     if (p.action === "skip") { skipped[p.reason]++; continue; }
     if (p.action === "add") add++; else refresh++;
     if (p.companyId != null) matched++; else created++;
     if (p.person === "create") persons++;
     if (p.state === "needs_contact") needs++;
+    if (p.state === "needs_email") noEmail++;
   }
   return {
     rows: out,
     summary: {
       total: rows.length, add, refresh, skip: out.length - add - refresh,
-      matchedCompanies: matched, newCompanies: created, newPersons: persons, needsContact: needs, skipped,
+      matchedCompanies: matched, newCompanies: created, newPersons: persons, needsContact: needs, needsEmail: noEmail, skipped,
     },
   };
 }

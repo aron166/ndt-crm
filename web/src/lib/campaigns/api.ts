@@ -80,6 +80,7 @@ export const patchSchema = z.object({
   ends_on: ymd.nullable().optional(),
   brief: json_.optional(),
   adopt_brief_proposal: z.boolean().optional(),
+  outbound_automations: z.boolean().optional(),
 }).refine((p) => Object.keys(p).length > 0, "empty patch");
 
 export const specifySchema = z.object({

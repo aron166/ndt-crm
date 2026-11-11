@@ -6,9 +6,12 @@
 // Usage (from web/):
 //   CRM_URL=https://ndt-crm.vercel.app CRM_KEY=helm_xxx \
 //   node scripts/load-campaign-members.mjs --file <path.json> --campaign <slug> --batch <id>            # dry run (default)
-//   ... --apply                    # writes; on a running campaign this sends it back to draft (Áron re-approves)
-//   ... --undo                     # dry run of the undo for --batch; add --apply to remove untouched members
+//   ... --undo                     # dry run of the undo for --batch
 //   ... --include-lost             # keep rows the builder marked crm_lost (default: skipped)
+// Applying a load or an undo is SESSION ONLY (Kai 2026-11-11): an app key gets 403. The apply is
+// done by a logged-in admin or manager from the campaign's member-load screen, or by this script
+// with that person's session cookie instead of a key: CRM_COOKIE='sb-...-auth-token=...' plus
+// --apply (CRM_KEY is then ignored). Never put a cookie in a file in this repo.
 // Prints counts only, never a name, phone or e-mail. mapLaunchRow is pure (tested).
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -31,8 +34,7 @@ export function mapLaunchRow(r) {
     email: email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : undefined,
     tier: clip(r.tier, 2),
     lane: clip(r.lane, 40),
-    // Péter's own network: he phones them; no e-mail step (Áron, 2026-11-11).
-    phone_only: r.owner === "Péter call",
+    // No phone-only exception: Péter's own clients get the e-mail first too (Áron, 2026-11-11).
     why: clip(r.why, 300),
     ...(Number.isInteger(Number(r.rank)) && Number(r.rank) >= 0 ? { priority: Math.min(1000, Number(r.rank)) } : {}),
   };
@@ -48,13 +50,27 @@ function arg(name) {
 }
 const flag = (name) => process.argv.includes(`--${name}`);
 
-async function call(method, path, body) {
+/**
+ * Auth for a call: a write (apply) needs a person's session; a dry run may use an app key.
+ * @param {boolean} write
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function authHeaders(write, env = process.env) {
+  if (write) {
+    if (!env.CRM_COOKIE) throw new Error("--apply is session only: set CRM_COOKIE to a logged-in admin's session (an app key gets 403)");
+    return { Cookie: env.CRM_COOKIE };
+  }
+  if (env.CRM_COOKIE) return { Cookie: env.CRM_COOKIE };
+  if (!env.CRM_KEY) throw new Error("CRM_KEY (or CRM_COOKIE) is required");
+  return { Authorization: `Bearer ${env.CRM_KEY}` };
+}
+
+async function call(method, path, body, write) {
   const base = process.env.CRM_URL;
-  const key = process.env.CRM_KEY;
-  if (!base || !key) throw new Error("CRM_URL and CRM_KEY are required");
+  if (!base) throw new Error("CRM_URL is required");
   const res = await fetch(new URL(path, base), {
     method,
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    headers: { ...authHeaders(write), "Content-Type": "application/json" },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const out = await res.json().catch(() => ({}));
@@ -72,7 +88,7 @@ async function main() {
   }
   const enc = encodeURIComponent(slug);
   if (flag("undo")) {
-    const r = await call("DELETE", `/api/campaigns/${enc}/members?batch=${encodeURIComponent(batch)}&dry_run=${apply ? 0 : 1}`);
+    const r = await call("DELETE", `/api/campaigns/${enc}/members?batch=${encodeURIComponent(batch)}&dry_run=${apply ? 0 : 1}`, undefined, apply);
     console.log(JSON.stringify({ undo: true, dry_run: r.dry_run, summary: r.summary }, null, 2));
     return;
   }
@@ -80,16 +96,16 @@ async function main() {
   if (!file) { console.error("--file <path.json> is required"); process.exit(1); }
   const raw = JSON.parse(fs.readFileSync(file, "utf8"));
   const rows = selectRows(Array.isArray(raw) ? raw : raw.rows ?? [], { includeLost: flag("include-lost") }).map(mapLaunchRow);
-  const total = { rows: rows.length, add: 0, refresh: 0, skip: 0, newCompanies: 0, newPersons: 0, needsContact: 0, skipped: {} };
+  const total = { rows: rows.length, add: 0, refresh: 0, skip: 0, newCompanies: 0, newPersons: 0, needsContact: 0, needsEmail: 0, skipped: {} };
   // One batch id across chunks: the undo removes the whole load.
   for (let i = 0; i < rows.length; i += 500) {
-    const r = await call("POST", `/api/campaigns/${enc}/members`, { dry_run: !apply, batch, rows: rows.slice(i, i + 500) });
-    for (const k of ["add", "refresh", "skip", "newCompanies", "newPersons", "needsContact"]) total[k] += r.summary[k];
+    const r = await call("POST", `/api/campaigns/${enc}/members`, { dry_run: !apply, batch, rows: rows.slice(i, i + 500) }, apply);
+    for (const k of ["add", "refresh", "skip", "newCompanies", "newPersons", "needsContact", "needsEmail"]) total[k] += r.summary[k] ?? 0;
     for (const [k, v] of Object.entries(r.summary.skipped)) total.skipped[k] = (total.skipped[k] ?? 0) + v;
     if (r.status) total.status = r.status;
   }
   console.log(JSON.stringify({ dry_run: !apply, campaign: slug, batch, ...total }, null, 2));
-  if (!apply) console.log("dry run: nothing written (add --apply)");
+  if (!apply) console.log("dry run: nothing written (apply from the campaign's member-load screen, or --apply with CRM_COOKIE)");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

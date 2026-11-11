@@ -1229,6 +1229,8 @@ model Campaign {
   approvedById   Int?      @map("approved_by_id")
   approvedAt     DateTime? @map("approved_at")
   approvedHash   String?   @map("approved_hash")
+  /// Promoted leads may fire send_email / webhook_out automations only when true (Vanda #188-8). Áron sets it; part of the approval hash.
+  outboundAutomations Boolean @default(false) @map("outbound_automations")
   createdAt      DateTime  @default(now()) @map("created_at")
 
   tenant       Tenant           @relation(fields: [tenantId], references: [id])
@@ -1287,7 +1289,6 @@ model CampaignMember {
   priority       Int       @default(100)
   tier           String?
   lane           String?
-  phoneOnly      Boolean   @default(false) @map("phone_only")
   why            String?
   city           String?
   importBatch    String?   @map("import_batch")

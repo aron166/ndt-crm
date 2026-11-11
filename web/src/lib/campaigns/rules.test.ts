@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { localDay } from "@/lib/booking/time";
 import {
-  approvalHash, canApprove, canSetStatus, isForwardMove, planOutcome, selectDailyList, startFor,
+  approvalHash, canApprove, canSetStatus, isForwardMove, planOutcome, selectDailyList, startFor, stepsFitKind,
   MAX_NO_ANSWER, type StepDef,
 } from "./rules";
 import { MAIN_STAGES } from "@/lib/leads/lifecycle";
@@ -16,21 +16,44 @@ const WED = localDay(new Date("2026-11-11T09:00:00Z"));
 const open = (over: Partial<{ state: "queued"; stepPosition: number; attempts: number; hasPhone: boolean }> = {}) =>
   ({ state: "queued" as const, stepPosition: 2, attempts: 0, hasPhone: true, ...over });
 
-describe("startFor: who gets which first step", () => {
-  it("unknown firm with an e-mail starts on the e-mail step", () => {
-    expect(startFor(EMAIL_THEN_CALL, { phoneOnly: false, hasEmail: true, hasPhone: true })).toEqual({ stepPosition: 1, state: "queued" });
+describe("startFor: e-mail first for everyone (Áron 2026-11-11)", () => {
+  it("a member with an e-mail starts on the e-mail step", () => {
+    expect(startFor(EMAIL_THEN_CALL, { hasEmail: true, hasPhone: true })).toEqual({ stepPosition: 1, state: "queued" });
   });
-  it("Péter's own past client is phone only: starts on the call step even with an e-mail", () => {
-    expect(startFor(EMAIL_THEN_CALL, { phoneOnly: true, hasEmail: true, hasPhone: true })).toEqual({ stepPosition: 2, state: "queued" });
+  it("a warm member (Péter's past client) gets the e-mail first too: no phone-only exception", () => {
+    // The old phone_only flag is gone; nothing in the input can route a member past the e-mail.
+    expect(startFor(EMAIL_THEN_CALL, { hasEmail: true, hasPhone: true }).stepPosition).toBe(1);
   });
-  it("no e-mail skips to the call step", () => {
-    expect(startFor(EMAIL_THEN_CALL, { phoneOnly: false, hasEmail: false, hasPhone: true })).toEqual({ stepPosition: 2, state: "queued" });
+  it("no e-mail is needs_email on the e-mail step, never skipped to the call", () => {
+    expect(startFor(EMAIL_THEN_CALL, { hasEmail: false, hasPhone: true })).toEqual({ stepPosition: 1, state: "needs_email" });
   });
-  it("no phone and no e-mail is needs_contact, never on a list", () => {
-    expect(startFor(EMAIL_THEN_CALL, { phoneOnly: false, hasEmail: false, hasPhone: false })).toEqual({ stepPosition: 1, state: "needs_contact" });
+  it("no phone and no e-mail on a sequence is needs_email (the e-mail comes first)", () => {
+    expect(startFor(EMAIL_THEN_CALL, { hasEmail: false, hasPhone: false }).state).toBe("needs_email");
   });
-  it("phone-only member with no phone is needs_contact", () => {
-    expect(startFor(EMAIL_THEN_CALL, { phoneOnly: true, hasEmail: true, hasPhone: false }).state).toBe("needs_contact");
+  it("a pure cold-call campaign starts on the call; no phone is needs_contact", () => {
+    expect(startFor(CALL_ONLY, { hasEmail: false, hasPhone: true })).toEqual({ stepPosition: 1, state: "queued" });
+    expect(startFor(CALL_ONLY, { hasEmail: true, hasPhone: false }).state).toBe("needs_contact");
+  });
+});
+
+describe("stepsFitKind", () => {
+  const call = (position: number) => ({ position, channel: "call" as const });
+  const email = (position: number) => ({ position, channel: "email" as const });
+  it("a sequence opens with the e-mail; a call before it is refused", () => {
+    expect(stepsFitKind("sequence", [email(1), call(2)])).toBeNull();
+    expect(stepsFitKind("sequence", [call(1), email(2)])).toMatch(/e-mail/);
+    expect(stepsFitKind("sequence", [{ position: 1, channel: "post" as const }, call(2), email(3)])).toMatch(/e-mail/);
+  });
+  it("cold_call takes calls only, cold_email e-mails only", () => {
+    expect(stepsFitKind("cold_call", [call(1), call(2)])).toBeNull();
+    expect(stepsFitKind("cold_call", [email(1), call(2)])).not.toBeNull();
+    expect(stepsFitKind("cold_email", [email(1)])).toBeNull();
+    expect(stepsFitKind("cold_email", [email(1), call(2)])).not.toBeNull();
+  });
+  it("ad, organic and content are content only", () => {
+    expect(stepsFitKind("ad", [{ position: 1, channel: "ad" as const }])).toBeNull();
+    expect(stepsFitKind("organic", [email(1)])).not.toBeNull();
+    expect(stepsFitKind(null, [call(1)])).not.toBeNull();
   });
 });
 
@@ -96,10 +119,10 @@ describe("planOutcome: the promotion rule", () => {
     expect(p).toMatchObject({ suppress: true, promote: null });
     expect(p.member.state).toBe("declined");
   });
-  it("a bounce falls through to the call step today", () => {
+  it("a bounce is needs_email, never a fall-through to the call", () => {
     const p = planOutcome(open({ stepPosition: 1 }), "bounce", EMAIL_THEN_CALL, WED);
     if ("error" in p) throw new Error(p.error);
-    expect(p.member).toMatchObject({ stepPosition: 2, nextEligibleOn: "2026-11-11", state: "queued" });
+    expect(p.member).toMatchObject({ stepPosition: 1, state: "needs_email" });
   });
   it("a closed member takes no outcome but a note", () => {
     const closed = { ...open(), state: "promoted" as never };

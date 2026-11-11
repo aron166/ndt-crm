@@ -58,22 +58,23 @@ describe("planMembers: dedupe against existing companies, leads and suppressions
     ], idx(), STEPS);
     const [a, b] = p.rows;
     expect(a).toMatchObject({ action: "add", person: 501, stepPosition: 1, state: "queued" });
-    // company 12 has a contact with a phone and no e-mail: straight to the call step
-    expect(b).toMatchObject({ action: "add", person: 77, stepPosition: 2, state: "queued" });
+    // company 12 has a contact with a phone and no e-mail: waits for an e-mail, never called first
+    expect(b).toMatchObject({ action: "add", person: 77, stepPosition: 1, state: "needs_email" });
+    expect(p.summary.needsEmail).toBe(1);
   });
-  it("phone_only rows (Péter's own clients) start on the call step", () => {
+  it("a past client is no exception: a phone_only flag in the payload is dropped and the e-mail comes first", () => {
     const p = planMembers([row({ company_name: "Régi ügyfél", phone: "1", email: "r@r.example.test", phone_only: true })], idx(), STEPS);
-    expect(p.rows[0]).toMatchObject({ stepPosition: 2 });
+    expect(p.rows[0]).toMatchObject({ stepPosition: 1, state: "queued" });
   });
-  it("no contact at all loads as needs_contact", () => {
+  it("no contact at all loads as needs_email on a sequence", () => {
     const p = planMembers([row({ company_name: "Senki Kft." })], idx(), STEPS);
-    expect(p.rows[0]).toMatchObject({ action: "add", state: "needs_contact", person: null });
-    expect(p.summary.needsContact).toBe(1);
+    expect(p.rows[0]).toMatchObject({ action: "add", state: "needs_email", person: null });
+    expect(p.summary.needsEmail).toBe(1);
   });
-  it("a re-run refreshes a needs_contact member that now has a contact, and skips the rest", () => {
-    const members = new Map([[10, "needs_contact"], [11, "queued"]]);
+  it("a re-run refreshes a needs_email member that now has an e-mail, and skips the rest", () => {
+    const members = new Map([[10, "needs_email"], [11, "queued"]]);
     const p = planMembers([
-      row({ crm_company_id: 10, company_name: "X", phone: "1" }),
+      row({ crm_company_id: 10, company_name: "X", email: "x@x.example.test" }),
       row({ crm_company_id: 11, company_name: "Y", phone: "1" }),
     ], idx({ members }), STEPS);
     expect(p.rows.map((r) => r.action)).toEqual(["refresh", "skip"]);

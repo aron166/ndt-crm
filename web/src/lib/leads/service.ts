@@ -156,6 +156,8 @@ function leadWho(lead: LeadRow, leadId: number): string {
 /** Input a stage move may carry (board prompt, API, automations). */
 export interface ChangeLeadStatusOpts extends Omit<TransitionInput, "tasks" | "attempts"> {
   fireAutomations?: boolean;
+  /** Automation action types this move must not run (lib/automations/types skipActionTypes). */
+  skipAutomationActions?: readonly string[];
   /** Which table event this is; omitted = the first row from the current stage to the target. */
   event?: string;
 }
@@ -245,6 +247,7 @@ export async function changeLeadStatus(
       companyName: before.company?.name ?? null,
       toStatus: newStatus,
       fields: eventFields(before, { status: newStatus }),
+      skipActionTypes: opts.skipAutomationActions,
     });
   }
   return { success: true, changed: true };

@@ -30,7 +30,7 @@ describe.skipIf(!enabled)("campaigns service (integration)", () => {
     svc = await import("./service");
     analytics = await import("./analytics");
     await db.user.deleteMany({ where: { email: { in: ["it-camp-aron@example.test", "it-camp-peter@example.test"] } } });
-    aron = (await db.user.create({ data: { tenantId: 1, name: "IT Aron", email: "it-camp-aron@example.test", passwordHash: "x" } })).id;
+    aron = (await db.user.create({ data: { tenantId: 1, name: "IT Aron", email: "it-camp-aron@example.test", passwordHash: "x", role: "admin" } })).id;
     peter = (await db.user.create({ data: { tenantId: 1, name: "IT Peter", email: "it-camp-peter@example.test", passwordHash: "x" } })).id;
     const t = await db.tenant.findUniqueOrThrow({ where: { id: 1 }, select: { settings: true } });
     prevSettings = t.settings;
@@ -83,7 +83,11 @@ describe.skipIf(!enabled)("campaigns service (integration)", () => {
     expect(dry.summary.skipped.open_lead).toBe(1);
     expect(await db.campaignMember.count({ where: { campaignId } })).toBe(0); // dry run wrote nothing
 
-    const applied = await svc.addMembers(app, slug, { dry_run: false, batch: "b1", rows });
+    // Applying is session only with an operator role: the key and a member-role user get 403.
+    expect(await svc.addMembers(app, slug, { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
+    expect(await svc.addMembers(session, slug, { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
+    expect(await db.campaignMember.count({ where: { campaignId } })).toBe(0);
+    const applied = await svc.addMembers({ tenantId: 1, userId: aron }, slug, { dry_run: false, batch: "b1", rows });
     if ("error" in applied) throw new Error(applied.error);
     expect(applied).toMatchObject({ added: 3 });
     const again = await svc.addMembers(app, slug, { dry_run: true, batch: "b1", rows });
@@ -125,6 +129,30 @@ describe.skipIf(!enabled)("campaigns service (integration)", () => {
     if ("error" in undo) throw new Error(undo.error);
     // only the untouched needs_contact member goes, with the company the load created for it
     expect(undo.summary).toMatchObject({ members: 3, remove: 1, keptTouched: 2, softDeleteCompanies: 1 });
+    expect(await svc.undoBatch(app, slug, "b1", false)).toMatchObject({ status: 403 });
     expect(await db.lead.findUnique({ where: { id: openLeadId } })).not.toBeNull();
+  });
+
+  it("a sequence puts the e-mail first for everyone; no e-mail is needs_email, never on the call list", async () => {
+    const app = { tenantId: 1, userId: null, appSlug: "it" };
+    expect(await svc.createCampaign(app, { name: `${tag} rossz`, kind: "sequence", steps: [{ channel: "call" }, { channel: "email" }] })).toMatchObject({ status: 400 });
+    const c = await svc.createCampaign(app, { name: `${tag} Sorozat`, kind: "sequence", steps: [{ channel: "email" }, { channel: "call", wait_days: 3 }] });
+    if ("error" in c) throw new Error(c.error);
+    try {
+      // A warm past client: phone on file, no e-mail.
+      const warm = await db.company.create({ data: { tenantId: 1, name: `${tag} Zéta Kft.` } });
+      const wp = await db.person.create({ data: { tenantId: 1, firstName: "Teszt", lastName: "Zéta", phone: "+36 1 000 0006" } });
+      await db.contact.create({ data: { tenantId: 1, personId: wp.id, companyId: warm.id, phone: "+36 1 000 0006" } });
+      const rows = [
+        { crm_company_id: warm.id, company_name: "x" },
+        { company_name: `${tag} Epszilon Kft.`, email: "info@epszilon.example.test", phone: "+36 1 000 0005" },
+      ];
+      const dry = await svc.addMembers(app, c.slug, { dry_run: true, batch: "s1", rows });
+      if ("error" in dry) throw new Error(dry.error);
+      expect(dry.summary).toMatchObject({ add: 2, needsEmail: 1 });
+      expect((dry.rows ?? []).map((r) => ("state" in r ? [r.stepPosition, r.state] : null))).toEqual([[1, "needs_email"], [1, "queued"]]);
+    } finally {
+      await db.campaign.deleteMany({ where: { id: c.id } });
+    }
   });
 });
