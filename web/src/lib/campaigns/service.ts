@@ -33,6 +33,8 @@ import {
 import { closeSpecRequests } from "./spec-requests";
 export { requestSpecification } from "./spec-requests";
 import { planMembers, type MemberRow, type MembersPlan, reachFromContacts, isEmailAddress } from "./members";
+import { campaignVariants, emailContext, memberAddress, valuesFor } from "./preview";
+import { pickAsset, renderEmail, renderedText, segmentOf } from "./email-preview";
 
 export interface CampaignCtx {
   tenantId: number;
@@ -573,11 +575,14 @@ export async function approveCampaign(ctx: CampaignCtx, slug: string, expect?: {
   if (c.steps.length === 0) return fail(409, "Nincs lépés");
   const misfit = stepsFitKind(c.kind as CampaignKind, c.steps, audienceOf(c.audience).source);
   if (misfit) return fail(409, misfit);
-  if (c.steps.some((st) => st.channel === "email" && st.contentItem?.status !== "live")) return fail(409, "Az e-mail lépés anyaga még nincs jóváhagyva (élő)");
+  // An e-mail step needs its own live asset or segment variants, and every variant live: a proposal never launches.
+  const variants = await campaignVariants(ctx.tenantId, c.id, tx);
+  if (variants.some((v) => v.status !== "live")) return fail(409, "Egy szegmensváltozat még nincs jóváhagyva (élő)");
+  if (c.steps.some((st) => st.channel === "email" && st.contentItem?.status !== "live" && !variants.some((v) => v.step === st.position))) return fail(409, "Az e-mail lépés anyaga még nincs jóváhagyva (élő)");
   if (c.steps.some((st) => st.contentItemId != null && st.contentItem?.status !== "live")) return fail(409, "Egy lépés anyaga még nincs jóváhagyva (élő)");
   const members = await tx.campaignMember.findMany({ where: { tenantId: ctx.tenantId, campaignId: c.id }, select: { companyId: true, state: true } });
   if (!members.some((m) => m.state === "queued")) return fail(409, "Nincs hívható vagy írható tag");
-  const hash = approvalHash({ memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations, audience: audienceOf(c.audience) });
+  const hash = approvalHash({ memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations, audience: audienceOf(c.audience), variants });
   if (expect && expect.hash !== hash) return fail(409, "A kampány változott, mióta megnyitottad; frissíts és nézd át újra");
   const now = new Date();
   // Guard on the status we read: a concurrent edit that sent it back to draft is fine, a
@@ -935,7 +940,7 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   const tenantId = ctx.tenantId;
   const c = await db.campaign.findFirst({
     where: { tenantId, slug },
-    select: { id: true, slug: true, status: true, dailyCap: true, startsOn: true, endsOn: true, audience: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true } } },
+    select: { id: true, slug: true, status: true, dailyCap: true, startsOn: true, endsOn: true, audience: true, senderUserId: true, steps: { select: { position: true, channel: true, waitDays: true, contentItemId: true } } },
   });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status !== "running") return fail(409, "Csak jóváhagyott, futó kampány e-mail lépése készít piszkozatot");
@@ -949,10 +954,13 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   const members = (await db.campaignMember.findMany({
     where: { tenantId, campaignId: c.id, state: "queued", stepPosition: { in: [...emailSteps.keys()] }, company: { deletedAt: null } },
     orderBy: [{ priority: "asc" }, { id: "asc" }],
-    select: { id: true, companyId: true, personId: true, stepPosition: true, nextEligibleOn: true, person: { select: { email: true } } },
+    select: {
+      id: true, companyId: true, personId: true, stepPosition: true, nextEligibleOn: true, segment: true, lane: true, city: true,
+      person: { select: { email: true, firstName: true, lastName: true } }, company: { select: { name: true, city: true } },
+    },
   })).filter((m) => m.nextEligibleOn == null || m.nextEligibleOn.toISOString().slice(0, 10) <= today);
-  const itemIds = [...new Set([...emailSteps.values()].map((x) => x.contentItemId).filter((v): v is number => v != null))];
-  const live = itemIds.length ? await db.contentItem.findMany({ where: { tenantId, id: { in: itemIds }, status: "live" }, select: { id: true, title: true, body: true } }) : [];
+  // The same context and render as the preview: what Áron saw is what is drafted (live versions only).
+  const ec = await emailContext(tenantId, c.id, c.senderUserId);
   const companyIds = members.map((m) => m.companyId);
   const [done, leads, contacts] = await Promise.all([
     db.emailDraft.findMany({ where: { tenantId, campaign: c.slug, companyId: { in: companyIds } }, select: { companyId: true, step: true, status: true } }),
@@ -964,29 +972,29 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   const repliedCo = new Set(done.filter((x) => x.status === "replied").map((x) => x.companyId));
   const openLead = new Set(leads.map((l) => l.companyId));
   const leadsAudience = audienceOf(c.audience).source === "leads_by_stage";
-  const addressOf = (m: { companyId: number; personId: number | null; person: { email: string | null } | null }) => {
-    if (isEmailAddress(m.person?.email)) return m.person!.email!;
-    const own = contacts.filter((k) => k.companyId === m.companyId && (m.personId == null || k.personId === m.personId));
-    for (const k of own.length ? own : contacts.filter((x) => x.companyId === m.companyId)) {
-      for (const e of [k.email, k.person?.email]) if (isEmailAddress(e)) return e;
-    }
-    return null;
-  };
-  let noAddress = 0, noAsset = 0;
+  let noAddress = 0, noAsset = 0, unresolved = 0;
   const data: Prisma.EmailDraftCreateManyInput[] = [];
   for (const m of members) {
     if (data.length >= room) break;
     if (seen.has(`${m.companyId}:${m.stepPosition}`) || repliedCo.has(m.companyId)) continue;
     if (leadsAudience ? !openLead.has(m.companyId) : openLead.has(m.companyId)) continue;
-    const asset = live.find((i) => i.id === emailSteps.get(m.stepPosition)?.contentItemId);
+    const segment = segmentOf(m);
+    const step = ec.steps.find((x) => x.position === m.stepPosition);
+    const itemId = step ? pickAsset(step, ec.variants.get(m.stepPosition) ?? [], segment, true) : null;
+    const asset = itemId != null ? ec.items.find((i) => i.id === itemId && i.status === "live" && i.liveVersion) : undefined;
     if (!asset) { noAsset++; continue; }
-    const to = addressOf(m);
+    const to = memberAddress(m, contacts);
     if (!to) { noAddress++; continue; }
-    data.push({ tenantId, companyId: m.companyId, personId: m.personId, campaign: c.slug, step: m.stepPosition, subject: asset.title, body: asset.body, toEmail: to.trim(), status: "draft", createdById: ctx.userId });
+    const r = renderEmail({ subject: asset.title, body: asset.liveVersion!.body }, valuesFor(m, segment, ec));
+    const subject = renderedText(r.subject);
+    const body = renderedText(r.body);
+    // A field left open or a glued suffix never reaches a draft: the launch-tab check lists the member instead.
+    if (subject == null || body == null || r.suffix.length) { unresolved++; continue; }
+    data.push({ tenantId, companyId: m.companyId, personId: m.personId, campaign: c.slug, step: m.stepPosition, subject, body, toEmail: to, status: "draft", createdById: ctx.userId, templateVersionId: asset.liveVersion!.id });
   }
   if (data.length) await db.emailDraft.createMany({ data, skipDuplicates: true });
-  audit("campaign", c.id, "update", null, { emailDrafts: data.length, noAddress, noAsset }, auditOpts(ctx));
-  return { ok: true as const, drafted: data.length, noAddress, noAsset };
+  audit("campaign", c.id, "update", null, { emailDrafts: data.length, noAddress, noAsset, unresolved }, auditOpts(ctx));
+  return { ok: true as const, drafted: data.length, noAddress, noAsset, unresolved };
 }
 
 /**

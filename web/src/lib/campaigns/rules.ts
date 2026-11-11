@@ -335,6 +335,8 @@ export function approvalHash(input: {
   outboundAutomations?: boolean;
   /** Who is touched; only a leads-by-stage audience joins the payload (Vanda #194-7). */
   audience?: { source: AudienceSource; stages: string[] };
+  /** Segment variants of the e-mail steps (content items tagged campaignStep + segment). */
+  variants?: readonly { step: number; segment: string; itemId: number }[];
 }): string {
   const payload = JSON.stringify({
     m: [...input.memberCompanyIds].sort((a, b) => a - b),
@@ -345,6 +347,8 @@ export function approvalHash(input: {
     // Only in the payload when on, so every hash computed before this flag existed still matches.
     ...(input.outboundAutomations ? { o: 1 } : {}),
     ...(input.audience?.source === "leads_by_stage" ? { a: [...input.audience.stages].sort() } : {}),
+    // Only when a step has variants, so every earlier hash still matches.
+    ...(input.variants?.length ? { v: input.variants.map((x) => [x.step, x.segment, x.itemId]).sort((a, b) => String(a).localeCompare(String(b))) } : {}),
   });
   return createHash("sha256").update(payload).digest("hex");
 }

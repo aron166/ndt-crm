@@ -12,7 +12,7 @@ vi.mock("@/lib/booking/queries", () => ({ resolveDemoHost: vi.fn() }));
 vi.mock("@/lib/leads/queries", () => ({ getLeadStatuses: vi.fn().mockResolvedValue(["new", "contacting", "qualified", "won", "lost"].map((key) => ({ key, label: key }))) }));
 vi.mock("@/lib/suppression", () => ({ loadSuppressionSet: vi.fn().mockResolvedValue({ emails: new Set(), domains: new Set() }) }));
 vi.mock("@/lib/content/service", () => ({ createItem: vi.fn() }));
-vi.mock("@/lib/integrations/resend", () => ({ sendEmail: vi.fn(() => { throw new Error("never send from the campaign engine"); }) }));
+vi.mock("@/lib/integrations/resend", () => ({ sendEmail: vi.fn(() => { throw new Error("never send from the campaign engine"); }), getResendConfig: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/db", () => {
   const m = () => vi.fn();
   return { db: {
@@ -21,7 +21,7 @@ vi.mock("@/lib/db", () => {
     campaignMember: { findFirst: m(), findMany: m(), updateMany: m(), createMany: m() },
     campaignEvent: { findFirst: m(), create: m() },
     contact: { findFirst: m(), findMany: m() }, lead: { findFirst: m(), findMany: m(), create: m() }, interaction: { create: m(), updateMany: m() },
-    contentItem: { findMany: m() }, emailDraft: { findMany: m(), createMany: m(), count: m(), updateMany: m(), deleteMany: m() }, user: { findFirst: m() }, task: { findMany: m(), updateMany: m() },
+    contentItem: { findMany: m() }, contentReview: { findMany: m() }, tenant: { findUnique: m() }, emailDraft: { findMany: m(), createMany: m(), count: m(), updateMany: m(), deleteMany: m() }, user: { findFirst: m() }, task: { findMany: m(), updateMany: m() },
     suppression: { upsert: m() }, company: { updateMany: m() }, leadStatusHistory: { create: m() },
     $queryRaw: vi.fn().mockResolvedValue([]), $executeRaw: vi.fn().mockResolvedValue(1), $transaction: vi.fn(),
   } };
@@ -33,12 +33,17 @@ type M = ReturnType<typeof vi.fn>;
 const d = db as unknown as Record<string, Record<string, M>> & { $transaction: M };
 const SESSION = { tenantId: 1, userId: 5 };
 const NOW = new Date("2026-11-13T09:00:00Z");
+const CO = { name: "Minta Kft.", city: null };
+/** A live content item as the preview context loads it: the draft uses the LIVE version's text. */
+const live = (id: number, title: string, body: string, meta: unknown = null) => ({ id, title, status: "live", sourceMeta: meta, liveVersion: { id: id * 10, number: 1, body }, currentVersion: { id: id * 10 + 1, number: 2, body: "UNAPPROVED NEWER TEXT" } });
 
 beforeEach(() => {
   vi.clearAllMocks();
   d.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
   d.user.findFirst.mockResolvedValue({ role: "admin" });
   d.campaignStep.findMany.mockResolvedValue([]);
+  d.tenant.findUnique.mockResolvedValue(null);
+  d.contentReview.findMany.mockResolvedValue([]);
 });
 
 describe("edits", () => {
@@ -108,12 +113,13 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
     d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null,
       steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 50 }, { position: 2, channel: "email", waitDays: 2, contentItemId: null }] });
     d.campaignMember.findMany.mockResolvedValue([
-      { id: 1, companyId: 7, personId: 8, stepPosition: 1, nextEligibleOn: null, person: { email: "a@p.example.test" } },
-      { id: 2, companyId: 9, personId: null, stepPosition: 1, nextEligibleOn: null, person: null },
-      { id: 3, companyId: 11, personId: 12, stepPosition: 2, nextEligibleOn: null, person: { email: "c@p.example.test" } },
-      { id: 4, companyId: 13, personId: 14, stepPosition: 1, nextEligibleOn: new Date("2026-11-20T00:00:00Z"), person: { email: "d@p.example.test" } },
+      { id: 1, companyId: 7, personId: 8, stepPosition: 1, nextEligibleOn: null, person: { email: "a@p.example.test", firstName: "-", lastName: "-" }, company: CO },
+      { id: 2, companyId: 9, personId: null, stepPosition: 1, nextEligibleOn: null, person: null, company: CO },
+      { id: 3, companyId: 11, personId: 12, stepPosition: 2, nextEligibleOn: null, person: { email: "c@p.example.test", firstName: "-", lastName: "-" }, company: CO },
+      { id: 4, companyId: 13, personId: 14, stepPosition: 1, nextEligibleOn: new Date("2026-11-20T00:00:00Z"), person: { email: "d@p.example.test", firstName: "-", lastName: "-" }, company: CO },
     ]);
-    d.contentItem.findMany.mockResolvedValue([{ id: 50, title: "Első levél", body: "Tisztelt ..." }]);
+    d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: 50 }, { position: 2, contentItemId: null }]);
+    d.contentItem.findMany.mockResolvedValue([live(50, "Első levél", "Tisztelt ...")]);
     d.emailDraft.findMany.mockResolvedValue([]);
     d.emailDraft.count.mockResolvedValue(0);
     d.lead.findMany.mockResolvedValue([]);
@@ -122,6 +128,27 @@ describe("an e-mail step produces drafts for the gated sender, never a send", ()
     const r = await draftEmailStep(SESSION, "bp", NOW);
     expect(r).toMatchObject({ ok: true, drafted: 1, noAddress: 1, noAsset: 1 });
     expect(d.emailDraft.createMany.mock.calls[0][0].data).toEqual([expect.objectContaining({ companyId: 7, personId: 8, campaign: "bp", step: 1, subject: "Első levél", body: "Tisztelt ...", toEmail: "a@p.example.test", status: "draft" })]);
+  });
+  it("drafts what the preview shows: the segment's variant, merge fields filled, live text only; an unresolved field is counted, never drafted", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", dailyCap: 15, startsOn: null, endsOn: null, senderUserId: null,
+      steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: null }] });
+    d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: null }]);
+    d.campaignMember.findMany.mockResolvedValue([
+      { id: 1, companyId: 7, personId: 8, stepPosition: 1, nextEligibleOn: null, person: { email: "a@p.example.test", firstName: "Anna", lastName: "Kovács" }, company: CO, segment: "drillers", lane: null, city: "Győr" },
+      { id: 2, companyId: 9, personId: 10, stepPosition: 1, nextEligibleOn: null, person: { email: "b@p.example.test", firstName: "-", lastName: "-" }, company: CO, segment: null, lane: "engineer", city: null },
+      { id: 3, companyId: 11, personId: 12, stepPosition: 1, nextEligibleOn: null, person: { email: "c@p.example.test", firstName: "-", lastName: "-" }, company: CO, segment: null, lane: "warm network (Péter phones)", city: null },
+    ]);
+    d.contentItem.findMany.mockResolvedValue([
+      live(60, "Fúrás előtt", "{{greeting}} {{city}}", { campaignStep: 1, segment: "D" }),
+      live(61, "Tervezőknek", "{{greeting}} {{sender_phone}}", { campaignStep: 1, segment: "B" }),
+    ]);
+    d.emailDraft.findMany.mockResolvedValue([]);
+    d.emailDraft.count.mockResolvedValue(0);
+    d.lead.findMany.mockResolvedValue([]);
+    d.contact.findMany.mockResolvedValue([]);
+    d.emailDraft.createMany.mockResolvedValue({ count: 1 });
+    expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ ok: true, drafted: 1, unresolved: 1, noAsset: 1 });
+    expect(d.emailDraft.createMany.mock.calls[0][0].data).toEqual([expect.objectContaining({ companyId: 7, subject: "Fúrás előtt", body: "Tisztelt Kovács Anna! Győr", templateVersionId: 600 })]);
   });
   it("a draft campaign drafts nothing (approval first)", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "draft", dailyCap: 15, startsOn: null, endsOn: null, steps: [] });
@@ -142,9 +169,10 @@ describe("a sent draft advances its member (item 4)", () => {
 
 describe("Vanda #194 fixes", () => {
   const running = { id: 3, slug: "bp", status: "running", dailyCap: 2, startsOn: null, endsOn: null, audience: null, steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 50 }] };
-  const mem = (id: number, companyId: number, email: string | null) => ({ id, companyId, personId: id * 10, stepPosition: 1, nextEligibleOn: null, person: email ? { email } : null });
+  const mem = (id: number, companyId: number, email: string | null) => ({ id, companyId, personId: id * 10, stepPosition: 1, nextEligibleOn: null, person: email ? { email, firstName: "-", lastName: "-" } : null, company: { name: `Cég ${id}`, city: null }, segment: null, lane: null, city: null });
   beforeEach(() => {
-    d.contentItem.findMany.mockResolvedValue([{ id: 50, title: "Levél", body: "Szöveg" }]);
+    d.campaignStep.findMany.mockResolvedValue([{ position: 1, contentItemId: 50 }]);
+    d.contentItem.findMany.mockResolvedValue([live(50, "Levél", "Szöveg")]);
     d.emailDraft.findMany.mockResolvedValue([]);
     d.emailDraft.count.mockResolvedValue(0);
     d.lead.findMany.mockResolvedValue([]);
