@@ -1,0 +1,50 @@
+/* Call cockpit extras on top of the page kit. Astryx tokens only. */
+.wrap { max-width: 880px; margin: 0 auto; }
+.progress { display: flex; align-items: center; gap: 12px; margin-block-end: 20px; flex-wrap: wrap; }
+.track { flex: 1; min-width: 80px; height: 6px; background: var(--ui-surface-muted); border-radius: 4px; overflow: hidden; }
+.fill { height: 100%; background: var(--ui-accent); transition: width 0.2s; }
+.tally { font-size: 14px; color: var(--ui-success-text); font-weight: 600; }
+.select { min-height: 40px; font: inherit; font-size: 14px; color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); padding: 0 12px; }
+
+.big { gap: 24px; padding: 28px 28px; }
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.company { margin: 0; font-size: 32px; line-height: 1.15; font-weight: 700; color: var(--ui-text); overflow-wrap: anywhere; }
+.side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.block { display: flex; flex-direction: column; gap: 12px; padding-block-start: 20px; border-top: 1px solid var(--ui-border); }
+.contactName { font-size: 24px; font-weight: 600; color: var(--ui-text); }
+.phone { display: inline-flex; align-items: center; gap: 10px; font-size: 28px; font-weight: 700; color: var(--ui-text); font-variant-numeric: tabular-nums; text-decoration: none; }
+.phone:hover { text-decoration: underline; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { min-height: 40px; padding: 0 14px; border-radius: var(--ui-radius-control); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--ui-border-strong); background: var(--ui-surface); color: var(--ui-text-muted); }
+.chipOn { background: var(--ui-surface-muted); color: var(--ui-text); border-color: var(--ui-accent); }
+.live { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ui-success-text); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ui-success); }
+.intel { font-size: 14px; color: var(--ui-text-muted); white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.label { font-size: 12px; font-weight: 600; color: var(--ui-text-muted); }
+.hist { display: flex; gap: 12px; font-size: 14px; }
+.histWhen { flex-shrink: 0; width: 84px; color: var(--ui-text-muted); font-variant-numeric: tabular-nums; }
+.field { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); padding: 10px 12px; resize: vertical; }
+.date { font: inherit; font-size: 14px; color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); min-height: 40px; padding: 0 10px; }
+.inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; color: var(--ui-text-muted); }
+.err { font-size: 14px; color: var(--ui-danger-text); }
+.outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.outcome { min-height: 48px; background: var(--ui-surface); }
+.key { font-size: 12px; opacity: 0.6; font-variant-numeric: tabular-nums; }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.skip { background: none; border: 0; padding: 0 8px; min-height: 40px; font: inherit; font-size: 14px; color: var(--ui-text-muted); cursor: pointer; }
+.listRow { cursor: pointer; }
+.listRow[data-active="true"] { background: var(--ui-surface-muted); }
+.phoneBtn { padding: 0 12px; }
+.center { align-items: center; text-align: center; padding: 40px 24px; }
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; padding: 4px 12px; border-radius: 16px; background: var(--ui-surface); }
+@media (max-width: 760px) {
+  .big { padding: 20px 16px; }
+  .company { font-size: 26px; }
+  .phone { font-size: 24px; }
+  .outcomes { grid-template-columns: repeat(2, 1fr); }
+  .side { align-items: flex-start; }
+}
+.segBtn { border: 0; font-family: inherit; cursor: pointer; }
+.segBtn[aria-pressed="false"] { background: transparent; }
+.listRow[data-active="true"] .listBar { background: var(--ui-accent); }
+@media (pointer: coarse) { .segBtn, .chip, .select, .date, .skip { min-height: 44px; } }

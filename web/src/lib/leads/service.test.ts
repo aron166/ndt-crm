@@ -30,10 +30,11 @@ vi.mock("./queries", () => ({
 vi.mock("@/lib/db", () => ({
   db: {
     lead: { findFirst: vi.fn(), updateMany: vi.fn() },
-    task: { updateMany: vi.fn(), create: vi.fn() },
+    task: { updateMany: vi.fn(), create: vi.fn(), findFirst: vi.fn() },
     user: { findFirst: vi.fn() },
     interaction: { create: vi.fn() },
     company: { updateMany: vi.fn() },
+    pipeline: { findFirst: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -41,7 +42,8 @@ vi.mock("@/lib/db", () => ({
 type M = ReturnType<typeof vi.fn>;
 const mockDb = db as unknown as {
   lead: { findFirst: M; updateMany: M };
-  task: { updateMany: M; create: M };
+  task: { updateMany: M; create: M; findFirst: M };
+  pipeline: { findFirst: M };
   $transaction: M;
 };
 const ctx: LeadCtx = { tenantId: 1, userId: 2, actor: "user" };
@@ -61,6 +63,7 @@ let txTaskUpdateMany: ReturnType<typeof vi.fn>;
 let txTaskCreate: ReturnType<typeof vi.fn>;
 let txLeadUpdateMany: ReturnType<typeof vi.fn>;
 let txHistoryCreate: ReturnType<typeof vi.fn>;
+let txDealCreate: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -71,6 +74,8 @@ beforeEach(() => {
   txTaskCreate = vi.fn().mockResolvedValue({ id: 99 });
   txLeadUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
   txHistoryCreate = vi.fn().mockResolvedValue({ id: 1 });
+  txDealCreate = vi.fn().mockResolvedValue({ id: 500 });
+  mockDb.pipeline.findFirst.mockResolvedValue({ id: 3, stages: [{ id: 4 }] });
   mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
       interaction: { create: vi.fn().mockResolvedValue({ id: 55 }) },
@@ -78,6 +83,7 @@ beforeEach(() => {
       lead: { updateMany: txLeadUpdateMany },
       leadStatusHistory: { create: txHistoryCreate },
       company: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      deal: { create: txDealCreate, aggregate: vi.fn().mockResolvedValue({ _max: { position: null } }) },
     }),
   );
 });
@@ -146,6 +152,57 @@ describe("changeLeadStatus: the transition table and the open-lead rule", () => 
     expect(txLeadUpdateMany.mock.calls[0][0].data).toMatchObject({
       status: "lost", outcome: "lost", lostReason: "other", lostNote: "kiderült: bérbeadó", nextAction: null,
     });
+  });
+});
+
+describe("changeLeadStatus: won converts the lead to a Deal", () => {
+  const ORDERED = { ...LEAD, status: "ordered", offerType: "service", nextAction: "Fizetés", nextDue: new Date("2026-09-20T10:00:00Z") };
+
+  it("ordered -> won creates one deal, claims the lead, then writes the move as won", async () => {
+    mockDb.lead.findFirst.mockResolvedValue(ORDERED);
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ success: true, changed: true });
+    expect(txDealCreate).toHaveBeenCalledTimes(1);
+    expect(txDealCreate.mock.calls[0][0].data.customFields).toEqual({ fromLeadId: 10, offerType: "service" });
+    const claim = txLeadUpdateMany.mock.calls[0][0];
+    expect(claim.where).toMatchObject({ id: 10, convertedDealId: null });
+    expect(claim.data).toMatchObject({ convertedDealId: 500 });
+    const move = txLeadUpdateMany.mock.calls.find((c) => c[0].data.status === "won")![0];
+    expect(move.data).toMatchObject({ status: "won", outcome: "won" });
+    expect(txLeadUpdateMany.mock.invocationCallOrder[0]).toBeGreaterThan(txDealCreate.mock.invocationCallOrder[0]);
+  });
+
+  it("is idempotent: an already converted lead creates no second deal and still moves", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...ORDERED, convertedDealId: 77 });
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ success: true, changed: true });
+    expect(txDealCreate).not.toHaveBeenCalled();
+    expect(txLeadUpdateMany.mock.calls.some((c) => c[0].data.status === "won")).toBe(true);
+  });
+
+  it("deal and move share ONE transaction: a stale move rolls the deal back (Vanda follow-up #1)", async () => {
+    mockDb.lead.findFirst.mockResolvedValue(ORDERED);
+    // claim succeeds, the guarded move finds the lead changed (0 rows)
+    txLeadUpdateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ error: "A lead időközben változott, frissítsd az oldalt" });
+    expect(mockDb.$transaction).toHaveBeenCalledTimes(1);
+    expect(txHistoryCreate).not.toHaveBeenCalled();
+  });
+
+  it("refuses without a company and writes no status and no history", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...ORDERED, companyId: null, company: null });
+    const res = await changeLeadStatus(10, "won", ctx);
+    expect(res).toEqual({ error: "A leadhez nincs cég társítva" });
+    expect(txDealCreate).not.toHaveBeenCalled();
+    expect(txHistoryCreate).not.toHaveBeenCalled();
+    expect(txLeadUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("a non-won move never touches deal.create", async () => {
+    const res = await changeLeadStatus(10, "qualified", ctx, { offerType: "service" });
+    expect(res).toEqual({ success: true, changed: true });
+    expect(txDealCreate).not.toHaveBeenCalled();
   });
 });
 
@@ -300,6 +357,22 @@ describe("completeOpenLeadCallTasks is the single shared query", () => {
 
 describe("logLeadCallOutcome — bookings", () => {
   const inDays = (n: number) => new Date(Date.now() + n * 86_400_000);
+
+  it("existingBookingTaskId: logs against the drawer's meeting, no second task, scoped lookup", async () => {
+    const startsAt = inDays(2);
+    mockDb.task.findFirst.mockResolvedValueOnce({ assignedToId: 7, startsAt, dueDate: startsAt });
+    const res = await logLeadCallOutcome(10, { outcome: "meeting_booked", note: "foglalva", existingBookingTaskId: 55 }, ctx);
+    expect(res).toMatchObject({ success: true });
+    expect(mockDb.task.findFirst.mock.calls[0][0].where).toMatchObject({ id: 55, tenantId: ctx.tenantId, leadId: 10, type: "meeting" });
+    expect(txTaskCreate).not.toHaveBeenCalled();
+  });
+
+  it("existingBookingTaskId of another lead, tenant or a done meeting: rejected, nothing written", async () => {
+    mockDb.task.findFirst.mockResolvedValueOnce(null);
+    const res = await logLeadCallOutcome(10, { outcome: "meeting_booked", note: "foglalva", existingBookingTaskId: 99 }, ctx);
+    expect(res).toMatchObject({ error: expect.any(String) });
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
 
   it("user ctx, meeting_booked without bookingAt: rejected with issues.bookingAt, no task created", async () => {
     const res = await logLeadCallOutcome(10, {

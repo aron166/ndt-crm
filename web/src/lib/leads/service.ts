@@ -200,7 +200,7 @@ export async function changeLeadStatus(
   if ("error" in plan) return plan;
 
   const escalationUserId = plan.tasks.some((t) => t.escalate) ? await resolveDemoHost(ctx.tenantId, "aron") : null;
-  try { await db.$transaction(async (tx) => {
+  const move = async (tx: Tx) => {
     // Moving the card is acting on the lead: its open callback task is done.
     // EXCEPT into `recall`, which IS "call this back later".
     if (newStatus !== RECALL_STATUS) await completeOpenLeadCallTasks(tx, leadId, ctx.tenantId, now, { keepLifecycle: true });
@@ -209,7 +209,23 @@ export async function changeLeadStatus(
       companyId: before.companyId, personId: before.contact?.personId ?? null, who: leadWho(before, leadId),
       actorUserId: ctx.userId, actorAgentId: ctx.actorAgentId, escalationUserId, now,
     });
-  }); } catch (e) {
+  };
+  try {
+    if (newStatus === "won") {
+      // Won = the deal door (Áron, 2026-11-10): the Deal and the move commit in
+      // ONE transaction, so a lead is never won without its deal or converted
+      // but stuck in its old stage.
+      const conv = await convertLeadToDeal(leadId, ctx, move);
+      if ("error" in conv) return conv;
+    } else {
+      await db.$transaction(move);
+    }
+  } catch (e) {
+    if (isLeadChanged(e) && newStatus === "won") {
+      // Double submit: the other request already won it, so this click succeeded too.
+      const now2 = await db.lead.findFirst({ where: { id: leadId, tenantId: ctx.tenantId }, select: { status: true, convertedDealId: true } });
+      if (now2?.status === "won" && now2.convertedDealId) return { success: true, changed: false };
+    }
     if (isLeadChanged(e)) return { error: LEAD_CHANGED_MSG };
     throw e;
   }
@@ -256,14 +272,22 @@ export async function assignLead(
  * convertedDealId/convertedAt atomically (the conditional updateMany is the
  * double-submit guard). The lead entity is kept for history, never duplicated.
  */
-export async function convertLeadToDeal(leadId: number, ctx: LeadCtx): Promise<Result<{ dealId: number }>> {
+export async function convertLeadToDeal(
+  leadId: number,
+  ctx: LeadCtx,
+  /** Runs inside the SAME transaction after the claim (the won stage move), so both commit or neither. */
+  andThen?: (tx: Tx) => Promise<void>,
+): Promise<Result<{ dealId: number }>> {
   const { tenantId } = ctx;
   const lead = await db.lead.findFirst({
     where: { id: leadId, tenantId },
     include: { company: { select: { id: true, name: true } }, contact: { select: { personId: true } } },
   });
   if (!lead) return { error: "Lead nem található" };
-  if (lead.convertedDealId) return { success: true, dealId: lead.convertedDealId };
+  if (lead.convertedDealId) {
+    if (andThen) await db.$transaction((tx) => andThen(tx));
+    return { success: true, dealId: lead.convertedDealId };
+  }
   if (!lead.companyId || !lead.company) return { error: "A leadhez nincs cég társítva" };
 
   const pipeline = await db.pipeline.findFirst({
@@ -288,6 +312,8 @@ export async function convertLeadToDeal(leadId: number, ctx: LeadCtx): Promise<R
           assignedToId: lead.assignedToId,
           pipelineId: pipeline.id, stageId: firstStage.id,
           value: lead.estimatedValue ?? null, currency: "HUF",
+          // W2: what was sold travels with the deal (no Deal column for it).
+          customFields: { fromLeadId: leadId, ...(lead.offerType ? { offerType: lead.offerType } : {}) },
           position: (maxPos._max.position ?? -1) + 1,
           stageEnteredAt: new Date(),
         },
@@ -298,10 +324,18 @@ export async function convertLeadToDeal(leadId: number, ctx: LeadCtx): Promise<R
         data: { convertedDealId: deal.id, convertedAt: new Date() },
       });
       if (claim.count === 0) throw new Error("LEAD_ALREADY_CONVERTED");
+      if (andThen) await andThen(tx);
       return deal.id;
     });
   } catch (e) {
-    if (e instanceof Error && e.message === "LEAD_ALREADY_CONVERTED") return { error: "A lead már át lett alakítva deallé" };
+    if (e instanceof Error && e.message === "LEAD_ALREADY_CONVERTED") {
+      // Lost a concurrent claim: the other request converted it. Idempotent for a plain
+      // conversion; a won move rolled back with it, so the caller retries on fresh state.
+      if (andThen) throw new Error(LEAD_CHANGED);
+      const again = await db.lead.findFirst({ where: { id: leadId, tenantId }, select: { convertedDealId: true } });
+      if (again?.convertedDealId) return { success: true, dealId: again.convertedDealId };
+      return { error: "A lead már át lett alakítva deallé" };
+    }
     throw e;
   }
   audit("deal", dealId, "create", null, { title, fromLeadId: leadId }, auditOpts(ctx));
@@ -359,6 +393,16 @@ export async function setLeadOutcome(
     if (before.convertedDealId) return { error: "Deallé alakított lead nem nyitható újra" };
     const r = await changeLeadStatus(leadId, "new", ctx, { event: "lead_reopened" });
     return "error" in r ? r : { success: true };
+  }
+
+  if (outcome === "won" && before.status !== "won") {
+    const table = await getLeadTransitions(ctx.tenantId);
+    if (transitionsBetween(table, before.status ?? "new", "won").length > 0) {
+      const r = await changeLeadStatus(leadId, "won", ctx);
+      if ("error" in r) return r;
+      const after = await db.lead.findFirst({ where: { id: leadId, tenantId: ctx.tenantId }, select: { convertedDealId: true } });
+      return { success: true, dealId: after?.convertedDealId ?? undefined };
+    }
   }
 
   let dealId: number | undefined;
@@ -552,6 +596,22 @@ export async function logLeadCallOutcome(
     }
   }
 
+  // Booked in the drawer: the call is logged against that meeting task (this lead, this tenant), and its host
+  // owns the lead; no second task is created (plan.bookingAt stays empty).
+  let existingBookingHostId: number | null = null;
+  let existingBookingStart: Date | null = null;
+  if (input.existingBookingTaskId != null) {
+    if (input.outcome !== "meeting_booked" || input.bookingAt) return { error: "A meglévő foglalás csak időpont nélküli foglalt meetinggel adható meg", issues: {} };
+    const booked = await db.task.findFirst({
+      // Live meetings only: a done or cancelled one cannot carry a new booked call.
+      where: { id: input.existingBookingTaskId, tenantId: ctx.tenantId, leadId, type: "meeting", status: { notIn: ["done", "cancelled"] } },
+      select: { assignedToId: true, startsAt: true, dueDate: true },
+    });
+    if (!booked) return { error: "A foglalás nem ehhez a leadhez tartozik" };
+    existingBookingHostId = booked.assignedToId;
+    existingBookingStart = booked.startsAt ?? booked.dueDate;
+  }
+
   // The demo lands on the HOST's calendar (finding 3), not the logger's.
   let bookingHostId: number | null = null;
   if (input.bookingAt) {
@@ -570,7 +630,14 @@ export async function logLeadCallOutcome(
   const personId = lead.contact?.personId ?? null;
   const who = leadWho(lead, leadId);
   // meeting_booked: whoever holds the meeting owns the lead (was demo_aron / demo_peter).
-  if (input.outcome === "meeting_booked" && input.demoWith) {
+  if (input.outcome === "meeting_booked" && input.existingBookingTaskId != null) {
+    if (existingBookingHostId != null) callPlan.input.ownerId = existingBookingHostId;
+    // The meeting is booked already: the next step is that meeting, not "arrange a time" in 3 workdays.
+    if (existingBookingStart) {
+      callPlan.input.nextAction = lead.status === "offer_sent" ? "Demó" : "Egyeztetés";
+      callPlan.input.nextDue = existingBookingStart;
+    }
+  } else if (input.outcome === "meeting_booked" && input.demoWith) {
     callPlan.input.ownerId = bookingHostId ?? await resolveDemoHost(ctx.tenantId, input.demoWith);
   }
   let transitionPlan: TransitionPlan | null = null;

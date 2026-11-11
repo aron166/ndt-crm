@@ -126,6 +126,8 @@ export const callOutcomeSchema = z
     callId: z.string().trim().max(200).optional(),
     /** The interaction this one replaces: a correction, or a parse answering a transcript. */
     supersedesInteractionId: z.number().int().positive().optional(),
+    /** The meeting task the lead page's booking drawer already created: log the call against it, create no second one. */
+    existingBookingTaskId: z.number().int().positive().optional(),
     /**
      * When the CALL happened, if that is not now. A parse of yesterday's queued
      * transcript belongs on the timeline at the time of the call, not of the
@@ -140,7 +142,7 @@ export const callOutcomeSchema = z
         ctx.addIssue({ code: "custom", path: ["callbackAt"], message: "Visszahíváshoz dátum és óra kötelező" });
       }
     }
-    if (d.outcome === "meeting_booked" && !d.demoWith) {
+    if (d.outcome === "meeting_booked" && !d.demoWith && !d.existingBookingTaskId) {
       ctx.addIssue({ code: "custom", path: ["demoWith"], message: "Add meg, kivel lesz a demó (Áron / Péter)" });
     }
     // The booking fields come as a PAIR (a date without a rung cannot be ranked).
@@ -176,12 +178,14 @@ export type CallOutcomeInput = z.infer<typeof callOutcomeSchema>;
  * Returns the first problem as a Zod-style issue, or null.
  */
 export function bookingIssue(
-  input: Pick<CallOutcomeInput, "outcome" | "bookingAt">,
+  input: Pick<CallOutcomeInput, "outcome" | "bookingAt"> & { existingBookingTaskId?: number },
   actor: "user" | "agent",
   now: Date,
 ): { path: "bookingAt"; message: string } | null {
   if (input.outcome !== "meeting_booked") return null;
   if (!input.bookingAt) {
+    // Booked in the drawer already: the time lives on that task.
+    if (input.existingBookingTaskId) return null;
     return actor === "user" ? { path: "bookingAt", message: "Foglaláshoz dátum és óra kötelező" } : null;
   }
   if (input.bookingAt.getTime() < now.getTime()) {

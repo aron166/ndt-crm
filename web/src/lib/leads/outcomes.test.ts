@@ -147,3 +147,15 @@ describe("card helpers", () => {
     expect(daysSince("2026-09-04T13:00:00Z", now)).toBe(0);
   });
 });
+
+describe("existingBookingTaskId (booked in the lead page drawer)", () => {
+  const now = new Date("2026-11-10T10:00:00Z");
+  it("a user may log meeting_booked without a date when the drawer already booked it", () => {
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: undefined, existingBookingTaskId: 5 }, "user", now)).toBeNull();
+    expect(bookingIssue({ outcome: "meeting_booked", bookingAt: undefined }, "user", now)?.path).toBe("bookingAt");
+  });
+  it("the schema does not demand demoWith when the booking task exists", () => {
+    expect(callOutcomeSchema.safeParse({ outcome: "meeting_booked", note: "ok", existingBookingTaskId: 5 }).success).toBe(true);
+    expect(callOutcomeSchema.safeParse({ outcome: "meeting_booked", note: "ok" }).success).toBe(false);
+  });
+});

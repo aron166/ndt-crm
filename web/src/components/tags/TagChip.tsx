@@ -8,24 +8,16 @@ interface TagChipProps {
   size?: "sm" | "default";
 }
 
-function textColor(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? "#1e293b" : "#ffffff";
-}
-
 export function TagChip({ name, color, onRemove, size = "default" }: TagChipProps) {
-  const fg = textColor(color);
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full font-medium",
         size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-xs"
       )}
-      style={{ backgroundColor: color, color: fg }}
+      style={{ backgroundColor: "var(--ui-surface-muted)", color: "var(--ui-text)" }}
     >
+      <span aria-hidden="true" className="size-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
       {name}
       {onRemove && (
         <button

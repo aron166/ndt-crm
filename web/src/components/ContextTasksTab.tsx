@@ -9,6 +9,7 @@ import { TaskStatusBadge } from "@/components/TaskStatusBadge";
 import { reopenTask } from "@/app/actions/tasks";
 import { useTaskCompletion } from "@/components/useTaskCompletion";
 import { formatDate } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface Task {
@@ -113,24 +114,21 @@ export function ContextTasksTab({
       {logModal}
 
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-[var(--ui-text-muted)]">
           {open.length} nyitott{done.length > 0 && ` · ${done.length} kész`}
         </p>
-        <button
-          onClick={() => { setEditTask(null); setModalOpen(true); }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors"
-        >
+        <Button type="button" size="sm" onClick={() => { setEditTask(null); setModalOpen(true); }}>
           <Plus className="size-3.5" />
           Feladat
-        </button>
+        </Button>
       </div>
 
       {tasks.length === 0 ? (
-        <p className="text-sm text-slate-400 py-6 text-center">
+        <p className="text-sm text-[var(--ui-text-muted)] py-6 text-center">
           Nincs feladat. Hozz létre egyet a Feladat gombbal.
         </p>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-[var(--ui-surface)] rounded-[var(--ui-radius-surface)] shadow-[var(--ui-shadow-raised)] overflow-hidden">
           <table className="w-full text-sm">
             <tbody>
               {[...open, ...done].map((t) => {
@@ -139,41 +137,43 @@ export function ContextTasksTab({
                   <tr
                     key={t.id}
                     className={cn(
-                      "border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors",
+                      "border-b border-[var(--ui-border)] last:border-0 hover:bg-[var(--ui-hover)] transition-colors",
                       t.status === "done" && "opacity-60"
                     )}
                   >
                     <td className="px-3 py-2.5 w-8">
                       {t.status !== "done" ? (
                         <button
+                          type="button"
                           onClick={() => handleComplete(t)}
-                          className="w-4.5 h-4.5 rounded-full border-2 border-slate-300 hover:border-green-500 transition-colors"
+                          className="w-4.5 h-4.5 rounded-full border-2 border-[var(--ui-border-strong)] hover:border-[var(--ui-success)] transition-colors"
                           title="Kész"
+                          aria-label="Kész"
                         />
                       ) : (
-                        <button onClick={() => handleReopen(t.id)} title="Újranyitás">
-                          <CheckCircle2 className="size-4 text-green-500" />
-                        </button>
+                        <Button type="button" variant="ghost" size="icon-xs" className="size-6 min-h-6" onClick={() => handleReopen(t.id)} title="Újranyitás" aria-label="Újranyitás">
+                          <CheckCircle2 className="size-4 text-[var(--ui-success-text)]" />
+                        </Button>
                       )}
                     </td>
                     <td className="px-2 py-2.5 flex-1">
                       <Link
                         href={`/tasks/${t.id}`}
                         className={cn(
-                          "hover:text-indigo-600 transition-colors",
-                          t.status === "done" ? "line-through text-slate-400" : "text-slate-900"
+                          "hover:text-[var(--ui-text-link)] transition-colors",
+                          t.status === "done" ? "line-through text-[var(--ui-text-muted)]" : "text-[var(--ui-text)]"
                         )}
                       >
                         {t.title}
                       </Link>
                       {t._count.subTasks > 0 && (
-                        <span className="ml-2 text-xs text-slate-400">
+                        <span className="ml-2 text-xs text-[var(--ui-text-muted)]">
                           {t._count.subTasks} alfeladat
                         </span>
                       )}
                     </td>
                     <td className="px-2 py-2.5 hidden sm:table-cell">
-                      <span className={cn("text-xs", overdue ? "text-red-600 font-semibold" : "text-slate-400")}>
+                      <span className={cn("text-xs", overdue ? "text-[var(--ui-danger-text)] font-semibold" : "text-[var(--ui-text-muted)]")}>
                         {t.dueDate ? formatDate(t.dueDate) : ""}
                         {overdue && " Lejárt"}
                       </span>
@@ -182,14 +182,17 @@ export function ContextTasksTab({
                       <TaskStatusBadge status={t.status} />
                     </td>
                     <td className="px-3 py-2.5 w-8">
-                      <button
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        className="size-6 min-h-6"
                         onClick={() => { setEditTask(t); setModalOpen(true); }}
-                        className="text-xs text-slate-400 hover:text-slate-700"
                         title="Szerkesztés"
                         aria-label="Szerkesztés"
                       >
                         <PencilLine size={14} aria-hidden="true" />
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 );

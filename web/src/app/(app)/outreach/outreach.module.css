@@ -1,0 +1,24 @@
+/* Outreach screens: layout the Astryx kit lacks. Tokens only. */
+.field { box-sizing: border-box; min-height: 40px; max-width: 100%; padding: 6px 10px; font: inherit; font-size: 14px; background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius-control); }
+@media (pointer: coarse) { .field { min-height: 44px; } }
+.field:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+textarea.field { resize: vertical; line-height: 1.6; }
+.stackXs { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.btnRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.late.late { color: var(--ui-danger-text); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.panelPad { padding: 16px 18px; background: var(--ui-surface); border-radius: var(--ui-radius-surface); box-shadow: var(--ui-shadow-raised); }
+.warn { padding: 12px 16px; background: color-mix(in srgb, var(--ui-danger) 8%, transparent); border: 1px solid var(--ui-danger); border-radius: var(--ui-radius-surface); color: var(--ui-danger-text); font-size: 14px; }
+.sub { border-top: 1px solid var(--ui-border); padding-top: 12px; margin-top: 12px; }
+.settingsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 700px) { .settingsGrid { grid-template-columns: 1fr; } }
+.settingsFoot { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+.draftItem { border-bottom: 1px solid var(--ui-border); }
+.draftItem > [data-u], .draftItem > :first-child { border-bottom: 0; }
+.draftControls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 0 18px 12px; }
+.draftNote { padding: 0 18px 10px; }
+.draftExpanded { padding: 0 18px 16px; display: flex; flex-direction: column; gap: 10px; }
+.replyForm { display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
+.nameShrink { min-width: 0; }
+.emptyC { align-items: center; text-align: center; }

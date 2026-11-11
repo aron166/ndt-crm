@@ -76,6 +76,14 @@ describe("runNurture", () => {
     expect(ev.find((e) => e.eventType === "nurture_skipped")?.payload.reason).toBe("nurture_disabled");
   });
 
+  // Default off: a tenant that never set the key, or set a truthy non-boolean, sends nothing.
+  it.each([{}, { nurture_enabled: "true" }, { nurture_enabled: 1 }, { nurture_enabled: null }])(
+    "never sends when settings are %j", async (settings) => {
+      setup(settings);
+      await runNurture(1, now);
+      expect(send).not.toHaveBeenCalled();
+    });
+
   it("does not log the same skip again within 6 days", async () => {
     setup({ nurture_enabled: false });
     d.appEvent.findFirst.mockResolvedValueOnce({ id: 1 } as never);

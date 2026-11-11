@@ -4,165 +4,116 @@ import { serializeDates } from "@/lib/serialize";
 import { getLeadStatuses, getScriptVariants } from "@/lib/leads/queries";
 import { LeadsKanban } from "./LeadsKanban";
 import { Settings2 } from "lucide-react";
-import { fullName, formatRelativeTime } from "@/lib/utils";
 import { getLeadExtras } from "@/lib/leads/board";
 import { firstContactByLead } from "@/lib/leads/first-contact-query";
 import { minutesToFirstContact, tierAFlag } from "@/lib/leads/first-contact";
-import { LEAD_OUTCOME_LABEL, callOutcomeLabel, type LeadOutcome } from "@/lib/leads/outcomes";
-import { MAIN_STAGES, lostReasonLabel } from "@/lib/leads/lifecycle";
+import { MAIN_STAGES, SIDE_STAGES } from "@/lib/leads/lifecycle";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
-import { TIERS, TIER_LABEL, TIER_COLOR, isTier } from "@/lib/leads/tier";
+import { TIERS, TIER_LABEL, isTier } from "@/lib/leads/tier";
+import { getActor } from "@/lib/actor";
+import { LeadsHeader } from "./queue/LeadsHeader";
+import { CallQueue } from "./queue/CallQueue";
+import { TripsAside } from "./queue/TripsAside";
+import { groupQueue, getQueueRows, getQueueTotal, getFooterCounts } from "./queue/queue-data";
+import { ClosedList, CLOSED_WHERE } from "./closed/ClosedList";
+import qcss from "./queue/queue.module.css";
 
 const TENANT_ID = 1;
-const PAGE_SIZE = 30;
-// ponytail: per-column cap (newest first) + "N / total" badge — a kanban has no
+// ponytail: per-column cap (newest first) + "N / total" badge: a kanban has no
 // natural page; add per-column "load more" when a column actually exceeds this.
 const COLUMN_LIMIT = 50;
+
+/** Start of the won column window: the last 30 days. */
+const wonSince = () => new Date(Date.now() - 30 * 86_400_000);
 
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string; tier?: string }>;
+  searchParams: Promise<{ view?: string; page?: string; tier?: string; owner?: string }>;
 }) {
-  const { view, page: rawPage, tier: rawTier } = await searchParams;
+  const { view, page: rawPage, tier: rawTier, owner: rawOwner } = await searchParams;
   const showConverted = view === "closed" || view === "converted";
+  // No view = the leads board (Aron 2026-11-10: a lead is not a call); the call queue is one view, ?view=queue.
+  const isQueue = !showConverted && view === "queue";
   const sideView = view === "recall" || view === "lost" ? view : null;
   const parsedPage = Number.parseInt(rawPage ?? "1", 10);
   const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
-  // Tier filter applies only to the active (kanban) view — closed list ignores it.
+  // Tier filter applies only to the active (kanban) view: closed list ignores it.
   const tier = isTier(rawTier) ? rawTier : null;
 
   // Counts power the toggle. Won (= converted to a deal) and lost leads leave
-  // the active board — the "Lezárt" list keeps them for history.
-  const CLOSED_WHERE = { tenantId: TENANT_ID, OR: [{ outcome: { not: "open" } }, { convertedDealId: { not: null } }] };
-  const [activeCount, convertedCount] = await Promise.all([
-    db.lead.count({ where: { tenantId: TENANT_ID, convertedDealId: null, outcome: "open" } }),
+  // the active board: the "Lezárt" list keeps them for history.
+  const [actor, users, convertedCount] = await Promise.all([
+    getActor(TENANT_ID),
+    db.user.findMany({ where: { tenantId: TENANT_ID, email: { not: { endsWith: "@system" } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     db.lead.count({ where: CLOSED_WHERE }),
   ]);
 
-  const Toggle = (
-    <div className="flex flex-wrap items-center gap-2">
-      <Link
-        href="/leads"
-        className="rounded-full font-mono-ndt"
-        style={{
-          minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
-          background: showConverted ? "var(--bg-panel)" : "var(--indigo-soft)",
-          color: showConverted ? "var(--fg-mute)" : "var(--indigo)",
-          border: `1px solid ${showConverted ? "var(--line-soft)" : "var(--indigo-line)"}`,
-        }}
-      >
-        Aktív · {activeCount}
-      </Link>
-      <Link
-        href="/leads?view=closed"
-        className="rounded-full font-mono-ndt"
-        style={{
-          minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
-          background: showConverted ? "var(--mint-soft)" : "var(--bg-panel)",
-          color: showConverted ? "var(--mint)" : "var(--fg-mute)",
-          border: `1px solid ${showConverted ? "var(--mint-line)" : "var(--line-soft)"}`,
-        }}
-      >
-        Lezárt · {convertedCount}
-      </Link>
-    </div>
-  );
+  const explicitOwner = rawOwner === "all" || users.some((u) => String(u.id) === rawOwner);
+  // No owner chosen and the signed-in user owns no open lead: show everyone's queue, not an
+  // empty page (Aron could not find his leads in prod, 2026-11-10). The owner filter shows "Mindenki".
+  const myTotal = !explicitOwner && rawOwner !== "me" && actor.userId != null ? await getQueueTotal(actor.userId) : null;
+  const ownsNone = !explicitOwner && rawOwner !== "me" && (actor.userId == null || myTotal === 0);
+  const ownerParam = explicitOwner ? rawOwner! : ownsNone ? "all" : "me";
+  // An explicit ?owner=me without a resolved user sees nothing (-1), never everyone.
+  const assignedToId = ownerParam === "all" ? null : ownerParam === "me" ? (actor.userId ?? -1) : Number(ownerParam);
+  // Board main columns and the queue are the same set (open, recall and lost off), so one count serves both tabs
+  // and follows the owner filter. Recall leads sit off the main columns and stay out of it.
+  const openTotal = ownerParam === "me" && myTotal != null ? myTotal : await getQueueTotal(assignedToId);
+  const queueTotalOther = openTotal;
+
+  const header = (
+    props: Pick<React.ComponentProps<typeof LeadsHeader>, "view" | "title" | "help" | "owner" | "actions"> & { queueCount?: number },
+  ) => <LeadsHeader {...props} queueCount={props.queueCount ?? queueTotalOther} openCount={openTotal} ownerHref={ownerHref} closedCount={convertedCount} />;
+  // Owner links keep the view and, on the board, the tier and side filters.
+  const ownerHref = (key: string) => {
+    const q = new URLSearchParams();
+    if (isQueue) q.set("view", "queue");
+    else if (sideView) q.set("view", sideView);
+    if (!isQueue && tier) q.set("tier", tier);
+    q.set("owner", key);
+    return `/leads?${q.toString()}`;
+  };
+  // PROPOSAL copy
+  const ownerHelp = ownsNone ? "Nincs hozzád rendelt nyitott lead, ezért mindenki leadjei látszanak." : undefined;
 
   if (showConverted) {
-    const converted = await db.lead.findMany({
-      where: CLOSED_WHERE,
-      include: {
-        company: { select: { id: true, name: true } },
-        contact: { select: { person: { select: { firstName: true, lastName: true } } } },
-      },
-      orderBy: [{ closedAt: { sort: "desc", nulls: "last" } }, { convertedAt: "desc" }],
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    });
-    const totalPages = Math.ceil(convertedCount / PAGE_SIZE);
-    const pageHref = (p: number) => `/leads?view=closed&page=${p}`;
-
     return (
       <div className="mount">
-        <div className="page-head">
-          <div>
-            <h1 className="page-title">Leadek</h1>
-            <p className="page-sub">Nyert (deallé alakított) és vesztett leadek.</p>
-          </div>
-          <div className="page-actions">{Toggle}</div>
-        </div>
+        {header({ view: "closed", title: "Lezárt leadek" /* PROPOSAL copy */ })}
+        <ClosedList page={page} total={convertedCount} />
+      </div>
+    );
+  }
 
-        <div className="panel">
-          {converted.length === 0 ? (
-            <div className="panel-pad" style={{ fontSize: 14, color: "var(--fg-mute)" }}>
-              Még nincs lezárt lead.
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {converted.map((l) => {
-                const personName = l.contact?.person
-                  ? fullName(l.contact.person.firstName, l.contact.person.lastName)
-                  : (l.customFields as Record<string, unknown> | null)?.contact_name as string | undefined;
-                return (
-                  <div
-                    key={l.id}
-                    className="flex items-center gap-3"
-                    style={{ padding: "12px 16px", borderBottom: "1px solid var(--line-soft)", fontSize: 14 }}
-                  >
-                    <Link href={`/leads/${l.id}`} className="row-link" style={{ flex: 1, color: "var(--fg)" }}>
-                      {l.serviceInterest || l.subject || "Érdeklődés"}
-                    </Link>
-                    {l.company && (
-                      <Link href={`/companies/${l.company.id}`} className="row-link truncate" style={{ width: 180, color: "var(--fg-mute)" }}>
-                        {l.company.name}
-                      </Link>
-                    )}
-                    <span className="truncate" style={{ width: 150, color: "var(--fg-faint)" }}>{personName || "-"}</span>
-                    <span className="font-mono-ndt" style={{ width: 90, color: "var(--fg-faint)", fontSize: 12 }}>
-                      {formatRelativeTime(l.closedAt ?? l.convertedAt)}
-                    </span>
-                    {l.convertedDealId ? (
-                      <Link href="/deals" className="font-mono-ndt" style={{ color: "var(--mint)", fontSize: 12, width: 150 }}>
-                        Nyert → Deal #{l.convertedDealId}
-                      </Link>
-                    ) : (
-                      <span className="font-mono-ndt truncate" style={{ color: "var(--coral)", fontSize: 12, width: 150 }}>
-                        {LEAD_OUTCOME_LABEL[l.outcome as LeadOutcome] ?? l.outcome}
-                        {l.lostReason ? ` · ${lostReasonLabel(l.lostReason)}` : ""}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+  if (isQueue) {
+    const now = new Date();
+    const [statuses, rows, counts, queueTotal] = await Promise.all([
+      getLeadStatuses(TENANT_ID), getQueueRows(assignedToId), getFooterCounts(), openTotal,
+    ]);
+    // Heading counts come from the loaded rows (at most 200, most urgent first), so
+    // past the cap they undercount; the list footer says so.
+    const groups = groupQueue(rows, now);
+    const n = (k: string) => groups.find((g) => g.key === k)?.rows.length ?? 0;
+    const late = n("overdue");
+    const today = n("today");
+    // PROPOSAL copy
+    const title = late + today === 0 ? "Ma nincs esedékes hívás" : `${late} késésben, ${today} ma esedékes`;
+    return (
+      <div className="mount">
+        {header({
+          view: "queue", title, queueCount: queueTotal,
+          help: ownerHelp ?? "Felülről lefelé haladj. A Hívás gomb tárcsáz és megnyitja a lead lapját.",
+          owner: { current: ownerParam, users },
+        })}
+        <div className={qcss.split}>
+          <CallQueue
+            groups={groups} statuses={statuses} now={now} recall={counts.recall} lost={counts.lost}
+            owner={ownerParam} ownerName={users.find((u) => String(u.id) === ownerParam)?.name ?? null}
+            total={queueTotal} loaded={rows.length}
+          />
+          <TripsAside now={now} />
         </div>
-
-        {/* Pagination — same pattern as /companies */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>
-            <span>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, convertedCount)} / {convertedCount.toLocaleString("hu-HU")}</span>
-            <div className="flex gap-2">
-              {page > 1 && (
-                <Link
-                  href={pageHref(page - 1)}
-                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
-                >
-                  ← Előző
-                </Link>
-              )}
-              {page < totalPages && (
-                <Link
-                  href={pageHref(page + 1)}
-                  style={{ padding: "4px 10px", background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 5, color: "var(--fg-soft)", fontSize: 12 }}
-                >
-                  Következő →
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -178,7 +129,7 @@ export default async function LeadsPage({
   const mainStatuses = allStatuses.filter((s) => (MAIN_STAGES as readonly string[]).includes(s.key));
   const sideDef: LeadStatusDef | null = sideView
     ? allStatuses.find((s) => s.key === sideView) ?? {
-        key: sideView, label: sideView === "recall" ? "Visszahívás" : "Elveszett", color: "#8b8b9a", position: 99,
+        key: sideView, label: sideView === "recall" ? "Visszahívás" : "Elveszett", color: "#8b8b9a", position: 99, // design-allow: user data colour (stage fallback)
         isInitial: false, isTerminal: sideView === "lost", isCommitment: false, description: null,
       } // PROPOSAL copy
     : null;
@@ -188,20 +139,24 @@ export default async function LeadsPage({
     tenantId: TENANT_ID, convertedDealId: null,
     outcome: sideView === "lost" ? "lost" : "open",
     ...(tier ? { tier } : {}),
+    ...(assignedToId != null ? { assignedToId } : {}),
   };
   const knownKeys = allStatuses.map((s) => s.key);
-  // A lead whose status was deleted at /leads/setup has no column — it lands in
+  // A lead whose status was deleted at /leads/setup has no column: it lands in
   // the entry column instead of vanishing from the board (which would make the
   // "Aktív · N" count disagree with the sum of the columns).
   const colWhere = (key: string) =>
     sideView === "lost" ? ACTIVE
     : sideView ? { ...ACTIVE, status: key }
+    // Won leads are closed (outcome won, converted to a Deal) but keep their column.
+    // Last 30 days only, so the column does not fill with old deals; older ones live in Lezárt.
+    : key === "won" ? { tenantId: TENANT_ID, status: "won", closedAt: { gte: wonSince() }, ...(tier ? { tier } : {}), ...(assignedToId != null ? { assignedToId } : {}) }
     : key === initialKey
       ? { ...ACTIVE, OR: [{ status: key }, { status: null }, { status: { notIn: knownKeys } }] }
       : { ...ACTIVE, status: key };
 
   // One bounded query per column (newest first). Never an unbounded findMany.
-  // ponytail: under the cap, rows.length IS the total — the COUNT only fires for a
+  // ponytail: under the cap, rows.length IS the total: the COUNT only fires for a
   // capped column, and pays a serial round trip when it does. Fine at ~2ms (fra1);
   // if several columns ever sit at the cap, pair it back into the findMany's Promise.all.
   const perColumn = await Promise.all(
@@ -210,6 +165,7 @@ export default async function LeadsPage({
         where: colWhere(st.key),
         include: {
           company: { select: { id: true, name: true } },
+          assignedTo: { select: { name: true } },
           contact: {
             select: {
               id: true, phone: true, email: true,
@@ -242,22 +198,22 @@ export default async function LeadsPage({
     // column the server counted it in.
     status: sideView ?? (l.status && knownKeys.includes(l.status) ? l.status : initialKey),
     estimatedValue: l.estimatedValue != null ? Number(l.estimatedValue) : null,
+    owner: l.assignedTo?.name ?? null,
     customFields: (l.customFields ?? null) as Record<string, unknown> | null,
     lastContactAt: extras.get(l.id)?.lastContactAt ?? null,
     callbackDueAt: extras.get(l.id)?.callbackDueAt ?? null,
   }));
-  const fresh = columnTotals[initialKey] ?? 0;
 
-  const tierPill = (href: string, active: boolean, label: string, color?: string) => (
+  const tierPill = (href: string, active: boolean, label: string) => (
     <Link
       key={href}
       href={href}
-      className="rounded-full font-mono-ndt"
+      className="rounded-full inline-flex items-center touch44"
       style={{
-        minHeight: 26, whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
-        background: active ? (color ? "var(--bg-hover)" : "var(--indigo-soft)") : "var(--bg-panel)",
-        color: active ? (color ?? "var(--indigo)") : "var(--fg-mute)",
-        border: `1px solid ${active ? (color ?? "var(--indigo-line)") : "var(--line-soft)"}`,
+        whiteSpace: "nowrap", padding: "0 12px", fontSize: 12, lineHeight: "26px",
+        background: active ? "var(--ui-accent-surface)" : "var(--ui-surface)",
+        color: active ? "var(--ui-text)" : "var(--ui-text-muted)",
+        border: `1px solid ${active ? "var(--ui-border-strong)" : "var(--ui-border)"}`,
       }}
     >
       {label}
@@ -268,10 +224,11 @@ export default async function LeadsPage({
   const hrefWith = (key: "tier" | "view", value: string | null) => {
     const q = new URLSearchParams();
     if (tier) q.set("tier", tier);
-    if (sideView) q.set("view", sideView);
+    q.set("view", sideView ?? "board");
+    if (ownerParam !== "me") q.set("owner", ownerParam);
     if (value) q.set(key, value); else q.delete(key);
-    const str = q.toString();
-    return str ? `/leads?${str}` : "/leads";
+    if (key === "view" && !value) q.set("view", "board");
+    return `/leads?${q.toString()}`;
   };
 
   const SideFilter = (
@@ -285,36 +242,28 @@ export default async function LeadsPage({
   const TierFilter = (
     <div className="flex flex-wrap items-center gap-2">
       {tierPill(hrefWith("tier", null), tier === null, "Mind")}
-      {TIERS.map((t) => tierPill(hrefWith("tier", t), tier === t, `${t} · ${TIER_LABEL[t]}`, TIER_COLOR[t]))}
+      {TIERS.map((t) => tierPill(hrefWith("tier", t), tier === t, `${t} · ${TIER_LABEL[t]}`))}
     </div>
   );
 
   return (
     <div className="mount">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title" style={{ gap: 12 }}>
-            Leadek
-            {fresh > 0 && (
-              <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--indigo)", fontWeight: 500 }}>
-                · {fresh} új
-              </span>
-            )}
-          </h1>
-          <p className="page-sub">
-            Beérkező érdeklődések a landing oldalakról és automatizációkból.
-          </p>
-        </div>
-        <div className="page-actions" style={{ gap: 8 }}>
-          {TierFilter}
-          {SideFilter}
-          {Toggle}
-          <Link href="/leads/setup" className="btn sm" style={{ gap: 6 }}>
-            <Settings2 style={{ width: 13, height: 13 }} />
-            Státuszok
-          </Link>
-        </div>
-      </div>
+      {header({
+        view: "board",
+        title: "Leadek", // PROPOSAL copy
+        help: ownerHelp,
+        owner: { current: ownerParam, users },
+        actions: (
+          <div className="flex flex-wrap items-center gap-2">
+            {TierFilter}
+            {SideFilter}
+            <Link href="/leads/setup" className="btn sm" style={{ gap: 6 }}>
+              <Settings2 style={{ width: 13, height: 13 }} />
+              Státuszok
+            </Link>
+          </div>
+        ),
+      })}
 
       <LeadsKanban
         statuses={boardStatuses}

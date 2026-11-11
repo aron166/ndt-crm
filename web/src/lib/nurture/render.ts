@@ -5,6 +5,10 @@
 // comes from the approved template; nothing from the lead is interpolated except
 // the greeting name, which is HTML-escaped. Hungarian footer copy is PROPOSAL.
 
+// Mail clients render this HTML outside the app theme, so it needs literal colours.
+const EMAIL_RULE = "#ddd"; // design-allow: email HTML has no app tokens
+const EMAIL_MUTED = "#666"; // design-allow: email HTML has no app tokens
+
 export interface RenderContext {
   templateKey: string;
   position: number;
@@ -85,7 +89,7 @@ export function renderBody(bodyMd: string, ctx: RenderContext): { text: string; 
       i--;
       for (const r of rows) text.push(r.map((c) => inlineText(c, ctx)).join(" | "));
       html.push(`<table cellpadding="6" style="border-collapse:collapse">${rows.map((r, ri) =>
-        `<tr>${r.map((c) => `<${ri === 0 ? "th" : "td"} style="border:1px solid #ddd;text-align:left">${inlineHtml(c, ctx)}</${ri === 0 ? "th" : "td"}>`).join("")}</tr>`).join("")}</table>`);
+        `<tr>${r.map((c) => `<${ri === 0 ? "th" : "td"} style="border:1px solid ${EMAIL_RULE};text-align:left">${inlineHtml(c, ctx)}</${ri === 0 ? "th" : "td"}>`).join("")}</tr>`).join("")}</table>`);
       continue;
     }
     if (/^\s*-{3,}\s*$/.test(l)) { text.push(""); continue; }
@@ -97,7 +101,7 @@ export function renderBody(bodyMd: string, ctx: RenderContext): { text: string; 
   const unsub = `<a href="${esc(ctx.unsubscribeUrl)}">Leiratkozás</a>`;
   return {
     text: [...text, "", ...foot].join("\n").replace(/\n{3,}/g, "\n\n").trim(),
-    html: `${html.filter((h, i, a) => h || a[i - 1]).join("\n")}\n<hr><p style="color:#666;font-size:12px">${foot
+    html: `${html.filter((h, i, a) => h || a[i - 1]).join("\n")}\n<hr><p style="color:${EMAIL_MUTED};font-size:12px">${foot
       .slice(1, -1).map(esc).join("<br>")}<br>${unsub}</p>`,
   };
 }

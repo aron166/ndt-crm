@@ -106,6 +106,13 @@ describe("planTransition", () => {
     if ("error" in r) throw new Error(r.error);
     expect(r.data).toMatchObject({ status: "new", outcome: "open", closedAt: null });
   });
+  it("ordered -> won (order_won) closes the lead as won and plans the handover task", () => {
+    const r = planTransition(lead("ordered", { nextAction: "x", nextDue: now }), row("ordered", "order_won"), {}, now);
+    if ("error" in r) throw new Error(r.error);
+    expect(r.data).toMatchObject({ status: "won", outcome: "won", closedAt: now, nextAction: null, nextDue: null });
+    expect(r.tasks).toHaveLength(1);
+    expect(r.tasks[0].title).toContain("Átadás");
+  });
   it("a from mismatch errors", () => {
     expect(err(planTransition(lead("new"), row("contacting", "call_no_answer"), {}, now))).toContain("Nem engedélyezett");
   });
@@ -165,6 +172,24 @@ describe("DEFAULT_TRANSITIONS", () => {
   it("(from, event) pairs are unique", () => {
     const keys = DEFAULT_TRANSITIONS.map((t) => `${t.from}|${t.event}`);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe("call_logged: reached, second call agreed", () => {
+  const now = new Date("2026-11-09T12:00:00Z");
+  const base = { status: "new", attempts: 0, assignedToId: 3, offerType: null, nextAction: null, nextDue: null, statusEnteredAt: now };
+  const next = { nextAction: "Második hívás", nextDue: new Date("2026-11-10T09:00:00Z") };
+  it("new -> contacting with attempts 1, contacting stays with attempts + 1", () => {
+    const t1 = findTransition(DEFAULT_TRANSITIONS, "new", "call_logged")!;
+    const r1 = planTransition(base, t1, next, now);
+    expect("error" in r1 ? r1 : r1.data).toMatchObject({ status: "contacting", attempts: 1, nextAction: "Második hívás" });
+    const t2 = findTransition(DEFAULT_TRANSITIONS, "contacting", "call_logged")!;
+    const r2 = planTransition({ ...base, status: "contacting", attempts: 3 }, t2, next, now);
+    expect("error" in r2 ? r2 : r2.data).toMatchObject({ status: "contacting", attempts: 4 });
+  });
+  it("still needs a next action (no entry task)", () => {
+    const t1 = findTransition(DEFAULT_TRANSITIONS, "new", "call_logged")!;
+    expect(planTransition(base, t1, {}, now)).toHaveProperty("error");
   });
 });
 

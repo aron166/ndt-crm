@@ -19,16 +19,16 @@ function Row({ t, canApprove }: { t: TemplateRow; canApprove: boolean }) {
   const [open, setOpen] = useState(false);
   const approved = t.status === "approved";
   return (
-    <div style={{ padding: "12px 0", borderTop: "1px solid var(--line-soft)" }}>
+    <div style={{ padding: "12px 0", borderTop: "1px solid var(--ui-border)" }}>
       <div className="flex items-center gap-2 flex-wrap">
         <strong style={{ fontSize: 14 }}>{t.subject}</strong>
-        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-mute)" }}>{t.key}</span>
-        <span className="badge-ds" style={{ color: approved ? "var(--indigo)" : "var(--fg-mute)" }}>
+        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>{t.key}</span>
+        <span className="badge-ds" style={{ color: approved ? "var(--ui-accent)" : "var(--ui-text-muted)" }}>
           {approved ? "jóváhagyva" : t.status === "retired" ? "visszavonva" : "javaslat"}
         </span>
-        {t.approvedAt && <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>{t.approvedAt}</span>}
+        {t.approvedAt && <span style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>{t.approvedAt}</span>}
       </div>
-      {t.preview && <p style={{ fontSize: 13, color: "var(--fg-mute)", margin: "4px 0 0" }}>{t.preview}</p>}
+      {t.preview && <p style={{ fontSize: 13, color: "var(--ui-text-muted)", margin: "4px 0 0" }}>{t.preview}</p>}
       <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 8 }}>
         <button type="button" className="btn sm ghost" onClick={() => setOpen(!open)}>
           {open ? "Előnézet elrejtése" : "Előnézet"}
@@ -41,9 +41,9 @@ function Row({ t, canApprove }: { t: TemplateRow; canApprove: boolean }) {
             title={t.key}
             sandbox=""
             srcDoc={t.html}
-            style={{ width: "100%", height: 360, border: "1px solid var(--line-soft)", borderRadius: 6, background: "#fff" }}
+            style={{ width: "100%", height: 360, border: "1px solid var(--ui-border)", borderRadius: 6, background: "#fff" /* design-allow: email preview mimics a mail client */ }}
           />
-          <pre className="font-mono-ndt" style={{ fontSize: 12, whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--fg-soft)", marginTop: 8 }}>
+          <pre className="font-mono-ndt" style={{ fontSize: 12, whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--ui-text-muted)", marginTop: 8 }}>
             {t.text}
           </pre>
         </div>

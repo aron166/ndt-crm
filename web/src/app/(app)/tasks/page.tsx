@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import Link from "next/link";
+import { PageHeader, Seg } from "@/components/astryx/PageHeader";
 import { TasksClient } from "./TasksClient";
 import { TasksKanban } from "./TasksKanban";
 import { NewTaskButton } from "./NewTaskButton";
@@ -81,74 +81,36 @@ export default async function TasksPage({
     },
   });
 
+  const statusSeg = [
+    { key: "open", label: "Nyitott" },
+    { key: "done", label: "Kész" },
+    { key: "all", label: "Mind" },
+  ].map(({ key, label }) => ({ key, label, href: `/tasks?status=${key}&due=${dueFilter}&view=list` }));
+  const dueSeg = [
+    { key: "all", label: "Összes" },
+    { key: "overdue", label: "Lejárt" },
+    { key: "today", label: "Ma" },
+    { key: "week", label: "Héten" },
+  ].map(({ key, label }) => ({ key, label, href: `/tasks?status=${statusFilter}&due=${key}&view=list` }));
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
-        <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)", display: "flex", alignItems: "baseline", gap: 8 }}>
-          Feladatok
-          <span className="font-mono-ndt" style={{ fontSize: 14, color: "var(--fg-faint)", fontWeight: 400 }}>
-            {openCount} nyitott
-            {overdueCount > 0 && (
-              <span style={{ color: "var(--coral)", marginLeft: 6 }}>· {overdueCount} lejárt</span>
-            )}
-          </span>
-        </h1>
-        <div className="flex items-center gap-2">
-          <ViewToggle view={view} statusFilter={statusFilter} dueFilter={dueFilter} />
-          <NewTaskButton />
-        </div>
-      </div>
+      <PageHeader
+        title="Feladatok"
+        eyebrow={<>{openCount} nyitott{overdueCount > 0 && <span style={{ color: "var(--ui-danger-text)" }}> · {overdueCount} lejárt</span>}</>}
+        views={<ViewToggle view={view} statusFilter={statusFilter} dueFilter={dueFilter} />}
+        actions={<NewTaskButton />}
+        filters={
+          view === "list" ? (
+            <>
+              <Seg label="Státusz" current={statusFilter} items={statusSeg} />
+              <Seg label="Határidő" current={dueFilter} items={dueSeg} />
+            </>
+          ) : undefined
+        }
+      />
 
-      {view === "list" && (
-        <>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex items-center gap-0.5" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: 2 }}>
-              {[
-                { key: "open", label: "Nyitott" },
-                { key: "done", label: "Kész" },
-                { key: "all",  label: "Mind" },
-              ].map(({ key, label }) => (
-                <Link
-                  key={key}
-                  href={`/tasks?status=${key}&due=${dueFilter}&view=list`}
-                  className="font-mono-ndt rounded"
-                  style={{
-                    fontSize: 12, padding: "3px 10px",
-                    background: statusFilter === key ? "var(--bg-hover)" : "transparent",
-                    color: statusFilter === key ? "var(--fg)" : "var(--fg-mute)",
-                  }}
-                >
-                  {label}
-                </Link>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-0.5" style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 6, padding: 2 }}>
-              {[
-                { key: "all",     label: "Összes" },
-                { key: "overdue", label: "Lejárt" },
-                { key: "today",   label: "Ma" },
-                { key: "week",    label: "Héten" },
-              ].map(({ key, label }) => (
-                <Link
-                  key={key}
-                  href={`/tasks?status=${statusFilter}&due=${key}&view=list`}
-                  className="font-mono-ndt rounded"
-                  style={{
-                    fontSize: 12, padding: "3px 10px",
-                    background: dueFilter === key ? "var(--bg-hover)" : "transparent",
-                    color: dueFilter === key ? "var(--fg)" : "var(--fg-mute)",
-                  }}
-                >
-                  {label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          <TasksClient tasks={tasksForClient} />
-        </>
-      )}
+      {view === "list" && <TasksClient tasks={tasksForClient} />}
 
       {view === "kanban" && <TasksKanban tasks={tasksForClient} />}
     </div>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseTheme, DEFAULT_THEME } from "./theme";
-import { statusTone, STATUS_TONES } from "@/lib/marketing/types";
+import { statusTone, STATUS_TONES, STATUS_LABELS } from "@/lib/marketing/types";
 
 // The root layout renders whatever this returns into <html data-theme>, so
 // every shape a nullable JSONB column can hand back has to land on a theme
@@ -35,13 +35,15 @@ describe("parseTheme", () => {
 });
 
 describe("statusTone", () => {
-  it("gives every content status its own tone", () => {
-    const fgs = Object.values(STATUS_TONES).map((t) => t.fg);
-    // No two statuses may share a text tone, or the chip stops carrying
-    // meaning on its own — which is the whole reason it is coloured.
-    expect(new Set(fgs).size).toBe(fgs.length);
-    expect(STATUS_TONES.in_review.fg).not.toBe(STATUS_TONES.changes_requested.fg);
-    expect(STATUS_TONES.changes_requested.fg).not.toBe(STATUS_TONES.rewrite_requested.fg);
+  it("keeps a colour only for the meaning states (neutral chips otherwise)", () => {
+    expect(STATUS_TONES.rewrite_requested.fg).not.toBe(STATUS_TONES.draft.fg);
+    expect(STATUS_TONES.live.fg).not.toBe(STATUS_TONES.draft.fg);
+  });
+
+  it("gives every status a non-empty, unique label", () => {
+    const labels = Object.values(STATUS_LABELS);
+    for (const l of labels) expect(l.trim()).not.toBe("");
+    expect(new Set(labels).size).toBe(labels.length);
   });
 
   it("falls back to the draft tone for an unknown status", () => {

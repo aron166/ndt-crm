@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { TaskModal } from "./TaskModal";
+import k from "@/components/astryx/page.module.css";
 
 export function NewTaskButton() {
   const router = useRouter();
@@ -12,13 +12,10 @@ export function NewTaskButton() {
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
-      >
+      <button type="button" onClick={() => setOpen(true)} className={`${k.btn} ${k.btnPrimary}`}>
         <Plus className="size-4" />
         Új feladat
-      </Button>
+      </button>
       <TaskModal
         open={open}
         onClose={() => {

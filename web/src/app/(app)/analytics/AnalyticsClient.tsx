@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { AreaChart } from "@/components/viz/AreaChart";
+import k from "@/components/astryx/page.module.css";
+import s from "./analytics.module.css";
 
 interface RevenueMonth {
   month: string;
@@ -32,87 +34,78 @@ export function AnalyticsClient({
 
   const entityLinks: { label: string; href: string; count: string; accent?: string }[] = [
     { label: "Összes cég",                href: "/companies",                   count: totalCompanies.toLocaleString("hu-HU") },
-    { label: "Soha nem kontaktált",       href: "/companies?never_contacted=1", count: neverContacted.toLocaleString("hu-HU"), accent: "var(--amber)" },
+    { label: "Soha nem kontaktált",       href: "/companies?never_contacted=1", count: neverContacted.toLocaleString("hu-HU"), accent: "var(--ui-text-muted)" },
     { label: "Összes személy",            href: "/persons",                     count: totalPersons.toLocaleString("hu-HU") },
     { label: "Nyitott feladatok",         href: "/tasks?status=open",           count: openTasks > 0 ? openTasks.toLocaleString("hu-HU") : "-" },
     { label: "Aktív dealek",             href: "/deals",                       count: openDeals > 0 ? openDeals.toLocaleString("hu-HU") : "-" },
-    { label: "Összes számla",            href: "/analytics/invoices",          count: "→", accent: "var(--mint)" },
+    { label: "Összes számla",            href: "/analytics/invoices",          count: "→", accent: "var(--ui-text-muted)" },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="tabs-ds">
-        <button className={`tab-ds ${activeSection === "revenue" ? "active" : ""}`} onClick={() => setActiveSection("revenue")}>
+      <div className={k.seg}>
+        <button
+          type="button"
+          aria-pressed={activeSection === "revenue"}
+          className={`${k.segItem} ${s.segBtn} ${activeSection === "revenue" ? k.segItemOn : ""}`}
+          onClick={() => setActiveSection("revenue")}
+        >
           Bevétel · 24 hónap
         </button>
-        <button className={`tab-ds ${activeSection === "explorer" ? "active" : ""}`} onClick={() => setActiveSection("explorer")}>
+        <button
+          type="button"
+          aria-pressed={activeSection === "explorer"}
+          className={`${k.segItem} ${s.segBtn} ${activeSection === "explorer" ? k.segItemOn : ""}`}
+          onClick={() => setActiveSection("explorer")}
+        >
           Adatok böngészése
         </button>
       </div>
 
       {activeSection === "revenue" && (
-        <div className="panel mount">
-          <div className="panel-head">
-            <div className="panel-title">Havi forgalom · elmúlt 24 hónap (M HUF)</div>
+        <section className={k.section}>
+          <div className={s.head}>
+            <h2 className={k.h2}>Havi forgalom · elmúlt 24 hónap (M HUF)</h2>
             {monthSeries.length > 0 && (
-              <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)" }}>
-                {monthSeries.reduce((s, v) => s + v, 0).toFixed(1)}M összesen
+              <span className={k.num} style={{ fontSize: 14, color: "var(--ui-text)" }}>
+                {monthSeries.reduce((sum, v) => sum + v, 0).toFixed(1)}M összesen
               </span>
             )}
           </div>
-          <div style={{ padding: 20 }}>
-            {monthSeries.length >= 2 ? (
-              <>
-                <AreaChart data={monthSeries} height={180} color="var(--mint)" />
-                <div style={{ display: "flex", gap: 4, marginTop: 10, overflowX: "auto", paddingBottom: 4 }}>
-                  {revenueByMonth.map((r, i) => (
-                    <div key={i} style={{ textAlign: "center", flexShrink: 0, minWidth: 36 }}>
-                      <div className="font-mono-ndt" style={{ fontSize: 12, color: r.total > 0 ? "var(--mint)" : "var(--fg-faint)" }}>
-                        {r.total > 0 ? (r.total / 1_000_000).toFixed(0) : "-"}
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--fg-faint)" }}>{monthLabels[i]}</div>
+          {monthSeries.length >= 2 ? (
+            <>
+              <AreaChart data={monthSeries} height={180} color="var(--ui-chart-1)" />
+              <div className={s.years}>
+                {revenueByMonth.map((r, i) => (
+                  <div key={i} style={{ textAlign: "center", flexShrink: 0, minWidth: 36 }}>
+                    <div className={k.num} style={{ fontSize: 14, color: r.total > 0 ? "var(--ui-text)" : "var(--ui-text-muted)" }}>
+                      {r.total > 0 ? (r.total / 1_000_000).toFixed(0) : "-"}
                     </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p style={{ fontSize: 14, color: "var(--fg-faint)", textAlign: "center", padding: "32px 0" }}>
-                Nincs számla adat az elmúlt 24 hónapra.
-              </p>
-            )}
-          </div>
-        </div>
+                    <div className={s.axis}>{monthLabels[i]}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className={`${k.empty} ${s.center}`}>
+              Nincs számla adat az elmúlt 24 hónapra.
+            </p>
+          )}
+        </section>
       )}
 
       {activeSection === "explorer" && (
-        <div className="panel mount">
-          <div className="panel-head">
-            <div className="panel-title">Adatok böngészése</div>
+        <section className={k.section}>
+          <h2 className={k.h2}>Adatok böngészése</h2>
+          <div className={s.links}>
+            {entityLinks.map(({ label, href, count, accent }) => (
+              <a key={label} href={href} className={s.linkTile}>
+                <span>{label}</span>
+                <span className={k.num} style={{ fontSize: 14, color: accent ?? "var(--ui-accent)" }}>{count}</span>
+              </a>
+            ))}
           </div>
-          <div style={{ padding: 20 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {entityLinks.map(({ label, href, count, accent }) => (
-                <a
-                  key={label}
-                  href={href}
-                  className="flex items-center justify-between rounded-lg"
-                  style={{
-                    padding: "12px 14px",
-                    background: "var(--bg-0)",
-                    border: "1px solid var(--line-soft)",
-                    fontSize: 14, color: "var(--fg-soft)",
-                    transition: "border-color .15s, background .15s",
-                  }}
-                  onMouseOver={(e) => { e.currentTarget.style.borderColor = "var(--indigo-line)"; e.currentTarget.style.background = "var(--indigo-soft)"; }}
-                  onMouseOut={(e) => { e.currentTarget.style.borderColor = "var(--line-soft)"; e.currentTarget.style.background = "var(--bg-0)"; }}
-                >
-                  <span>{label}</span>
-                  <span className="font-mono-ndt" style={{ fontSize: 12, color: accent ?? "var(--indigo)" }}>{count}</span>
-                </a>
-              ))}
-            </div>
-          </div>
-        </div>
+        </section>
       )}
     </div>
   );

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface Option {
   id: number;
@@ -74,13 +75,13 @@ export function EntitySearch({
 
   if (value) {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-input bg-transparent text-sm">
+      <div className="flex items-center gap-2 px-3 py-1.5 border border-[var(--ui-border-strong)] bg-[var(--ui-surface)] text-sm text-[var(--ui-text)]" style={{ borderRadius: "var(--ui-radius-control)" }}>
         <span className="flex-1 truncate">{value.label}</span>
-        {value.sub && <span className="text-xs text-slate-400 shrink-0">{value.sub}</span>}
+        {value.sub && <span className="text-xs text-[var(--ui-text-muted)] shrink-0">{value.sub}</span>}
         {!disabled && (
-          <button type="button" onClick={handleClear} className="text-slate-400 hover:text-slate-700 shrink-0">
+          <Button type="button" variant="ghost" size="icon-xs" onClick={handleClear} aria-label="Törlés" /* PROPOSAL copy */>
             <X className="size-3.5" />
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -88,39 +89,36 @@ export function EntitySearch({
 
   return (
     <div ref={containerRef} className="relative">
-      <input
+      <Input
         type="text"
         value={query}
         onChange={handleInput}
         placeholder={placeholder}
         disabled={disabled}
-        className={cn(
-          "flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
-        )}
       />
       {loading && (
-        <span className="absolute right-2 top-2 text-xs text-slate-400">...</span>
+        <span className="absolute right-2 top-2.5 text-xs text-[var(--ui-text-muted)]">...</span>
       )}
       {open && options.length > 0 && (
-        <ul style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", boxShadow: "0 8px 24px var(--shadow-color)", maxHeight: 200, overflowY: "auto", listStyle: "none", padding: 0, margin: "4px 0 0" }}>
+        <ul style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: "var(--ui-radius-surface)", background: "var(--ui-surface-overlay)", boxShadow: "var(--ui-shadow-overlay)", maxHeight: 200, overflowY: "auto", listStyle: "none", padding: 0, margin: "4px 0 0" }}>
           {options.map((opt) => (
             <li key={opt.id}>
               <button
                 type="button"
-                style={{ width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 14, color: "var(--fg-soft)", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "background .1s" }}
-                onMouseOver={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+                style={{ width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 14, color: "var(--ui-text-muted)", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "background .1s" }}
+                onMouseOver={(e) => (e.currentTarget.style.background = "var(--ui-hover)")}
                 onMouseOut={(e) => (e.currentTarget.style.background = "none")}
                 onClick={() => handleSelect(opt)}
               >
                 <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.label}</span>
-                {opt.sub && <span style={{ fontSize: 12, color: "var(--fg-faint)", flexShrink: 0, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.sub}</span>}
+                {opt.sub && <span style={{ fontSize: 12, color: "var(--ui-text-muted)", flexShrink: 0, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.sub}</span>}
               </button>
             </li>
           ))}
         </ul>
       )}
       {open && !loading && options.length === 0 && query.length > 1 && (
-        <div style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: 8, border: "1px solid var(--line-soft)", background: "var(--bg-panel)", padding: "8px 12px", fontSize: 14, color: "var(--fg-faint)" }}>
+        <div style={{ position: "absolute", zIndex: 50, marginTop: 4, width: "100%", borderRadius: "var(--ui-radius-surface)", background: "var(--ui-surface-overlay)", boxShadow: "var(--ui-shadow-overlay)", padding: "8px 12px", fontSize: 14, color: "var(--ui-text-muted)" }}>
           Nincs találat
         </div>
       )}

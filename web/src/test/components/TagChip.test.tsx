@@ -27,15 +27,11 @@ describe("TagChip", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("uses dark text on light background", () => {
-    const { container } = render(<TagChip name="light" color="#ffffff" />);
-    const span = container.querySelector("span");
-    expect(span?.style.color).toBe("rgb(30, 41, 59)"); // #1e293b
-  });
-
-  it("uses light text on dark background", () => {
-    const { container } = render(<TagChip name="dark" color="#1e293b" />);
-    const span = container.querySelector("span");
-    expect(span?.style.color).toBe("rgb(255, 255, 255)");
+  it("keeps the tag colour as a small dot on a neutral chip", () => {
+    const { container } = render(<TagChip name="dot" color="#22c55e" />);
+    const chip = container.querySelector("span");
+    const dot = chip?.querySelector("span[aria-hidden]") as HTMLElement | null;
+    expect(chip?.style.backgroundColor).toBe("var(--ui-surface-muted)");
+    expect(dot?.style.backgroundColor).toBe("rgb(34, 197, 94)");
   });
 });

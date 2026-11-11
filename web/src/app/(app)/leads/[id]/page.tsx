@@ -11,6 +11,7 @@ import { minutesToFirstContact } from "@/lib/leads/first-contact";
 import { INTENT_LABEL, callWindowLabel } from "@/lib/leads/intake-notify";
 import { LeadOffersPanel } from "./LeadOffersPanel";
 import { LeadDetailClient } from "./LeadDetailClient";
+import s from "./v2/lead2.module.css";
 
 const TENANT_ID = 1;
 
@@ -41,7 +42,7 @@ export default async function LeadDetailPage({
 
   const personId = lead.contact?.person?.id ?? null;
 
-  const [interactions, auditEntries, statuses, users, openTasks, questionModel, scriptVariants, callTypeGroups, offers, documents] = await Promise.all([
+  const [interactions, auditEntries, statuses, users, openTasks, questionModel, scriptVariants, callTypeGroups, offers, documents, statusHistory, datedTasks] = await Promise.all([
     // Per-lead touches first-class (leadId), plus the person/company timeline
     // so older/company-level history still shows. Newest first, bounded.
     db.interaction.findMany({
@@ -64,7 +65,8 @@ export default async function LeadDetailPage({
     }),
     getEntityHistory("lead", leadId),
     getLeadStatuses(TENANT_ID),
-    db.user.findMany({ where: { tenantId: TENANT_ID }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    // A lead already owned by a @system user keeps that owner in the select.
+    db.user.findMany({ where: { tenantId: TENANT_ID, OR: [{ email: { not: { endsWith: "@system" } } }, { assignedLeads: { some: { id: leadId, tenantId: TENANT_ID } } }] }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     db.task.findMany({
       where: { tenantId: TENANT_ID, leadId, status: { in: ["created", "in_progress"] } },
       select: { id: true, title: true, dueDate: true, type: true, assignedTo: { select: { name: true } } },
@@ -88,6 +90,19 @@ export default async function LeadDetailPage({
       orderBy: { createdAt: "desc" },
       select: { id: true, kind: true, number: true, createdAt: true },
     }),
+    // Read-only inputs for the single timeline.
+    db.leadStatusHistory.findMany({
+      where: { tenantId: TENANT_ID, leadId },
+      select: { id: true, fromStatus: true, toStatus: true, event: true, at: true, actorUser: { select: { name: true } } },
+      orderBy: { at: "desc" },
+      take: 50,
+    }),
+    db.task.findMany({
+      where: { tenantId: TENANT_ID, leadId, dueDate: { not: null }, OR: [{ status: { in: ["created", "in_progress"] } }, { type: "meeting" }] },
+      select: { id: true, title: true, type: true, status: true, dueDate: true },
+      orderBy: { dueDate: "desc" },
+      take: 30,
+    }),
   ]);
 
   const firstContactMin = minutesToFirstContact(
@@ -110,18 +125,14 @@ export default async function LeadDetailPage({
 
   return (
     <div className="mount">
-      <div style={{ marginBottom: 16 }}>
-        <Link
-          href="/leads"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
-          className="row-link"
-        >
-          <ArrowLeft style={{ width: 14, height: 14 }} />
-          Vissza a leadekhez
-        </Link>
-      </div>
+      <Link href="/leads" className={s.back}>
+        <ArrowLeft size={14} />
+        {/* PROPOSAL copy */}
+        Vissza a leadekhez
+      </Link>
 
       <LeadDetailClient
+        key={leadId}
         keyFacts={keyFacts}
         firstContactMin={firstContactMin}
         lead={serializeDates({
@@ -140,6 +151,12 @@ export default async function LeadDetailPage({
         answerSources={answerSourcesFrom(lead.answerSources)}
         scriptVariants={scriptVariants}
         callTypeCounts={callTypeGroups.map((g) => ({ callType: g.callType, count: g._count._all }))}
+        statusHistory={serializeDates(statusHistory)}
+        datedTasks={serializeDates(datedTasks)}
+        offers={serializeDates(offers)}
+        documents={serializeDates(documents)}
+        // The booking API refuses a lead that is not open (409), so a closed lead gets the note, not the search.
+        leadOpen={lead.outcome === "open" && lead.convertedDealId == null}
         offersPanel={<LeadOffersPanel leadId={leadId} offers={serializeDates(offers)} documents={serializeDates(documents)} status={lead.status} />}
       />
     </div>

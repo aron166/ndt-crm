@@ -24,17 +24,17 @@ export function DossierTab({ enrichment, closenessScore, enrichmentUpdatedAt, em
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span className="h-section" style={{ margin: 0 }}>Kapcsolati pontszám</span>
-          <span style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--font-mono)", color: "var(--fg)" }}>
+          <span style={{ fontSize: 20, fontWeight: 600, color: "var(--ui-text)" }}>
             {closenessScore ?? "-"}
           </span>
         </div>
-        <span style={{ fontSize: 12, color: "var(--fg-faint)" }}>
+        <span style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
           Frissítve: {formatDate(enrichmentUpdatedAt)}
         </span>
       </div>
 
       {!hasContent ? (
-        <p style={{ fontSize: 14, color: "var(--fg-faint)" }}>{emptyText}</p>
+        <p style={{ fontSize: 14, color: "var(--ui-text-muted)" }}>{emptyText}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
           {(dossier!.apropo?.length ?? 0) > 0 && (
@@ -42,7 +42,7 @@ export function DossierTab({ enrichment, closenessScore, enrichmentUpdatedAt, em
               <div className="field-label" style={{ marginBottom: 8 }}>Apropó</div>
               <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 }}>
                 {dossier!.apropo!.map((line, i) => (
-                  <li key={i} style={{ fontSize: 16, fontWeight: 500, color: "var(--fg)", lineHeight: 1.5 }}>
+                  <li key={i} style={{ fontSize: 16, fontWeight: 500, color: "var(--ui-text)", lineHeight: 1.5 }}>
                     {line}
                   </li>
                 ))}
@@ -51,7 +51,7 @@ export function DossierTab({ enrichment, closenessScore, enrichmentUpdatedAt, em
           )}
 
           {dossier!.summary && (
-            <p style={{ fontSize: 14, color: "var(--fg-soft)", lineHeight: 1.6, margin: 0 }}>
+            <p style={{ fontSize: 14, color: "var(--ui-text-muted)", lineHeight: 1.6, margin: 0 }}>
               {dossier!.summary}
             </p>
           )}
@@ -63,24 +63,24 @@ export function DossierTab({ enrichment, closenessScore, enrichmentUpdatedAt, em
                 {sortDossierItems(dossier!.items!).map((item, i) => {
                   const href = safeHttpUrl(item.url);
                   return (
-                    <div key={i} style={{ borderBottom: "1px solid var(--line-soft)", paddingBottom: 10 }}>
+                    <div key={i} style={{ borderBottom: "1px solid var(--ui-border)", paddingBottom: 10 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                         {item.date && (
-                          <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--fg-faint)" }}>
+                          <span style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>
                             {item.date}
                           </span>
                         )}
-                        <span style={{ fontSize: 14, fontWeight: 500, color: "var(--fg)" }}>{item.title}</span>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ui-text)" }}>{item.title}</span>
                       </div>
                       {item.detail && (
-                        <p style={{ fontSize: 13, color: "var(--fg-mute)", margin: "4px 0 0", lineHeight: 1.5 }}>
+                        <p style={{ fontSize: 13, color: "var(--ui-text-muted)", margin: "4px 0 0", lineHeight: 1.5 }}>
                           {item.detail}
                         </p>
                       )}
                       {(item.source || href) && (
-                        <div style={{ marginTop: 4, fontSize: 12, color: "var(--fg-faint)" }}>
+                        <div style={{ marginTop: 4, fontSize: 12, color: "var(--ui-text-muted)" }}>
                           {href ? (
-                            <a href={href} target="_blank" rel="noreferrer" style={{ color: "var(--indigo)" }}>
+                            <a href={href} target="_blank" rel="noreferrer" style={{ color: "var(--ui-text-link)" }}>
                               {item.source || href}
                             </a>
                           ) : (
@@ -100,7 +100,7 @@ export function DossierTab({ enrichment, closenessScore, enrichmentUpdatedAt, em
               <div className="field-label" style={{ marginBottom: 8 }}>Forrás</div>
               <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
                 {dossier!.sources!.map((s, i) => (
-                  <li key={i} style={{ fontSize: 12, color: "var(--fg-faint)" }}>{s}</li>
+                  <li key={i} style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>{s}</li>
                 ))}
               </ul>
             </div>

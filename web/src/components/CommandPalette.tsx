@@ -6,7 +6,7 @@ import { globalSearch, type SearchResults } from "@/app/actions/search";
 import { Building2, Users, TrendingUp, CheckSquare, Tag, Search, X } from "lucide-react";
 import { PipelineStatusBadge } from "./PipelineStatusBadge";
 import { TaskStatusBadge } from "./TaskStatusBadge";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const EMPTY: SearchResults = { companies: [], persons: [], deals: [], tasks: [], tags: [] };
 
@@ -28,7 +28,7 @@ function hrefFor(item: ResultItem): string {
 }
 
 function iconFor(kind: ResultItem["kind"]) {
-  const s = { width: 14, height: 14, flexShrink: 0 as const, color: "var(--fg-faint)" };
+  const s = { width: 14, height: 14, flexShrink: 0 as const, color: "var(--ui-text-muted)" };
   switch (kind) {
     case "company": return <Building2 style={s} />;
     case "person":  return <Users style={s} />;
@@ -123,21 +123,21 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]"
-      style={{ background: "var(--overlay)", backdropFilter: "blur(6px)" }}
+      style={{ background: "var(--ui-scrim)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl rounded-xl overflow-hidden mount"
+        className="w-full max-w-xl overflow-hidden mount"
         style={{
-          background: "var(--bg-panel)",
-          border: "1px solid var(--line)",
-          boxShadow: "var(--glow-indigo), 0 24px 64px -12px var(--shadow-heavy)",
+          background: "var(--ui-surface-overlay)",
+          borderRadius: "var(--ui-radius-surface)",
+          boxShadow: "var(--ui-shadow-overlay)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4" style={{ borderBottom: "1px solid var(--line-soft)", height: 52 }}>
-          <Search style={{ width: 16, height: 16, color: "var(--fg-faint)", flexShrink: 0 }} />
+        <div className="flex items-center gap-3 px-4" style={{ borderBottom: "1px solid var(--ui-border)", height: 52 }}>
+          <Search style={{ width: 16, height: 16, color: "var(--ui-text-muted)", flexShrink: 0 }} />
           <input
             ref={inputRef}
             value={query}
@@ -146,16 +146,16 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             placeholder="Keresés cégekben, személyekben, dealekben..."
             style={{
               flex: 1, background: "transparent", border: "none", outline: "none",
-              fontSize: 14, color: "var(--fg)",
+              fontSize: 14, color: "var(--ui-text)",
             }}
           />
           {query && (
-            <button onClick={() => { setQuery(""); setResults(EMPTY); inputRef.current?.focus(); }}
-              style={{ color: "var(--fg-faint)", cursor: "pointer" }}>
+            <Button type="button" variant="ghost" size="icon-xs" aria-label="Törlés" /* PROPOSAL copy */
+              onClick={() => { setQuery(""); setResults(EMPTY); inputRef.current?.focus(); }}>
               <X style={{ width: 14, height: 14 }} />
-            </button>
+            </Button>
           )}
-          <kbd style={{ fontFamily: "var(--font-geist-mono)", fontSize: 12, padding: "2px 6px", background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 4, color: "var(--fg-faint)" }}>
+          <kbd className="ui-code" style={{ fontSize: 12, padding: "2px 6px", background: "var(--ui-surface-muted)", border: "1px solid var(--ui-border)", borderRadius: "var(--ui-radius-control)", color: "var(--ui-text-muted)" }}>
             ESC
           </kbd>
         </div>
@@ -163,14 +163,14 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         {/* Results */}
         <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
           {!query.trim() && (
-            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
+            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--ui-text-muted)" }}>
               Kezdj el gépelni a kereséshez...
             </div>
           )}
 
           {query.trim() && !hasResults && (
-            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--fg-faint)" }}>
-              Nincs találat: <strong style={{ color: "var(--fg-mute)" }}>{query}</strong>
+            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 14, color: "var(--ui-text-muted)" }}>
+              Nincs találat: <strong style={{ color: "var(--ui-text-muted)" }}>{query}</strong>
             </div>
           )}
 
@@ -179,8 +179,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               <div style={{
                 padding: "8px 16px 4px",
                 fontSize: 12, fontWeight: 600,
-                textTransform: "uppercase", letterSpacing: "0.1em",
-                color: "var(--fg-faint)",
+                color: "var(--ui-text-muted)",
               }}>
                 {GROUP_LABELS[kind]}
               </div>
@@ -194,17 +193,17 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     onMouseEnter={() => setActiveIdx(idx)}
                     className="w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors"
                     style={{
-                      background: isActive ? "var(--tint-faint)" : "transparent",
-                      borderLeft: isActive ? "2px solid var(--indigo)" : "2px solid transparent",
+                      background: isActive ? "var(--ui-hover)" : "transparent",
+                      borderLeft: isActive ? "2px solid var(--ui-accent)" : "2px solid transparent",
                     }}
                   >
                     {iconFor(item.kind)}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, color: "var(--fg)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 14, color: "var(--ui-text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {item.label}
                       </div>
                       {"sub" in item && item.sub && (
-                        <div style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 1 }}>{item.sub}</div>
+                        <div style={{ fontSize: 12, color: "var(--ui-text-muted)", marginTop: 1 }}>{item.sub}</div>
                       )}
                     </div>
                     {item.kind === "company" && item.status && (
@@ -215,12 +214,12 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     )}
                     {item.kind === "tag" && (
                       <div className="flex items-center gap-2">
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, boxShadow: `0 0 var(--glow-size) ${item.color}` }} />
-                        <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--fg-faint)" }}>{item.count}</span>
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color }} />
+                        <span style={{ fontSize: 12, color: "var(--ui-text-muted)" }}>{item.count}</span>
                       </div>
                     )}
                     {item.kind === "deal" && item.value && (
-                      <span className="font-mono-ndt" style={{ fontSize: 12, color: "var(--mint)" }}>
+                      <span style={{ fontSize: 12, color: "var(--ui-success-text)" }}>
                         {Math.round(item.value).toLocaleString("hu-HU")} HUF
                       </span>
                     )}
@@ -233,7 +232,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
         {/* Footer hint */}
         {hasResults && (
-          <div className="flex items-center gap-4 px-4" style={{ height: 36, borderTop: "1px solid var(--line-soft)", fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-geist-mono)" }}>
+          <div className="flex items-center gap-4 px-4" style={{ height: 36, borderTop: "1px solid var(--ui-border)", fontSize: 12, color: "var(--ui-text-muted)" }}>
             <span>↑↓ navigáció</span>
             <span>↵ megnyitás</span>
             <span>ESC bezárás</span>

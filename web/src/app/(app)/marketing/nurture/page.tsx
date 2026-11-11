@@ -3,7 +3,7 @@ import { getActor } from "@/lib/actor";
 import { demoHostsFromSettings } from "@/lib/booking/queries";
 import { offerConfigFromSettings } from "@/lib/offers/offer";
 import { renderBody } from "@/lib/nurture/render";
-import { MarketingTabs } from "../MarketingTabs";
+import { MarketingHeader } from "../MarketingTabs";
 import { TemplateList } from "./TemplateList";
 
 const TENANT_ID = 1;
@@ -46,30 +46,30 @@ export default async function NurturePage() {
 
   return (
     <div className="mount">
-      <MarketingTabs active="nurture" />
+      <MarketingHeader active="nurture" title="Hírlevél" />
 
       <div className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-pad">
           <strong>Hírlevél-küldés: {enabled ? "BE" : "KI"}</strong>
-          <span style={{ color: "var(--fg-mute)", marginLeft: 12, fontSize: 13 }}>Aláírásra váró sablon: {waiting}</span>
+          <span style={{ color: "var(--ui-text-muted)", marginLeft: 12, fontSize: 13 }}>Aláírásra váró sablon: {waiting}</span>
         </div>
       </div>
 
       <div className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-head">Szekvenciák</div>
         <div className="panel-pad">
-          {sequences.length === 0 && <p style={{ color: "var(--fg-mute)", fontSize: 13 }}>Nincs szekvencia.</p>}
+          {sequences.length === 0 && <p style={{ color: "var(--ui-text-muted)", fontSize: 13 }}>Nincs szekvencia.</p>}
           {sequences.map((s) => (
             <div key={s.id} style={{ marginBottom: 16 }}>
               <strong style={{ fontSize: 14 }}>{SEGMENT[s.segment] ?? s.segment}</strong>
-              <span style={{ fontSize: 12, color: "var(--fg-mute)", marginLeft: 8 }}>
+              <span style={{ fontSize: 12, color: "var(--ui-text-muted)", marginLeft: 8 }}>
                 {s.name}{s.active ? "" : " (inaktív)"} | {enrollGroups.filter((g) => g.sequenceId === s.id).map((g) => `${g.status}: ${g._count._all}`).join(", ") || "nincs feliratkozás"}
               </span>
               {s.steps.map((st) => (
                 <div key={st.id} style={{ fontSize: 13, padding: "4px 0", display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <span>{st.delayDays}. nap</span>
                   <span className="font-mono-ndt">{st.templateKey}</span>
-                  <span style={{ color: "var(--fg-mute)" }}>{AUDIENCE[st.audience] ?? st.audience}</span>
+                  <span style={{ color: "var(--ui-text-muted)" }}>{AUDIENCE[st.audience] ?? st.audience}</span>
                   <span>{stepState(st.templateKey)}</span>
                 </div>
               ))}
@@ -81,7 +81,7 @@ export default async function NurturePage() {
       <div className="panel" style={{ marginBottom: 16 }}>
         <div className="panel-head">Sablonok</div>
         <div className="panel-pad">
-          {rows.length === 0 && <p style={{ color: "var(--fg-mute)", fontSize: 13 }}>Nincs sablon.</p>}
+          {rows.length === 0 && <p style={{ color: "var(--ui-text-muted)", fontSize: 13 }}>Nincs sablon.</p>}
           <TemplateList rows={rows} canApprove={canApprove} />
         </div>
       </div>
@@ -97,7 +97,7 @@ export default async function NurturePage() {
               </div>
             );
           })}
-          {events.length === 0 && <p style={{ color: "var(--fg-mute)", fontSize: 13 }}>Még nincs esemény.</p>}
+          {events.length === 0 && <p style={{ color: "var(--ui-text-muted)", fontSize: 13 }}>Még nincs esemény.</p>}
         </div>
       </div>
     </div>

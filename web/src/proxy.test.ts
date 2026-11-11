@@ -12,6 +12,7 @@ describe("isServiceApiPath", () => {
     "/api/leads",
     "/api/leads/12",
     "/api/leads/12/interactions",
+    "/api/suppressions",
     "/api/content",
     "/api/content/queue",
     "/api/content/live",
@@ -48,6 +49,7 @@ describe("isServiceApiPath", () => {
     "/api/companies/abc",
     "/companies/42",
     "/leads",
+    "/api/suppressions/anything", // exact match only
     "/api/content/12", // no item route for apps
     "/api/content/12/review", // an app must never reach a verdict route
     "/api/content/abc/claim",

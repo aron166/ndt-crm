@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export interface DeleteCascade {
   company: boolean;
@@ -38,46 +39,42 @@ export function DeleteCardDialog({ open, kind, label, company, person, onConfirm
           <DialogTitle>{kind === "lead" ? "Lead-kártya törlése" : "Deal törlése"}</DialogTitle>
         </DialogHeader>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <p style={{ margin: 0, fontSize: 14, color: "var(--fg-soft)" }}>
-            Biztosan törlöd ezt a {cardWord}: <strong style={{ color: "var(--fg)" }}>{label}</strong>?
+          <p style={{ margin: 0, fontSize: 14, color: "var(--ui-text-muted)" }}>
+            Biztosan törlöd ezt a {cardWord}: <strong style={{ color: "var(--ui-text)" }}>{label}</strong>?
           </p>
 
           {(company || person) && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <p style={{ margin: 0, fontSize: 12, color: "var(--fg-faint)" }}>
+              <p style={{ margin: 0, fontSize: 12, color: "var(--ui-text-muted)" }}>
                 Alapból csak a kártya tűnik el. Opcionálisan a kapcsolódó rekordok is törölhetők
                 (visszaállíthatók):
               </p>
               {company && (
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--fg-soft)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--ui-text-muted)" }}>
                   <input type="checkbox" checked={delCompany} onChange={(e) => setDelCompany(e.target.checked)} />
-                  A(z) <strong style={{ color: "var(--fg)" }}>{company.name}</strong> cég törlése is
+                  A(z) <strong style={{ color: "var(--ui-text)" }}>{company.name}</strong> cég törlése is
                 </label>
               )}
               {person && (
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--fg-soft)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--ui-text-muted)" }}>
                   <input type="checkbox" checked={delPerson} onChange={(e) => setDelPerson(e.target.checked)} />
-                  <strong style={{ color: "var(--fg)" }}>{person.name}</strong> személy törlése is
+                  <strong style={{ color: "var(--ui-text)" }}>{person.name}</strong> személy törlése is
                 </label>
               )}
             </div>
           )}
 
-          <p style={{ margin: 0, fontSize: 12, color: "var(--fg-faint)" }}>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--ui-text-muted)" }}>
             Az interakciók megmaradnak (csak hozzáfűzhető napló).
             {delCompany && " A cég minden más kapcsolatából is eltűnik: később visszaállítható."}
           </p>
 
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="btn" onClick={onClose}>Mégse</button>
-            <button
-              className="btn"
-              style={{ background: "var(--coral)", color: "#fff", borderColor: "var(--coral)" }}
-              onClick={() => onConfirm({ company: delCompany, person: delPerson })}
-            >
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Mégse</Button>
+            <Button type="button" variant="destructive" className="bg-[var(--ui-danger)] text-[var(--ui-on-danger)] border-transparent hover:bg-[var(--ui-danger)]" onClick={() => onConfirm({ company: delCompany, person: delPerson })}>
               Törlés
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </div>
       </DialogContent>
     </Dialog>

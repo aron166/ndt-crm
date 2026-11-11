@@ -1,6 +1,23 @@
+/* Astryx beside Tailwind 4 (PICK.md, astryx docs styling-libraries/tailwind):
+   this layer order MUST come before the Tailwind import, or the Astryx reset
+   silently outranks every utility class. */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+@import "../styles/tokens.css";
+
+/* Astryx type: Figtree (theme-neutral's face) loaded by next/font, not the
+   theme's render-blocking Google @import. */
+[data-astryx-theme="neutral"] {
+  --font-family-body: var(--font-sans), -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-family-heading: var(--font-sans), -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-family-code: var(--font-geist-mono), ui-monospace, monospace;
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -257,6 +274,64 @@
   --bg-sidebar-blur:  oklch(0.972 0.005 258 / 0.95);
 }
 
+/* Legacy token bridge (Astryx redesign, 2026-11-10). Every screen not yet rebuilt on the page kit still reads the
+   old --bg-/--fg-/--indigo- vars; inside the Astryx theme they resolve to Astryx tokens, so old and new screens
+   share one palette. Declared on the theme element because Astryx tokens live there, not on :root (a var() in a
+   custom property resolves where it is declared). Aliases (--bg-1, shadcn --card...) are redeclared for the same
+   reason. Status hues (amber, mint, coral, sky) keep their light values: they carry meaning. Remove a line once no
+   screen reads that var. */
+[data-astryx-theme="neutral"] {
+  --bg-page: var(--ui-page);
+  --bg-panel: var(--ui-surface);
+  --bg-raised: var(--ui-surface-muted);
+  --bg-hover: color-mix(in srgb, var(--ui-text) 7%, var(--ui-surface));
+  --bg-popover: var(--ui-surface-overlay);
+  --bg-col: var(--ui-surface-muted);
+  --bg-thead: var(--ui-surface-muted);
+  --line: var(--ui-border-strong);
+  --line-soft: var(--ui-border);
+  --line-strong: var(--ui-border-strong);
+  --fg: var(--ui-text);
+  --fg-soft: var(--ui-text-muted);
+  --fg-mute: var(--ui-text-muted);
+  --fg-faint: var(--ui-text-muted);
+  --indigo: var(--ui-accent);
+  --indigo-dim: var(--ui-accent);
+  --indigo-soft: var(--ui-surface-muted);
+  --indigo-line: var(--ui-border-strong);
+  --indigo-fg: var(--ui-text-link);
+  --row-hover: var(--ui-hover);
+  --tint-faint: var(--ui-hover);
+  --tint-faintest: var(--ui-hover);
+  --fg-on-accent: var(--ui-on-accent);
+  --shadow-card: var(--ui-shadow-raised);
+  --shadow-primary: none;
+  --shadow-primary-hover: var(--ui-shadow-raised);
+  --glow-indigo: 0 0 0 1px var(--ui-border-strong);
+  --ring-indigo: 0 0 0 2px var(--ui-surface-muted);
+  --bg-0: var(--bg-page);
+  --bg-1: var(--bg-panel);
+  --bg-2: var(--bg-raised);
+  --bg-3: var(--bg-hover);
+  --background: var(--bg-page);
+  --foreground: var(--fg);
+  --card: var(--bg-panel);
+  --card-foreground: var(--fg);
+  --popover: var(--bg-popover);
+  --popover-foreground: var(--fg);
+  --primary: var(--ui-accent);
+  --primary-foreground: var(--ui-on-accent);
+  --secondary: var(--bg-raised);
+  --secondary-foreground: var(--fg-soft);
+  --muted: var(--bg-raised);
+  --muted-foreground: var(--fg-mute);
+  --accent: var(--bg-hover);
+  --accent-foreground: var(--fg);
+  --border: var(--line-soft);
+  --input: var(--line);
+  --ring: var(--ui-accent);
+}
+
 @theme inline {
   /* shadcn token passthrough */
   --color-background:              var(--background);
@@ -428,10 +503,13 @@
 }
 
 /* ── Utilities ───────────────────────────────────────────────── */
+/* 40 files use this for chips, dates and labels as well as ids; Áron read the mono chips as old and hard to scan
+   (2026-11-10). The design layer keeps the body face with tabular figures; real codes use .ui-code. */
 .font-mono-ndt {
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-feature-settings: 'tnum', 'zero';
+  font-family: var(--ui-font);
+  font-variant-numeric: tabular-nums;
 }
+.ui-code { font-family: var(--ui-font-mono); font-feature-settings: 'tnum', 'zero'; }
 .tabular { font-variant-numeric: tabular-nums; }
 
 /* Animations */
@@ -482,7 +560,7 @@
 
 /* ── Table / list row hover (server-component safe CSS-only approach) ── */
 .tbl-row { transition: background 0.10s; }
-.tbl-row:hover { background: var(--row-hover) !important; cursor: pointer; }
+.tbl-row:hover { background: var(--ui-hover) !important; cursor: pointer; }
 .tbl-row:hover .tbl-link { color: var(--indigo); }
 
 .tbl-link { color: var(--fg); font-weight: 500; }
@@ -502,11 +580,11 @@
 /* Complete circle button */
 .complete-btn {
   width: 18px; height: 18px; border-radius: 50%;
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--ui-border-strong);
   background: transparent; cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.complete-btn:hover { border-color: var(--mint); background: var(--mint-soft); }
+.complete-btn:hover { border-color: var(--ui-success); background: var(--ui-success-surface); }
 
 /* ── Mockup CSS variable aliases ──────────────────────────── */
 :root {
@@ -526,58 +604,65 @@
 @layer components {
 
 .btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  height: 32px; padding: 0 12px;
-  font-size: 13px; font-weight: 500;
-  border-radius: var(--r);
-  border: 1px solid var(--line);
-  background: var(--bg-1);
-  color: var(--fg);
-  /* Spring-curve easing — no linear/ease-in-out */
-  transition: all 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  box-sizing: border-box; min-height: var(--ui-control-h); padding: 0 16px;
+  font-size: var(--ui-text-md); font-weight: 600;
+  border-radius: var(--ui-radius-control);
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  transition: background var(--ui-dur-fast) var(--ui-ease-out);
   white-space: nowrap;
   cursor: pointer;
-  will-change: transform;
 }
-.btn:hover { background: var(--bg-2); border-color: var(--line-strong); transform: translateY(-1px); }
-/* Tactile feedback: physical push on :active */
-.btn:active { transform: translateY(0) scale(0.98); transition-duration: 80ms; }
-.btn.primary {
-  background: linear-gradient(180deg, var(--indigo), var(--indigo-dim));
-  border-color: var(--indigo-dim);
-  color: var(--primary-foreground);
-  box-shadow: var(--shadow-primary);
-}
-.btn.primary:hover { filter: brightness(1.1); box-shadow: var(--shadow-primary-hover); }
-.btn.ghost { background: transparent; border-color: transparent; color: var(--fg-soft); }
-.btn.ghost:hover { background: var(--bg-1); color: var(--fg); }
-.btn.sm { height: 26px; padding: 0 10px; font-size: 12px; }
+.btn:hover { background: var(--ui-hover); }
+.btn:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+.btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.btn.primary { background: var(--ui-accent); border-color: var(--ui-accent); color: var(--ui-on-accent); }
+.btn.primary:hover { background: color-mix(in srgb, var(--ui-accent) 85%, white); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--ui-text); }
+.btn.ghost:hover { background: var(--ui-hover); }
+.btn.sm { min-height: 36px; padding: 0 12px; font-size: var(--ui-text-sm); }
+@media (pointer: coarse) { .btn, .btn.sm { min-height: var(--ui-control-h-touch); } }
 
 .panel {
-  background: var(--bg-1);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-md);
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius-surface);
   position: relative;
-  /* Inner top-edge highlight — simulates physical panel depth */
-  box-shadow: inset 0 1px 0 var(--panel-edge);
+  box-shadow: var(--ui-shadow-raised);
 }
 .panel-pad { padding: 20px; }
 .panel-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--line-soft);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ui-border);
 }
 .panel-title {
-  font-size: 13px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--fg-mute);
+  font-size: var(--ui-text-lg); font-weight: 600;
+  color: var(--ui-text);
   display: flex; align-items: center; gap: 8px;
 }
+
+/* Form controls (FormField wrapper + legacy input classes) */
+.field-group { display: flex; flex-direction: column; gap: 4px; }
+.input-ds {
+  box-sizing: border-box; width: 100%; min-height: var(--ui-control-h); padding: 0 12px;
+  font: inherit; font-size: var(--ui-text-md);
+  background: var(--ui-surface); color: var(--ui-text);
+  border: 1px solid var(--ui-control-border); border-radius: var(--ui-radius-control);
+}
+@media (pointer: coarse) { .input-ds { font-size: 16px; } }
+.input-ds::placeholder { color: var(--ui-text-muted); }
+.input-ds:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 0; }
+.input-ds[aria-invalid="true"] { border-color: var(--ui-danger); }
+textarea.input-ds { padding-block: 8px; min-height: 80px; }
 
 /* ── Kanban columns (deals + leads boards; mirrors the tasks board) ── */
 .kcol {
   display: flex; flex-direction: column;
-  border-radius: 12px;
+  background: var(--ui-surface-muted);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+  border-radius: var(--ui-radius-surface);
   min-height: 200px;
   max-height: calc(100vh - 215px);
 }
@@ -585,7 +670,7 @@
   display: flex; align-items: center; gap: 8px;
   flex-shrink: 0;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--ui-border);
 }
 .kcol-dot {
   width: 8px; height: 8px;
@@ -593,9 +678,8 @@
   flex-shrink: 0;
 }
 .kcol-title {
-  font-size: 14px; font-weight: 600;
-  color: var(--fg-soft);
-  letter-spacing: 0.02em;
+  font-size: 15px; font-weight: 600;
+  color: var(--ui-text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .kcol-count {
@@ -619,13 +703,15 @@
 .kboard {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 320px;
+  grid-auto-columns: min(320px, 85vw);
   gap: 12px;
   align-items: start;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   padding-bottom: 8px;
 }
+/* Small inline controls on the boards and pills: 44px on touch. */
+@media (pointer: coarse) { .touch44 { min-height: 44px; } }
 .kcol.mount { animation: kcol-in 0.32s cubic-bezier(0.32, 0.72, 0, 1) both; }
 @keyframes kcol-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -634,28 +720,26 @@
 
 .badge-ds {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 20px; padding: 0 8px;
-  font-size: 11px; font-weight: 500;
-  border-radius: 999px;
+  min-height: 22px; padding: 0 10px;
+  font-size: 12px; font-weight: 600;
+  border-radius: var(--ui-radius-pill);
   border: 1px solid transparent;
-  font-family: var(--font-mono);
-  letter-spacing: 0.02em;
   white-space: nowrap;
 }
-.badge-ds.dot::before {
+.badge-ds.dot::before, .badge-ds.amber::before, .badge-ds.mint::before, .badge-ds.coral::before {
   content: '';
-  width: 5px; height: 5px; border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 var(--glow-size-sm) currentColor;
+  width: 6px; height: 6px; border-radius: 999px;
+  background: var(--badge-dot, var(--ui-text-muted));
   flex-shrink: 0;
 }
-.badge-ds.indigo { color: var(--indigo-fg); background: var(--indigo-soft); border-color: var(--indigo-line); }
-.badge-ds.amber  { color: var(--amber-fg);  background: var(--amber-soft);  border-color: var(--amber-line); }
-.badge-ds.mint   { color: var(--mint-fg);   background: var(--mint-soft);   border-color: var(--mint-line); }
-.badge-ds.coral  { color: var(--coral-fg);  background: var(--coral-soft);  border-color: var(--coral-line); }
-.badge-ds.sky    { color: var(--sky-fg);    background: var(--sky-soft);    border-color: var(--sky-line); }
-.badge-ds.violet { color: var(--violet-fg); background: var(--violet-soft); border-color: var(--violet-line); }
-.badge-ds.slate  { color: var(--fg-mute); background: var(--bg-2); border-color: var(--line-soft); }
+/* Áron 2026-11-10: status is a quiet neutral chip; colour only where it means something (error, warning, success),
+   and then only on the small dot. Variant names stay so callers do not change. */
+.badge-ds, .badge-ds.indigo, .badge-ds.sky, .badge-ds.violet, .badge-ds.slate,
+.badge-ds.amber, .badge-ds.mint, .badge-ds.coral { color: var(--ui-text); background: var(--ui-surface-muted); border-color: transparent; }
+.badge-ds.slate { color: var(--ui-text-muted); }
+.badge-ds.amber { --badge-dot: var(--ui-warning); }
+.badge-ds.mint  { --badge-dot: var(--ui-success); }
+.badge-ds.coral { --badge-dot: var(--ui-danger); }
 
 .kpi {
   padding: 14px;
@@ -680,7 +764,7 @@
   color: var(--fg-mute);
 }
 .kpi .k-value {
-  font-family: var(--font-mono);
+  font-family: var(--ui-font); font-variant-numeric: tabular-nums;
   font-size: 22px; font-weight: 500;
   letter-spacing: -0.02em;
   margin-top: 4px;
@@ -736,7 +820,7 @@
 }
 .tl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .tl-head .who { font-size: 12px; color: var(--fg); font-weight: 500; }
-.tl-head .when { font-size: 11px; color: var(--fg-faint); font-family: var(--font-mono); flex-shrink: 0; }
+.tl-head .when { font-size: 11px; color: var(--fg-faint); font-family: var(--ui-font); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .tl-body { font-size: 12px; color: var(--fg-soft); margin-top: 4px; line-height: 1.5; }
 
 .tabs-ds { display: flex; gap: 2px; border-bottom: 1px solid var(--line-soft); }
@@ -753,15 +837,15 @@
 .tab-ds:hover { color: var(--fg); }
 .tab-ds.active { color: var(--fg); font-weight: 500; border-bottom-color: var(--indigo); box-shadow: 0 0 10px var(--indigo-glow); }
 .tab-ds .tcount {
-  font-family: var(--font-mono); font-size: 10px;
+  font-family: var(--ui-font); font-variant-numeric: tabular-nums; font-size: 10px;
   background: var(--bg-2); padding: 1px 6px;
   border-radius: 4px; color: var(--fg-mute);
 }
 
 .divider { height: 1px; background: var(--line-soft); margin: 16px 0; }
-.field-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-faint); font-weight: 600; margin-bottom: 4px; }
-.field-value { font-size: 14px; color: var(--fg); }
-.field-value.mono { font-family: var(--font-mono); font-size: 13px; }
+.field-label { font-size: 13px; color: var(--ui-text-muted); font-weight: 600; margin-bottom: 4px; }
+.field-value { font-size: var(--ui-text-md); color: var(--ui-text); }
+.field-value.mono { font-family: var(--ui-font-mono); font-size: 13px; }
 
 .split-grid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
 
@@ -789,7 +873,7 @@
 .tbl tbody tr:hover { background: var(--row-hover); cursor: pointer; }
 .tbl td.name { color: var(--fg); font-weight: 500; }
 .tbl td .sub { font-size: 11px; color: var(--fg-mute); margin-top: 2px; }
-.tbl td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.tbl td.num { font-family: var(--ui-font); font-variant-numeric: tabular-nums; }
 
 /* KPI grid — was missing, caused stacked layout on analytics page */
 .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
@@ -807,3 +891,23 @@
 @media (prefers-reduced-motion: reduce) {
   .strip-moved { animation: none; }
 }
+
+/* ── Astryx shell (CrmSideNav) ───────────────────────────────── */
+.crm-nav-top { display: flex; flex-direction: column; gap: 8px; padding: 4px 8px 8px; }
+.crm-search {
+  display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px;
+  border-radius: var(--radius-element); background: var(--color-background-muted);
+  color: var(--color-text-secondary); font-size: 14px; cursor: pointer; text-align: left;
+  transition: box-shadow 150ms ease-out;
+}
+.crm-search:hover { box-shadow: inset 0 0 0 1px var(--color-border-emphasized); }
+.crm-search:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.crm-search span { flex: 1; }
+.crm-nav-email { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Shell overflow guard (Aron's prod report 2026-11-10: nav shifted off the left edge, pages cut on the right).
+   The page itself never scrolls sideways; a screen wider than the content column scrolls inside that column.
+   overflow: hidden backs up Astryx's overflow: clip for browsers without clip. */
+html, body { overflow-x: hidden; }
+.astryx-app-shell { overflow: hidden; }
+.astryx-layout-content { min-width: 0; overflow-x: auto; }

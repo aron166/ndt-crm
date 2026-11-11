@@ -11,12 +11,9 @@ import { COST_CODES, costCodeUnitHint } from "@/lib/tasks/costing";
 import { quoteTotals, lineAmount } from "@/lib/quotes/calc";
 import { QUOTE_STATUS_META, type QuoteStatus } from "@/lib/quotes/status";
 import { formatHUF, formatDate } from "@/lib/utils";
-
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "6px 9px", fontSize: 14,
-  background: "var(--bg-0)", border: "1px solid var(--line-soft)",
-  borderRadius: 6, color: "var(--fg)", outline: "none",
-};
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import q from "../quotes.module.css";
 
 interface EditableLine {
   costCode: string;
@@ -144,128 +141,136 @@ export function QuoteBuilderClient({
 
   const meta = QUOTE_STATUS_META[quote.status];
 
+  const labelStyle: React.CSSProperties = { fontSize: 12, color: "var(--ui-text-muted)" };
+  const boxCls = `${q.box} mb-4`;
+
   return (
     <div className="max-w-4xl">
-      <Link href="/quotes" className="inline-flex items-center gap-1 text-sm mb-4" style={{ color: "var(--fg-faint)" }}>
+      <Link href="/quotes" className={k.back}>
         <ArrowLeft className="size-3.5" /> Árajánlatok
       </Link>
 
-      <div className="flex items-start justify-between mb-5">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, color: "var(--fg)" }}>
-              {quote.quoteNumber}
-            </h1>
-            <span style={{ fontSize: 14, fontWeight: 600, padding: "2px 9px", borderRadius: 6, color: meta.color, background: meta.bg }}>
+      <PageHeader
+        title={
+          <>
+            <span className={q.mono}>{quote.quoteNumber}</span>{" "}
+            <span className={q.badge} style={{ fontSize: 14, color: meta.color, background: meta.bg, verticalAlign: "middle" }}>
               {meta.label}
             </span>
-          </div>
-          <Link href={`/companies/${quote.companyId}`} className="text-sm mt-1 inline-block hover:underline" style={{ color: "var(--fg-soft)" }}>
+          </>
+        }
+        eyebrow={
+          <Link href={`/companies/${quote.companyId}`} className="hover:underline">
             {quote.companyName}
           </Link>
-        </div>
-        <div className="flex items-center gap-2">
-          <a href={`/quotes/${quote.id}/pdf`} target="_blank" rel="noopener noreferrer" className="btn inline-flex items-center gap-1.5">
-            <FileText className="size-3.5" /> PDF
-          </a>
-          {NEXT_ACTIONS[quote.status].map((next) => (
-            <button key={next} className="btn" disabled={pending} onClick={() => handleStatus(next)}>
-              {next === "sent" ? "Elküldve" : QUOTE_STATUS_META[next].label}
-            </button>
-          ))}
-        </div>
-      </div>
+        }
+        actions={
+          <>
+            <a href={`/quotes/${quote.id}/pdf`} target="_blank" rel="noopener noreferrer" className={k.btn}>
+              <FileText className="size-3.5" /> PDF
+            </a>
+            {NEXT_ACTIONS[quote.status].map((next) => (
+              <button key={next} className={k.btn} disabled={pending} onClick={() => handleStatus(next)}>
+                {next === "sent" ? "Elküldve" : QUOTE_STATUS_META[next].label}
+              </button>
+            ))}
+          </>
+        }
+      />
 
       {/* Header fields */}
-      <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12 }} className="p-5 mb-4">
+      <div className={boxCls}>
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Tárgy</label>
-            <input style={{ ...inputStyle, marginTop: 4 }} value={title} onChange={(e) => setTitle(e.target.value)} />
+            <label style={labelStyle}>Tárgy</label>
+            <input className={q.input} style={{ marginTop: 4 }} value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div>
-            <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Címzett (kapcsolattartó)</label>
-            <select style={{ ...inputStyle, marginTop: 4 }} value={personId ?? ""} onChange={(e) => setPersonId(e.target.value ? Number(e.target.value) : null)}>
+            <label style={labelStyle}>Címzett (kapcsolattartó)</label>
+            <select className={q.input} style={{ marginTop: 4 }} value={personId ?? ""} onChange={(e) => setPersonId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">-</option>
               {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Ajánlati kötöttség (érvényes eddig)</label>
-            <input type="date" style={{ ...inputStyle, marginTop: 4 }} value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+            <label style={labelStyle}>Ajánlati kötöttség (érvényes eddig)</label>
+            <input type="date" className={q.input} style={{ marginTop: 4 }} value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
           </div>
         </div>
       </div>
 
       {/* Line items */}
-      <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12 }} className="p-5 mb-4">
+      <div className={boxCls}>
         <div className="flex items-center justify-between mb-3">
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>Tételek</h2>
-          <button className="btn inline-flex items-center gap-1.5" onClick={addLine}><Plus className="size-3.5" /> Sor</button>
+          <h2 className={k.h2} style={{ fontSize: 16 }}>Tételek</h2>
+          <button className={k.btn} onClick={addLine}><Plus className="size-3.5" /> Sor</button>
         </div>
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr>
-              {["Kód", "Megnevezés", "Menny.", "Egység", "Egységár", "Összeg", ""].map((h, i) => (
-                <th key={i} style={{ textAlign: i >= 2 && i <= 5 ? "right" : "left", padding: "4px 6px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fg-faint)" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((l, idx) => (
-              <tr key={idx} style={{ borderTop: "1px solid var(--line-soft)" }}>
-                <td style={{ padding: "6px 6px", width: 110 }}>
-                  <select style={inputStyle} value={l.costCode} onChange={(e) => setCostCode(idx, e.target.value)}>
-                    <option value="">-</option>
-                    {COST_CODES.map((c) => <option key={c.value} value={c.value}>{c.value}</option>)}
-                  </select>
-                </td>
-                <td style={{ padding: "6px 6px" }}>
-                  <input style={inputStyle} value={l.description} onChange={(e) => setLine(idx, "description", e.target.value)} placeholder="Tétel megnevezése" />
-                </td>
-                <td style={{ padding: "6px 6px", width: 80 }}>
-                  <input type="number" inputMode="decimal" step="any" style={{ ...inputStyle, textAlign: "right" }} value={l.quantity} onChange={(e) => setLine(idx, "quantity", e.target.value)} />
-                </td>
-                <td style={{ padding: "6px 6px", width: 80 }}>
-                  <input style={inputStyle} value={l.unit} onChange={(e) => setLine(idx, "unit", e.target.value)} placeholder={costCodeUnitHint(l.costCode) || ""} />
-                </td>
-                <td style={{ padding: "6px 6px", width: 110 }}>
-                  <input type="number" inputMode="decimal" step="any" style={{ ...inputStyle, textAlign: "right" }} value={l.unitRate} onChange={(e) => setLine(idx, "unitRate", e.target.value)} />
-                </td>
-                <td style={{ padding: "6px 6px", width: 110, textAlign: "right", color: "var(--fg-soft)", whiteSpace: "nowrap" }}>
-                  {formatHUF(lineAmount({ quantity: numOrNull(l.quantity), unitRate: numOrNull(l.unitRate) }))}
-                </td>
-                <td style={{ padding: "6px 6px", width: 30 }}>
-                  <button type="button" onClick={() => removeLine(idx)} style={{ color: "var(--fg-faint)" }} title="Sor törlése">
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </td>
+        <div className={k.tableWrap}>
+          <table className={k.table} style={{ minWidth: 760 }}>
+            <thead>
+              <tr>
+                {["Kód", "Megnevezés", "Menny.", "Egység", "Egységár", "Összeg", ""].map((h, i) => (
+                  <th key={i} style={{ textAlign: i >= 2 && i <= 5 ? "right" : "left" }}>{h}</th>
+                ))}
               </tr>
-            ))}
-            {lines.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: "16px 6px", textAlign: "center", color: "var(--fg-faint)" }}>Nincs tétel: adj hozzá sort.</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {lines.map((l, idx) => (
+                <tr key={idx}>
+                  <td style={{ width: 110 }}>
+                    <select className={q.input} value={l.costCode} onChange={(e) => setCostCode(idx, e.target.value)}>
+                      <option value="">-</option>
+                      {COST_CODES.map((c) => <option key={c.value} value={c.value}>{c.value}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <input className={q.input} value={l.description} onChange={(e) => setLine(idx, "description", e.target.value)} placeholder="Tétel megnevezése" />
+                  </td>
+                  <td style={{ width: 80 }}>
+                    <input type="number" inputMode="decimal" step="any" className={`${q.input} ${q.numCell}`} value={l.quantity} onChange={(e) => setLine(idx, "quantity", e.target.value)} />
+                  </td>
+                  <td style={{ width: 80 }}>
+                    <input className={`${q.input} ${q.numCell}`} value={l.unit} onChange={(e) => setLine(idx, "unit", e.target.value)} placeholder={costCodeUnitHint(l.costCode) || ""} />
+                  </td>
+                  <td style={{ width: 110 }}>
+                    <input type="number" inputMode="decimal" step="any" className={`${q.input} ${q.numCell}`} value={l.unitRate} onChange={(e) => setLine(idx, "unitRate", e.target.value)} />
+                  </td>
+                  <td className={q.numCell} style={{ width: 110, whiteSpace: "nowrap" }}>
+                    {formatHUF(lineAmount({ quantity: numOrNull(l.quantity), unitRate: numOrNull(l.unitRate) }))}
+                  </td>
+                  <td style={{ width: 48 }}>
+                    <button type="button" onClick={() => removeLine(idx)} className={`${k.btn} ${k.btnIcon}`} title="Sor törlése" aria-label="Sor törlése" /* PROPOSAL copy */>
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {lines.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: "16px 6px", textAlign: "center", color: "var(--ui-text-muted)" }}>Nincs tétel: adj hozzá sort.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Totals */}
         <div className="flex justify-end mt-4">
-          <div style={{ width: 280 }}>
-            <div className="flex justify-between py-1" style={{ fontSize: 14, color: "var(--fg-soft)" }}>
+          <div style={{ width: 280, fontVariantNumeric: "tabular-nums" }}>
+            <div className="flex justify-between py-1" style={{ fontSize: 14, color: "var(--ui-text-muted)" }}>
               <span>Nettó összesen</span><span>{formatHUF(totals.net)}</span>
             </div>
-            <div className="flex items-center justify-between py-1" style={{ fontSize: 14, color: "var(--fg-soft)" }}>
+            <div className="flex items-center justify-between py-1" style={{ fontSize: 14, color: "var(--ui-text-muted)" }}>
               <span className="inline-flex items-center gap-1">
                 ÁFA
                 <input type="number" inputMode="decimal" step="any" min={0}
-                  style={{ ...inputStyle, width: 56, padding: "2px 6px", textAlign: "right" }}
+                  className={q.input}
+                  style={{ width: 64, padding: "0 6px", textAlign: "right" }}
                   value={vatRate} onChange={(e) => setVatRate(e.target.value)} />
                 %
               </span>
               <span>{formatHUF(totals.vat)}</span>
             </div>
-            <div className="flex justify-between py-2 mt-1" style={{ fontSize: 16, fontWeight: 600, color: "var(--fg)", borderTop: "1px solid var(--line-soft)" }}>
+            <div className="flex justify-between py-2 mt-1" style={{ fontSize: 16, fontWeight: 600, color: "var(--ui-text)", borderTop: "1px solid var(--ui-border)" }}>
               <span>Bruttó összesen</span><span>{formatHUF(totals.gross)}</span>
             </div>
           </div>
@@ -273,24 +278,24 @@ export function QuoteBuilderClient({
       </div>
 
       {/* Notes */}
-      <div style={{ background: "var(--bg-panel)", border: "1px solid var(--line-soft)", borderRadius: 12 }} className="p-5 mb-4">
-        <label style={{ fontSize: 12, color: "var(--fg-faint)" }}>Megjegyzés (a dokumentumon megjelenik)</label>
-        <textarea rows={3} style={{ ...inputStyle, marginTop: 4, resize: "vertical" }} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="pl. fizetési feltételek, az ár tartalmazza a kiszállást…" />
+      <div className={boxCls}>
+        <label style={labelStyle}>Megjegyzés (a dokumentumon megjelenik)</label>
+        <textarea rows={3} className={q.input} style={{ marginTop: 4, height: "auto", padding: "8px 10px", resize: "vertical" }} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="pl. fizetési feltételek, az ár tartalmazza a kiszállást…" />
       </div>
 
       {/* Action bar */}
       <div className="flex items-center justify-between">
-        <button className="btn" disabled={pending} onClick={handleDelete} style={{ color: "var(--coral)" }}>
+        <button className={k.btn} disabled={pending} onClick={handleDelete} style={{ color: "var(--ui-danger-text)" }}>
           Törlés
         </button>
         <div className="flex items-center gap-3">
           {msg && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--mint)" : "var(--coral)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 14, color: msg.ok ? "var(--ui-success-text)" : "var(--ui-danger-text)" }}>
               {msg.ok ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />} {msg.text}
             </span>
           )}
-          {quote.sentAt && <span style={{ fontSize: 14, color: "var(--fg-faint)" }}>Elküldve: {formatDate(quote.sentAt)}</span>}
-          <button className="btn primary" disabled={pending} onClick={handleSave}>{pending ? "Mentés…" : "Mentés"}</button>
+          {quote.sentAt && <span style={{ fontSize: 14, color: "var(--ui-text-muted)" }}>Elküldve: {formatDate(quote.sentAt)}</span>}
+          <button className={`${k.btn} ${k.btnPrimary}`} disabled={pending} onClick={handleSave}>{pending ? "Mentés…" : "Mentés"}</button>
         </div>
       </div>
     </div>

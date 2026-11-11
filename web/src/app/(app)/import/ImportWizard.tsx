@@ -4,12 +4,13 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Upload, ArrowLeft, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { fieldsFor, guessMapping, type ImportEntity } from "@/lib/import/fields";
 import type { ImportResult } from "@/lib/import/types";
+import k from "@/components/astryx/page.module.css";
+import s from "./import.module.css";
 
 interface ParsedSheet {
   name: string;
@@ -18,12 +19,6 @@ interface ParsedSheet {
 }
 
 const NONE = "__none__";
-
-const panel: React.CSSProperties = {
-  background: "var(--bg-panel)",
-  border: "1px solid var(--line-soft)",
-  borderRadius: 12,
-};
 
 export function ImportWizard() {
   const router = useRouter();
@@ -128,22 +123,21 @@ export function ImportWizard() {
   // ── Upload step ──────────────────────────────────────────────
   if (step === "upload") {
     return (
-      <div style={panel} className="p-6">
+      <div className={k.card}>
         <EntityToggle entity={entity} onChange={(e) => { setEntity(e); }} />
         <label
-          className="mt-5 flex flex-col items-center justify-center gap-2 cursor-pointer rounded-lg py-10 transition-colors"
-          style={{ border: "1px dashed var(--line)", background: "var(--bg-raised)" }}
+          className={`mt-5 flex flex-col items-center justify-center gap-2 cursor-pointer rounded-lg py-10 transition-colors ${s.drop}`}
         >
-          {loading ? <Loader2 className="size-6 animate-spin" style={{ color: "var(--indigo)" }} />
-            : <Upload className="size-6" style={{ color: "var(--fg-mute)" }} />}
-          <span style={{ fontSize: 14, color: "var(--fg-soft)" }}>
+          {loading ? <Loader2 className="size-6 animate-spin" style={{ color: "var(--ui-accent)" }} />
+            : <Upload className="size-6" style={{ color: "var(--ui-text-muted)" }} />}
+          <span className={s.dropText}>
             {loading ? "Feldolgozás…" : "Kattints a fájl kiválasztásához (.xlsx vagy .csv)"}
           </span>
           <input
             ref={fileRef}
             type="file"
             accept=".xlsx,.xls,.csv"
-            className="hidden"
+            className="sr-only"
             disabled={loading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
           />
@@ -158,51 +152,51 @@ export function ImportWizard() {
     const r = finalResult ?? dryResult;
     const done = !!finalResult;
     return (
-      <div style={panel} className="p-6">
+      <div className={k.card}>
         <div className="flex items-center justify-between mb-4">
-          <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--fg)" }}>
+          <h2 className={k.h2}>
             {done ? "Importálás kész" : "Előnézet (még nem mentett)"}
           </h2>
-          {done && <CheckCircle2 className="size-5" style={{ color: "var(--mint)" }} />}
+          {done && <CheckCircle2 className="size-5" style={{ color: "var(--ui-success-text)" }} />}
         </div>
 
-        <div className="grid grid-cols-4 gap-3 mb-4">
-          <Stat label="Új" value={r.created} accent="var(--mint)" />
-          <Stat label="Meglévő" value={r.matched} accent="var(--fg-mute)" />
-          <Stat label="Kihagyva" value={r.skipped} accent="var(--amber)" />
-          <Stat label="Hiba" value={r.errors.length} accent="var(--coral)" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <Stat label="Új" value={r.created} accent="var(--ui-success-text)" />
+          <Stat label="Meglévő" value={r.matched} accent="var(--ui-text-muted)" />
+          <Stat label="Kihagyva" value={r.skipped} accent="var(--ui-warning-text)" />
+          <Stat label="Hiba" value={r.errors.length} accent="var(--ui-danger-text)" />
         </div>
         {r.notesAppended > 0 && (
-          <p className="text-xs text-slate-400 mb-3">
+          <p className={`${k.muted} mb-3`}>
             {r.notesAppended} meglévő cégnél import megjegyzés {done ? "hozzáfűzve" : "hozzáfűzésre kerül"}.
           </p>
         )}
         {entity === "person" && (r.companiesCreated > 0 || r.contactsCreated > 0) && (
-          <p className="text-xs text-slate-400 mb-3">
+          <p className={`${k.muted} mb-3`}>
             +{r.companiesCreated} új cég, {r.contactsCreated} kapcsolat (személy ↔ cég){done ? " létrehozva" : " lesz"}.
           </p>
         )}
 
-        <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--line-soft)" }}>
-          <table className="w-full text-sm">
+        <div className={k.tableWrap}>
+          <table className={k.table}>
             <thead>
-              <tr style={{ background: "var(--bg-raised)" }}>
-                <th style={th}>Sor</th><th style={th}>Megnevezés</th><th style={th}>Állapot</th>
+              <tr>
+                <th>Sor</th><th>Megnevezés</th><th>Állapot</th>
               </tr>
             </thead>
             <tbody>
-              {r.sample.map((s) => (
-                <tr key={s.row} style={{ borderTop: "1px solid var(--line-soft)" }}>
-                  <td style={td} className="font-mono-ndt text-slate-400">{s.row}</td>
-                  <td style={td}>{s.label}</td>
-                  <td style={td}><StatusPill status={s.status} detail={s.detail} /></td>
+              {r.sample.map((row) => (
+                <tr key={row.row}>
+                  <td className={`${k.num} ${k.muted}`}>{row.row}</td>
+                  <td>{row.label}</td>
+                  <td><StatusPill status={row.status} detail={row.detail} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         {r.sample.length < r.total && (
-          <p className="text-xs text-slate-400 mt-2">Az első {r.sample.length} sor látszik a {r.total}-ból.</p>
+          <p className={`${k.muted} mt-2`}>Az első {r.sample.length} sor látszik a {r.total}-ból.</p>
         )}
 
         {error && <ErrorLine text={error} />}
@@ -210,27 +204,28 @@ export function ImportWizard() {
         <div className="flex items-center gap-2 mt-5">
           {!done ? (
             <>
-              <Button variant="outline" onClick={() => setStep("map")} disabled={loading}>
+              <button type="button" onClick={() => setStep("map")} disabled={loading} className={k.btn}>
                 <ArrowLeft className="size-4 mr-1" /> Vissza
-              </Button>
-              <Button
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              </button>
+              <button
+                type="button"
+                className={`${k.btn} ${k.btnPrimary}`}
                 onClick={() => runCommit(false)}
                 disabled={loading || r.created + r.matched + r.contactsCreated === 0}
               >
                 {loading ? <Loader2 className="size-4 mr-1 animate-spin" /> : null}
                 Importálás véglegesítése ({r.created} új)
-              </Button>
+              </button>
             </>
           ) : (
             <>
               <Link
                 href={entity === "company" ? "/companies" : "/persons"}
-                className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                className={`${k.btn} ${k.btnPrimary}`}
               >
                 {entity === "company" ? "Cégek megnyitása" : "Személyek megnyitása"}
               </Link>
-              <Button variant="outline" onClick={reset}>Új importálás</Button>
+              <button type="button" onClick={reset} className={k.btn}>Új importálás</button>
             </>
           )}
         </div>
@@ -240,58 +235,57 @@ export function ImportWizard() {
 
   // ── Mapping step ─────────────────────────────────────────────
   return (
-    <div style={panel} className="p-6">
+    <div className={k.card}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--fg)" }}>Oszlopok párosítása</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h2 className={k.h2}>Oszlopok párosítása</h2>
+          <p className={`${k.muted} mt-0.5`}>
             {fileName} · {activeSheet?.rows.length ?? 0} sor · {entity === "company" ? "Cégek" : "Személyek"}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={reset}>Másik fájl</Button>
+        <button type="button" onClick={reset} className={k.btn}>Másik fájl</button>
       </div>
 
       {sheets && sheets.length > 1 && (
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs text-slate-400">Munkalap:</span>
-          {sheets.map((s, i) => (
-            <button
-              key={s.name}
-              onClick={() => chooseSheet(i)}
-              className="rounded-full px-3 py-1 text-xs"
-              style={{
-                background: i === sheetIdx ? "var(--indigo-soft)" : "var(--bg-raised)",
-                color: i === sheetIdx ? "var(--indigo)" : "var(--fg-mute)",
-                border: `1px solid ${i === sheetIdx ? "var(--indigo-line)" : "var(--line-soft)"}`,
-              }}
-            >
-              {s.name}
-            </button>
-          ))}
+          <span className={k.muted}>Munkalap:</span>
+          <div className={k.seg}>
+            {sheets.map((sh, i) => (
+              <button
+                key={sh.name}
+                type="button"
+                aria-pressed={i === sheetIdx}
+                onClick={() => chooseSheet(i)}
+                className={`${k.segItem} ${s.segBtn} ${i === sheetIdx ? k.segItemOn : ""}`}
+              >
+                {sh.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {truncated && (
-        <p className="text-xs mb-3 flex items-center gap-1.5" style={{ color: "var(--amber)" }}>
+        <p className="text-sm mb-3 flex items-center gap-1.5" style={{ color: "var(--ui-warning-text)" }}>
           <AlertTriangle size={14} aria-hidden="true" /> A fájl több mint 10 000 sort tartalmaz: csak az első 10 000 lesz importálva.
         </p>
       )}
 
-      <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--line-soft)" }}>
-        <table className="w-full text-sm">
+      <div className={k.tableWrap}>
+        <table className={k.table}>
           <thead>
-            <tr style={{ background: "var(--bg-raised)" }}>
-              <th style={th}>Fájl oszlop</th><th style={th}>Minta</th><th style={th}>CRM mező</th>
+            <tr>
+              <th>Fájl oszlop</th><th>Minta</th><th>CRM mező</th>
             </tr>
           </thead>
           <tbody>
             {activeSheet?.columns.map((col) => (
-              <tr key={col} style={{ borderTop: "1px solid var(--line-soft)" }}>
-                <td style={td} className="font-medium">{col}</td>
-                <td style={td} className="text-slate-400 truncate max-w-[180px]">{sampleValue(col)}</td>
-                <td style={{ ...td, width: 220 }}>
+              <tr key={col}>
+                <td className="font-medium">{col}</td>
+                <td className={`${k.muted} truncate max-w-[180px]`}>{sampleValue(col)}</td>
+                <td className={s.selectCell}>
                   <Select value={mapping[col] || NONE} onValueChange={(v) => v && setColumnField(col, v)}>
-                    <SelectTrigger className="w-full h-8"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className={`w-full ${s.select}`}><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NONE}>Kihagyás</SelectItem>
                       {fields.map((f) => (
@@ -309,7 +303,7 @@ export function ImportWizard() {
       </div>
 
       {!requiredOk && (
-        <p className="text-xs mt-3" style={{ color: "var(--amber)" }}>
+        <p className="text-sm mt-3" style={{ color: "var(--ui-warning-text)" }}>
           {entity === "company"
             ? "Állítsd be, melyik oszlop a Cégnév."
             : "Állítsd be a név oszlopo(ka)t (Teljes név, vagy Vezeték- és Keresztnév)."}
@@ -318,35 +312,32 @@ export function ImportWizard() {
       {error && <ErrorLine text={error} />}
 
       <div className="flex items-center gap-2 mt-5">
-        <Button
-          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+        <button
+          type="button"
+          className={`${k.btn} ${k.btnPrimary}`}
           onClick={() => runCommit(true)}
           disabled={loading || !requiredOk}
         >
           {loading ? <Loader2 className="size-4 mr-1 animate-spin" /> : null}
           Előnézet
-        </Button>
+        </button>
       </div>
     </div>
   );
 }
 
 // ── Small presentational helpers ───────────────────────────────
-const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-faint)" };
-const td: React.CSSProperties = { padding: "8px 12px", color: "var(--fg-soft)" };
 
 function EntityToggle({ entity, onChange }: { entity: ImportEntity; onChange: (e: ImportEntity) => void }) {
   return (
-    <div className="flex items-center gap-0.5 w-fit" style={{ background: "var(--bg-raised)", border: "1px solid var(--line-soft)", borderRadius: 8, padding: 3 }}>
+    <div className={`${k.seg} w-fit`}>
       {([["company", "Cégek"], ["person", "Személyek"]] as const).map(([key, label]) => (
         <button
           key={key}
+          type="button"
+          aria-pressed={entity === key}
           onClick={() => onChange(key)}
-          className="rounded px-4 py-1.5 text-sm font-medium transition-colors"
-          style={{
-            background: entity === key ? "var(--indigo-soft)" : "transparent",
-            color: entity === key ? "var(--indigo)" : "var(--fg-mute)",
-          }}
+          className={`${k.segItem} ${s.segBtn} ${entity === key ? k.segItemOn : ""}`}
         >
           {label}
         </button>
@@ -357,17 +348,17 @@ function EntityToggle({ entity, onChange }: { entity: ImportEntity; onChange: (e
 
 function Stat({ label, value, accent }: { label: string; value: number; accent: string }) {
   return (
-    <div className="rounded-lg p-3" style={{ background: "var(--bg-raised)", border: "1px solid var(--line-soft)" }}>
-      <div className="font-mono-ndt" style={{ fontSize: 22, fontWeight: 700, color: accent }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--fg-mute)" }}>{label}</div>
+    <div className={`${k.card} ${k.stat}`}>
+      <div className={k.statV} style={{ color: accent }}>{value}</div>
+      <div className={k.statK}>{label}</div>
     </div>
   );
 }
 
 function StatusPill({ status, detail }: { status: string; detail?: string }) {
-  const color = status === "új" ? "var(--mint)" : status === "hiba" ? "var(--coral)" : status === "kihagyva" ? "var(--amber)" : "var(--fg-mute)";
+  const color = status === "új" ? "var(--ui-success-text)" : status === "hiba" ? "var(--ui-danger-text)" : status === "kihagyva" ? "var(--ui-warning-text)" : "var(--ui-text-muted)";
   return (
-    <span title={detail} className="font-mono-ndt" style={{ fontSize: 12, color }}>
+    <span title={detail} style={{ fontSize: 14, color }}>
       {status}{detail ? ` · ${detail}` : ""}
     </span>
   );
@@ -375,7 +366,7 @@ function StatusPill({ status, detail }: { status: string; detail?: string }) {
 
 function ErrorLine({ text }: { text: string }) {
   return (
-    <p className="flex items-center gap-1.5 text-sm mt-3" style={{ color: "var(--coral)" }}>
+    <p className="flex items-center gap-1.5 text-sm mt-3" style={{ color: "var(--ui-danger-text)" }}>
       <AlertTriangle className="size-4" /> {text}
     </p>
   );

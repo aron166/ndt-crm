@@ -10,13 +10,12 @@ import { getCompanyAttributes } from "@/app/actions/company-attributes";
 import { serializeDates } from "@/lib/serialize";
 import { serializeTaskCost } from "@/lib/tasks/costing";
 import { isConnected } from "@/lib/integrations/google_maps";
+import k from "@/components/astryx/page.module.css";
+import s from "../companies.module.css";
 
 const TENANT_ID = 1;
 
-const AVATAR_PALETTE = [
-  "var(--indigo)", "var(--mint)", "var(--amber)",
-  "var(--sky)", "var(--violet)", "var(--coral)",
-];
+// One neutral avatar style (taste rules): no per-name colours.
 
 export default async function CompanyDetailPage({
   params,
@@ -79,38 +78,33 @@ export default async function CompanyDetailPage({
     typeCounts[t] = (typeCounts[t] ?? 0) + 1;
   }
   const engagementBreakdown = [
-    { label: "Hívás",              value: typeCounts.call       ?? 0, color: "var(--mint)"   },
-    { label: "Email",              value: typeCounts.email      ?? 0, color: "var(--sky)"    },
-    { label: "Találkozó",         value: typeCounts.meeting    ?? 0, color: "var(--violet)" },
-    { label: "Helyszíni látogatás",value: typeCounts.site_visit ?? 0, color: "var(--amber)"  },
-  ].filter((s) => s.value > 0);
+    { label: "Hívás",              value: typeCounts.call       ?? 0, color: "var(--ui-chart-1)"   },
+    { label: "Email",              value: typeCounts.email      ?? 0, color: "var(--ui-chart-2)"    },
+    { label: "Találkozó",         value: typeCounts.meeting    ?? 0, color: "var(--ui-chart-3)" },
+    { label: "Helyszíni látogatás",value: typeCounts.site_visit ?? 0, color: "var(--ui-chart-4)"  },
+  ].filter((e) => e.value > 0);
   if (!engagementBreakdown.length) {
-    engagementBreakdown.push({ label: "Nincs adat", value: 1, color: "var(--bg-3)" });
+    engagementBreakdown.push({ label: "Nincs adat", value: 1, color: "var(--ui-surface-muted)" });
   }
 
   // KPI strip
   const openTasks = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled").length;
   const kpis = [
-    { label: "Számlák",         value: invoices.length,                   accent: "var(--mint)"   },
-    { label: "Kapcsolatok",     value: contacts.filter(c => !c.endedAt).length, accent: "var(--indigo)" },
-    { label: "Nyitott feladatok", value: openTasks,                       accent: "var(--amber)"  },
-    { label: "Interakciók",     value: interactions.length,               accent: "var(--sky)"    },
+    { label: "Számlák",         value: invoices.length },
+    { label: "Kapcsolatok",     value: contacts.filter(c => !c.endedAt).length },
+    { label: "Nyitott feladatok", value: openTasks },
+    { label: "Interakciók",     value: interactions.length },
   ];
 
-  const avatarColor = AVATAR_PALETTE[companyId % AVATAR_PALETTE.length];
   const initials = company.name.slice(0, 3).toUpperCase();
   const mapsConnected = await isConnected();
 
   return (
     <div className="mount">
       {/* Back + pipeline badge row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <Link
-          href="/companies"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--fg-mute)" }}
-          className="row-link"
-        >
-          <ArrowLeft style={{ width: 14, height: 14 }} />
+      <div className={s.topRow}>
+        <Link href="/companies" className={k.back}>
+          <ArrowLeft className="size-4" />
           Vissza a cégekhez
         </Link>
         <PipelineStatusBadge status={company.pipelineStatus} />
@@ -126,7 +120,6 @@ export default async function CompanyDetailPage({
         revenueSeries={revenueSeries}
         engagementBreakdown={engagementBreakdown}
         kpis={kpis}
-        avatarColor={avatarColor}
         initials={initials}
         initialTags={initialTags}
         auditEntries={serializeDates(auditEntries)}

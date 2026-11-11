@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { leadIntakeSchema } from "@/lib/leads/schema";
-import { ingestLead } from "@/lib/leads/ingest";
+import { ingestLead, appThreadKey } from "@/lib/leads/ingest";
 import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
 import { sendFormAlert } from "@/lib/leads/form-alert";
 import { sendAutoReply, sendLeadPing } from "@/lib/leads/intake-notify";
@@ -176,7 +176,10 @@ export async function POST(request: Request) {
       // rather than a server error. (Vanda, #89.)
       try {
         const winner = await db.lead.findFirst({
-          where: { tenantId: key.tenantId, threadKey: parsed.data.thread_key.trim().toLowerCase() },
+          where: {
+            tenantId: key.tenantId,
+            threadKey: { in: [parsed.data.thread_key.trim().toLowerCase(), appThreadKey(key.appSlug, parsed.data.thread_key)] },
+          },
           select: { id: true, companyId: true },
         });
         if (winner) {

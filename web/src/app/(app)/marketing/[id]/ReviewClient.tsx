@@ -20,6 +20,9 @@ import {
 import { publishContent, saveContentMetrics } from "@/app/actions/marketing";
 import { createClient } from "@/lib/supabase/client";
 import { MAX_STEP } from "@/lib/outreach/steps";
+import { PageHeader } from "@/components/astryx/PageHeader";
+import k from "@/components/astryx/page.module.css";
+import s from "../marketing.module.css";
 import "./review.css";
 
 // Bucket name duplicated here on purpose: storage.ts is server-only and must
@@ -317,31 +320,35 @@ export function ReviewClient({
   return (
     <div className={cx("review-wrap", showActionBar && "has-actionbar")}>
       {/* Header */}
-      <div className="review-header">
-        <h1 className="review-title">{item.title}</h1>
-        <div className="review-chips">
-          <span className="badge-ds slate">{categoryLabel}</span>
-          {item.format && <span className="badge-ds slate">{item.format.replace(/_/g, " ")}</span>}
-          {item.purpose && <span className="badge-ds slate">{item.purpose}</span>}
-          {item.campaign && <span className="badge-ds slate">{item.campaign.name}</span>}
-          <span
-            className="status-chip"
-            style={{ color: statusT.fg, background: statusT.bg, borderColor: statusT.line }}
-          >
-            {STATUS_LABELS[item.status as keyof typeof STATUS_LABELS] ?? item.status}
+      <PageHeader
+        title={item.title}
+        eyebrow={
+          <span className="review-chips">
+            <span className="badge-ds slate">{categoryLabel}</span>
+            {item.format && <span className="badge-ds slate">{item.format.replace(/_/g, " ")}</span>}
+            {item.purpose && <span className="badge-ds slate">{item.purpose}</span>}
+            {item.campaign && <span className="badge-ds slate">{item.campaign.name}</span>}
+            <span
+              className="status-chip"
+              style={{ color: statusT.fg, background: statusT.bg, borderColor: statusT.line }}
+            >
+              {STATUS_LABELS[item.status as keyof typeof STATUS_LABELS] ?? item.status}
+            </span>
           </span>
-        </div>
+        }
+      />
+      <div className="review-header">
 
         {item.category === "email" && (
           <div className="review-panel" style={{ marginTop: 8 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 14, color: "var(--fg)" }}>
+              <span className={k.strong}>
                 {item.outreachCampaign != null && item.outreachStep != null
                   ? UI.outreachSlotCurrent(item.outreachCampaign, item.outreachStep)
                   : UI.outreachSlotNone}
               </span>
               {!slotEditing && (
-                <button type="button" className="btn btn-sm" onClick={openSlotEditor}>
+                <button type="button" className={k.btn} onClick={openSlotEditor}>
                   {UI.outreachSlot}
                 </button>
               )}
@@ -350,6 +357,7 @@ export function ReviewClient({
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10, marginTop: 8 }}>
                 <FormField label={UI.outreachSlotCampaign}>
                   <input
+                    className={s.field}
                     list="outreach-campaign-options"
                     value={slotCampaign}
                     onChange={(e) => setSlotCampaign(e.target.value)}
@@ -365,17 +373,18 @@ export function ReviewClient({
                     type="number"
                     min={1}
                     max={MAX_STEP}
+                    className={s.field}
                     value={slotStep}
                     onChange={(e) => setSlotStep(e.target.value)}
                     style={{ width: 70 }}
                   />
                 </FormField>
-                <button type="button" className="btn" disabled={slotPending} onClick={() => setSlotEditing(false)}>
+                <button type="button" className={k.btn} disabled={slotPending} onClick={() => setSlotEditing(false)}>
                   {UI.cancel}
                 </button>
                 <button
                   type="button"
-                  className="btn primary"
+                  className={`${k.btn} ${k.btnPrimary}`}
                   disabled={
                     slotPending ||
                     !slotCampaign.trim() ||
@@ -388,7 +397,7 @@ export function ReviewClient({
                   {UI.outreachSlotSave}
                 </button>
                 {item.outreachCampaign != null && (
-                  <button type="button" className="btn" disabled={slotPending} onClick={clearSlot}>
+                  <button type="button" className={k.btn} disabled={slotPending} onClick={clearSlot}>
                     {UI.outreachSlotClear}
                   </button>
                 )}
@@ -438,7 +447,7 @@ export function ReviewClient({
         {actionError && !editing && !reviewPanel && <p className="review-error">{actionError}</p>}
       </div>
 
-      <div className="review-grid">
+      <div className={`${k.split} review-grid`}>
         {/* Reading pane */}
         <main className="review-main">
           {viewed && (
@@ -488,7 +497,7 @@ export function ReviewClient({
               )}
 
               {prevVersion && (
-                <button type="button" className="btn btn-sm diff-toggle" onClick={() => setShowDiff((d) => !d)}>
+                <button type="button" className={`${k.btn} diff-toggle`} onClick={() => setShowDiff((d) => !d)}>
                   {showDiff ? UI.hideDiff : UI.showDiff}
                 </button>
               )}
@@ -582,7 +591,7 @@ export function ReviewClient({
               )}
 
               <div className="editor-actions-row">
-                <label className="btn">
+                <label className={k.btn}>
                   {UI.addFile}
                   <input
                     type="file"
@@ -592,26 +601,26 @@ export function ReviewClient({
                     onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }}
                   />
                 </label>
-                <button type="button" className="btn" onClick={() => setAddingLink(true)}>{UI.addLink}</button>
+                <button type="button" className={k.btn} onClick={() => setAddingLink(true)}>{UI.addLink}</button>
               </div>
               {addingLink && (
                 <div className="editor-link-row">
                   <input placeholder="Link" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
                   <input placeholder="Felirat" value={linkCaption} onChange={(e) => setLinkCaption(e.target.value)} />
-                  <button type="button" className="btn btn-sm" disabled={!isHttpUrl(linkUrl)} onClick={confirmAddLink}>{UI.addLink}</button>
-                  <button type="button" className="btn ghost btn-sm" onClick={() => { setAddingLink(false); setLinkUrl(""); setLinkCaption(""); }}>{UI.cancel}</button>
+                  <button type="button" className={k.btn} disabled={!isHttpUrl(linkUrl)} onClick={confirmAddLink}>{UI.addLink}</button>
+                  <button type="button" className={k.btn} onClick={() => { setAddingLink(false); setLinkUrl(""); setLinkCaption(""); }}>{UI.cancel}</button>
                 </div>
               )}
 
               {actionError && (
                 <p className="review-error">
-                  {actionError} <button type="button" className="btn btn-sm" onClick={() => router.refresh()}>frissítés</button>
+                  {actionError} <button type="button" className={k.btn} onClick={() => router.refresh()}>frissítés</button>
                 </p>
               )}
 
               <div className="editor-save-row">
-                <button type="button" className="btn" disabled={isPending} onClick={() => setEditing(false)}>{UI.cancel}</button>
-                <button type="button" className="btn primary" disabled={isPending || !editBody.trim() || uploading.length > 0} onClick={saveEdit}>
+                <button type="button" className={k.btn} disabled={isPending} onClick={() => setEditing(false)}>{UI.cancel}</button>
+                <button type="button" className={`${k.btn} ${k.btnPrimary}`} disabled={isPending || !editBody.trim() || uploading.length > 0} onClick={saveEdit}>
                   {UI.saveAsVersion}
                 </button>
                 <span className="editor-reset-warning">{UI.resetWarning}</span>
@@ -622,12 +631,12 @@ export function ReviewClient({
           {showLive && (
             <section className="review-panel">
               <h2 className="review-panel-title">Megjelent</h2>
-              <button type="button" className="btn btn-sm" onClick={handleCopy}>{copied ? UI.copied : UI.copyText}</button>
+              <button type="button" className={k.btn} onClick={handleCopy}>{copied ? UI.copied : UI.copyText}</button>
               <div className="live-publish-row">
                 <input placeholder="Link" value={publishUrl} onChange={(e) => setPublishUrl(e.target.value)} />
                 <button
                   type="button"
-                  className="btn primary btn-sm"
+                  className={`${k.btn} ${k.btnPrimary}`}
                   disabled={isPending || !isHttpUrl(publishUrl)}
                   onClick={() => run(() => publishContent(item.id, publishUrl.trim()))}
                 >
@@ -654,7 +663,7 @@ export function ReviewClient({
                       />
                     </div>
                   ))}
-                  <button type="button" className="btn primary btn-sm" disabled={isPending} onClick={saveMetrics}>Metrikák mentése</button>
+                  <button type="button" className={`${k.btn} ${k.btnPrimary}`} disabled={isPending} onClick={saveMetrics}>Metrikák mentése</button>
                 </div>
               )}
             </section>
@@ -700,7 +709,7 @@ export function ReviewClient({
                 {showOldVersionNotice && (
                   <button
                     type="button"
-                    className="btn btn-sm"
+                    className={k.btn}
                     onClick={() => { setViewedId(item.currentVersionId); setShowDiff(false); }}
                   >
                     {`→ ${UI.version(currentVersion?.number ?? 0)}`}
@@ -739,10 +748,10 @@ export function ReviewClient({
                   />
                   {actionError && <p className="review-error">{actionError}</p>}
                   <div className="editor-actions-row">
-                    <button type="button" className="btn" disabled={isPending} onClick={() => setReviewPanel(null)}>{UI.cancel}</button>
+                    <button type="button" className={k.btn} disabled={isPending} onClick={() => setReviewPanel(null)}>{UI.cancel}</button>
                     <button
                       type="button"
-                      className="btn primary"
+                      className={`${k.btn} ${k.btnPrimary}`}
                       disabled={isPending || reviewComment.trim().length < 3 || !reviewReason}
                       onClick={() => submitVerdict(reviewPanel, reviewComment.trim(), reviewReason)}
                     >
@@ -785,7 +794,7 @@ export function ReviewClient({
                         <div className="check-actions">
                           <button
                             type="button"
-                            className="btn btn-sm"
+                            className={k.btn}
                             disabled={isPending}
                             onClick={() => { setCheckAction({ id: c.id, state: "resolved" }); setCheckText(""); setActionError(null); }}
                           >
@@ -793,7 +802,7 @@ export function ReviewClient({
                           </button>
                           <button
                             type="button"
-                            className="btn btn-sm"
+                            className={k.btn}
                             disabled={isPending}
                             onClick={() => { setCheckAction({ id: c.id, state: "waived" }); setCheckText(""); setActionError(null); }}
                           >
@@ -803,7 +812,7 @@ export function ReviewClient({
                       )}
                       {settled && (
                         <div className="check-actions">
-                          <button type="button" className="btn btn-sm" disabled={isPending} onClick={() => submitCheck(c.id, "open")}>
+                          <button type="button" className={k.btn} disabled={isPending} onClick={() => submitCheck(c.id, "open")}>
                             {UI.checkReopen}
                           </button>
                         </div>
@@ -822,12 +831,12 @@ export function ReviewClient({
                           />
                           {actionError && <p className="review-error">{actionError}</p>}
                           <div className="editor-actions-row">
-                            <button type="button" className="btn btn-sm" disabled={isPending} onClick={() => { setCheckAction(null); setCheckText(""); }}>
+                            <button type="button" className={k.btn} disabled={isPending} onClick={() => { setCheckAction(null); setCheckText(""); }}>
                               {UI.cancel}
                             </button>
                             <button
                               type="button"
-                              className="btn primary btn-sm"
+                              className={`${k.btn} ${k.btnPrimary}`}
                               disabled={isPending || checkText.trim().length < 2}
                               onClick={() => submitCheck(c.id, checkAction.state, checkText.trim())}
                             >
@@ -861,12 +870,12 @@ export function ReviewClient({
                     <option value="peter">{UI.checkForPeter}</option>
                   </select>
                   <div className="editor-actions-row">
-                    <button type="button" className="btn btn-sm" disabled={isPending} onClick={() => { setAddingCheck(false); setCheckQuestion(""); }}>
+                    <button type="button" className={k.btn} disabled={isPending} onClick={() => { setAddingCheck(false); setCheckQuestion(""); }}>
                       {UI.cancel}
                     </button>
                     <button
                       type="button"
-                      className="btn primary btn-sm"
+                      className={`${k.btn} ${k.btnPrimary}`}
                       disabled={isPending || checkQuestion.trim().length < 3}
                       onClick={submitAddCheck}
                     >
@@ -875,7 +884,7 @@ export function ReviewClient({
                   </div>
                 </>
               ) : (
-                <button type="button" className="btn btn-sm" onClick={() => setAddingCheck(true)}>{UI.checkAdd}</button>
+                <button type="button" className={k.btn} onClick={() => setAddingCheck(true)}>{UI.checkAdd}</button>
               )}
             </div>
           </section>
