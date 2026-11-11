@@ -22,6 +22,7 @@ export const CAMPAIGN_TRIGGER_LABEL: Record<string, string> = {
   campaign_call_outcome: "Hívás eredményt rögzítettek",
   campaign_step_completed: "Kiment egy e-mail lépés",
 };
+const REPLY_LABEL: Record<string, string> = { reply_positive: "Pozitív válasz", reply_negative: "Elutasító válasz" };
 const OUTCOME_LABEL: Record<string, string> = {
   no_answer: "Nem vették fel", interested: "Érdeklődik", wants: "Kéri / akarja", not_interested: "Nem érdekli", bad_number: "Rossz szám",
 };
@@ -33,7 +34,8 @@ const SAFE = ["create_task", "change_lead_status", "assign_lead", "add_note"];
 const OUTBOUND = OUTBOUND_ACTION_TYPES;
 
 function describe(r: CampaignRule): string {
-  const out = r.triggerType === "campaign_call_outcome" && typeof r.triggerConfig?.outcome === "string" ? `: ${OUTCOME_LABEL[r.triggerConfig.outcome] ?? r.triggerConfig.outcome}` : "";
+  const o = typeof r.triggerConfig?.outcome === "string" ? r.triggerConfig.outcome : null;
+  const out = o ? `: ${OUTCOME_LABEL[o] ?? REPLY_LABEL[o] ?? o}` : "";
   return `${CAMPAIGN_TRIGGER_LABEL[r.triggerType] ?? r.triggerType}${out} → ${ACTION_LABEL[r.actionType] ?? r.actionType}`;
 }
 
@@ -86,7 +88,7 @@ export function CampaignAutomations({ campaignId, rules, outbound, leadStatuses,
     f.set("name", name);
     f.set("triggerType", trigger);
     f.set("actionType", action);
-    f.set("triggerConfig", JSON.stringify({ campaignId, ...(trigger === "campaign_call_outcome" && outcome ? { outcome } : {}) }));
+    f.set("triggerConfig", JSON.stringify({ campaignId, ...((trigger === "campaign_call_outcome" || trigger === "campaign_member_replied") && outcome ? { outcome } : {}) }));
     f.set("actionConfig", JSON.stringify(config()));
     if (await run(() => createAutomation(f), "Szabály mentve")) { setOpen(false); setName(""); setText(""); }
   }
@@ -127,15 +129,15 @@ export function CampaignAutomations({ campaignId, rules, outbound, leadStatuses,
         <form onSubmit={create} className={s.ruleForm} aria-label="Új kampány szabály">
           <label className={s.field}><span>Név</span><input className={s.input} value={name} onChange={(e) => setName(e.target.value)} required maxLength={120} /></label>
           <label className={s.field}><span>Amikor</span>
-            <select className={s.input} value={trigger} onChange={(e) => setTrigger(e.target.value)}>
+            <select className={s.input} value={trigger} onChange={(e) => { setTrigger(e.target.value); setOutcome(""); }}>
               {Object.entries(CAMPAIGN_TRIGGER_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </label>
-          {trigger === "campaign_call_outcome" && (
-            <label className={s.field}><span>Eredmény</span>
+          {(trigger === "campaign_call_outcome" || trigger === "campaign_member_replied") && (
+            <label className={s.field}><span>{trigger === "campaign_member_replied" ? "Válasz" : "Eredmény"}</span>
               <select className={s.input} value={outcome} onChange={(e) => setOutcome(e.target.value)}>
                 <option value="">Bármelyik</option>
-                {Object.entries(OUTCOME_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                {Object.entries(trigger === "campaign_member_replied" ? REPLY_LABEL : OUTCOME_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </label>
           )}

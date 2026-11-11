@@ -98,7 +98,8 @@ export function triggerMatches(
     case "campaign_call_outcome":
       // Scoped only: a rule fires for its own campaign, never for another or for a rule without one.
       if (cfg.campaignId == null || event.campaignId == null || Number(cfg.campaignId) !== event.campaignId) return false;
-      return event.type !== "campaign_call_outcome" || !cfg.outcome || cfg.outcome === event.outcome;
+      // Call outcome and reply rules may name the outcome (interested, reply_positive, ...).
+      return (event.type !== "campaign_call_outcome" && event.type !== "campaign_member_replied") || !cfg.outcome || cfg.outcome === event.outcome;
     case "deal_idle_in_stage":
     case "lead_idle":
       // Evaluated by the scheduled job, not the event-driven path.
