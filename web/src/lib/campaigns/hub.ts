@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { resolveDemoHost } from "@/lib/booking/queries";
 import { addDays, atLocal, localDay } from "@/lib/booking/time";
 import { campaignAnalytics } from "./analytics";
+import { approvalHash, type StepDef } from "./rules";
 import { dailyList, getCampaign, listCampaigns, OPERATOR_ROLES } from "./service";
 
 /** Monday 00:00 Budapest of the week `now` is in. */
@@ -86,7 +87,7 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
     ...c.steps.map((s) => s.contentItemId).filter((v): v is number => v != null),
     ...(proposal?.assets ?? []).map((a) => a.item_id),
   ])];
-  const [items, counts, batches, me, aron, stats, owner] = await Promise.all([
+  const [items, counts, batches, me, aron, stats, owner, memberIds] = await Promise.all([
     db.contentItem.findMany({
       where: { tenantId, OR: [{ id: { in: assetIds } }, { campaignId: c.id }] },
       select: { id: true, title: true, status: true, metrics: true, currentVersion: { select: { number: true } } },
@@ -98,7 +99,14 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
     resolveDemoHost(tenantId, "aron"),
     campaignAnalytics(tenantId, { slug }),
     c.ownerUserId != null ? db.user.findFirst({ where: { tenantId, id: c.ownerUserId }, select: { name: true } }) : null,
+    db.campaignMember.findMany({ where: { tenantId, campaignId: c.id }, select: { companyId: true } }),
   ]);
+  // What Áron sees is what launches: the approve action sends this hash back and the service 409s on any change.
+  const previewHash = approvalHash({
+    memberCompanyIds: memberIds.map((m) => m.companyId),
+    steps: c.steps as (StepDef & { contentItemId: number | null })[],
+    dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations,
+  });
   const assets: AssetState[] = items.map((i) => ({ id: i.id, title: i.title, status: i.status, version: i.currentVersion?.number ?? null }));
   return {
     campaign: c,
@@ -109,6 +117,7 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
     members: Object.fromEntries(counts.map((x) => [x.state, x._count._all])) as Record<string, number>,
     batches,
     stats: stats[0]?.stats ?? null,
+    previewHash,
     isAron: aron != null && aron === userId,
     canOperate: me != null && OPERATOR_ROLES.includes(me.role),
   };

@@ -15,7 +15,7 @@ import { MemberLoad, loadCounts } from "@/app/(app)/campaigns/[slug]/MemberLoad"
 beforeEach(() => vi.clearAllMocks());
 
 const READY: LaunchData = {
-  slug: "bp", status: "draft", dailyCap: 15, startsOn: "2026-11-26", endsOn: null, outboundAutomations: false, approvedAt: null,
+  slug: "bp", status: "draft", dailyCap: 15, startsOn: "2026-11-26", endsOn: null, outboundAutomations: false, approvedAt: null, previewHash: "a".repeat(64),
   steps: [
     { position: 1, channel: "email", waitDays: 0, audienceRule: "all", contentItemId: 5 },
     { position: 2, channel: "call", waitDays: 3, audienceRule: "no_reply", contentItemId: 6 },
@@ -40,7 +40,7 @@ describe("Indítás", () => {
     render(<LaunchPanel d={READY} isAron />);
     expect(screen.getByText(/Ezt hagyod jóvá: 80 cég \(76 elérhető\), 2 lépés, napi 15, E-mail v3, Szkript v1/)).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Jóváhagyás és indítás" }));
-    expect(A.approveCampaignAction).toHaveBeenCalledWith("bp", { members: 80, steps: 2, dailyCap: 15 });
+    expect(A.approveCampaignAction).toHaveBeenCalledWith("bp", "a".repeat(64));
   });
   it("an unsaved cap change blocks the launch until it is saved (a save resets to draft)", async () => {
     render(<LaunchPanel d={READY} isAron />);

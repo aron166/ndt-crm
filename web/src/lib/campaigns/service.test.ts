@@ -4,6 +4,7 @@ import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
 import { changeLeadStatus } from "@/lib/leads/service";
 import { runAutomations } from "@/lib/automations/engine";
 import { resolveDemoHost } from "@/lib/booking/queries";
+import { approvalHash, type StepDef } from "./rules";
 import { addMembers, approveCampaign, recordOutcome, setCampaignStatus, specifyCampaign, setSteps, undoBatch, updateCampaign } from "./service";
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
@@ -168,10 +169,13 @@ describe("only Áron launches", () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence", dailyCap: 15, steps: [{ position: 1, channel: "email", waitDays: 0, contentItemId: 5, contentItem: { status: "in_review" } }] });
     expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp")).toMatchObject({ status: 409 });
   });
-  it("approve refuses when the campaign changed since the approver looked", async () => {
-    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp", { members: 2, steps: 1, dailyCap: 15 })).toMatchObject({ status: 409 });
+  it("approve refuses when the campaign changed since the approver looked, even a same-size member swap", async () => {
+    const steps: (StepDef & { contentItemId: number | null })[] = [{ position: 1, channel: "call", waitDays: 0, contentItemId: null }];
+    const seen = approvalHash({ memberCompanyIds: [8], steps, dailyCap: 15 }); // he saw company 8; company 7 is there now
+    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp", { hash: seen })).toMatchObject({ status: 409 });
     expect(d.campaign.updateMany).not.toHaveBeenCalled();
-    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp", { members: 1, steps: 1, dailyCap: 15 })).toMatchObject({ ok: true });
+    const now = approvalHash({ memberCompanyIds: [7], steps, dailyCap: 15 });
+    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp", { hash: now })).toMatchObject({ ok: true, approved_hash: now });
   });
   it("a sequence whose call comes before the e-mail cannot launch", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence", dailyCap: 15, steps: [

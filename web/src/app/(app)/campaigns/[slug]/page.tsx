@@ -54,7 +54,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
       {tab === "launch" && (
         <LaunchPanel isAron={d.isAron} d={{
           slug: c.slug, status: c.status, dailyCap: c.dailyCap, startsOn: ymd(c.startsOn), endsOn: ymd(c.endsOn),
-          outboundAutomations: c.outboundAutomations, approvedAt: c.approvedAt ? c.approvedAt.toISOString() : null,
+          outboundAutomations: c.outboundAutomations, previewHash: d.previewHash, approvedAt: c.approvedAt ? c.approvedAt.toISOString() : null,
           steps: c.steps, assets: d.assets, members: d.members,
         }} />
       )}
