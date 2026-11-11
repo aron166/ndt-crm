@@ -36,6 +36,9 @@ export function mapLaunchRow(r) {
     lane: clip(r.lane, 40),
     // No phone-only exception: Péter's own clients get the e-mail first too (Áron, 2026-11-11).
     why: clip(r.why, 300),
+    segment: clip(r.segment, 60),
+    source: clip(r.sources, 200),
+    contact_source: clip(r.enriched_from, 300),
     ...(Number.isInteger(Number(r.rank)) && Number(r.rank) >= 0 ? { priority: Math.min(1000, Number(r.rank)) } : {}),
   };
 }

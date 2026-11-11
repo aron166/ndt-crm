@@ -1,0 +1,73 @@
+import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import { copyRuleBreaks, parseSegmentCopy } from "./copy-file";
+
+const CTA = "Ha egy kicsit is felkeltette az érdeklődését, nem bonyolítom: válaszoljon annyit, hogy „érdekel”, és felhívom.";
+const fenceOf = (s: string) => "```\n" + s + "\n```";
+const MD = [
+  "Minden levél teste ugyanígy zárul:", "", fenceOf("{{CTA}}\n\n{{sender_name}}"), "",
+  "## Segment A (generálkivitelezők)", "", "Tárgy: Vágás előtt", "", fenceOf("{{greeting}}\n\nSzöveg A."), "",
+  "## Segment B (tervezők)", "", "Tárgy: Ára", "", fenceOf("{{greeting}}\n\nA mérés ára 90 000 Ft."), "",
+  "## Segment H (magánszemélyek)", "", "Nem hideg levél.", "",
+  "## Utánkövetés (egyetlen)", "", fenceOf("{{greeting}}\n\nRöviden."), "",
+].join("\n");
+
+describe("parseSegmentCopy", () => {
+  it("builds one touch-1 item per segment with the closing block and the CTA, and refuses rule breaks", () => {
+    const r = parseSegmentCopy(MD, CTA);
+    expect(r.items).toEqual([{ segment: "A", label: "generálkivitelezők", subject: "Vágás előtt", body: `{{greeting}}\n\nSzöveg A.\n\n${CTA}\n\n{{sender_name}}` }]);
+    expect(r.refused.map((x) => x.what)).toEqual(["B szegmens", "H szegmens", "Utánkövetés (minden szegmens)"]);
+    expect(r.refused[0].reason).toContain("ár vagy díj");
+  });
+  it("Vanda #195-4: a second section for the same segment is refused, not counted", () => {
+    const dup = MD + "\n## Segment A (megint)\n\nTárgy: Más\n\n" + fenceOf("{{greeting}}\n\nMásik A.") + "\n";
+    const r = parseSegmentCopy(dup, CTA);
+    expect(r.items.map((i) => i.segment)).toEqual(["A"]);
+    expect(r.refused.some((x) => x.what === "A szegmens" && /kétszer/.test(x.reason))).toBe(true);
+  });
+  it("refuses everything without a CTA", () => {
+    expect(parseSegmentCopy(MD, " ").items).toEqual([]);
+  });
+});
+
+describe("copyRuleBreaks", () => {
+  it("names each launch rule", () => {
+    expect(copyRuleBreaks("Hatósági engedély kell? „érdekel”")).toEqual(["„engedély”"]);
+    expect(copyRuleBreaks("Garanciát vállalunk. „érdekel”")).toEqual(["„garancia”"]);
+    expect(copyRuleBreaks("Az első ilyen mérés. „érdekel”")).toEqual(["„első” (minősítés nélkül tilos)"]);
+    expect(copyRuleBreaks("Pontosság ±5 mm. „érdekel”")).toEqual(["plusz-mínusz pontosság"]);
+    expect(copyRuleBreaks("Foglaljon időpontot. „érdekel”")).toEqual(["az ügyfél foglal (mi foglalunk, soha az ügyfél)"]);
+    expect(copyRuleBreaks("Írjon vissza.")).toEqual(["nincs „érdekel” válasz kérés"]);
+    expect(copyRuleBreaks("Radarral mérünk, a járat előtt. Válaszoljon: „érdekel”")).toEqual([]);
+  });
+  it("Vanda #195-2: suffixed price words are caught", () => {
+    for (const t of ["kedvező áron", "az árat megbeszéljük", "árakról", "árban benne", "ezer forint"]) expect(copyRuleBreaks(`${t} „érdekel”`), t).toEqual(["ár vagy díj"]);
+  });
+  it("Vanda #195-3: booking wording caught, a plain verb form not", () => {
+    expect(copyRuleBreaks("Foglalhat időpontot. „érdekel”")).toEqual(["az ügyfél foglal (mi foglalunk, soha az ügyfél)"]);
+    expect(copyRuleBreaks("Válasszon időpontot. „érdekel”")).toEqual(["az ügyfél foglal (mi foglalunk, soha az ügyfél)"]);
+    expect(copyRuleBreaks("Ezt ők foglalják le. „érdekel”")).toEqual([]);
+  });
+  it("Vanda #195 r2-2: possessive and compound price words are caught; look-alikes are not", () => {
+    for (const t of ["az árát", "árában", "áráról", "árainkról", "árajánlatot küldünk", "árlista", "árazás", "50e ft"]) expect(copyRuleBreaks(`${t} „érdekel”`), t).toEqual(["ár vagy díj"]);
+    for (const t of ["áram", "Árpád", "várat", "határ", "árok"]) expect(copyRuleBreaks(`${t} „érdekel”`), t).toEqual([]);
+  });
+  it("Vanda #195 r2-3: foglalhatja and lefoglalhatja are caught, lefoglaljuk is not", () => {
+    for (const t of ["Foglalhatja most.", "Le is foglalhatja.", "Lefoglalhatja a napot."]) expect(copyRuleBreaks(`${t} „érdekel”`), t).toEqual(["az ügyfél foglal (mi foglalunk, soha az ügyfél)"]);
+    expect(copyRuleBreaks("Mi lefoglaljuk a napot. „érdekel”")).toEqual([]);
+  });
+  it("Vanda #195-6: the CTA is kept verbatim, $ sequences included", () => {
+    const r = parseSegmentCopy(MD, "Írjon: „érdekel” $& $'");
+    expect(r.items[0].body).toContain("Írjon: „érdekel” $& $'");
+  });
+});
+
+// The real file, when it is on this machine: what tonight's load would carry (counts in the PR body).
+const REAL = "/home/aron166/Projects/workspace/docs/birdsview/launch-2026-11/demo/EMAIL.md";
+describe.runIf(fs.existsSync(REAL))("EMAIL.md (launch 2026-11)", () => {
+  it("yields the seven mailed segments A-G, all clean", () => {
+    const r = parseSegmentCopy(fs.readFileSync(REAL, "utf8"), CTA);
+    expect(r.items.map((i) => i.segment)).toEqual(["A", "B", "C", "D", "E", "F", "G"]);
+    for (const i of r.items) expect(i.body).toContain("„érdekel”");
+  });
+});

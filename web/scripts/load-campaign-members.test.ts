@@ -18,6 +18,11 @@ describe("mapLaunchRow", () => {
   it("a CRM match carries the CRM id and name", () => {
     expect(mapLaunchRow({ ...BASE, crm_company_id: 42, crm_name: "Minta Építő Korlátolt" })).toMatchObject({ crm_company_id: 42, company_name: "Minta Építő Korlátolt" });
   });
+  it("keeps the row's raw segment, list sources and contact-route origin (quick view provenance)", () => {
+    const m = mapLaunchRow({ ...BASE, segment: "drillers", sources: "crm+peterdrive", enriched_from: "https://minta.example/kapcsolat" });
+    expect(memberRowSchema.parse(m)).toMatchObject({ segment: "drillers", source: "crm+peterdrive", contact_source: "https://minta.example/kapcsolat" });
+    expect(mapLaunchRow({ ...BASE, segment: "", enriched_from: "" })).toMatchObject({ segment: undefined, contact_source: undefined });
+  });
   it("Péter's own network is no exception: no phone_only flag, the e-mail comes first", () => {
     expect(mapLaunchRow({ ...BASE, owner: "Péter call" })).not.toHaveProperty("phone_only");
   });

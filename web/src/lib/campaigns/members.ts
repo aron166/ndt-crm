@@ -30,6 +30,10 @@ export const memberRowSchema = z.object({
   tier: optStr(2),
   lane: optStr(40),
   why: optStr(300),
+  /** Provenance from the launch-list row (quick view): raw segment, list sources, where the contact was found. */
+  segment: optStr(60),
+  source: optStr(200),
+  contact_source: optStr(300),
   priority: z.number().int().min(0).max(1000).optional(),
 });
 export type MemberRow = z.infer<typeof memberRowSchema>;

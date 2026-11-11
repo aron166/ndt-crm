@@ -82,7 +82,7 @@ export function AudiencePanel({ slug, status, source, stages, leadStatuses, canO
       {hasEmailStep && status === "running" && canOperate && (
         <div className={k.actions}>
           <button type="button" className={k.btn} disabled={busy}
-            onClick={() => run(() => draftEmailStepAction(slug) as Promise<{ error?: string; drafted?: number; noAddress?: number; noAsset?: number }>, (x) => `${x.drafted ?? 0} piszkozat az Outreach sorban (nincs cím: ${x.noAddress ?? 0}, nincs élő anyag: ${x.noAsset ?? 0}). Küldés csak onnan, jóváhagyás után.`)}>
+            onClick={() => run(() => draftEmailStepAction(slug) as Promise<{ error?: string; drafted?: number; noAddress?: number; noAsset?: number; unresolved?: number }>, (x) => `${x.drafted ?? 0} piszkozat az Outreach sorban (nincs cím: ${x.noAddress ?? 0}, nincs élő anyag: ${x.noAsset ?? 0}, kitöltetlen mező: ${x.unresolved ?? 0}). Küldés csak onnan, jóváhagyás után.`)}>
             Mai e-mail lépés piszkozatai
           </button>
         </div>

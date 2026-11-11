@@ -153,6 +153,19 @@ describe("only Áron launches", () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "cold_call", dailyCap: 15, outboundAutomations: false, steps: [{ position: 1, channel: "call", waitDays: 0, contentItemId: null, contentItem: null }] });
     d.campaignMember.findMany.mockResolvedValue([{ companyId: 7, state: "queued" }]);
     d.campaign.updateMany.mockResolvedValue({ count: 1 });
+    d.contentItem.findMany.mockResolvedValue([]);
+  });
+  it("segment variants: a proposal variant blocks the launch; all variants live launch an e-mail step with no own asset, and join the hash", async () => {
+    const step = { position: 1, channel: "email", waitDays: 0, contentItemId: null, contentItem: null };
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "cold_email", dailyCap: 15, outboundAutomations: false, steps: [step] });
+    d.contentItem.findMany.mockResolvedValue([{ id: 60, status: "in_review", sourceMeta: { campaignStep: 1, segment: "A" } }]);
+    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp")).toMatchObject({ status: 409, error: expect.stringMatching(/szegmensváltozat/) });
+    d.contentItem.findMany.mockResolvedValue([{ id: 60, status: "live", sourceMeta: { campaignStep: 1, segment: "A" } }]);
+    const r = await approveCampaign({ tenantId: 1, userId: 2 }, "bp");
+    expect(r).toMatchObject({ ok: true });
+    const plain = approvalHash({ memberCompanyIds: [7], steps: [step as StepDef & { contentItemId: null }], dailyCap: 15 });
+    expect((r as { approved_hash: string }).approved_hash).not.toBe(plain);
+    expect(approvalHash({ memberCompanyIds: [7], steps: [step as StepDef & { contentItemId: null }], dailyCap: 15, variants: [] })).toBe(plain);
   });
   it("an app key can never approve", async () => {
     expect(await approveCampaign(APP, "bp")).toMatchObject({ status: 403 });

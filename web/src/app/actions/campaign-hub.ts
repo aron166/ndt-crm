@@ -10,6 +10,7 @@ import { addMembersSchema } from "@/lib/campaigns/members";
 import { createSchema, outcomeSchema, patchSchema, stepsSchema } from "@/lib/campaigns/api";
 import { parseMemberFile } from "@/lib/campaigns/member-file";
 import type { OutcomeKey } from "@/lib/campaigns/rules";
+import { memberQuickView, type QuickView } from "@/lib/campaigns/preview";
 
 const TENANT_ID = 1;
 type Err = { error: string };
@@ -155,12 +156,21 @@ export async function loadLeadAudienceAction(slug: string, batch: string, dryRun
 }
 
 /** The e-mail step's drafts for today (item 4): into the Outreach queue, never sent from here. */
-export async function draftEmailStepAction(slug: string): Promise<{ ok: true; drafted: number; noAddress: number; noAsset: number } | Err> {
+export async function draftEmailStepAction(slug: string): Promise<{ ok: true; drafted: number; noAddress: number; noAsset: number; unresolved: number } | Err> {
   const { userId } = await getActor(TENANT_ID);
   if (userId == null) return { error: NOT_A_CRM_USER };
   if (typeof slug !== "string") return { error: "Érvénytelen adat" };
   const r = await svc.draftEmailStep({ tenantId: TENANT_ID, userId }, slug);
   if ("error" in r) return { error: r.error };
   touch(slug);
-  return { ok: true, drafted: r.drafted, noAddress: r.noAddress, noAsset: r.noAsset };
+  return { ok: true, drafted: r.drafted, noAddress: r.noAddress, noAsset: r.noAsset, unresolved: r.unresolved };
+}
+
+/** Prospect quick view of one member (read only: no write anywhere in this path, preview.test.ts). */
+export async function memberQuickViewAction(slug: string, memberId: number): Promise<{ ok: true; view: QuickView } | Err> {
+  const { userId } = await getActor(TENANT_ID);
+  if (userId == null) return { error: NOT_A_CRM_USER };
+  if (typeof slug !== "string" || !Number.isInteger(memberId) || memberId <= 0) return { error: "Érvénytelen tag" };
+  const view = await memberQuickView(TENANT_ID, slug, memberId);
+  return view ? { ok: true, view } : { error: "Tag nem található ebben a kampányban" };
 }

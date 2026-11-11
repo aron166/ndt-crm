@@ -18,17 +18,23 @@ export interface LaunchData {
   slug: string; status: string; dailyCap: number; startsOn: string | null; endsOn: string | null;
   outboundAutomations: boolean; approvedAt: string | null; previewHash: string;
   steps: StepRow[]; assets: AssetState[]; members: Record<string, number>;
+  /** Segment variants of the e-mail steps (lib/campaigns/preview campaignVariants). */
+  variants?: { step: number; segment: string; itemId: number; status: string }[];
 }
 
 /** What still blocks a launch, in the service's order (approveCampaign is the final word). */
-export function launchBlockers(d: Pick<LaunchData, "status" | "steps" | "assets" | "members">): string[] {
+export function launchBlockers(d: Pick<LaunchData, "status" | "steps" | "assets" | "members" | "variants">): string[] {
   const out: string[] = [];
   if (d.status !== "draft" && d.status !== "paused") out.push(d.status === "running" ? "A kampány már fut" : "Lezárt kampány");
   if (d.steps.length === 0) out.push("Nincs lépés");
   const byId = new Map(d.assets.map((a) => [a.id, a]));
   for (const st of d.steps) {
     const a = st.contentItemId != null ? byId.get(st.contentItemId) : undefined;
-    if (st.channel === "email" && !a) out.push(`${st.position}. lépés: nincs e-mail anyag`);
+    // Segment variants stand in for the step's own asset; every one must be live (service.approveCampaign).
+    const vars = (d.variants ?? []).filter((v) => v.step === st.position);
+    const open = vars.filter((v) => v.status !== "live");
+    if (open.length) out.push(`${st.position}. lépés: ${open.length} szegmensváltozat még nincs jóváhagyva (${open.map((v) => v.segment).join(", ")})`);
+    if (st.channel === "email" && !a && vars.length === 0) out.push(`${st.position}. lépés: nincs e-mail anyag`);
     else if (a && a.status !== "live") out.push(`${st.position}. lépés: az anyag még nincs jóváhagyva`);
   }
   if (!(d.members.queued > 0)) out.push("Nincs elérhető tag");
@@ -100,7 +106,7 @@ export function LaunchPanel({ d, isAron }: { d: LaunchData; isAron: boolean }) {
                 <li key={st.position} className={s.step}>
                   <span className={s.stepNo}>{st.position}</span>
                   <span>{stepLine(st)}</span>
-                  <span className={s.state} data-s={a?.status}>{a ? `${a.title}${a.version ? ` v${a.version}` : ""}: ${assetStateLabel(a.status)}` : "nincs anyag"}</span>
+                  <span className={s.state} data-s={a?.status}>{a ? `${a.title}${a.version ? ` v${a.version}` : ""}: ${assetStateLabel(a.status)}` : (d.variants ?? []).some((v) => v.step === st.position) ? `${(d.variants ?? []).filter((v) => v.step === st.position).length} szegmensváltozat` : "nincs anyag"}</span>
                 </li>
               );
             })}

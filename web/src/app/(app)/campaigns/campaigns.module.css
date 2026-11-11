@@ -72,3 +72,25 @@ textarea.input { min-height: 72px; resize: vertical; }
 .ruleList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .ruleForm { display: grid; gap: 12px; max-width: 520px; margin-top: 12px; }
 .stageSet { display: flex; flex-wrap: wrap; gap: 8px 16px; border: 0; padding: 0; margin: 8px 0; }
+
+/* Prospect quick view: a side sheet on a native modal dialog (focus trap, Esc, inert page). */
+.sheet { margin: 0 0 0 auto; height: 100dvh; max-height: 100dvh; width: min(560px, 100vw); max-width: 100vw; box-sizing: border-box; padding: 0; border: 0; background: var(--ui-surface); color: var(--ui-text); box-shadow: var(--ui-shadow-overlay); }
+.sheetInner { min-height: 100%; display: flex; flex-direction: column; }
+.sheetInner > .sheetBody { flex: 1; }
+.sheet::backdrop { background: var(--ui-scrim); }
+.sheetHead { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 20px 20px 14px; background: var(--ui-surface); border-bottom: 1px solid var(--ui-border); }
+.sheetHead h2 { margin: 0; font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }
+.sheetBody { display: flex; flex-direction: column; gap: 4px; padding: 4px 20px 24px; }
+.sheetFoot { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 20px; background: var(--ui-surface); border-top: 1px solid var(--ui-border); }
+.sheetSec { display: flex; flex-direction: column; gap: 6px; padding: 14px 0; border-bottom: 1px solid var(--ui-border); }
+.sheetSec h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--ui-text-muted); }
+.missing { color: var(--ui-text-muted); font-style: italic; }
+.mail { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: var(--ui-surface-muted); border-radius: var(--ui-radius-surface); }
+.mailMeta { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; font-size: 13px; }
+.mailMeta > :nth-child(odd) { color: var(--ui-text-muted); }
+.mailBody { margin: 0; white-space: pre-wrap; font: inherit; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+.marker { padding: 0 4px; border-radius: 4px; background: var(--ui-warning-surface); color: var(--ui-warning-text); font-family: var(--ui-font-mono, monospace); font-size: 12px; font-style: normal; }
+.flag { margin: 0; padding: 8px 12px; border-radius: var(--ui-radius-control); background: var(--ui-warning-surface); color: var(--ui-warning-text); font-size: 13px; }
+.rowBtn { all: unset; cursor: pointer; font-weight: 600; color: var(--ui-text); overflow-wrap: anywhere; }
+.rowBtn:hover { text-decoration: underline; }
+.rowBtn:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; border-radius: 2px; }

@@ -9,6 +9,7 @@ import Link from "next/link";
 import k from "@/components/astryx/page.module.css";
 import { groupByCity } from "@/lib/campaigns/labels";
 import { recordCampaignOutcomeAction } from "@/app/actions/campaign-hub";
+import { MemberQuickView } from "@/components/campaigns/MemberQuickView";
 import s from "../campaigns/campaigns.module.css";
 
 export interface CallItem {
@@ -44,6 +45,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
   // One note per member: a note typed on company A never goes out with company B's tap (interactions are append-only).
   const [notesBy, setNotesBy] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
+  const [peek, setPeek] = useState<number | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string; leadId?: number } | null>(null);
   const current = items.find((i) => i.id === selected) ?? items[0] ?? null;
   // The selected company's own step script; `scripts` absent (older payload) falls back to the one script.
@@ -119,6 +121,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
               <div>
                 <h2 className={k.groupTitle}>{current.company.name}</h2>
                 {current.why && <p className={k.muted} style={{ margin: "4px 0 0" }}>Miért: {current.why}</p>}
+                <button type="button" className={k.link} style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} aria-haspopup="dialog" onClick={() => setPeek(current.id)}>Részletek és az elküldött e-mail</button>
               </div>
               {current.person && (
                 <div>
@@ -152,6 +155,7 @@ export function CampaignCallView({ slug, data }: { slug: string; data: CallViewD
           )}
         </div>
       )}
+      <MemberQuickView slug={slug} memberId={peek} onClose={() => setPeek(null)} />
     </div>
   );
 }

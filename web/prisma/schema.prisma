@@ -1291,6 +1291,10 @@ model CampaignMember {
   lane           String?
   why            String?
   city           String?
+  /// The launch-list row's raw segment, list sources and contact-route origin (20261111220000). Shown in the prospect quick view.
+  segment        String?
+  source         String?
+  contactSource  String?   @map("contact_source")
   importBatch    String?   @map("import_batch")
   createdCompany Boolean   @default(false) @map("created_company")
   createdPerson  Boolean   @default(false) @map("created_person")
