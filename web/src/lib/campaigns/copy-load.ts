@@ -32,12 +32,14 @@ export async function loadSegmentCopy(ctx: CampaignCtx, slug: string, input: Cop
   if (c.steps.find((s) => s.position === input.step)?.channel !== "email") return fail(400, `A ${input.step}. lépés nem e-mail lépés`);
   const { items, refused } = parseSegmentCopy(input.markdown, input.cta);
   const planned = items.map((i) => ({ ...i, externalRef: `${input.source_ref}#${c.slug}-step${input.step}-${i.segment}` }));
-  const existing = new Set((await db.contentItem.findMany({
-    where: { tenantId: ctx.tenantId, externalRef: { in: planned.map((p) => p.externalRef) } }, select: { externalRef: true },
-  })).map((x) => x.externalRef));
+  const stored = new Map((await db.contentItem.findMany({
+    where: { tenantId: ctx.tenantId, externalRef: { in: planned.map((p) => p.externalRef) } }, select: { externalRef: true, title: true, body: true },
+  })).map((x) => [x.externalRef, x]));
+  // An existing ref is never overwritten (createItem returns it untouched); a text that differs is named, not skipped silently.
+  const editedSkipped = planned.filter((p) => { const x = stored.get(p.externalRef); return x && (x.title !== p.subject || x.body !== p.body); }).map((p) => p.segment);
   const summary = {
-    parsed: items.length, create: planned.filter((p) => !existing.has(p.externalRef)).length, existing: existing.size,
-    refused: refused as CopyRefusal[], segments: planned.map((p) => p.segment),
+    parsed: items.length, create: planned.filter((p) => !stored.has(p.externalRef)).length, existing: stored.size,
+    edited_skipped: editedSkipped, refused: refused as CopyRefusal[], segments: planned.map((p) => p.segment),
   };
   if (input.dry_run) return { ok: true as const, dry_run: true, summary };
 
