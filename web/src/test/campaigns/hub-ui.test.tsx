@@ -6,8 +6,10 @@ const push = vi.fn();
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 const createCampaignAction = vi.fn();
+const requestSpecificationAction = vi.fn();
 vi.mock("@/app/actions/campaign-hub", () => ({
   createCampaignAction: (...a: unknown[]) => createCampaignAction(...a),
+  requestSpecificationAction: (...a: unknown[]) => requestSpecificationAction(...a),
   updateCampaignAction: vi.fn(), adoptProposedStepsAction: vi.fn(), saveStepsAction: vi.fn(),
 }));
 
@@ -90,5 +92,21 @@ describe("Specifikáció AI-val", () => {
   it("with no proposal there is nothing to adopt", () => {
     render(<SpecifyPanel slug="bp" editable proposal={null} assets={[]} />);
     expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("asking an agent from the panel (item 6)", () => {
+  it("prefills what is missing and records a request; the CRM calls no model", async () => {
+    requestSpecificationAction.mockResolvedValue({ ok: true, created: true });
+    render(<SpecifyPanel slug="bp" editable proposal={null} assets={[]} canRequest missing={["cél, ajánlat", "2. lépés anyaga (Hívás)"]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Ügynök kérése" }));
+    expect((screen.getByLabelText("Mit kérsz az ügynöktől?") as HTMLTextAreaElement).value).toBe("Hiányzik: cél, ajánlat, 2. lépés anyaga (Hívás).");
+    await userEvent.click(screen.getByRole("button", { name: "Kérés küldése" }));
+    expect(requestSpecificationAction).toHaveBeenCalledWith("bp", "Hiányzik: cél, ajánlat, 2. lépés anyaga (Hívás).");
+    expect(screen.getByRole("status").textContent).toMatch(/Kérés rögzítve/);
+  });
+  it("no request on a running campaign", () => {
+    render(<SpecifyPanel slug="bp" editable proposal={null} assets={[]} canRequest={false} />);
+    expect(screen.queryByRole("button", { name: "Ügynök kérése" })).toBeNull();
   });
 });

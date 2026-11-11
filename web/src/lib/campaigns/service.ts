@@ -28,6 +28,8 @@ import type { ContentCategory } from "@/lib/content/types";
 import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
   MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor } from "./rules";
+import { closeSpecRequests } from "./spec-requests";
+export { requestSpecification } from "./spec-requests";
 import { planMembers, type MemberRow, type MembersPlan, reachFromContacts } from "./members";
 
 export interface CampaignCtx {
@@ -308,6 +310,8 @@ export async function specifyCampaign(ctx: CampaignCtx, slug: string, input: Spe
   });
   if ("error" in result) return result;
   audit("campaign", c.id, "update", null, { briefProposal: { by: source, assets: result.assets.length } }, auditOpts(ctx));
+  // The proposal answers the campaign's open specification requests (item 6).
+  await closeSpecRequests(ctx.tenantId, slug);
   return { ok: true as const, proposal: result };
 }
 

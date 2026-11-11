@@ -32,7 +32,7 @@ vi.mock("@/lib/db", () => {
     leadStatusHistory: { create: m() },
     interaction: { create: m(), updateMany: m(), findMany: m() },
     suppression: { upsert: m() },
-    task: { create: m(), findMany: m() },
+    task: { create: m(), findMany: m(), updateMany: m() },
     contentItem: { findMany: m() },
     deal: { findMany: m() },
     $queryRaw: vi.fn().mockResolvedValue([]),
@@ -220,6 +220,11 @@ describe("specify: proposals only", () => {
     const data = d.campaign.update.mock.calls[0][0].data;
     expect(Object.keys(data)).toEqual(["briefProposal"]);
     expect(d.campaignStep.createMany).not.toHaveBeenCalled();
+    // The proposal answers this campaign's open specification requests, and only this campaign's (item 6).
+    expect(d.task.updateMany.mock.calls[0][0]).toMatchObject({
+      where: { tenantId: 1, status: { in: ["created", "in_progress"] }, setMembership: { hasEvery: ["campaign_spec_request", "campaign:bp"] } },
+      data: { status: "done" },
+    });
   });
   it("proposed steps must fit the kind (a call before the e-mail is a 400)", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });

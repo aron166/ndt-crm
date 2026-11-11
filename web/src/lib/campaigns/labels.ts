@@ -112,3 +112,15 @@ export function outreachStatsHref(params: URLSearchParams | Record<string, strin
 /** Type tab label: the folded-in old views (Marketing (régi), Kiküldés) carry no count, their lists count differently. */
 export const typeTabLabel = (key: string, label: string, count: number) =>
   key === "marketing" || key === "outreach" ? label : `${label} ${count}`;
+
+/** What a specification request asks an agent for: the empty brief fields, no steps, steps without an asset. */
+export function missingForSpec(c: { kind: string | null; brief: unknown; steps: readonly { position: number; channel: string; contentItemId: number | null }[] }): string[] {
+  const b = (c.brief ?? {}) as Record<string, unknown>;
+  const out: string[] = [];
+  if (typeof b.offer !== "string" || !b.offer.trim()) out.push("cél, ajánlat");
+  if (typeof b.audience !== "string" || !b.audience.trim()) out.push("célközönség");
+  if (isContentOnly(c.kind)) return out;
+  if (c.steps.length === 0) out.push("lépések");
+  for (const s of c.steps) if ((s.channel === "email" || s.channel === "call") && s.contentItemId == null) out.push(`${s.position}. lépés anyaga (${CHANNEL_LABEL[s.channel as StepChannel]})`);
+  return out;
+}

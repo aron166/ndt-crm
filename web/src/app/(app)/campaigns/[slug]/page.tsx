@@ -7,7 +7,7 @@ import { PageHeader, Seg } from "@/components/astryx/PageHeader";
 import k from "@/components/astryx/page.module.css";
 import { getActor } from "@/lib/actor";
 import { campaignPage } from "@/lib/campaigns/hub";
-import { assetStateLabel, isContentOnly, kindLabel, statusLabel } from "@/lib/campaigns/labels";
+import { assetStateLabel, isContentOnly, kindLabel, missingForSpec, statusLabel } from "@/lib/campaigns/labels";
 import type { CampaignKind } from "@/lib/campaigns/rules";
 import { RunningStrip } from "@/components/campaigns/RunningStrip";
 import { SpecifyPanel, type Proposal } from "./SpecifyPanel";
@@ -104,7 +104,8 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           )}
         </div>
         <div>
-          <SpecifyPanel slug={c.slug} proposal={d.proposal as Proposal | null} assets={d.assets} editable={c.status !== "stopped" && c.status !== "done"} canAdoptSteps={c.status === "draft" && !contentOnly} />
+          <SpecifyPanel slug={c.slug} proposal={d.proposal as Proposal | null} assets={d.assets} editable={c.status !== "stopped" && c.status !== "done"} canAdoptSteps={c.status === "draft" && !contentOnly}
+            missing={missingForSpec({ kind: c.kind, brief: c.brief, steps: c.steps })} openRequest={d.openSpecRequest} canRequest={c.status === "draft" || c.status === "paused"} />
         </div>
       </div>}
     </div>
