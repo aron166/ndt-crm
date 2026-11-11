@@ -8,6 +8,7 @@ import { approvalHash, type StepDef } from "./rules";
 import { addMembers, approveCampaign, recordOutcome, setCampaignStatus, specifyCampaign, setSteps, undoBatch, updateCampaign } from "./service";
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
+import { audit } from "@/lib/audit";
 vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/enrichment/recompute", () => ({ recomputeCloseness: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolvedValue(undefined) }));
@@ -225,6 +226,17 @@ describe("specify: proposals only", () => {
       where: { tenantId: 1, status: { in: ["created", "in_progress"] }, setMembership: { hasEvery: ["campaign_spec_request", "campaign:bp"] } },
       data: { status: "done" },
     });
+  });
+  it("an empty proposal is a 400 and closes no request (Vanda #192-3)", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
+    expect(await specifyCampaign(APP, "bp", {})).toMatchObject({ status: 400 });
+    expect(d.task.updateMany).not.toHaveBeenCalled();
+  });
+  it("closing a request is audited with the agent as actor (Vanda #192-2)", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
+    d.task.findMany.mockResolvedValue([{ id: 91 }]);
+    await specifyCampaign(APP, "bp", { brief: { offer: "x" } });
+    expect(audit).toHaveBeenCalledWith("task", 91, "update", { status: "open" }, { status: "done", by: "corvid" }, expect.objectContaining({ actorAgentId: "corvid" }));
   });
   it("proposed steps must fit the kind (a call before the e-mail is a 400)", async () => {
     d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "sequence" });
