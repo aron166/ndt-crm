@@ -383,3 +383,11 @@ describe("add_note (item 5, Vanda #193-3)", () => {
     });
   });
 });
+
+describe("reply rules can name positive or negative (Vanda #193 r2-1)", () => {
+  it("a callback rule on positive replies does not fire for a 'not interested' reply", () => {
+    const e = (outcome: string): AutomationEvent => ({ type: "campaign_member_replied", tenantId: 1, companyId: 7, personId: null, campaignId: 1, outcome, fields: {} });
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1, outcome: "reply_positive" }, e("reply_negative"))).toBe(false);
+    expect(triggerMatches("campaign_member_replied", { campaignId: 1, outcome: "reply_positive" }, e("reply_positive"))).toBe(true);
+  });
+});

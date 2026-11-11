@@ -144,6 +144,9 @@ async function parseRuleForm(formData: FormData): Promise<RuleInput | { error: s
       const { userId } = await getActor(TENANT_ID);
       if (userId == null || userId !== (await resolveDemoHost(TENANT_ID, "aron"))) return { error: "Kimenő kampány szabályt csak Áron menthet" };
     }
+    if (triggerType === "campaign_member_replied" && triggerConfig?.outcome != null && triggerConfig.outcome !== "") {
+      if (triggerConfig.outcome !== "reply_positive" && triggerConfig.outcome !== "reply_negative") return { error: "Ismeretlen válasz típus" };
+    }
     if (triggerType === "campaign_call_outcome" && triggerConfig?.outcome != null && triggerConfig.outcome !== "") {
       if (!CALL_OUTCOME_KEYS.includes(triggerConfig.outcome as never) || triggerConfig.outcome === "note_only") return { error: "Ismeretlen hívás eredmény" };
     }

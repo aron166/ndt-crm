@@ -94,6 +94,10 @@ describe("campaign-scoped rules (item 5)", () => {
     f.set("name", "n"); f.set("triggerType", "lead_created"); f.set("actionType", "add_note"); f.set("actionConfig", JSON.stringify({ textTemplate: "x" }));
     expect(await createAutomation(f)).toEqual({ error: "Jegyzet művelet csak kampány szabályban" });
   });
+  it("a reply filter is positive or negative only (Vanda #193 r2-1)", async () => {
+    db.campaign.findFirst.mockResolvedValue({ id: 3, outboundAutomations: false });
+    expect(await createAutomation(rule("create_task", { titleTemplate: "x" }, { campaignId: 3, outcome: "no_answer" }))).toEqual({ error: "Ismeretlen válasz típus" });
+  });
   it("a call outcome filter must be a real outcome (Vanda #193-5)", async () => {
     db.campaign.findFirst.mockResolvedValue({ id: 3, outboundAutomations: false });
     const f = rule("create_task", { titleTemplate: "x" }, { campaignId: 3, outcome: "foo" });
