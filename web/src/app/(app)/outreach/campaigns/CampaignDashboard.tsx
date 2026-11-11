@@ -92,7 +92,7 @@ export default function CampaignDashboard({
         eyebrow={<Link href="/outreach" className={k.back} style={{ marginBottom: 0 }}>← Outreach</Link>}
         actions={
           // PROPOSAL (unreviewed HU)
-          <Link href="/marketing/campaigns" className={k.btn}>
+          <Link href="/campaigns" className={k.btn}>
             Kampányok kezelése
           </Link>
         }

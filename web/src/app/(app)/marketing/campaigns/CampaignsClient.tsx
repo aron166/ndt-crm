@@ -92,9 +92,13 @@ export function CampaignsClient({
         title="Kampányok"
         eyebrow="Kampányok és célközönségük: szegmensből kimenő lista."
         actions={
+          <>
+          {/* PROPOSAL copy: the hub is where every campaign type now lives (Áron 2026-11-11, variant A). */}
+          <Link href="/campaigns" className={k.btn}>Kampányok központ</Link>
           <button type="button" className={`${k.btn} ${k.btnPrimary}`} onClick={() => setOpen(true)}>
             <Plus className="size-4" /> Új kampány
           </button>
+          </>
         }
       />
 

@@ -1,0 +1,108 @@
+// Campaigns hub reads for the pages (server only). Every query is scoped by tenantId; the
+// callers are pages under the (app) layout, which already refuses a non-CRM user.
+
+import { db } from "@/lib/db";
+import { resolveDemoHost } from "@/lib/booking/queries";
+import { addDays, atLocal, localDay } from "@/lib/booking/time";
+import { campaignAnalytics } from "./analytics";
+import { dailyList, getCampaign, listCampaigns, OPERATOR_ROLES } from "./service";
+
+/** Monday 00:00 Budapest of the week `now` is in. */
+export function weekStart(now: Date): Date {
+  const today = localDay(now);
+  return atLocal(addDays(today, -((today.dow + 6) % 7)), 0);
+}
+
+export interface HubRow {
+  id: number; slug: string; name: string; kind: string | null; status: string;
+  owner: string | null; audience: number; queued: number; today: number | null;
+  leadsThisWeek: number; assetsInReview: number; stepCount: number;
+}
+
+export async function hubList(tenantId: number, now: Date = new Date()) {
+  const rows = await listCampaigns(tenantId);
+  const slugs = rows.map((r) => r.slug);
+  const ids = rows.map((r) => r.id);
+  const [users, leads, review] = await Promise.all([
+    db.user.findMany({ where: { tenantId }, select: { id: true, name: true } }),
+    db.lead.groupBy({ by: ["campaign"], where: { tenantId, campaign: { in: slugs }, createdAt: { gte: weekStart(now) } }, _count: { _all: true } }),
+    db.contentItem.groupBy({ by: ["campaignId"], where: { tenantId, campaignId: { in: ids }, status: "in_review" }, _count: { _all: true } }),
+  ]);
+  const userName = new Map(users.map((u) => [u.id, u.name]));
+  const today = new Map<number, number>();
+  for (const r of rows.filter((x) => x.status === "running" && x.steps.some((s) => s.channel === "call"))) {
+    const l = await dailyList(tenantId, r.slug, now);
+    if (!("error" in l)) today.set(r.id, l.items.length);
+  }
+  const out: HubRow[] = rows.map((r) => {
+    const m = r.members as Record<string, number>;
+    return {
+      id: r.id, slug: r.slug, name: r.name, kind: r.kind, status: r.status,
+      owner: r.ownerUserId != null ? userName.get(r.ownerUserId) ?? null : null,
+      audience: Object.values(m).reduce((a, b) => a + b, 0), queued: m.queued ?? 0,
+      today: today.get(r.id) ?? null,
+      leadsThisWeek: leads.find((x) => x.campaign === r.slug)?._count._all ?? 0,
+      assetsInReview: review.find((x) => x.campaignId === r.id)?._count._all ?? 0,
+      stepCount: r.steps.length,
+    };
+  });
+  return { rows: out, summary: summarize(out) };
+}
+
+export function summarize(rows: readonly HubRow[]) {
+  return {
+    running: rows.filter((r) => r.status === "running").length,
+    // A draft Áron could approve now: it has steps and a queued member.
+    awaiting: rows.filter((r) => (r.status === "draft" || r.status === "paused") && r.stepCount > 0 && r.queued > 0).length,
+    callsToday: rows.reduce((a, r) => a + (r.today ?? 0), 0),
+    leadsThisWeek: rows.reduce((a, r) => a + r.leadsThisWeek, 0),
+    assetsInReview: rows.reduce((a, r) => a + r.assetsInReview, 0),
+  };
+}
+
+export interface AssetState { id: number; title: string; status: string; version: number | null }
+
+/** Everything the campaign page shows; null when the slug is not in the tenant. */
+export async function campaignPage(tenantId: number, slug: string, userId: number) {
+  const c = await getCampaign(tenantId, slug);
+  if (!c) return null;
+  const proposal = (c.briefProposal ?? null) as { brief?: Record<string, unknown> | null; steps?: { channel: string; wait_days?: number }[] | null; assets?: { item_id: number; step_position: number | null }[]; note?: string | null; proposed_by?: string; proposed_at?: string } | null;
+  const assetIds = [...new Set([
+    ...c.steps.map((s) => s.contentItemId).filter((v): v is number => v != null),
+    ...(proposal?.assets ?? []).map((a) => a.item_id),
+  ])];
+  const [items, counts, batches, me, aron, stats, owner] = await Promise.all([
+    db.contentItem.findMany({
+      where: { tenantId, OR: [{ id: { in: assetIds } }, { campaignId: c.id }] },
+      select: { id: true, title: true, status: true, metrics: true, currentVersion: { select: { number: true } } },
+      orderBy: { id: "asc" },
+    }),
+    db.campaignMember.groupBy({ by: ["state"], where: { tenantId, campaignId: c.id }, _count: { _all: true } }),
+    db.campaignMember.groupBy({ by: ["importBatch"], where: { tenantId, campaignId: c.id }, _count: { _all: true }, _min: { createdAt: true } }),
+    db.user.findFirst({ where: { tenantId, id: userId }, select: { role: true } }),
+    resolveDemoHost(tenantId, "aron"),
+    campaignAnalytics(tenantId, { slug }),
+    c.ownerUserId != null ? db.user.findFirst({ where: { tenantId, id: c.ownerUserId }, select: { name: true } }) : null,
+  ]);
+  const touchedByBatch = await db.campaignMember.groupBy({
+    by: ["importBatch"],
+    where: { tenantId, campaignId: c.id, OR: [{ attempts: { gt: 0 } }, { lastTouchedAt: { not: null } }, { leadId: { not: null } }] },
+    _count: { _all: true },
+  });
+  const assets: AssetState[] = items.map((i) => ({ id: i.id, title: i.title, status: i.status, version: i.currentVersion?.number ?? null }));
+  return {
+    campaign: c,
+    owner: owner?.name ?? null,
+    proposal,
+    assets,
+    metrics: items.map((i) => ({ id: i.id, title: i.title, metrics: (i.metrics ?? null) as Record<string, number> | null })),
+    members: Object.fromEntries(counts.map((x) => [x.state, x._count._all])) as Record<string, number>,
+    batches: batches.filter((b) => b.importBatch != null).map((b) => ({
+      batch: b.importBatch!, members: b._count._all, createdAt: b._min.createdAt,
+      touched: touchedByBatch.find((t) => t.importBatch === b.importBatch)?._count._all ?? 0,
+    })),
+    stats: stats[0]?.stats ?? null,
+    isAron: aron != null && aron === userId,
+    canOperate: me != null && OPERATOR_ROLES.includes(me.role),
+  };
+}

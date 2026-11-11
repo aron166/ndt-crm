@@ -10,6 +10,8 @@ import { PageHeader, Seg } from "@/components/astryx/PageHeader";
 import k from "@/components/astryx/page.module.css";
 import s from "./analytics.module.css";
 import { AnalyticsClient } from "./AnalyticsClient";
+import { RunningStrip } from "@/components/campaigns/RunningStrip";
+import { campaignAnalytics } from "@/lib/campaigns/analytics";
 
 const TENANT_ID = 1;
 
@@ -62,6 +64,7 @@ export default async function AnalyticsPage({
     openTasks,
     openDeals,
     pipelineDistribution,
+    runningCampaigns,
   ] = await Promise.all([
     db.company.count({ where: { tenantId: TENANT_ID } }),
     db.person.count({ where: { tenantId: TENANT_ID } }),
@@ -92,6 +95,7 @@ export default async function AnalyticsPage({
       FROM companies WHERE tenant_id = ${TENANT_ID}
       GROUP BY pipeline_status ORDER BY pipeline_status
     `,
+    campaignAnalytics(TENANT_ID),
   ]);
 
   // ── Revenue by year ────────────────────────────────────────
@@ -168,6 +172,8 @@ export default async function AnalyticsPage({
           />
         }
       />
+
+      <RunningStrip rows={runningCampaigns} />
 
       {/* KPI strip */}
       <div className={`mount mount-1 ${s.kpis}`}>
