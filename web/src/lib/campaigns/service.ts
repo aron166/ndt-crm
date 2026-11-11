@@ -7,6 +7,7 @@
 // Nothing here sends a message, and nothing here creates an SLA task except the one the
 // existing reply intake creates for a positive e-mail reply.
 
+import { OUTBOUND_ACTION_TYPES } from "@/lib/automations/types";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { audit, type AuditOptions } from "@/lib/audit";
@@ -66,7 +67,7 @@ async function isAron(ctx: CampaignCtx): Promise<boolean> {
 }
 
 /** Automation actions that reach outside the CRM (an e-mail, a webhook into n8n). */
-export const OUTBOUND_ACTIONS: readonly string[] = ["send_email", "webhook_out"];
+export const OUTBOUND_ACTIONS = OUTBOUND_ACTION_TYPES;
 
 /** Roles that may write CRM records in bulk (apply a member load, undo one). */
 export const OPERATOR_ROLES: readonly string[] = ["admin", "manager"];

@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import k from "@/components/astryx/page.module.css";
 import { createAutomation, deleteAutomation, toggleAutomation } from "@/app/actions/automations";
+import { OUTBOUND_ACTION_TYPES } from "@/lib/automations/types";
 import s from "../campaigns.module.css";
 
 export interface CampaignRule {
@@ -19,7 +20,7 @@ export const CAMPAIGN_TRIGGER_LABEL: Record<string, string> = {
   campaign_member_replied: "Egy tag válaszolt",
   campaign_member_promoted: "Egy tagból lead lett",
   campaign_call_outcome: "Hívás eredményt rögzítettek",
-  campaign_step_completed: "Egy tag végzett egy lépéssel",
+  campaign_step_completed: "Kiment egy e-mail lépés",
 };
 const OUTCOME_LABEL: Record<string, string> = {
   no_answer: "Nem vették fel", interested: "Érdeklődik", wants: "Kéri / akarja", not_interested: "Nem érdekli", bad_number: "Rossz szám",
@@ -29,7 +30,7 @@ const ACTION_LABEL: Record<string, string> = {
   send_email: "E-mail küldése (kimenő)", webhook_out: "Webhook (kimenő)",
 };
 const SAFE = ["create_task", "change_lead_status", "assign_lead", "add_note"];
-const OUTBOUND = ["send_email", "webhook_out"];
+const OUTBOUND = OUTBOUND_ACTION_TYPES;
 
 function describe(r: CampaignRule): string {
   const out = r.triggerType === "campaign_call_outcome" && typeof r.triggerConfig?.outcome === "string" ? `: ${OUTCOME_LABEL[r.triggerConfig.outcome] ?? r.triggerConfig.outcome}` : "";
@@ -47,6 +48,7 @@ export function CampaignAutomations({ campaignId, rules, outbound, leadStatuses,
   const [outcome, setOutcome] = useState("");
   const [action, setAction] = useState("create_task");
   const [text, setText] = useState("");
+  const [subject, setSubject] = useState("");
   const [status, setStatus] = useState("");
   const [user, setUser] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,7 +77,7 @@ export function CampaignAutomations({ campaignId, rules, outbound, leadStatuses,
     if (action === "change_lead_status") return { toStatus: status };
     if (action === "assign_lead") return { assignedToId: Number(user) };
     if (action === "webhook_out") return { url: text };
-    return { subjectTemplate: name, bodyTemplate: text, sendOnce: true };
+    return { subjectTemplate: subject, bodyTemplate: text, sendOnce: true };
   }
 
   async function create(e: React.FormEvent) {
@@ -156,9 +158,14 @@ export function CampaignAutomations({ campaignId, rules, outbound, leadStatuses,
                 {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </label>
+          ) : action === "send_email" ? (
+            <>
+              <label className={s.field}><span>E-mail tárgya</span><input className={s.input} value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={200} /></label>
+              <label className={s.field}><span>E-mail szövege</span><textarea className={s.input} rows={6} value={text} onChange={(e) => setText(e.target.value)} required maxLength={5000} /></label>
+            </>
           ) : (
             <label className={s.field}>
-              <span>{action === "create_task" ? "Feladat címe ({company} beírható)" : action === "add_note" ? "Jegyzet ({company}, {outcome} beírható)" : action === "webhook_out" ? "https webhook URL" : "E-mail szövege"}</span>
+              <span>{action === "create_task" ? "Feladat címe ({company} beírható)" : action === "add_note" ? "Jegyzet ({company} beírható)" : "https webhook URL"}</span>
               <input className={s.input} value={text} onChange={(e) => setText(e.target.value)} required maxLength={2000} />
             </label>
           )}
