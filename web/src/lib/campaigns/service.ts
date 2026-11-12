@@ -1000,6 +1000,18 @@ export async function loadLeadAudience(ctx: CampaignCtx, slug: string, input: { 
   return { ok: true as const, dry_run: false, summary };
 }
 
+/** The approval hash of a campaign as it stands now (same inputs as approveCampaign); compare with approvedHash. */
+export async function approvalHashNow(
+  tenantId: number,
+  c: { id: number; dailyCap: number; outboundAutomations: boolean; audience: Prisma.JsonValue | null; steps: { position: number; channel: string; waitDays: number; audienceRule: string; contentItemId: number | null }[] },
+) {
+  const [members, variants] = await Promise.all([
+    db.campaignMember.findMany({ where: { tenantId, campaignId: c.id }, select: { companyId: true } }),
+    campaignVariants(tenantId, c.id),
+  ]);
+  return approvalHash({ memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations, audience: audienceOf(c.audience), variants });
+}
+
 /**
  * The e-mail step's work for today: a DRAFT in the Outreach queue for each queued member on an
  * e-mail step whose wait is over, with the step's live asset as subject and body. Nothing is sent
@@ -1020,11 +1032,7 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   if (c.status !== "running") return fail(409, "Csak jóváhagyott, futó kampány e-mail lépése készít piszkozatot");
   // Drafted is what Áron approved: the approval hash over the same inputs as approveCampaign must still match,
   // so any drift (a variant restored or tagged after approval) waits for a re-approval (Vanda #195-1, r2-1).
-  const [hashMembers, hashVariants] = await Promise.all([
-    db.campaignMember.findMany({ where: { tenantId, campaignId: c.id }, select: { companyId: true } }),
-    campaignVariants(tenantId, c.id),
-  ]);
-  const hashNow = approvalHash({ memberCompanyIds: hashMembers.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations, audience: audienceOf(c.audience), variants: hashVariants });
+  const hashNow = await approvalHashNow(tenantId, c);
   if (c.approvedHash == null || hashNow !== c.approvedHash) return fail(409, "A kampány változott a jóváhagyás óta (például egy szegmensváltozat); hagyd jóvá újra");
   // The cap is per day, not per click (Vanda #194-5).
   const madeToday = await db.emailDraft.count({ where: { tenantId, campaign: c.slug, createdAt: { gte: atLocal(localDay(now), 0) } } });
