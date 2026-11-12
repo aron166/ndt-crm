@@ -650,7 +650,6 @@ export function CompanyDetailClient({
           <section className={`${k.card} mount`}>
             <div className={s.head}>
               <h2 className={k.h2}>Kapcsolatok</h2>
-              <button className={k.btn} onClick={() => setAddOpen(true)}>+ Hozzáadás</button>
             </div>
             <div className={k.tableWrap}>
               <table className={k.table}>

@@ -292,12 +292,6 @@ export function PersonDetailClient({
 
           {/* Quick action strip — always visible below tabs */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "16px 0" }}>
-            <LogInteractionButton
-              personId={person.id}
-              companyId={currentContact?.companyId}
-              personName={`${person.lastName ?? ""} ${person.firstName ?? ""}`.trim()}
-              companyName={currentContact?.company.name}
-            />
             <button className={k.btn} onClick={() => setTaskOpen(true)}>+ Feladat</button>
           </div>
 
