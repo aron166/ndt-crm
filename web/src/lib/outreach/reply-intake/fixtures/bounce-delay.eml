@@ -1,0 +1,32 @@
+From: MAILER-DAEMON@mail.pelda-kft.hu
+To: aron@ndt.hu
+Subject: Undelivered Mail Returned to Sender
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <bounce-delay-1@mail.pelda-kft.hu>
+MIME-Version: 1.0
+Content-Type: multipart/report; report-type=delivery-status; boundary="BND"
+
+--BND
+Content-Type: text/plain; charset=UTF-8
+
+The message is delayed to dead@pelda-kft.hu.
+
+--BND
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; mail.pelda-kft.hu
+
+Final-Recipient: rfc822; dead@pelda-kft.hu
+Action: delayed
+Status: 4.4.7
+Diagnostic-Code: smtp; 451 4.4.7 delivery delayed
+
+--BND
+Content-Type: message/rfc822
+
+From: aron@ndt.hu
+To: dead@pelda-kft.hu
+Subject: Ajanlat
+
+Szia
+--BND--

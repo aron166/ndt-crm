@@ -364,7 +364,7 @@ export function SettingsClient({ tenant, connectedIntegrations, appKeys }: Setti
       <PageHeader
         title="Beállítások"
         views={tabs}
-        actions={<Link href="/settings/suppressions" className={k.btn}>Tiltólista</Link>}
+        actions={<><Link href="/settings/profile" className={k.btn}>Feladó profil</Link><Link href="/settings/suppressions" className={k.btn}>Tiltólista</Link></>}
       />
 
       {tab === "general" && (

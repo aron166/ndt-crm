@@ -57,6 +57,10 @@ export interface SendEmailInput {
   fromName?: string | null;
   /** Files to attach (Resend: base64 content). */
   attachments?: { filename: string; content: string }[];
+  /** Extra mail headers (e.g. List-Unsubscribe). */
+  headers?: Record<string, string>;
+  /** Resend Idempotency-Key HTTP header: a retried call does not send twice. */
+  idempotencyKey?: string;
 }
 
 /** Send a test email to the configured From address to verify the credentials. */
@@ -110,6 +114,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       headers: {
         Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
+        ...(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {}),
       },
       body: JSON.stringify({
         from,
@@ -118,6 +123,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         text: input.text,
         ...(input.replyTo ? { reply_to: input.replyTo } : {}),
         ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+        ...(input.headers ? { headers: input.headers } : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));

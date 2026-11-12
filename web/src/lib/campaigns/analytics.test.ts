@@ -48,3 +48,16 @@ describe("campaign analytics aggregate", () => {
     expect(isBooked({ id: 1, status: "recall", outcome: "open" })).toBe(false);
   });
 });
+
+describe("delivery events are not touches", () => {
+  it("email_delivered and email_opened do not count", () => {
+    const at = new Date("2026-11-16T08:00:00Z");
+    const r = aggregate(
+      [{ id: 1, state: "queued", leadId: null }],
+      [{ memberId: 1, stepPosition: 1, outcome: "email_delivered", at }, { memberId: 1, stepPosition: 1, outcome: "email_opened", at }],
+      [],
+    );
+    expect(r.touched).toBe(0);
+    expect(r.byDay).toHaveLength(0);
+  });
+});

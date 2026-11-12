@@ -579,3 +579,85 @@ describe("ingestLead - app-namespaced thread keys (no draft vouching)", () => {
     expect((lastLeadData.value as { threadKey: string | null }).threadKey).toBeNull();
   });
 });
+
+describe("ingestLead - attribution passthrough and idempotency_key", () => {
+  const landing = { tenantId: 1, appSlug: "betonscan_landing" };
+  const form = (extra: Record<string, unknown> = {}) =>
+    parse({ company_name: "Minta Kft.", contact_email: "a@minta.hu", channel: "landing", ...extra });
+
+  it("the schema keeps the new attribution fields and bounds their length", () => {
+    const ok = form({
+      gclid: "G1", fbclid: "F1", entry_path: "/", submit_path: "/tarcsavagas", landing_route: "tarcsavagas",
+      last_touch_utm_source: "google", last_touch_utm_medium: "cpc", last_touch_utm_campaign: "c", last_touch_utm_content: "x",
+      last_touch_utm_term: "t", last_touch_referrer: "https://google.com/", idempotency_key: "Abc-123",
+    });
+    expect(ok).toMatchObject({ gclid: "G1", landing_route: "tarcsavagas", last_touch_referrer: "https://google.com/", idempotency_key: "abc-123" });
+    for (const f of ["gclid", "fbclid", "entry_path", "submit_path", "landing_route", "last_touch_utm_source", "last_touch_referrer", "idempotency_key"]) {
+      expect(leadIntakeSchema.safeParse({ company_name: "x", contact_email: "a@b.hu", [f]: "x".repeat(2001) }).success, f).toBe(false);
+    }
+  });
+
+  it("all of them land in customFields; the idempotency key does not", async () => {
+    const { tx, lastLeadData } = makeTx({});
+    await ingestLead(form({ gclid: "G1", fbclid: "F1", entry_path: "/", submit_path: "/x", landing_route: "r", last_touch_utm_source: "google", last_touch_referrer: "https://g.co/", utm_source: "first", idempotency_key: "k1" }), landing, tx);
+    const cf = (lastLeadData.value as { customFields: Record<string, unknown> }).customFields;
+    expect(cf).toMatchObject({ gclid: "G1", fbclid: "F1", entry_path: "/", submit_path: "/x", landing_route: "r", last_touch_utm_source: "google", last_touch_referrer: "https://g.co/", utm_source: "first" });
+    expect(cf).not.toHaveProperty("idempotency_key");
+  });
+
+  it("legacy payload without the new fields is unchanged: no new keys, no thread key", async () => {
+    const { tx, lastLeadData } = makeTx({});
+    await ingestLead(form({ utm_source: "x" }), landing, tx);
+    const d = lastLeadData.value as { customFields: Record<string, unknown>; threadKey: string | null };
+    expect(Object.keys(d.customFields)).not.toContain("gclid");
+    expect(d.threadKey).toBeNull();
+  });
+
+  it("stores the key app-namespaced; a repeat returns the first lead and writes nothing", async () => {
+    const { tx, lastLeadData } = makeTx({});
+    await ingestLead(form({ idempotency_key: "K-1" }), landing, tx);
+    const stored = (lastLeadData.value as { threadKey: string }).threadKey;
+    expect(stored).toBe("app~betonscan_landing~idem~k-1");
+
+    const again = makeTx({ lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: stored } });
+    const res = await ingestLead(form({ idempotency_key: "K-1" }), landing, again.tx);
+    expect(res).toMatchObject({ deduped: true, leadId: 900, companyId: 42 });
+    expect(again.created).toMatchObject({ lead: 0, company: 0, person: 0, contact: 0, auditLog: 0, appEvent: 0 });
+  });
+
+  it("another app, or another key, is a new lead", async () => {
+    const seeded = { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: "app~betonscan_landing~idem~k-1" };
+    const a = makeTx({ lead: seeded });
+    expect((await ingestLead(form({ idempotency_key: "K-1" }), { tenantId: 1, appSlug: "other" }, a.tx)).deduped).toBe(false);
+    const b = makeTx({ lead: seeded });
+    expect((await ingestLead(form({ idempotency_key: "K-2" }), landing, b.tx)).deduped).toBe(false);
+  });
+
+  it("a cold-email reply keeps its thread_key; the idempotency key does not override it", async () => {
+    const { tx, lastLeadData } = makeTx({});
+    await ingestLead(form({ channel: "cold_email", thread_key: "Thread-ABC", idempotency_key: "k9" }), landing, tx);
+    expect((lastLeadData.value as { threadKey: string }).threadKey).toBe("app~betonscan_landing~thread-abc");
+  });
+});
+
+describe("ingestLead - idempotency repeat reports what the route needs to recover effects", () => {
+  const landing = { tenantId: 1, appSlug: "betonscan_landing" };
+  const key = "app~betonscan_landing~idem~k-1";
+  const input = () => parse({ company_name: "Minta Kft.", contact_email: "a@minta.hu", channel: "landing", idempotency_key: "k-1" });
+  const created = new Date("2026-11-12T10:00:00Z");
+
+  it("unmarked: effectsDone false, with the lead's age and person", async () => {
+    const { tx } = makeTx({ lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: key, createdAt: created, customFields: { utm_source: "x" }, contact: { personId: 8 } } });
+    expect(await ingestLead(input(), landing, tx)).toMatchObject({ deduped: true, viaIdempotencyKey: true, leadCreatedAt: created, effectsDone: false, personId: 8 });
+  });
+  it("marked: effectsDone true", async () => {
+    const { tx } = makeTx({ lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: key, createdAt: created, customFields: { effects_done_at: "2026-11-12T10:00:03Z" } } });
+    expect(await ingestLead(input(), landing, tx)).toMatchObject({ deduped: true, viaIdempotencyKey: true, effectsDone: true });
+  });
+  it("a thread_key dedupe is not flagged as an idempotency repeat", async () => {
+    const { tx } = makeTx({ lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: "app~growth~thread-abc" } });
+    const r = await ingestLead(parse({ company_name: "V", contact_email: "k@v.hu", channel: "cold_email", thread_key: "Thread-ABC" }), { tenantId: 1, appSlug: "growth" }, tx);
+    expect(r.deduped).toBe(true);
+    expect(r.viaIdempotencyKey).toBeUndefined();
+  });
+});

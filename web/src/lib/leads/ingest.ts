@@ -29,7 +29,7 @@ export interface LeadTx {
   };
   lead: {
     create(args: Prisma.LeadCreateArgs): Promise<{ id: number }>;
-    findFirst(args: Prisma.LeadFindFirstArgs): Promise<{ id: number; companyId: number | null; contactId: number | null } | null>;
+    findFirst(args: Prisma.LeadFindFirstArgs): Promise<{ id: number; companyId: number | null; contactId: number | null; createdAt?: Date; customFields?: unknown; contact?: { personId: number } | null } | null>;
   };
   emailDraft: {
     findFirst(args: Prisma.EmailDraftFindFirstArgs): Promise<{ id: number; companyId: number; campaign: string } | null>;
@@ -71,6 +71,11 @@ export interface IngestResult {
   deduped: boolean;
   /** The draft this reply answered, when `thread_key` matched one. */
   draftId: number | null;
+  /** Set on a deduped repeat that matched by idempotency_key: lets the route recover effects a failed first request never ran. */
+  viaIdempotencyKey?: true;
+  leadCreatedAt?: Date;
+  /** The route stamps customFields.effects_done_at once the post-commit effects ran. */
+  effectsDone?: boolean;
   /** Derived qualification tier, null when no answers were submitted. */
   tier: LeadTier | null;
   companyId: number | null;
@@ -160,24 +165,37 @@ export async function ingestLead(
   // its own threads and never claims another app's or a draft-vouched key. Exactly
   // one form is matched, so an unvouched caller cannot land on a vouched lead either
   // (growth cold-email tool, 2026-11-10; Vanda #166-1, #166-2).
-  const matchKey = !claimedThreadKey || !isColdEmailReply ? null
-    : draft ? claimedThreadKey : appThreadKey(sourceApp, claimedThreadKey);
+  // A client's idempotency_key (the landing) dedupes through the same column and unique index,
+  // namespaced by app under the reserved prefix with an "idem~" marker, so it never meets a
+  // draft-vouched key. A cold-email reply keeps its thread key. shortcut: "idem~" is not
+  // reserved, so one app's thread_key "idem~x" and idempotency_key "x" would share a row; same app
+  // only, harmless, and a reserved marker would need a thread_key schema rule.
+  const idemKey = input.idempotency_key?.trim() || null;
+  const matchKey = isColdEmailReply && claimedThreadKey
+    ? (draft ? claimedThreadKey : appThreadKey(sourceApp, claimedThreadKey))
+    : idemKey ? appThreadKey(sourceApp, `idem~${idemKey}`) : null;
 
   if (matchKey) {
     const existingLead = await tx.lead.findFirst({
       where: { tenantId, threadKey: matchKey },
-      select: { id: true, companyId: true },
+      select: { id: true, companyId: true, createdAt: true, customFields: true, contact: { select: { personId: true } } },
     });
     if (existingLead) {
+      const viaIdem = !(isColdEmailReply && claimedThreadKey) && idemKey != null;
       return {
         leadId: existingLead.id,
         deduped: true,
         draftId: null,
         tier: null,
         companyId: existingLead.companyId,
-        personId: null,
+        personId: existingLead.contact?.personId ?? null,
         companyReused: true,
         personReused: true,
+        ...(viaIdem ? {
+          viaIdempotencyKey: true as const,
+          leadCreatedAt: existingLead.createdAt,
+          effectsDone: Boolean((existingLead.customFields as Record<string, unknown> | null)?.effects_done_at),
+        } : {}),
       };
     }
   }
@@ -260,6 +278,9 @@ export async function ingestLead(
   const passthrough: (keyof LeadIntake)[] = [
     "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
     "referrer", "landing_variant", "lead_score", "priority",
+    "gclid", "fbclid", "entry_path", "submit_path", "landing_route",
+    "last_touch_utm_source", "last_touch_utm_medium", "last_touch_utm_campaign", "last_touch_utm_content",
+    "last_touch_utm_term", "last_touch_referrer",
   ];
   for (const k of passthrough) {
     if (input[k] !== undefined && input[k] !== null) customFields[k] = input[k];

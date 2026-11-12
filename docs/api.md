@@ -18,6 +18,20 @@ The Supabase service-role key is **not** accepted anywhere.
 - Writes are audited (`audit_log`, actor = the key's app slug) and, where a human
   would have left a trace, append an `interactions` row.
 
+### Key scopes
+
+`app_api_keys.scopes` is a space-separated list. `NULL` = legacy key: no restriction,
+exactly as before. A scoped key outside its scopes gets `401` (key not valid for this route).
+An empty or all-unknown list is a key that may do nothing.
+
+| Scope | Opens |
+|---|---|
+| `leads:write` | `POST /api/leads`, `POST /api/events` |
+| `prospects:write` | `POST` and `DELETE /api/campaigns/:slug/members`: apply (`dry_run: false`) and undo a prospect load. A write on a running campaign still sends it back to draft for re-approval. The batch id must start with `<app slug>-` (a key never undoes a person's load). A scoped key without this scope cannot dry-run these routes either. |
+| `read` | every other `GET` / `HEAD` (including `GET /api/leads`, personal data) |
+
+Every other route (content, outcomes, PATCH and so on) is for legacy keys only.
+
 ```bash
 export CRM=https://ndt-crm.vercel.app
 export KEY=helm_xxxxxxxx
@@ -63,6 +77,8 @@ curl -X POST $CRM/api/leads \
 | `channel` | `cold_email · landing · linkedin · meta_ads · referral · import · manual` (default `landing`) |
 | `campaign` | free text tag |
 | `utm_*`, `referrer`, `landing_variant`, `lead_score`, `priority` | stored on `custom_fields` |
+| `gclid`, `fbclid`, `entry_path`, `submit_path`, `landing_route`, `last_touch_utm_{source,medium,campaign,content,term}`, `last_touch_referrer` | stored on `custom_fields`; `utm_*` stay the first touch; each bounded (200 to 500 chars) |
+| `idempotency_key` / header `Idempotency-Key` | optional, one value per submission (header and field must agree). A repeat from the same app returns `200 { deduped: true, leadId }` with the first lead: no second lead, intro e-mail, alert or automation. The lead is stamped `custom_fields.effects_done_at` when its post-commit effects (intro, alert, ping, automations) ran; a repeat older than 60 s on an unstamped lead runs them once and stamps it (`effectsRecovered: true`). Stored app-namespaced in `leads.thread_key` |
 | `qualification` | optional `{ slug: answer }` — the locked qualification model, see below |
 | `question_set` | **optional** — which named question set the form asked (`rovid` \| `felmeres` \| whatever the tenant named). Recorded with the answers; never validated against our set list, never required |
 | `send_intro` | optional bool — send the termékismertető now (see below) |
@@ -721,6 +737,22 @@ is called, so a double-click or a retried request cannot put the same email in
 front of the same company twice; a row left in `sending` means the process died
 mid-send and is deliberately **not** re-sendable.
 
+### `POST /api/webhooks/resend` — Resend delivery events
+
+Signed by Resend (Svix headers `svix-id`, `svix-timestamp`, `svix-signature`; no session, no app key). Set
+`RESEND_WEBHOOK_SECRET` (the `whsec_...` signing secret of the Resend webhook, tenant 1). Unset: `503`. Bad or
+stale (over 300 s) signature: `401`. Unparseable JSON: `400`. Processing error: `500` (Resend retries; the stored row
+stays unprocessed, so the retry redoes the effects). Success: `200 { ok, duplicate, type }`. Every event is stored in
+`email_provider_events`, unique on the svix id, so a redelivery is a no-op.
+
+| Event | Effect |
+|---|---|
+| `email.bounced` with `bounce.type` `Permanent`, `email.suppressed` | address suppressed, rest of that outreach cancelled, campaign member `needs_email`, the draft's `lastError` set |
+| `email.complained` | address suppressed, rest of that outreach cancelled, campaign member declined |
+| `email.delivered`, `email.opened` | one `campaign_events` row (`email_delivered` / `email_opened`) per member and step; not counted as touches |
+| Temporary bounce, `email.sent`, `email.clicked`, `email.delivery_delayed`, `email.failed`, `domain.*`, any new type | stored only |
+
+
 ## Content
 
 The content approval pipeline (spec `docs/specs/2026-09-17-content-approval-design.md`).
@@ -1301,6 +1333,31 @@ Rules live in `/automations`. Triggers: `lead_created`, `lead_status_changed`,
 `assign_lead`, `webhook_out` (POSTs `{ event, tenantId, leadId, dealId, companyId,
 personId, company, fields, firedAt }` to your URL — the seam for n8n / a voice agent).
 Time-based triggers run from the daily cron (`/api/cron/automations`, 07:00 UTC).
+
+## Reply intake (IMAP cron)
+
+`GET|POST /api/cron/reply-intake`, `Authorization: Bearer <CRON_SECRET>` (401 otherwise, also when `CRON_SECRET` is unset).
+Polls the sending mailbox over IMAP and feeds replies, opt-outs and bounces into the existing handling.
+
+Env: `IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD` (all required), `IMAP_PORT` (default 993, TLS). Any required one missing:
+`200 {"ok":true,"configured":false}` and nothing else happens.
+
+The mailbox is opened READ-ONLY: nothing is marked seen, moved or deleted. Each poll reads the last 14 days (at most the 300 newest).
+Mail from our own domains (the Resend `fromEmail` domain and the IMAP user's domain) is ignored.
+
+| Class | Detected by | Effect |
+|---|---|---|
+| bounce | `multipart/report; report-type=delivery-status`, From mailer-daemon/postmaster, or an undeliverable-type subject | `applyOptOut` kind `bounce` for the failed recipient |
+| auto | `Auto-Submitted` (not `no`), `X-Autoreply`, `X-Autorespond`, `Precedence: auto_reply`, read receipt, out-of-office subject | stored only, not a reply |
+| opt_out | explicit opt-out (leiratkozás, unsubscribe, töröljenek ...) in the subject or the sender's own text (quoted text is cut first) | `applyOptOut` kind `unsubscribe`; no lead, no call task |
+| reply | anything else from outside | matched to a sent draft (Resend message id in In-Reply-To/References, else the From address, else the company domain; free-mail domains are never domain-matched), then the same handling as "Válasz jött" (lead, draft `replied`, remaining touches cancelled). `replyType` stays empty: a human classifies |
+| unmatched reply | no draft found | stored only |
+
+Idempotency: every message is stored in `email_provider_events` (provider `imap`, eventId = Message-ID, else sha256 of the raw mail;
+only a short payload, never the whole body). A message already processed is skipped; one whose effects failed has `processedAt` null and is retried on the next poll.
+
+`200` body: `{ok, configured, seen, new, replies, optOuts, bounces, autos, unmatched, ignored}`. IMAP failure: `502 {"ok":false,"error":"IMAP"}`.
+After a successful fetch and run, `tenants.settings.inboxCheckedAt` (ISO time) is set by one atomic `jsonb_set`; the scheduled sender refuses to send when it is older than 60 minutes.
 
 ## Booking (W8b route-aware, session auth)
 
