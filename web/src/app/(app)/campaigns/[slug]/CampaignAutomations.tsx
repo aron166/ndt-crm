@@ -118,7 +118,7 @@ export function CampaignAutomations({ campaignId, rules, outbound, leadStatuses,
                 </span>
                 <span className={k.actions}>
                   <button type="button" className={k.btn} disabled={busy} onClick={() => run(() => toggleAutomation(r.id, !r.isActive), r.isActive ? "Kikapcsolva" : "Bekapcsolva")}>{r.isActive ? "Kikapcsolás" : "Bekapcsolás"}</button>
-                  <button type="button" className={k.btn} disabled={busy} onClick={() => run(() => deleteAutomation(r.id), "Törölve")}>Törlés</button>
+                  <button type="button" className={k.btn} disabled={busy} onClick={() => { if (confirm("Biztosan törlöd ezt a szabályt?")) run(() => deleteAutomation(r.id), "Törölve"); }}>Törlés</button>
                 </span>
               </li>
             );
