@@ -42,9 +42,13 @@ async function applyEffects(tenantId: number, c: Classified): Promise<{ outcome:
     case "bounce":
       if (c.recipient) await applyOptOut(tenantId, c.recipient, { kind: "bounce", source: "imap_bounce", agent: "reply-intake" });
       return { outcome: "bounces" };
-    case "opt_out":
-      await applyOptOut(tenantId, c.from, { kind: "unsubscribe", source: "imap_reply", agent: "reply-intake" });
-      return { outcome: "optOuts" };
+    case "opt_out": {
+      // Only someone we mailed: an opt-out word from a stranger suppresses nobody.
+      const draft = await matchDraft(tenantId, c.from, c.inReplyTo);
+      if (!draft) return { outcome: "unmatched" };
+      await applyOptOut(tenantId, c.from, { kind: "unsubscribe", source: "imap_reply", agent: "reply-intake", draftId: draft.id });
+      return { outcome: "optOuts", draftId: draft.id };
+    }
     case "auto": return { outcome: "autos" };
     case "ignore": return { outcome: "ignored" };
     case "reply": {

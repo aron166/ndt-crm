@@ -123,6 +123,7 @@ describe("runReplyIntake", () => {
   it("P2002 with processedAt null -> effects rerun", async () => {
     m.create.mockRejectedValueOnce({ code: "P2002" });
     m.findUnique.mockResolvedValueOnce({ id: 5, processedAt: null });
+    m.draftFindFirst.mockResolvedValueOnce({ id: 11 });
     const r = await runReplyIntake(1, [fx("opt-out.eml")], NOW);
     expect(r).toMatchObject({ seen: 0, new: 1, optOuts: 1 });
     expect(m.optOut).toHaveBeenCalledTimes(1);
@@ -130,6 +131,7 @@ describe("runReplyIntake", () => {
 
   it("one message throwing does not stop the next; its row stays unprocessed", async () => {
     m.optOut.mockRejectedValueOnce(new Error("boom"));
+    m.draftFindFirst.mockResolvedValueOnce({ id: 11 });
     const r = await runReplyIntake(1, [fx("opt-out.eml"), fx("bounce-dsn.eml")], NOW);
     expect(m.reportError).toHaveBeenCalledTimes(1);
     expect(m.optOut).toHaveBeenCalledTimes(2);

@@ -6,9 +6,9 @@ import type { ParsedMail } from "mailparser";
 export type Classified =
   | { kind: "bounce"; messageId: string; recipient: string | null }
   | { kind: "auto"; messageId: string }
-  | { kind: "opt_out"; messageId: string; from: string }
+  | { kind: "opt_out"; messageId: string; from: string; inReplyTo: string[] }
   | { kind: "reply"; messageId: string; from: string; inReplyTo: string[]; snippet: string }
-  | { kind: "ignore"; messageId: string; reason: "own_domain" | "no_from" };
+  | { kind: "ignore"; messageId: string; reason: "own_domain" | "no_from" | "bulk" };
 
 /** Lowercase and strip accents (NFD, drop combining marks), so ő and ű fold too. */
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -70,6 +70,11 @@ export function classifyMail(parsed: ParsedMail, raw: Buffer, ourDomains: string
   ) return { kind: "auto", messageId };
 
   if (!from) return { kind: "ignore", messageId, reason: "no_from" };
+  // A list mail (newsletter, notification) is never a person answering us, even when its footer says "unsubscribe".
+  const precedence = header(parsed, "precedence").trim().toLowerCase();
+  if (parsed.headers.has("list-id") || parsed.headers.has("list-unsubscribe") || precedence === "bulk" || precedence === "list") {
+    return { kind: "ignore", messageId, reason: "bulk" };
+  }
   if (ourDomains.some((d) => from.endsWith("@" + d.toLowerCase()))) return { kind: "ignore", messageId, reason: "own_domain" };
 
   // mailparser derives `text` from the html when there is no plain part; only then use our own html cut.
@@ -78,8 +83,7 @@ export function classifyMail(parsed: ParsedMail, raw: Buffer, ourDomains: string
   const own = cutQuote(body.replace(/\r\n?/g, "\n")).trim();
   const snippet = own.slice(0, 1000);
 
-  if (HARD_NO.test(foldedSubject) || HARD_NO.test(fold(own).replace(/\s+/g, " "))) return { kind: "opt_out", messageId, from };
-
-  const refs = `${parsed.inReplyTo ?? ""} ${[parsed.references ?? []].flat().join(" ")}`.match(/<[^>]+>/g) ?? [];
-  return { kind: "reply", messageId, from, inReplyTo: [...new Set(refs)], snippet };
+  const refs = [...new Set(`${parsed.inReplyTo ?? ""} ${[parsed.references ?? []].flat().join(" ")}`.match(/<[^>]+>/g) ?? [])];
+  if (HARD_NO.test(foldedSubject) || HARD_NO.test(fold(own).replace(/\s+/g, " "))) return { kind: "opt_out", messageId, from, inReplyTo: refs };
+  return { kind: "reply", messageId, from, inReplyTo: refs, snippet };
 }
