@@ -44,7 +44,7 @@ describe.skipIf(!enabled)("resend webhook (integration)", () => {
     ({ processResendEvent: proc } = await import("./resend-webhook"));
     companyId = (await db.company.create({ data: { tenantId: 1, name: `${tag} Kft.` } })).id;
     const c = await db.campaign.create({
-      data: { tenantId: 1, name: tag, slug: tag, kind: "sequence", status: "running", steps: { create: [{ position: 1, channel: "email" }] } },
+      data: { tenantId: 1, name: tag, slug: tag, kind: "sequence", status: "running", steps: { create: [{ tenantId: 1, position: 1, channel: "email" }] } },
     });
     campaignId = c.id;
     memberId = (await db.campaignMember.create({ data: { tenantId: 1, campaignId, companyId, state: "queued" } })).id;

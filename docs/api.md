@@ -721,6 +721,22 @@ is called, so a double-click or a retried request cannot put the same email in
 front of the same company twice; a row left in `sending` means the process died
 mid-send and is deliberately **not** re-sendable.
 
+### `POST /api/webhooks/resend` — Resend delivery events
+
+Signed by Resend (Svix headers `svix-id`, `svix-timestamp`, `svix-signature`; no session, no app key). Set
+`RESEND_WEBHOOK_SECRET` (the `whsec_...` signing secret of the Resend webhook, tenant 1). Unset: `503`. Bad or
+stale (over 300 s) signature: `401`. Unparseable JSON: `400`. Processing error: `500` (Resend retries; the stored row
+stays unprocessed, so the retry redoes the effects). Success: `200 { ok, duplicate, type }`. Every event is stored in
+`email_provider_events`, unique on the svix id, so a redelivery is a no-op.
+
+| Event | Effect |
+|---|---|
+| `email.bounced` with `bounce.type` `Permanent`, `email.suppressed` | address suppressed, rest of that outreach cancelled, campaign member `needs_email`, the draft's `lastError` set |
+| `email.complained` | address suppressed, rest of that outreach cancelled, campaign member declined |
+| `email.delivered`, `email.opened` | one `campaign_events` row (`email_delivered` / `email_opened`) per member and step; not counted as touches |
+| Temporary bounce, `email.sent`, `email.clicked`, `email.delivery_delayed`, `email.failed`, `domain.*`, any new type | stored only |
+
+
 ## Content
 
 The content approval pipeline (spec `docs/specs/2026-09-17-content-approval-design.md`).
