@@ -28,6 +28,9 @@ export function isBooked(l: AggLead): boolean {
   return l.outcome === "won" || (l.status != null && BOOKED_STAGES.includes(l.status));
 }
 
+/** Provider receipts (Resend webhook): recorded, but not touches. */
+export const DELIVERY_OUTCOMES: readonly string[] = ["email_delivered", "email_opened"];
+
 export function aggregate(members: readonly AggMember[], events: readonly AggEvent[], leads: readonly AggLead[]): CampaignStatsV2 {
   const leadById = new Map(leads.map((l) => [l.id, l]));
   const touched = new Set<number>();
@@ -35,7 +38,7 @@ export function aggregate(members: readonly AggMember[], events: readonly AggEve
   const steps = new Map<number, { touched: Set<number>; replied: Set<number>; promoted: Set<number> }>();
   const days = new Map<string, DayStats>();
   for (const e of events) {
-    if (e.outcome === "note_only") continue; // a note is not a touch
+    if (e.outcome === "note_only" || DELIVERY_OUTCOMES.includes(e.outcome)) continue; // a note or a delivery receipt is not a touch
     touched.add(e.memberId);
     const s = steps.get(e.stepPosition) ?? { touched: new Set(), replied: new Set(), promoted: new Set() };
     s.touched.add(e.memberId);

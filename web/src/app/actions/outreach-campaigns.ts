@@ -13,14 +13,11 @@ import { reportError } from "@/lib/report-error";
 import { advanceOnSent, campaignSendBlock } from "@/lib/campaigns/service";
 import { threadKeyFor, MAX_STEP, type DraftStatus } from "@/lib/outreach/drafts";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
-import { runAutomations } from "@/lib/automations/engine";
 import {
-  canMarkReplied, markRepliedSchema, markSentSchema, MANUAL_SENDABLE_STATUSES,
+  markRepliedSchema, markSentSchema, MANUAL_SENDABLE_STATUSES,
   buildFunnel, type CampaignFunnel, type ReplyType,
 } from "@/lib/outreach/campaign";
-import { ingestLead } from "@/lib/leads/ingest";
-import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
-import { leadIntakeSchema } from "@/lib/leads/schema";
+import { recordDraftReply } from "@/lib/outreach/record-reply";
 import { campaignBySlug, resolveAudience } from "@/lib/outreach/registry";
 import { countAudience } from "@/lib/marketing/audience-query";
 import { CALLABLE_STATUSES } from "@/lib/outreach/queue";
@@ -188,79 +185,12 @@ export async function markDraftReplied(
   const parsed = markRepliedSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
   const { draftId, replyType, note } = parsed.data;
-
-  const row = await db.emailDraft.findFirst({
-    where: { id: draftId, tenantId: TENANT_ID },
-    include: {
-      company: { select: { name: true } },
-      person: { select: { firstName: true, lastName: true, email: true, phone: true } },
-    },
-  });
-  if (!row) return { ok: false, error: "Piszkozat nem található" };
-  if (!canMarkReplied(row.status as DraftStatus)) {
-    return { ok: false, error: "Csak elküldött érintésre jöhet válasz" };
-  }
-  const email = row.toEmail ?? row.person?.email ?? null;
-  const phone = row.person?.phone ?? null;
-  if (!email && !phone) return { ok: false, error: "Nincs email cím vagy telefonszám a címzetthez" };
-
-  const already = await db.emailDraft.findFirst({
-    where: { tenantId: TENANT_ID, companyId: row.companyId, campaign: row.campaign, status: "replied" },
-    select: { id: true },
-  });
-  if (already) return { ok: false, error: "Erre a megkeresésre már rögzítettünk választ" };
-
-  const draftKey = row.threadKey ?? threadKeyFor(row.campaign, row.companyId);
-  // One lead per CONVERSATION: the Gmail thread id when it was pasted, else one
-  // manual key per outreach (campaign + company), so a second click dedupes. ponytail: if the reply-intake skill later reads the
-  // same Gmail thread and no id was pasted, it creates a second lead — paste
-  // the thread id on send to avoid it.
-  const threadKey = (row.externalThreadId ?? `manual:${draftKey}`).toLowerCase();
-
-  const intake = leadIntakeSchema.safeParse({
-    company_name: row.company.name,
-    contact_name: row.person ? `${row.person.firstName} ${row.person.lastName}`.trim() : undefined,
-    contact_email: email ?? undefined,
-    contact_phone: phone ?? undefined,
-    message: note,
-    source: "cold_email_reply",
-    channel: "cold_email",
-    campaign: row.campaign,
-    thread_key: threadKey,
-    draft_key: draftKey,
-    reply_type: replyType,
-  });
-  if (!intake.success) return { ok: false, error: "Érvénytelen adat a lead létrehozásához" };
-
-  try {
-    const res = await db.$transaction((tx) =>
-      ingestLead(intake.data, { tenantId: TENANT_ID, appSlug: "crm-ui", draftId }, tx),
-    );
-    if (!res.deduped) {
-      audit("email_draft", draftId, "update", { status: row.status }, { status: "replied", replyType, leadId: res.leadId }, auditOpts);
-      // Same post-commit steps as POST /api/leads: the W2 SLA timer, then the follow-up task rules.
-      await startLeadLifecycle(TENANT_ID, res.leadId);
-      await runAutomations({
-        type: "lead_created",
-        tenantId: TENANT_ID,
-        leadId: res.leadId,
-        companyId: res.companyId,
-        personId: res.personId,
-        companyName: row.company.name,
-        fields: {
-          company: row.company.name, source: "cold_email_reply", channel: "cold_email",
-          campaign: row.campaign, serviceInterest: null, message: note ?? null,
-          sourceApp: "crm-ui", tier: res.tier, replyType,
-        },
-      });
-    }
+  const res = await recordDraftReply(TENANT_ID, { draftId, replyType, note, appSlug: "crm-ui" });
+  if (res.ok) {
     revalidatePath("/outreach");
     revalidatePath("/leads");
-    return { ok: true, leadId: res.leadId, deduped: res.deduped };
-  } catch (err) {
-    reportError("outreach.markDraftReplied", err, { draftId });
-    return { ok: false, error: "A válasz rögzítése nem sikerült" };
   }
+  return res;
 }
 
 export interface DueTouch {

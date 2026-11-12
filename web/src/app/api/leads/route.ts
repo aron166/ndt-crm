@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { reportError } from "@/lib/report-error";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { leadIntakeSchema } from "@/lib/leads/schema";
-import { ingestLead, appThreadKey } from "@/lib/leads/ingest";
+import { ingestLead, appThreadKey, type IngestResult } from "@/lib/leads/ingest";
 import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
 import { sendFormAlert } from "@/lib/leads/form-alert";
 import { sendAutoReply, sendLeadPing } from "@/lib/leads/intake-notify";
@@ -22,9 +22,12 @@ import { leadListQuerySchema, leadSearchWhere, LEAD_API_SELECT } from "@/lib/lea
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, Idempotency-Key",
   "Access-Control-Max-Age": "86400",
 };
+
+/** A repeat younger than this is probably racing the first request's own effects. */
+const RECOVER_AFTER_MS = 60_000;
 
 function json(body: unknown, status: number) {
   return NextResponse.json(body, { status, headers: CORS_HEADERS });
@@ -74,6 +77,14 @@ export async function POST(request: Request) {
     return json({ error: "Invalid JSON" }, 400);
   }
 
+  // Idempotency-Key header or idempotency_key body field; two different values are a client bug.
+  const header = request.headers.get("idempotency-key")?.trim().toLowerCase();
+  const field = raw && typeof raw === "object" ? (raw as Record<string, unknown>).idempotency_key : undefined;
+  if (header && typeof field === "string" && field.trim() && field.trim().toLowerCase() !== header) {
+    return json({ error: "Idempotency-Key header and idempotency_key differ" }, 400);
+  }
+  if (header && raw && typeof raw === "object") raw = { ...(raw as object), idempotency_key: header };
+
   const parsed = leadIntakeSchema.safeParse(raw);
   if (!parsed.success) {
     return json(
@@ -87,63 +98,86 @@ export async function POST(request: Request) {
       ingestLead(parsed.data, { tenantId: key.tenantId, appSlug: key.appSlug }, tx),
     );
 
-    // A reply we have already recorded. Nothing was written, so nothing
-    // downstream may fire either: re-sending the intro material or re-running
-    // `lead_created` would mean a second email and a second follow-up task for
-    // one answered thread. 200, not 201 — nothing was created.
+    // Everything that happens AFTER the lead is committed. With an idempotency key a stamp
+    // (customFields.effects_done_at) records that it all ran, so a retry after a crash in here can
+    // run it once more instead of being told "deduped" and leaving sales unaware of a real lead.
+    const runEffects = async (result: IngestResult) => {
+      // The intro material (termékismertető) is the thing the qualification
+      // answers were traded for — send it (or task it) before anything else.
+      const intro: IntroResult | null = parsed.data.send_intro
+        ? await sendIntroMaterial({
+            tenantId: key.tenantId,
+            leadId: result.leadId,
+            to: parsed.data.contact_email,
+            companyId: result.companyId,
+            personId: result.personId,
+          })
+        : null;
+
+      // W2 SLA timer: owner, first-call next action + task. Post-commit, fail-safe.
+      await startLeadLifecycle(key.tenantId, result.leadId);
+      // Web form: internal alert to sales (Péter + Áron). Never to the lead; no-op without Resend.
+      if (parsed.data.channel === "landing") {
+        // Sales ping (Telegram) and the lead's auto-reply (off until Áron signs it); both no-op when unconfigured.
+        await Promise.all([
+          sendFormAlert(key.tenantId, result.leadId),
+          sendLeadPing(key.tenantId, result.leadId),
+          sendAutoReply(key.tenantId, result.leadId),
+        ]);
+      }
+
+      // Fire task-automation rules for the new lead (e.g. the seeded follow-up
+      // task). Runs post-commit and is itself fail-safe, so it never blocks or
+      // fails the intake response.
+      await runAutomations({
+        type: "lead_created",
+        tenantId: key.tenantId,
+        leadId: result.leadId,
+        companyId: result.companyId,
+        personId: result.personId,
+        companyName: parsed.data.company_name,
+        fields: {
+          company: parsed.data.company_name,
+          source: parsed.data.source ?? null,
+          channel: parsed.data.channel,
+          campaign: parsed.data.campaign ?? null,
+          serviceInterest: parsed.data.service_interest ?? null,
+          message: parsed.data.message ?? null,
+          sourceApp: key.appSlug,
+          // Derived qualification tier (A–E) — lets a rule target e.g. tier D.
+          tier: result.tier,
+        },
+      });
+      if (parsed.data.idempotency_key) {
+        // A failed stamp must not turn a finished request into a 500: the landing would retry and
+        // the intro would go out again after 60 s. Worst case the effects re-run once on a retry.
+        try {
+          await db.$executeRaw`
+            UPDATE "leads" SET "custom_fields" = jsonb_set(COALESCE("custom_fields", '{}'::jsonb), ARRAY['effects_done_at'], to_jsonb(${new Date().toISOString()}::text), true)
+             WHERE "id" = ${result.leadId} AND "tenant_id" = ${key.tenantId}`;
+        } catch (stampErr) {
+          reportError("api.leads.effects_stamp", stampErr, { leadId: result.leadId });
+        }
+      }
+      return intro;
+    };
+
+    // A lead we have already recorded. Nothing was written, so by default nothing downstream fires:
+    // a second intro e-mail or `lead_created` run would be a duplicate. 200, not 201.
     if (result.deduped) {
+      // Idempotency repeat on a lead whose effects never completed, and old enough that the first
+      // request is surely not still running them: finish the job once. (Two retries racing here
+      // could both run it; shortcut, a lock would need a column.)
+      const recover = result.viaIdempotencyKey && !result.effectsDone
+        && result.leadCreatedAt != null && Date.now() - result.leadCreatedAt.getTime() > RECOVER_AFTER_MS;
+      if (recover) await runEffects(result);
       return json(
-        { ok: true, leadId: result.leadId, deduped: true, companyId: result.companyId },
+        { ok: true, leadId: result.leadId, deduped: true, companyId: result.companyId, ...(recover ? { effectsRecovered: true } : {}) },
         200,
       );
     }
 
-    // The intro material (termékismertető) is the thing the qualification
-    // answers were traded for — send it (or task it) before anything else.
-    const intro: IntroResult | null = parsed.data.send_intro
-      ? await sendIntroMaterial({
-          tenantId: key.tenantId,
-          leadId: result.leadId,
-          to: parsed.data.contact_email,
-          companyId: result.companyId,
-          personId: result.personId,
-        })
-      : null;
-
-    // W2 SLA timer: owner, first-call next action + task. Post-commit, fail-safe.
-    await startLeadLifecycle(key.tenantId, result.leadId);
-    // Web form: internal alert to sales (Péter + Áron). Never to the lead; no-op without Resend.
-    if (parsed.data.channel === "landing") {
-      // Sales ping (Telegram) and the lead's auto-reply (off until Áron signs it); both no-op when unconfigured.
-      await Promise.all([
-        sendFormAlert(key.tenantId, result.leadId),
-        sendLeadPing(key.tenantId, result.leadId),
-        sendAutoReply(key.tenantId, result.leadId),
-      ]);
-    }
-
-    // Fire task-automation rules for the new lead (e.g. the seeded follow-up
-    // task). Runs post-commit and is itself fail-safe, so it never blocks or
-    // fails the intake response.
-    await runAutomations({
-      type: "lead_created",
-      tenantId: key.tenantId,
-      leadId: result.leadId,
-      companyId: result.companyId,
-      personId: result.personId,
-      companyName: parsed.data.company_name,
-      fields: {
-        company: parsed.data.company_name,
-        source: parsed.data.source ?? null,
-        channel: parsed.data.channel,
-        campaign: parsed.data.campaign ?? null,
-        serviceInterest: parsed.data.service_interest ?? null,
-        message: parsed.data.message ?? null,
-        sourceApp: key.appSlug,
-        // Derived qualification tier (A–E) — lets a rule target e.g. tier D.
-        tier: result.tier,
-      },
-    });
+    const intro = await runEffects(result);
 
     return json(
       {
@@ -169,7 +203,7 @@ export async function POST(request: Request) {
       err instanceof Prisma.PrismaClientKnownRequestError &&
       err.code === "P2002" &&
       hitThreadKeyIndex &&
-      parsed.data.thread_key
+      (parsed.data.thread_key || parsed.data.idempotency_key)
     ) {
       // The recovery read is itself wrapped: we only got here because a
       // transaction failed, so the connection may be gone. An throw escaping
@@ -180,7 +214,10 @@ export async function POST(request: Request) {
         const winner = await db.lead.findFirst({
           where: {
             tenantId: key.tenantId,
-            threadKey: { in: [parsed.data.thread_key.trim().toLowerCase(), appThreadKey(key.appSlug, parsed.data.thread_key)] },
+            threadKey: { in: [
+              ...(parsed.data.thread_key ? [parsed.data.thread_key.trim().toLowerCase(), appThreadKey(key.appSlug, parsed.data.thread_key)] : []),
+              ...(parsed.data.idempotency_key ? [appThreadKey(key.appSlug, `idem~${parsed.data.idempotency_key}`)] : []),
+            ] },
           },
           select: { id: true, companyId: true },
         });

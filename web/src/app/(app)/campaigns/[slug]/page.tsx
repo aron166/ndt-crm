@@ -16,6 +16,7 @@ import { LaunchPanel } from "./LaunchPanel";
 import { MemberLoad } from "./MemberLoad";
 import { MemberList } from "./MemberList";
 import { EmailCheck } from "./EmailCheck";
+import { listSenders } from "@/app/actions/outreach-campaigns";
 import { campaignEmailCheck } from "@/lib/campaigns/preview";
 import { memberRows } from "@/lib/campaigns/hub";
 import { CampaignAutomations } from "./CampaignAutomations";
@@ -69,7 +70,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           steps: c.steps, assets: d.assets, members: d.members, variants: d.variants,
         }} />
       )}
-      {tab === "launch" && <EmailCheck slug={c.slug} c={await campaignEmailCheck(TENANT_ID, c.id, c.senderUserId)} />}
+      {tab === "launch" && <EmailCheck slug={c.slug} c={await campaignEmailCheck(TENANT_ID, c.id, c.senderUserId)} campaignId={c.id} senderUserId={c.senderUserId} senders={await listSenders()} />}
       {tab === "automations" && await automationsTab(c.id, c.outboundAutomations)}
       {tab === "members" && (
         <MemberList slug={c.slug} rows={await memberRows(TENANT_ID, c.id)} openId={Number(rawMember) > 0 ? Number(rawMember) : null} />

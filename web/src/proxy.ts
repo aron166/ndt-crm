@@ -35,6 +35,8 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/conversations" ||
     pathname === "/api/leads" ||
     pathname === "/api/suppressions" ||
+    pathname === "/api/outreach/unsubscribe" || // signed link, recipients have no session
+    pathname === "/api/webhooks/resend" || // signed by Resend, no session
     pathname.startsWith("/api/leads/") ||
     pathname === "/api/content" ||
     // Content approval loop (app key): queue, live, claim, versions. Anchored —
@@ -51,6 +53,7 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/outreach/targets" ||
     pathname === "/api/outreach/drafts" ||
     pathname === "/api/cron/automations" ||
+    pathname === "/api/cron/reply-intake" ||
     pathname === "/api/cron/content-digest" ||
     pathname === "/api/cron/weekly-report" ||
     pathname === "/api/reports/weekly" ||

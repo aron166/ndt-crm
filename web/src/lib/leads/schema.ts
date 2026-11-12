@@ -11,6 +11,7 @@ const emptyToUndef = (v: unknown) =>
   typeof v === "string" && v.trim() === "" ? undefined : v;
 
 const optStr = z.preprocess(emptyToUndef, z.string().trim().max(2000).optional());
+const bounded = (max: number) => z.preprocess(emptyToUndef, z.string().trim().max(max).optional());
 
 export const leadIntakeSchema = z
   .object({
@@ -68,6 +69,23 @@ export const leadIntakeSchema = z
     utm_term: optStr,
     referrer: optStr,
     landing_variant: optStr,
+    // Attribution from the landing: click ids, where the visit started and where it was
+    // submitted, the route, and the LAST touch (utm_* above stay the first touch). All land in
+    // customFields. Bounded: a public endpoint must not store 2 kB per field of anything.
+    gclid: bounded(200),
+    fbclid: bounded(200),
+    entry_path: bounded(500),
+    submit_path: bounded(500),
+    landing_route: bounded(100),
+    last_touch_utm_source: bounded(200),
+    last_touch_utm_medium: bounded(200),
+    last_touch_utm_campaign: bounded(200),
+    last_touch_utm_content: bounded(200),
+    last_touch_utm_term: bounded(200),
+    last_touch_referrer: bounded(500),
+    // A client-generated key for one submission (header Idempotency-Key or this field; the route
+    // merges them). A repeat returns the first result: see ingest.ts. Lowercased like thread_key.
+    idempotency_key: z.preprocess(emptyToUndef, z.string().trim().toLowerCase().max(200).optional()),
     lead_score: z.preprocess(emptyToUndef, z.coerce.number().optional()),
     priority: optStr,
 
