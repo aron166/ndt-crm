@@ -29,7 +29,7 @@ export interface LeadTx {
   };
   lead: {
     create(args: Prisma.LeadCreateArgs): Promise<{ id: number }>;
-    findFirst(args: Prisma.LeadFindFirstArgs): Promise<{ id: number; companyId: number | null; contactId: number | null } | null>;
+    findFirst(args: Prisma.LeadFindFirstArgs): Promise<{ id: number; companyId: number | null; contactId: number | null; createdAt?: Date; customFields?: unknown; contact?: { personId: number } | null } | null>;
   };
   emailDraft: {
     findFirst(args: Prisma.EmailDraftFindFirstArgs): Promise<{ id: number; companyId: number; campaign: string } | null>;
@@ -71,6 +71,11 @@ export interface IngestResult {
   deduped: boolean;
   /** The draft this reply answered, when `thread_key` matched one. */
   draftId: number | null;
+  /** Set on a deduped repeat that matched by idempotency_key: lets the route recover effects a failed first request never ran. */
+  viaIdempotencyKey?: true;
+  leadCreatedAt?: Date;
+  /** The route stamps customFields.effects_done_at once the post-commit effects ran. */
+  effectsDone?: boolean;
   /** Derived qualification tier, null when no answers were submitted. */
   tier: LeadTier | null;
   companyId: number | null;
@@ -173,18 +178,24 @@ export async function ingestLead(
   if (matchKey) {
     const existingLead = await tx.lead.findFirst({
       where: { tenantId, threadKey: matchKey },
-      select: { id: true, companyId: true },
+      select: { id: true, companyId: true, createdAt: true, customFields: true, contact: { select: { personId: true } } },
     });
     if (existingLead) {
+      const viaIdem = !(isColdEmailReply && claimedThreadKey) && idemKey != null;
       return {
         leadId: existingLead.id,
         deduped: true,
         draftId: null,
         tier: null,
         companyId: existingLead.companyId,
-        personId: null,
+        personId: existingLead.contact?.personId ?? null,
         companyReused: true,
         personReused: true,
+        ...(viaIdem ? {
+          viaIdempotencyKey: true as const,
+          leadCreatedAt: existingLead.createdAt,
+          effectsDone: Boolean((existingLead.customFields as Record<string, unknown> | null)?.effects_done_at),
+        } : {}),
       };
     }
   }
