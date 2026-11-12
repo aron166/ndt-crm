@@ -86,6 +86,26 @@ describe("deal stage change: one path for the board and the modal", () => {
     expect(runAutomations).not.toHaveBeenCalled();
   });
 
+  it("a modal save with a bad stageId leaves the deal unchanged (validated before any write)", async () => {
+    d.pipelineStage.findFirst.mockResolvedValue(null);
+    expect(await updateDeal(5, form({ stageId: "2", title: "Más" }))).toEqual({ error: "Szakasz nem található" });
+    expect(d.deal.updateMany).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("a deal that is gone writes nothing and says so", async () => {
+    d.deal.findFirst.mockResolvedValue(null);
+    expect(await updateDeal(5, form({ stageId: "2" }))).toEqual({ error: "Deal nem található" });
+    expect(d.deal.updateMany).not.toHaveBeenCalled();
+    expect(runAutomations).not.toHaveBeenCalled();
+  });
+
+  it("a stage of another pipeline moves the deal into that pipeline, as a board drag does", async () => {
+    d.pipelineStage.findFirst.mockResolvedValue({ id: 2, name: "B", pipelineId: 11 });
+    expect(await updateDeal(5, form({ stageId: "2" }))).toEqual({ success: true });
+    expect(d.deal.updateMany.mock.calls.map((c) => c[0].data).find((x) => x.stageId === 2)).toMatchObject({ pipelineId: 11 });
+  });
+
   it("not a CRM user: refused", async () => {
     (requireCrmUser as unknown as M).mockResolvedValue("NOT_A_CRM_USER");
     expect(await updateDeal(5, form({ stageId: "2" }))).toEqual({ error: "NOT_A_CRM_USER" });
