@@ -18,9 +18,9 @@ export async function GET(request: Request, { params }: P) {
 
 /**
  * POST /api/campaigns/:slug/members. dry_run defaults to TRUE (app key or session): the
- * response is the plan (matched, created, skipped and why). dry_run false writes it: session only,
- * admin or manager (an app key gets 403, service addMembers). On a
- * running campaign a write sends it back to draft (a new approval).
+ * response is the plan (matched, created, skipped and why). dry_run false writes it: a session
+ * admin or manager, OR an app key with the prospects:write scope (other keys get 403, service
+ * addMembers). On a running campaign a write sends it back to draft (a new approval).
  */
 export async function POST(request: Request, { params }: P) {
   const a = await campaignCtx(request);
@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: P) {
   return "error" in r ? failRes(r) : json(r, b.data.dry_run ? 200 : 201);
 }
 
-/** DELETE /api/campaigns/:slug/members?batch=<id>&dry_run=0: undo one load. dry_run defaults to true (key or session); dry_run=0 is session only, admin or manager. */
+/** DELETE /api/campaigns/:slug/members?batch=<id>&dry_run=0: undo one load. dry_run defaults to true (key or session); dry_run=0 needs a session admin or manager or a key with prospects:write. */
 export async function DELETE(request: Request, { params }: P) {
   const a = await campaignCtx(request);
   if ("res" in a) return a.res;
