@@ -1043,6 +1043,8 @@ model AppApiKey {
   isActive   Boolean   @default(true) @map("is_active")
   createdAt  DateTime  @default(now()) @map("created_at")
   lastUsedAt DateTime? @map("last_used_at")
+  /// Space-separated: leads:write prospects:write read. NULL = legacy key, today's behaviour (lib/app-key-auth.ts).
+  scopes     String?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
