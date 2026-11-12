@@ -25,7 +25,7 @@ import { revenueBreakdown, type Revenue, type RevenueRow } from "@/lib/campaigns
  * - suppression hit: a suppression added in the window, or an email draft the
  *   suppression list cancelled (audit reason `suppressed`). Sends blocked inside
  *   sendEmail are not persisted anywhere, so they are not counted.
- * - revenue: leads that became a deal (converted_at) or were won (closed_at) in the window, with the
+ * - revenue: converted = converted_at in the window; won = outcome won with closed_at in the window, with the
  *   deal's value, joined to channel, source, campaign (the lead tag, else the hub campaign of its
  *   member) and the member's segment. Pure grouping in campaigns/analytics revenueBreakdown.
  * - company touched: any non-superseded interaction linked to the company.
@@ -153,6 +153,21 @@ export interface WeeklyReport {
 
 const sum = (rows: { count: number }[]) => rows.reduce((a, r) => a + r.count, 0);
 
+export interface RawRevenue extends Omit<RevenueRow, "converted" | "won"> { outcome: string; convertedAt: Date | null; closedAt: Date | null }
+
+/**
+ * Flags scoped to [from, to): converted = converted_at inside, won = outcome won AND closed_at inside.
+ * A lead converted last week and won this week is "won" now, not "converted" now, so a week's figures
+ * do not change when the report is re-run later. Rows that are neither are dropped.
+ */
+export function windowRevenueRows(raw: readonly RawRevenue[], { from, to }: ReportWindow): RevenueRow[] {
+  const inside = (d: Date | null) => d != null && d.getTime() >= from.getTime() && d.getTime() < to.getTime();
+  return raw.flatMap(({ outcome, convertedAt, closedAt, ...r }) => {
+    const converted = inside(convertedAt), won = outcome === "won" && inside(closedAt);
+    return converted || won ? [{ ...r, converted, won }] : [];
+  });
+}
+
 export async function getWeeklyReport(tenantId: number, { from, to }: ReportWindow): Promise<WeeklyReport> {
   const [bySource, tierARows, outcomes, demoRows, transitions, suppressionRows, companies, revenueRows] = await Promise.all([
     db.$queryRaw<{ source: string | null; tier: string | null; count: number }[]>`
@@ -237,8 +252,8 @@ export async function getWeeklyReport(tenantId: number, { from, to }: ReportWind
        ORDER BY 3 DESC, 4 DESC
        LIMIT 10`,
 
-    db.$queryRaw<RevenueRow[]>`
-      SELECT (l."converted_deal_id" IS NOT NULL) AS "converted", (l."outcome" = 'won') AS "won",
+    db.$queryRaw<RawRevenue[]>`
+      SELECT l."outcome", l."converted_at" AS "convertedAt", l."closed_at" AS "closedAt",
              d."value"::float AS "value", d."currency", l."channel", l."source",
              COALESCE(l."campaign", m."slug") AS "campaign", m."segment"
         FROM "leads" l
@@ -249,7 +264,7 @@ export async function getWeeklyReport(tenantId: number, { from, to }: ReportWind
         ) m ON true
        WHERE l."tenant_id" = ${tenantId}
          AND ((l."converted_at" >= ${from} AND l."converted_at" < ${to})
-           OR (l."outcome" = 'won' AND COALESCE(l."closed_at", l."converted_at") >= ${from} AND COALESCE(l."closed_at", l."converted_at") < ${to}))`,
+           OR (l."outcome" = 'won' AND l."closed_at" >= ${from} AND l."closed_at" < ${to}))`,
   ]);
 
   return {
@@ -264,6 +279,6 @@ export async function getWeeklyReport(tenantId: number, { from, to }: ReportWind
     stageTransitions: transitions,
     suppression: suppressionRows[0] ?? { added: 0, draftsCancelled: 0 },
     topCompanies: companies,
-    revenue: revenueBreakdown(revenueRows),
+    revenue: revenueBreakdown(windowRevenueRows(revenueRows, { from, to })),
   };
 }

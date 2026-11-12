@@ -131,9 +131,11 @@ export async function campaignAnalytics(tenantId: number, opts: { slug?: string;
   const deals = dealIds.length ? await db.deal.findMany({ where: { tenantId, id: { in: dealIds } }, select: { id: true, value: true, currency: true } }) : [];
   return campaigns.map((c) => {
     const mine = members.filter((m) => m.campaignId === c.id);
+    const seen = new Set<number>(); // one lead counts once per campaign, even if two members point at it
     const revenueRows: RevenueRow[] = mine.flatMap((m) => {
       const l = leads.find((x) => x.id === m.leadId);
-      if (!l) return [];
+      if (!l || seen.has(l.id)) return [];
+      seen.add(l.id);
       const d = deals.find((x) => x.id === l.convertedDealId);
       return [{ converted: l.convertedDealId != null, won: l.outcome === "won", value: d?.value != null ? d.value.toString() : null, currency: d?.currency ?? null, channel: l.channel, source: l.source, campaign: c.slug, segment: m.segment }];
     });

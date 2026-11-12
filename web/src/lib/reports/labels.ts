@@ -72,3 +72,6 @@ export function revenueLines(r: Revenue): RevenueLine[] {
     ...dims.flatMap(([name, rows, label]) => rows.filter((x) => x.converted > 0 || x.won > 0).map((x) => ({ label: `${name}: ${label(x.key)}`, won: x.won, wonValue: x.wonValue, converted: x.converted, convertedValue: x.convertedValue }))),
   ];
 }
+
+/** The note that deals in another currency are not in the sums; null when there are none. */
+export const revenueNote = (r: Revenue): string | null => (r.total.otherCurrency > 0 ? REPORT_UI.revenueOtherCurrency(r.total.otherCurrency) : null);

@@ -9,7 +9,7 @@ import k from "@/components/astryx/page.module.css";
 import s from "@/app/(app)/campaigns/campaigns.module.css";
 import { kindLabel, isContentOnly } from "@/lib/campaigns/labels";
 import type { CampaignStatsV2, Revenue } from "@/lib/campaigns/analytics";
-import { REPORT_UI, revenueLines } from "@/lib/reports/labels";
+import { REPORT_UI, revenueLines, revenueNote } from "@/lib/reports/labels";
 import { formatHUF } from "@/lib/utils";
 
 export interface StripRow { campaign: { slug: string; name: string; kind: string | null }; stats: CampaignStatsV2; revenue?: Revenue }
@@ -53,7 +53,8 @@ export function RunningStrip({ rows, title = "Futó kampányok" }: { rows: Strip
                 if (view === "revenue") {
                   const lines = r.revenue ? revenueLines(r.revenue) : [];
                   if (lines.length === 0) return [<tr key={r.campaign.slug}><td>{name}{kind}</td><td colSpan={5} className={k.muted}>{REPORT_UI.revenueNone}</td></tr>];
-                  return lines.map((x, i) => (
+                  const note = revenueNote(r.revenue!);
+                  return [...lines.map((x, i) => (
                     <tr key={`${r.campaign.slug}-${x.label}`}>
                       <td>{i === 0 ? <>{name}{kind}</> : null}</td>
                       <td>{x.label}</td>
@@ -62,7 +63,7 @@ export function RunningStrip({ rows, title = "Futó kampányok" }: { rows: Strip
                       <td className={k.num}>{x.converted}</td>
                       <td className={k.num}>{formatHUF(x.convertedValue)}</td>
                     </tr>
-                  ));
+                  )), ...(note ? [<tr key={`${r.campaign.slug}-note`}><td /><td colSpan={5} className={k.muted}>{note}</td></tr>] : [])];
                 }
                 if (view === "total") {
                   const na = isContentOnly(r.campaign.kind);
