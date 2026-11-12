@@ -210,7 +210,7 @@ The live application is the Next.js app in `web/`.
 ### Local CI gate
 
 GitHub Actions is unpaid, so the gate runs locally on a committed SHA: `/home/aron166/Projects/workspace/tools/ci-guard.sh scripts/local-ci.sh` from the repo or worktree root.
-It runs prisma generate, tsc, eslint on changed files, vitest and `next build` (Turbopack, as production builds) and ends its log with `LOCAL-CI-GATE PASS <full sha>` or `FAIL`.
+It runs prisma generate, tsc, eslint on changed files, vitest and `next build` (Turbopack, as production builds) and ends its log with `LOCAL-CI-GATE PASS <full sha>` or `FAIL` (exit code follows). Every step runs with dummy database and Supabase values, so `web/.env` never reaches production. `scripts/local-ci.sh --selftest` checks the FAIL path.
 The log lands in `~/.cache/<checkout dir>-local-ci/`, where `workspace/tools/review-ready.sh <repo> <branch>` finds it.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
