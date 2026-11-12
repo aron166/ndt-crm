@@ -317,6 +317,14 @@ describe("member loads and undo are session only with an operator role (Kai, Van
     const KEY = { ...APP, scopes: ["prospects:write" as const] };
     const READ = { ...APP, scopes: ["read" as const] };
     const LEGACY = { ...APP, scopes: null };
+    it("a key writes and undoes only batches named after its own app slug (Vanda #197-3)", async () => {
+      d.campaignMember.findMany.mockResolvedValue([]);
+      d.campaignMember.deleteMany.mockResolvedValue({ count: 0 });
+      const own = `${KEY.appSlug}-2026-11-12`;
+      expect(await undoBatch(KEY, "bp", "human-batch", false)).toMatchObject({ status: 403 });
+      expect(await addMembers(KEY, "bp", { dry_run: false, batch: "human-batch", rows })).toMatchObject({ status: 403 });
+      expect(await undoBatch(KEY, "bp", own, false)).toMatchObject({ ok: true });
+    });
     it("addMembers apply: prospects:write proceeds, legacy and read-only get 403, session operator unchanged", async () => {
       d.company.create.mockResolvedValue({ id: 70 });
       expect(await addMembers(KEY, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ ok: true, dry_run: false, added: 1 });
