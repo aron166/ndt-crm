@@ -313,6 +313,30 @@ describe("member loads and undo are session only with an operator role (Kai, Van
     expect(await undoBatch(SESSION, "bp", "b1", false)).toMatchObject({ ok: true });
     expect(d.campaign.update.mock.calls[0][0].data).toMatchObject({ status: "draft", approvedHash: null });
   });
+  describe("prospects:write key (scopes)", () => {
+    const KEY = { ...APP, scopes: ["prospects:write"] };
+    const READ = { ...APP, scopes: ["read"] };
+    const LEGACY = { ...APP, scopes: null };
+    it("addMembers apply: prospects:write proceeds, legacy and read-only get 403, session operator unchanged", async () => {
+      d.company.create.mockResolvedValue({ id: 70 });
+      expect(await addMembers(KEY, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ ok: true, dry_run: false, added: 1 });
+      d.$transaction.mockClear();
+      expect(await addMembers(LEGACY, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
+      expect(await addMembers(READ, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
+      expect(d.$transaction).not.toHaveBeenCalled();
+      d.user.findFirst.mockResolvedValue({ role: "admin" });
+      expect(await addMembers(SESSION, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ ok: true, added: 1 });
+    });
+    it("undoBatch apply: prospects:write proceeds, legacy and read-only get 403, session operator unchanged", async () => {
+      d.campaignMember.findMany.mockResolvedValue([]);
+      d.campaignMember.deleteMany.mockResolvedValue({ count: 0 });
+      expect(await undoBatch(KEY, "bp", "b1", false)).toMatchObject({ ok: true, dry_run: false });
+      expect(await undoBatch(LEGACY, "bp", "b1", false)).toMatchObject({ status: 403 });
+      expect(await undoBatch(READ, "bp", "b1", false)).toMatchObject({ status: 403 });
+      d.user.findFirst.mockResolvedValue({ role: "admin" });
+      expect(await undoBatch(SESSION, "bp", "b1", false)).toMatchObject({ ok: true });
+    });
+  });
   it("a content-only campaign takes no members", async () => {
     d.campaign.findFirst.mockResolvedValue({ ...SEQ, kind: "organic" });
     expect(await addMembers(APP, "bp", { dry_run: true, batch: "b1", rows })).toMatchObject({ status: 409 });
