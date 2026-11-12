@@ -1318,6 +1318,31 @@ Rules live in `/automations`. Triggers: `lead_created`, `lead_status_changed`,
 personId, company, fields, firedAt }` to your URL — the seam for n8n / a voice agent).
 Time-based triggers run from the daily cron (`/api/cron/automations`, 07:00 UTC).
 
+## Reply intake (IMAP cron)
+
+`GET|POST /api/cron/reply-intake`, `Authorization: Bearer <CRON_SECRET>` (401 otherwise, also when `CRON_SECRET` is unset).
+Polls the sending mailbox over IMAP and feeds replies, opt-outs and bounces into the existing handling.
+
+Env: `IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD` (all required), `IMAP_PORT` (default 993, TLS). Any required one missing:
+`200 {"ok":true,"configured":false}` and nothing else happens.
+
+The mailbox is opened READ-ONLY: nothing is marked seen, moved or deleted. Each poll reads the last 14 days (at most the 300 newest).
+Mail from our own domains (the Resend `fromEmail` domain and the IMAP user's domain) is ignored.
+
+| Class | Detected by | Effect |
+|---|---|---|
+| bounce | `multipart/report; report-type=delivery-status`, From mailer-daemon/postmaster, or an undeliverable-type subject | `applyOptOut` kind `bounce` for the failed recipient |
+| auto | `Auto-Submitted` (not `no`), `X-Autoreply`, `X-Autorespond`, `Precedence: auto_reply`, read receipt, out-of-office subject | stored only, not a reply |
+| opt_out | explicit opt-out (leiratkozás, unsubscribe, töröljenek ...) in the subject or the sender's own text (quoted text is cut first) | `applyOptOut` kind `unsubscribe`; no lead, no call task |
+| reply | anything else from outside | matched to a sent draft (Resend message id in In-Reply-To/References, else the From address, else the company domain; free-mail domains are never domain-matched), then the same handling as "Válasz jött" (lead, draft `replied`, remaining touches cancelled). `replyType` stays empty: a human classifies |
+| unmatched reply | no draft found | stored only |
+
+Idempotency: every message is stored in `email_provider_events` (provider `imap`, eventId = Message-ID, else sha256 of the raw mail;
+only a short payload, never the whole body). A message already processed is skipped; one whose effects failed has `processedAt` null and is retried on the next poll.
+
+`200` body: `{ok, configured, seen, new, replies, optOuts, bounces, autos, unmatched, ignored}`. IMAP failure: `502 {"ok":false,"error":"IMAP"}`.
+After a successful fetch and run, `tenants.settings.inboxCheckedAt` (ISO time) is set by one atomic `jsonb_set`; the scheduled sender refuses to send when it is older than 60 minutes.
+
 ## Booking (W8b route-aware, session auth)
 
 Auth: the session cookie plus a CRM user of the tenant. Anything else gets 403 `{ error }`. This is not the app-key (`Bearer`) surface. All times are ISO 8601 (`startsAt` may carry an offset); working-day and "tomorrow" logic runs in Europe/Budapest, and there are no same-day bookings. Drive times are a straight-line band in slice 1 (`DriveBand { min, max }` minutes: `min` cannot be quicker, `max` will not be slower) and become exact (`min == max`) when the OSRM matrix lands. Validation errors are 400 `{ error }`.

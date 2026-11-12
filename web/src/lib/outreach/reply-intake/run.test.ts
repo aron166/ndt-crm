@@ -46,7 +46,7 @@ describe("runReplyIntake", () => {
   });
 
   it("matched by In-Reply-To through a stored resend message id (checked first)", async () => {
-    m.queryRaw.mockResolvedValueOnce([{ draftId: 42 }]);
+    m.queryRaw.mockResolvedValueOnce([{ id: 42, status: "sent" }]);
     await runReplyIntake(1, [fx("plain-reply.eml")], NOW);
     expect(m.record).toHaveBeenCalledWith(1, expect.objectContaining({ draftId: 42 }));
     expect(m.draftFindFirst).not.toHaveBeenCalled();
@@ -99,7 +99,7 @@ describe("runReplyIntake", () => {
   });
 
   it("auto and ignore -> stored only", async () => {
-    const r = await runReplyIntake(1, [fx("out-of-office.eml"), fx("from-ourselves.eml")], NOW);
+    const r = await runReplyIntake(1, [fx("out-of-office.eml"), fx("from-ourselves.eml")], NOW, ["ndt.hu"]);
     expect(r).toMatchObject({ new: 2, autos: 1, ignored: 1 });
     expect(m.record).not.toHaveBeenCalled();
     expect(m.optOut).not.toHaveBeenCalled();
