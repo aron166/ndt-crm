@@ -89,7 +89,11 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
     await setTenant({ outreachFooter: FOOTER, inboxCheckedAt: new Date(NOW.getTime() - 5 * 60_000).toISOString() });
   });
   // Campaigns of earlier tests must not keep sending in later ones.
-  afterEach(() => db.campaign.updateMany({ where: { tenantId }, data: { scheduledSending: false } }));
+  // Earlier tests' sends must not fill the mailbox's warm-up cap of later ones: move them before every warm-up start.
+  afterEach(async () => {
+    await db.campaign.updateMany({ where: { tenantId }, data: { scheduledSending: false } });
+    await db.emailDraft.updateMany({ where: { tenantId, sentAt: { not: null } }, data: { sentAt: new Date("2026-10-01T10:00:00Z") } });
+  });
 
   afterAll(async () => {
     if (!db) return;
@@ -152,6 +156,16 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
     expect(sentCalls()).toBe(2);
     expect(await go(c.slug)).toMatchObject({ sentDraftId: null, blocked: ["cap_reached"] });
     expect(sentCalls()).toBe(2);
+  });
+
+  it("every send from the mailbox today counts against the warm-up cap, a hand-sent one too (Nate review of D)", async () => {
+    const c = await mk({ warmup: "2026-11-11" }); // day 0: cap 10
+    const other = await db.company.create({ data: { tenantId, name: `${tag} hand-sent` } });
+    for (let k = 0; k < 10; k++) {
+      await db.emailDraft.create({ data: { tenantId, companyId: other.id, campaign: `${tag}-manual`, step: k + 1 > 4 ? 4 : k + 1, subject: "S", body: "B", status: "sent", sentVia: "resend", sentAt: new Date(), ...(k > 3 ? { campaign: `${tag}-manual-${k}` } : {}) } });
+    }
+    expect(await go(c.slug)).toMatchObject({ sentDraftId: null, blocked: ["cap_reached"] });
+    expect(sentCalls()).toBe(0);
   });
 
   it("warmup not started: missing or in the future", async () => {
