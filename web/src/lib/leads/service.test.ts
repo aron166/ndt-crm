@@ -8,6 +8,8 @@ import { resolveDemoHost, loadBookings } from "@/lib/booking/queries";
 // directions, plus the "duplication structurally impossible" claim.
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
+vi.mock("@/lib/campaigns/service", () => ({ advanceMembersForCall: vi.fn().mockResolvedValue(1) }));
+import { advanceMembersForCall } from "@/lib/campaigns/service";
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/booking/queries", () => ({
   resolveDemoHost: vi.fn().mockResolvedValue(null),
@@ -32,7 +34,7 @@ vi.mock("@/lib/db", () => ({
     lead: { findFirst: vi.fn(), updateMany: vi.fn() },
     task: { updateMany: vi.fn(), create: vi.fn(), findFirst: vi.fn() },
     user: { findFirst: vi.fn() },
-    interaction: { create: vi.fn() },
+    interaction: { create: vi.fn(), findFirst: vi.fn() },
     company: { updateMany: vi.fn() },
     pipeline: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
@@ -546,5 +548,42 @@ describe("lost flow (fix/crm-lost-flow)", () => {
     mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, status: "won", outcome: "won", convertedDealId: 9 });
     const res = await logLeadCallOutcome(10, { outcome: "no_answer", note: "x" }, ctx);
     expect(res).toMatchObject({ error: "A lead már lezárt: előbb nyisd újra" });
+  });
+});
+
+describe("one call-outcome writer (C1): a lead call advances the company's campaign members", () => {
+  it("after the commit, with the mapped campaign key and the lead's company", async () => {
+    const res = await logLeadCallOutcome(10, { outcome: "no_answer", note: "nem vette fel" }, ctx);
+    expect(res).toMatchObject({ success: true });
+    expect(advanceMembersForCall).toHaveBeenCalledWith({ tenantId: 1, userId: 2, appSlug: undefined }, 7, "no_answer", expect.any(Date));
+  });
+
+  it("wrong_number is a bad_number on the campaign", async () => {
+    await logLeadCallOutcome(10, { outcome: "wrong_number", note: "nem ő" }, ctx);
+    expect((advanceMembersForCall as unknown as M).mock.calls[0][2]).toBe("bad_number");
+  });
+
+  it("an agent call carries the agent as appSlug", async () => {
+    await logLeadCallOutcome(10, { outcome: "no_answer", note: "x" }, { ...agentCtx, actorAgentId: "corvid" });
+    expect((advanceMembersForCall as unknown as M).mock.calls[0][0]).toEqual({ tenantId: 1, userId: null, appSlug: "corvid" });
+  });
+
+  it("a correction does not advance the member a second time", async () => {
+    (db as unknown as { interaction: Record<string, M> }).interaction.findFirst.mockResolvedValue({ id: 70 });
+    const res = await logLeadCallOutcome(10, { outcome: "no_answer", note: "javítás", supersedesInteractionId: 70 }, ctx);
+    expect(res).toMatchObject({ success: true });
+    expect(advanceMembersForCall).not.toHaveBeenCalled();
+  });
+
+  it("a lead without a company advances nothing", async () => {
+    mockDb.lead.findFirst.mockResolvedValue({ ...LEAD, companyId: null, company: null });
+    await logLeadCallOutcome(10, { outcome: "no_answer", note: "x" }, ctx);
+    expect(advanceMembersForCall).not.toHaveBeenCalled();
+  });
+
+  it("a failing member advance never fails the logged call", async () => {
+    (advanceMembersForCall as unknown as M).mockRejectedValueOnce(new Error("boom"));
+    const res = await logLeadCallOutcome(10, { outcome: "no_answer", note: "x" }, ctx);
+    expect(res).toMatchObject({ success: true });
   });
 });
