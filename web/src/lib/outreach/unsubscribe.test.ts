@@ -98,6 +98,10 @@ describe("applyOptOut", () => {
     rec.mockResolvedValue({ error: "Nem futó kampány", status: 409 });
     expect(await applyOptOut(1, "a@b.hu", opts)).toEqual({ suppressed: true, memberUpdated: false });
   });
+  it("a throwing recordOutcome still reports suppressed (Vanda #196-5)", async () => {
+    rec.mockRejectedValue(new Error("db gone"));
+    expect(await applyOptOut(1, "a@b.hu", opts)).toEqual({ suppressed: true, memberUpdated: false });
+  });
   it("no draft: memberUpdated false", async () => {
     m.emailDraft.findFirst.mockResolvedValue(null);
     expect(await applyOptOut(1, "a@b.hu", opts)).toEqual({ suppressed: true, memberUpdated: false });
