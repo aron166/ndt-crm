@@ -24,7 +24,7 @@ vi.mock("@/lib/db", () => {
     campaignMember: { findFirst: m(), findMany: m(), updateMany: m(), create: m(), deleteMany: m() },
     user: { findFirst: m() },
     person: { findMany: m(), create: m(), updateMany: m() },
-    emailDraft: { findMany: m() }, invoice: { findMany: m() }, proposal: { findMany: m() }, quote: { findMany: m() },
+    emailDraft: { findMany: m(), findFirst: m(), updateMany: m() }, invoice: { findMany: m() }, proposal: { findMany: m() }, quote: { findMany: m() },
     company: { findMany: m(), updateMany: m(), create: m() },
     campaignStep: { deleteMany: m(), createMany: m(), findMany: vi.fn().mockResolvedValue([]) },
     campaignEvent: { create: m(), findFirst: m() },
@@ -69,6 +69,8 @@ beforeEach(() => {
   d.lead.findFirst.mockResolvedValue(null);
   d.lead.create.mockResolvedValue({ id: 300 });
   d.interaction.create.mockResolvedValue({ id: 600 });
+  d.emailDraft.updateMany.mockResolvedValue({ count: 0 });
+  d.campaignMember.findMany.mockResolvedValue([]);
 });
 
 describe("recordOutcome: promotion without an SLA task flood", () => {
@@ -389,5 +391,62 @@ describe("per-campaign automations (item 5)", () => {
     await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "no_answer" }, NOW);
     const camp = (runAutomations as M).mock.calls.map((c) => c[0]).filter((e) => String(e.type).startsWith("campaign_"));
     expect(camp).toEqual([expect.objectContaining({ type: "campaign_call_outcome", outcome: "no_answer", skipActionTypes: [] })]);
+  });
+});
+
+describe("one reply path (C2): a reply logged in the hub stops the outreach like /outreach does", () => {
+  beforeEach(() => {
+    d.campaignMember.findFirst.mockResolvedValue(member({ stepPosition: 1 }));
+    d.emailDraft.findFirst.mockResolvedValue({ id: 70 });
+    d.emailDraft.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("reply_positive: the answered touch is replied, every queued touch to the company in every campaign is cancelled, the SLA starts once", async () => {
+    const r = await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "reply_positive" }, NOW);
+    expect(r).toMatchObject({ ok: true });
+    expect(d.emailDraft.findFirst.mock.calls[0][0].where).toMatchObject({ tenantId: 1, companyId: 7, campaign: "bp", status: "sent" });
+    const [flip, cancel] = d.emailDraft.updateMany.mock.calls.map((c) => c[0]);
+    expect(flip).toMatchObject({ where: { id: 70, tenantId: 1, status: "sent" }, data: { status: "replied", replyType: null } });
+    expect(cancel).toMatchObject({ where: { tenantId: 1, companyId: 7, status: { in: ["draft", "approved", "failed"] } }, data: { status: "cancelled" } });
+    expect(cancel.where).not.toHaveProperty("campaign");
+    expect(startLeadLifecycle).toHaveBeenCalledTimes(1);
+  });
+
+  it("the answered touch is the REPLYING person's, never a colleague's", async () => {
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "reply_positive" }, NOW);
+    expect(d.emailDraft.findFirst.mock.calls[0][0].where).toMatchObject({ companyId: 7, campaign: "bp", status: "sent", personId: 8 });
+  });
+
+  it("a member with no person: the company's newest sent touch is the answered one", async () => {
+    d.campaignMember.findFirst.mockResolvedValue(member({ stepPosition: 1, personId: null, person: null }));
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "reply_positive" }, NOW);
+    expect(d.emailDraft.findFirst.mock.calls[0][0].where).not.toHaveProperty("personId");
+  });
+
+  it("reply_negative stops the outreach too", async () => {
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "reply_negative" }, NOW);
+    expect(d.emailDraft.updateMany.mock.calls[0][0]).toMatchObject({ data: { status: "replied", replyType: "no" } });
+    expect(d.emailDraft.updateMany.mock.calls[1][0]).toMatchObject({ data: { status: "cancelled" } });
+  });
+
+  it("no sent touch found: nothing is flipped, the queued touches are still cancelled", async () => {
+    d.emailDraft.findFirst.mockResolvedValue(null);
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "reply_positive" }, NOW);
+    expect(d.emailDraft.updateMany).toHaveBeenCalledTimes(1);
+    expect(d.emailDraft.updateMany.mock.calls[0][0]).toMatchObject({ data: { status: "cancelled" } });
+  });
+
+  it("logging the same reply twice changes nothing more", async () => {
+    d.campaignMember.findFirst.mockResolvedValue(member({ stepPosition: 1, state: "promoted" }));
+    const r = await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "reply_positive" }, NOW);
+    expect(r).toMatchObject({ status: 409 });
+    expect(d.emailDraft.updateMany).not.toHaveBeenCalled();
+    expect(startLeadLifecycle).not.toHaveBeenCalled();
+    expect(d.lead.create).not.toHaveBeenCalled();
+  });
+
+  it("a call outcome touches no draft", async () => {
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "no_answer" }, NOW);
+    expect(d.emailDraft.updateMany).not.toHaveBeenCalled();
   });
 });
