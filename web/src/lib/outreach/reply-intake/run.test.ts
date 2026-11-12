@@ -85,10 +85,17 @@ describe("runReplyIntake", () => {
     expect(m.update).toHaveBeenCalled();
   });
 
+  it("an opt-out from someone we never mailed suppresses nobody (Nate review of E)", async () => {
+    const r = await runReplyIntake(1, [fx("opt-out.eml")], NOW);
+    expect(m.optOut).not.toHaveBeenCalled();
+    expect(r.unmatched).toBe(1);
+  });
+
   it("opt-out -> applyOptOut unsubscribe, no recordDraftReply", async () => {
+    m.draftFindFirst.mockResolvedValueOnce({ id: 11 });
     const r = await runReplyIntake(1, [fx("opt-out.eml")], NOW);
     expect(r.optOuts).toBe(1);
-    expect(m.optOut).toHaveBeenCalledWith(1, "anna@pelda-kft.hu", { kind: "unsubscribe", source: "imap_reply", agent: "reply-intake" });
+    expect(m.optOut).toHaveBeenCalledWith(1, "anna@pelda-kft.hu", { kind: "unsubscribe", source: "imap_reply", agent: "reply-intake", draftId: 11 });
     expect(m.record).not.toHaveBeenCalled();
   });
 

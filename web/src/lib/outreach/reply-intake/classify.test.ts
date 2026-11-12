@@ -69,6 +69,9 @@ describe("classifyMail", () => {
     expect(r.messageId).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("a newsletter (List-Id, List-Unsubscribe, Precedence bulk) is ignored, never a reply or an opt-out (Nate review of E)", async () => {
+    expect(await run("newsletter.eml")).toMatchObject({ kind: "ignore", reason: "bulk" });
+  });
   it("no From is ignored", async () => {
     const raw = Buffer.from("Message-ID: <x@y>\r\nSubject: x\r\n\r\nhi\r\n");
     expect(classifyMail(await simpleParser(raw), raw, OURS)).toMatchObject({ kind: "ignore", reason: "no_from" });
