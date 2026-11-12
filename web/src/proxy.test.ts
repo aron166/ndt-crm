@@ -46,6 +46,7 @@ describe("isServiceApiPath", () => {
     "/api/reports/campaigns",
     "/api/campaigns/bp/lead-audience", // item 4: an agent may dry-run a lead load
     "/api/outreach/unsubscribe", // signed link, recipients have no session
+    "/api/webhooks/resend", // signed by Resend, no session
     "/api/specification-requests", // Vanda #192-1: the agent polls with an app key, no cookie
   ];
   for (const path of bypassed) {
