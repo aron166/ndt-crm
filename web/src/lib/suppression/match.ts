@@ -20,6 +20,23 @@ export function normalizeEmail(v: string): string {
   return at < 0 ? s : s.slice(0, at + 1) + s.slice(at + 1).replace(/\.+$/, "");
 }
 
+/**
+ * Folded form for suppression compares, so "name+x@gmail.com" and "n.a.m.e@gmail.com"
+ * cannot dodge a suppression of "name@gmail.com". "+tag" goes everywhere; dots only on Gmail.
+ */
+export function suppressionKey(v: string): string {
+  const e = normalizeEmail(v);
+  const at = e.lastIndexOf("@");
+  if (at < 0) return e;
+  let local = e.slice(0, at);
+  let domain = e.slice(at + 1);
+  const plus = local.indexOf("+");
+  if (plus > 0) local = local.slice(0, plus);
+  if (domain === "googlemail.com") domain = "gmail.com";
+  if (domain === "gmail.com") local = local.replace(/\./g, "");
+  return local + "@" + domain;
+}
+
 /** "a@b.hu" -> "b.hu"; "@b.hu" or "b.hu" -> "b.hu"; anything else -> null. */
 export function normalizeDomain(v: string): string | null {
   const d = clean(v).replace(/^.*@/, "").replace(/\.+$/, "");
@@ -64,11 +81,8 @@ export function isSuppressed(email: string | null | undefined, set: SuppressionS
   const e = normalizeEmail(email);
   if (!e) return false;
   const at = e.lastIndexOf("@");
-  if (set.emails.has(e)) return true;
+  if (set.emails.has(suppressionKey(e))) return true;
   if (at < 0) return false;
-  // "a+tag@d" is the same mailbox as "a@d".
-  const plus = e.indexOf("+");
-  if (plus > 0 && plus < at && set.emails.has(e.slice(0, plus) + e.slice(at))) return true;
   const labels = e.slice(at + 1).split(".");
   for (let i = 0; i < labels.length - 1; i++) {
     if (set.domains.has(labels.slice(i).join("."))) return true;

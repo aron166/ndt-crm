@@ -57,7 +57,7 @@ describe("parseSuppressionTarget", () => {
 });
 
 describe("folded address matching", () => {
-  const fold = (e: string[], d: string[] = []) => ({ emails: new Set(e.map(suppressionKey)), domains: new Set(d) });
+  const fold = (e: string[], d: string[] = []) => ({ emails: new Set<string>(e.map(suppressionKey)), domains: new Set(d) });
   it("folds gmail dots and plus tags", () => {
     const s = fold(["name@gmail.com"]);
     for (const a of ["name+x@gmail.com", "n.a.m.e@gmail.com", "N.Ame+promo@GoogleMail.com"]) expect(isSuppressed(a, s)).toBe(true);

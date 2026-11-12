@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { audit, type AuditOptions } from "@/lib/audit";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
-import { isSuppressed } from "./index";
+import { isSuppressed, suppressionKey } from "./index";
 
 /**
  * A new suppression entry: queued drafts to it must not go out, so cancel them now.
@@ -17,7 +17,7 @@ export async function cancelQueuedDraftsFor(
     where: { tenantId, status: { in: ["draft", "approved", "failed"] } },
     select: { id: true, status: true, toEmail: true, personId: true, companyId: true },
   });
-  const set = { emails: new Set(target.email ? [target.email] : []), domains: new Set(target.domain ? [target.domain] : []) };
+  const set = { emails: new Set(target.email ? [suppressionKey(target.email)] : []), domains: new Set(target.domain ? [target.domain] : []) };
   let cancelled = 0;
   for (const d of queued) {
     // ponytail: one lookup per row; batch when the queue is hundreds

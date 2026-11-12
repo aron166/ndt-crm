@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { isSuppressed, type SuppressionSet } from "./match";
+import { isSuppressed, suppressionKey, type SuppressionSet } from "./match";
 
 export * from "./match";
 
@@ -12,7 +12,7 @@ export async function loadSuppressionSet(tenantId: number): Promise<SuppressionS
   });
   const set: SuppressionSet = { emails: new Set(), domains: new Set() };
   for (const r of rows) {
-    if (r.email) set.emails.add(r.email);
+    if (r.email) set.emails.add(suppressionKey(r.email));
     if (r.domain) set.domains.add(r.domain);
   }
   return set;
