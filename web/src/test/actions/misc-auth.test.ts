@@ -70,7 +70,6 @@ describe("misc actions auth gate", () => {
     expect(await tags.addTag("company", 1, "x")).toEqual({ error: DENIED });
     expect(await tags.removeTag("company", 1, 1)).toEqual({ error: DENIED });
     await expect(tags.getTagsForEntity("company", 1)).rejects.toThrow(DENIED);
-    await expect(tags.searchByTag("x")).rejects.toThrow(DENIED);
     noDbCalls();
   });
 

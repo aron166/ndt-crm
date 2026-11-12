@@ -170,19 +170,6 @@ export async function setCurrentEmployer(formData: FormData) {
   return { success: true, companyId };
 }
 
-export async function closeContact(contactId: number, companyId: number, personId: number) {
-  const denied = await requireCrmUser(TENANT_ID);
-  if (denied) return { error: denied };
-  await db.contact.updateMany({
-    where: { id: contactId, tenantId: TENANT_ID },
-    data: { endedAt: new Date() },
-  });
-  await audit("contact", contactId, "update", { endedAt: null }, { endedAt: new Date().toISOString() });
-  revalidatePath(`/companies/${companyId}`);
-  revalidatePath(`/persons/${personId}`);
-  return { success: true };
-}
-
 // "Person left company" — close contact + auto-create a follow-up task
 export async function personLeftCompany(contactId: number, companyId: number, personId: number, endedAt?: Date) {
   const denied = await requireCrmUser(TENANT_ID);

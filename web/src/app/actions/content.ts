@@ -226,29 +226,6 @@ export async function archiveContent(itemId: number): Promise<{ ok: true } | Fai
   return { ok: true };
 }
 
-/** Title / purpose are item metadata, not reviewed copy — editing them is not a new version. */
-export async function updateContentMeta(
-  itemId: number,
-  input: { title?: string; purpose?: string | null; format?: string | null },
-): Promise<{ ok: true } | Fail> {
-  const actor = await userActor();
-  if ("ok" in actor) return actor;
-  const parsed = z.object({
-    title: z.string().trim().min(1).max(300).optional(),
-    purpose: z.string().trim().max(300).nullable().optional(),
-    format: z.string().trim().max(60).nullable().optional(),
-  }).safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Érvénytelen adat" };
-  const before = await db.contentItem.findFirst({
-    where: { id: itemId, tenantId: TENANT_ID }, select: { title: true, purpose: true, format: true },
-  });
-  if (!before) return { ok: false, error: "Nem található" };
-  await db.contentItem.update({ where: { id: itemId }, data: parsed.data });
-  audit("content_item", itemId, "update", before, parsed.data, { tenantId: TENANT_ID });
-  revalidateContent(itemId);
-  return { ok: true };
-}
-
 export interface ReviewerOption { id: number; name: string; email: string; selected: boolean }
 
 export async function getContentReviewerOptions(): Promise<ReviewerOption[]> {

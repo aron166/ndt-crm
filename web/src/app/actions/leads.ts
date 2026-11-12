@@ -81,24 +81,6 @@ export async function moveLead(leadId: number, newStatus: string, details: MoveL
   return { success: true };
 }
 
-export async function updateLeadStatus(leadId: number, newStatus: string, details: MoveLeadDetails = {}) {
-  const ctx = await userLeadCtx(TENANT_ID);
-  if ("error" in ctx) return ctx;
-  return moveLead(leadId, newStatus, details);
-}
-
-/** Lead → deal hand-off (the `won` door). Logic lives in lib/leads/service.ts. */
-export async function convertLeadToDeal(leadId: number) {
-  const ctx = await userLeadCtx(TENANT_ID);
-  if ("error" in ctx) return ctx;
-  const res = await setLeadOutcome(leadId, "won", ctx);
-  if ("error" in res) return res;
-  revalidatePath("/leads");
-  revalidatePath(`/leads/${leadId}`);
-  revalidatePath("/deals");
-  return { success: true, dealId: res.dealId };
-}
-
 /** open | won | lost from the card / detail dropdown. */
 export async function setLeadOutcomeAction(leadId: number, outcome: LeadOutcome, lostReason?: string | null) {
   const ctx = await userLeadCtx(TENANT_ID);

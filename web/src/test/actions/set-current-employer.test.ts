@@ -36,7 +36,7 @@ vi.mock("@/lib/actor", () => {
 vi.mock("@/lib/enrichment/recompute", () => ({ recomputeCloseness: vi.fn() }));
 
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
-import { setCurrentEmployer, personLeftCompany, closeContact } from "@/app/actions/contacts";
+import { setCurrentEmployer, personLeftCompany } from "@/app/actions/contacts";
 
 const mockGetActor = getActor as unknown as ReturnType<typeof vi.fn>;
 
@@ -138,7 +138,7 @@ describe("setCurrentEmployer", () => {
 
 // The gate itself. Ending an employment is what removes a person from every
 // outreach contact picker (they all filter endedAt: null), so an ungated
-// closeContact/personLeftCompany was a drop-anyone-from-the-send primitive.
+// personLeftCompany was a drop-anyone-from-the-send primitive.
 describe("every contacts action rejects a signed-in-but-not-a-CRM-user actor", () => {
   beforeEach(() => {
     mockGetActor.mockResolvedValue({ userId: null, email: "stranger@example.com" });
@@ -156,11 +156,5 @@ describe("every contacts action rejects a signed-in-but-not-a-CRM-user actor", (
     const res = await personLeftCompany(100, 7, 5);
     expect(res).toEqual({ error: NOT_A_CRM_USER });
     expect(db.contact.findFirst).not.toHaveBeenCalled();
-  });
-
-  it("closeContact refuses and writes nothing", async () => {
-    const res = await closeContact(100, 7, 5);
-    expect(res).toEqual({ error: NOT_A_CRM_USER });
-    expect(audit).not.toHaveBeenCalled();
   });
 });
