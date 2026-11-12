@@ -218,6 +218,27 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
     expect((await db.emailDraft.findUniqueOrThrow({ where: { id: c.draftIds[0] } })).lastError).toBeTruthy();
   });
 
+  it("three failed sends in the last hour stop and pause the campaign instead of burning the queue (Vanda #200-1)", async () => {
+    const c = await mk({ n: 5 });
+    h.send.mockResolvedValue({ ok: false, error: "Nem sikerült kapcsolódni a Resendhez." });
+    for (let k = 0; k < 3; k++) await go(c.slug);
+    expect(sentCalls()).toBe(3);
+    expect(await go(c.slug)).toMatchObject({ sentDraftId: null, blocked: expect.arrayContaining(["send_failing"]) });
+    expect(sentCalls()).toBe(3);
+    expect((await db.campaign.findUniqueOrThrow({ where: { id: c.id } })).status).toBe("paused");
+    expect((await Promise.all(c.draftIds.map(status))).filter((x) => x === "approved")).toHaveLength(2);
+    h.send.mockImplementation(async () => ({ ok: true, id: `re_${++h.n}` }));
+  });
+
+  it("a company that replied in another campaign gets no cold e-mail from this one (Vanda #200-6)", async () => {
+    const c = await mk({ n: 2 });
+    const co = c.members[0].companyId;
+    await db.emailDraft.create({ data: { tenantId, companyId: co, campaign: `${tag}-other`, step: 1, subject: "s", body: "b", status: "replied", sentVia: "resend", sentAt: new Date("2026-10-01T10:00:00Z") } });
+    const r = await go(c.slug);
+    expect(r?.sentDraftId).toBe(c.draftIds[1]);
+    expect(await status(c.draftIds[0])).toBe("approved");
+  });
+
   it("1 bounce over 10 sent drafts stops the campaign and pauses it", async () => {
     const c = await mk({ n: 1 });
     const cos = await Promise.all(Array.from({ length: 10 }, (_, k) => db.company.create({ data: { tenantId, name: `${tag} old ${seq}-${k}` } })));
