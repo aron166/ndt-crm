@@ -22,7 +22,7 @@ import { loadSuppressionSet } from "@/lib/suppression";
 import { isSuppressed } from "@/lib/suppression/match";
 import { MAIN_STAGES } from "@/lib/leads/lifecycle";
 import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
-import { changeLeadStatus } from "@/lib/leads/service";
+import { changeLeadStatus, completeOpenLeadCallTasks } from "@/lib/leads/service";
 import { runAutomations } from "@/lib/automations/engine";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
 import { stopTouchesAfterReply } from "@/lib/outreach/stop-touches";
@@ -31,7 +31,7 @@ import { createItem } from "@/lib/content/service";
 import type { ContentCategory } from "@/lib/content/types";
 import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
-  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type StepDef, type StepChannel, scriptItemFor, campaignAutomationEvents, type StepCondition, audienceOf, type AudienceSource, OPEN_MEMBER_STATES, startFor } from "./rules";
+  MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type CallOutcomeKey, type StepDef, type StepChannel, scriptItemFor, campaignAutomationEvents, type StepCondition, audienceOf, type AudienceSource, OPEN_MEMBER_STATES, startFor } from "./rules";
 import { closeSpecRequests } from "./spec-requests";
 export { requestSpecification } from "./spec-requests";
 import { planMembers, type MemberRow, type MembersPlan, reachFromContacts, isEmailAddress } from "./members";
@@ -709,7 +709,13 @@ export interface OutcomeInput {
   email?: string;
 }
 
-export async function recordOutcome(ctx: CampaignCtx, slug: string, input: OutcomeInput, now: Date = new Date()) {
+/**
+ * `callAlreadyLogged`: the call was written by the lead path (logLeadCallOutcome) or by the
+ * first campaign of a /calls tap. This touch then moves only the member: no second interaction,
+ * no company status write, no lead move (the lead path moved it). A missing lead is still
+ * created by the promotion rule.
+ */
+export async function recordOutcome(ctx: CampaignCtx, slug: string, input: OutcomeInput, now: Date = new Date(), opts: { callAlreadyLogged?: boolean } = {}) {
   const tenantId = ctx.tenantId;
   const c = await db.campaign.findFirst({
     where: { tenantId, slug },
@@ -759,19 +765,21 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
       });
     }
     let interactionId: number | null = null;
-    if (plan.logCall) {
+    if (plan.logCall && !opts.callAlreadyLogged) {
       const meta = outcomeMeta(input.outcome)!;
       const base = input.notes?.trim() || meta.label;
       const dur = input.duration_sec && input.duration_sec > 0 ? Math.round(input.duration_sec) : null;
       const notes = dur ? `${base} · ${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, "0")}` : base;
       const it = await tx.interaction.create({
         data: {
-          tenantId, companyId: m.companyId, personId: m.personId, leadId: lockedLead?.id ?? null, type: "call", direction: "outbound",
+          tenantId, companyId: m.companyId, personId: m.personId, leadId: lockedLead?.id ?? null, userId: ctx.userId, type: "call", direction: "outbound",
           notes, outcome: meta.interactionOutcome, occurredAt: now, campaign: c.slug,
         },
         select: { id: true },
       });
       interactionId = it.id;
+      // The call happened: the linked lead's open callback tasks are done (same as the lead path).
+      if (lockedLead) await completeOpenLeadCallTasks(tx, lockedLead.id, tenantId, now);
       const newStatus = nextStatusFor(input.outcome, m.company.pipelineStatus);
       await tx.company.updateMany({ where: { id: m.companyId, tenantId }, data: { lastInteractionDate: now, ...(newStatus !== null ? { pipelineStatus: newStatus } : {}) } });
     }
@@ -852,7 +860,11 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
   if ("error" in res) return res;
 
   // Post-commit, like every other lead intake: never roll the logged call back.
-  if (plan.logCall) await recomputeCloseness({ tenantId, companyId: m.companyId, personId: m.personId });
+  if (res.interactionId != null) {
+    await recomputeCloseness({ tenantId, companyId: m.companyId, personId: m.personId });
+    audit("interaction", res.interactionId, "create", null,
+      { type: "call", outcome: outcomeMeta(input.outcome)?.interactionOutcome ?? input.outcome, leadId: res.leadId, companyId: m.companyId, personId: m.personId }, auditOpts(ctx));
+  }
   // A promotion never sends anything by itself: send_email and webhook_out rules are skipped
   // unless Áron switched the campaign's outbound automations on (Vanda #188-8).
   const outboundSkip = c.outboundAutomations ? [] : OUTBOUND_ACTIONS;
@@ -867,7 +879,7 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
         campaign: c.slug, serviceInterest: null, message: input.notes ?? null, sourceApp: ctx.appSlug ?? "crm-ui", tier: null,
       },
     }).catch((err) => reportError("campaigns.recordOutcome.automations", err, { leadId: res.leadId }));
-  } else if (plan.promote && res.linked && isForwardMove(MAIN_STAGES, res.linked.status, plan.promote.stage)) {
+  } else if (plan.promote && res.linked && !opts.callAlreadyLogged && isForwardMove(MAIN_STAGES, res.linked.status, plan.promote.stage)) {
     // An existing open lead moves forward only through the tenant's transition table.
     const r = await changeLeadStatus(res.linked.id, plan.promote.stage, {
       tenantId, userId: ctx.userId, actor: ctx.userId != null ? "user" : "agent", actorAgentId: ctx.appSlug,
@@ -893,6 +905,38 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
     suppressed: plan.suppress && Boolean(normalizeEmail(input.email ?? m.person?.email ?? null)),
     who,
   };
+}
+
+
+/** The company's campaign members waiting for a call now: queued, campaign running or paused, current step a call. */
+export async function findCallableMembers(tenantId: number, companyId: number, skipCampaignId?: number) {
+  const rows = await db.campaignMember.findMany({
+    where: {
+      tenantId, companyId, state: "queued", campaign: { status: { in: ["running", "paused"] } },
+      ...(skipCampaignId != null ? { NOT: { campaignId: skipCampaignId } } : {}),
+    },
+    select: { id: true, stepPosition: true, campaign: { select: { id: true, slug: true, steps: { select: { position: true, channel: true } } } } },
+    orderBy: { id: "asc" },
+  });
+  return rows
+    .filter((m) => m.campaign.steps.find((st) => st.position === m.stepPosition)?.channel === "call")
+    .map((m) => ({ memberId: m.id, campaignId: m.campaign.id, slug: m.campaign.slug }));
+}
+
+/**
+ * A call already logged elsewhere (lead path, or the first campaign of a /calls tap) advances
+ * every other campaign member of the company waiting for a call. Never throws: the call is
+ * committed, a member that cannot move is reported. Returns how many moved.
+ */
+export async function advanceMembersForCall(ctx: CampaignCtx, companyId: number, outcome: CallOutcomeKey, now: Date = new Date(), skipCampaignId?: number): Promise<number> {
+  let moved = 0;
+  for (const m of await findCallableMembers(ctx.tenantId, companyId, skipCampaignId)) {
+    const r = await recordOutcome(ctx, m.slug, { member_id: m.memberId, outcome }, now, { callAlreadyLogged: true })
+      .catch((err: unknown) => ({ error: err instanceof Error ? err.message : String(err) }));
+    if ("error" in r) reportError("campaigns.advanceMembersForCall", new Error(String(r.error)), { memberId: m.memberId });
+    else moved += 1;
+  }
+  return moved;
 }
 
 

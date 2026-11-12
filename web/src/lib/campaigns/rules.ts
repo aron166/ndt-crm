@@ -4,6 +4,7 @@
 // member (and whether it becomes a lead, in which stage), today's capped call list, and the
 // approval hash. The DB side is lib/campaigns/service.ts.
 
+import type { CallOutcomeKey as LeadCallOutcomeKey } from "@/lib/leads/outcomes";
 import { createHash } from "node:crypto";
 import { addWorkingDays, localDay, type LocalDay } from "@/lib/booking/time";
 
@@ -138,6 +139,15 @@ export function stepsFitKind(kind: CampaignKind | null, steps: readonly { channe
 /** Hívás mód outcome keys (lib/outreach/queue.ts CALL_OUTCOMES), the same taps. */
 export const CALL_OUTCOME_KEYS = ["no_answer", "interested", "wants", "not_interested", "bad_number", "note_only"] as const;
 export type CallOutcomeKey = (typeof CALL_OUTCOME_KEYS)[number];
+/**
+ * A call logged on a LEAD (lead page, board, /drive, /api/calls/result) also advances the company's
+ * campaign member, so the campaign does not call again. The lead buttons have their own keys;
+ * this is the explicit translation (C1, 2026-11-12). A callback request reads as interest.
+ */
+export const LEAD_CALL_TO_CAMPAIGN_OUTCOME: Record<LeadCallOutcomeKey, CallOutcomeKey> = {
+  no_answer: "no_answer", wrong_number: "bad_number", not_interested: "not_interested",
+  disqualified: "not_interested", callback_requested: "interested", meeting_booked: "wants",
+};
 export const EMAIL_EVENTS = ["email_sent", "reply_positive", "reply_negative", "unsubscribe", "bounce"] as const;
 export type EmailEvent = (typeof EMAIL_EVENTS)[number];
 export type OutcomeKey = CallOutcomeKey | EmailEvent;

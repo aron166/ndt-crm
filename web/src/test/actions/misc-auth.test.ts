@@ -26,7 +26,8 @@ vi.mock("@/lib/enrichment/recompute", () => ({ recomputeCloseness: vi.fn() }));
 vi.mock("@/lib/actor", () => {
   const getActor = vi.fn();
   return { getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER", requireCrmUser: async (t: number) => ((await getActor(t)).userId == null ? "NOT_A_CRM_USER" : null),
-};
+    userLeadCtx: async (t: number) => ((await getActor(t)).userId == null ? { error: "NOT_A_CRM_USER" } : { tenantId: t, userId: (await getActor(t)).userId, actor: "user" }),
+  };
 });
 
 import { getActor } from "@/lib/actor";
