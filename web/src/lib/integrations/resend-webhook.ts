@@ -41,10 +41,11 @@ export async function processResendEvent(
   const data = isObj(ev.data) ? ev.data : {};
   const emailId = typeof data.email_id === "string" ? data.email_id : null;
   const to = Array.isArray(data.to) ? data.to.find((x) => typeof x === "string") : undefined;
-  const email = (typeof to === "string" ? normalizeEmail(to) : "") || null;
   const draft = emailId
-    ? await db.emailDraft.findFirst({ where: { tenantId, providerMessageId: emailId }, select: { id: true, companyId: true, campaign: true, step: true } })
+    ? await db.emailDraft.findFirst({ where: { tenantId, providerMessageId: emailId }, orderBy: { id: "asc" }, select: { id: true, companyId: true, campaign: true, step: true, toEmail: true } })
     : null;
+  // The address we sent to wins over the payload's first recipient (Vanda #198-2); unmatched mail keeps the payload's.
+  const email = normalizeEmail(draft?.toEmail ?? (typeof to === "string" ? to : "")) || null;
   const created = typeof ev.created_at === "string" ? new Date(ev.created_at) : null;
   const occurredAt = created && !Number.isNaN(created.getTime()) ? created : null;
 
