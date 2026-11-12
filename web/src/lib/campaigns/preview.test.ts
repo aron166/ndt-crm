@@ -97,6 +97,34 @@ describe("campaignEmailCheck", () => {
   });
 });
 
+describe("sender profile resolves the launch check", () => {
+  const members = () => d.campaignMember.findMany.mockReset().mockResolvedValue([{ ...MEMBER, id: 2, companyId: 41, segment: "drillers", person: { firstName: "Anna", lastName: "Kovács", email: "anna@p.example.test", phone: null } }]);
+  const items = () => d.contentItem.findMany.mockReset()
+    .mockResolvedValueOnce([{ id: 60, status: "live", sourceMeta: { campaignStep: 1, segment: "D" } }])
+    .mockResolvedValueOnce([LIVE]);
+  it("no sender on the campaign: the member is incomplete on the sender phone", async () => {
+    items(); members();
+    const c = await campaignEmailCheck(T, 3, null);
+    expect(c).toMatchObject({ total: 1, complete: 0, unresolved: 1 });
+    expect(c.rows[0].problems).toEqual(["1. lépés: kitöltetlen mező: feladó telefonszáma"]);
+  });
+  it("sender picked but no phone saved: still incomplete, and the sender name shows", async () => {
+    items(); members();
+    d.user.findFirst.mockResolvedValue({ name: "Nagy Péter", settings: null });
+    const c = await campaignEmailCheck(T, 3, 5);
+    expect(c.complete).toBe(0);
+    expect(c.sender).toMatchObject({ name: "Nagy Péter", phone: null });
+  });
+  it("sender with name and phone in users.settings: the same member is complete", async () => {
+    items(); members();
+    d.user.findFirst.mockResolvedValue({ name: "Nagy Péter", settings: { theme: "dark", phone: "+36 30 123 4567" } });
+    const c = await campaignEmailCheck(T, 3, 5);
+    expect(c).toMatchObject({ total: 1, complete: 1, unresolved: 0, rows: [] });
+    expect(c.sender).toMatchObject({ name: "Nagy Péter", phone: "+36 30 123 4567" });
+    assertReadOnlyAndScoped();
+  });
+});
+
 describe("contact helpers", () => {
   it("role address vs personal", () => {
     expect(isRoleAddress("info@x.example")).toBe(true);
