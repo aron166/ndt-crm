@@ -1234,6 +1234,8 @@ model Campaign {
   approvedHash   String?   @map("approved_hash")
   /// Promoted leads may fire send_email / webhook_out automations only when true (Vanda #188-8). Áron sets it; part of the approval hash.
   outboundAutomations Boolean @default(false) @map("outbound_automations")
+  /// The cron sender (/api/cron/campaign-send) may send this campaign's approved drafts. Áron turns it on; not in the approval hash (20261112040000).
+  scheduledSending    Boolean @default(false) @map("scheduled_sending")
   createdAt      DateTime  @default(now()) @map("created_at")
 
   tenant       Tenant           @relation(fields: [tenantId], references: [id])
