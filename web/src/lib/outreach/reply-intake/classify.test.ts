@@ -44,6 +44,14 @@ describe("classifyMail", () => {
     expect(await run("bounce-dsn.eml")).toMatchObject({ kind: "bounce", recipient: "dead@pelda-kft.hu" });
   });
 
+  it("a delayed DSN (Action delayed, Status 4.x.x) is auto, never a bounce (Vanda #203-2)", async () => {
+    expect((await run("bounce-delay.eml")).kind).toBe("auto");
+  });
+
+  it("a forged bounce from a stranger with X-Failed-Recipients and no 5.x.x status is not a bounce (Vanda #203-2)", async () => {
+    expect((await run("bounce-forged.eml")).kind).not.toBe("bounce");
+  });
+
   it("read receipt is auto, not a bounce", async () => {
     expect((await run("read-receipt.eml")).kind).toBe("auto");
   });

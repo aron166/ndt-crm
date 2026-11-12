@@ -27,6 +27,8 @@ describe.skipIf(!enabled)("reply intake (integration)", () => {
   let companyIds: number[] = [];
   let prevSettings: unknown = null;
   let drafts: { reply: number; touch2: number; bounce: number };
+  const mailFrom = (addr: string, id: string, date: string) =>
+    Buffer.from(`From: ${addr}\r\nTo: aron@ndt.hu\r\nSubject: Re: Ajanlat\r\nDate: ${date}\r\nMessage-ID: <${id}>\r\n\r\nErdekel\r\n`);
 
   beforeAll(async () => {
     process.env.DATABASE_URL = CONNECTION;
@@ -43,6 +45,9 @@ describe.skipIf(!enabled)("reply intake (integration)", () => {
     const reply = await db.emailDraft.create({ data: { ...base, companyId: a.id, step: 1, status: "sent", toEmail: "anna@pelda-kft.hu", threadKey: threadKeyFor(campaign, a.id) } });
     const touch2 = await db.emailDraft.create({ data: { ...base, companyId: a.id, step: 2, status: "approved", toEmail: "anna@pelda-kft.hu", sentAt: null } });
     const bounce = await db.emailDraft.create({ data: { ...base, companyId: b.id, step: 1, status: "sent", toEmail: "dead@pelda-kft.hu", threadKey: threadKeyFor(campaign, b.id) } });
+    // sent 2026-11-13 (after the mail date) and 2026-09-01 (72 days before it): neither may match by address
+    await db.emailDraft.create({ data: { ...base, companyId: a.id, step: 3, status: "sent", toEmail: "late@pelda-kft.hu", sentAt: new Date("2026-11-13T09:00:00Z"), threadKey: threadKeyFor(campaign, a.id) + "-late" } });
+    await db.emailDraft.create({ data: { ...base, companyId: a.id, step: 4, status: "sent", toEmail: "old@pelda-kft.hu", sentAt: new Date("2026-09-01T09:00:00Z"), threadKey: threadKeyFor(campaign, a.id) + "-old" } });
     drafts = { reply: reply.id, touch2: touch2.id, bounce: bounce.id };
   });
 
@@ -50,7 +55,7 @@ describe.skipIf(!enabled)("reply intake (integration)", () => {
     if (!db) return;
     const leads = await db.lead.findMany({ where: { companyId: { in: companyIds } }, select: { id: true } });
     const leadIds = leads.map((l) => l.id);
-    await db.emailProviderEvent.deleteMany({ where: { tenantId: 1, provider: "imap", eventId: { in: ["<plain-1@mail.pelda-kft.hu>", "<bounce-1@mail.pelda-kft.hu>", "<ooo-1@mail.pelda-kft.hu>"] } } });
+    await db.emailProviderEvent.deleteMany({ where: { tenantId: 1, provider: "imap", eventId: { in: ["<plain-1@mail.pelda-kft.hu>", "<bounce-1@mail.pelda-kft.hu>", "<ooo-1@mail.pelda-kft.hu>", "<it-late@x>", "<it-old@x>", "<it-bounce-stranger@x>"] } } });
     await db.task.deleteMany({ where: { leadId: { in: leadIds } } });
     await db.leadStatusHistory.deleteMany({ where: { leadId: { in: leadIds } } });
     await db.interaction.deleteMany({ where: { companyId: { in: companyIds } } });
@@ -91,6 +96,16 @@ describe.skipIf(!enabled)("reply intake (integration)", () => {
     const before = await db.lead.count({ where: { companyId: { in: companyIds } } });
     const r = await run.runReplyIntake(1, [fx("out-of-office.eml")]);
     expect(r.autos).toBe(1);
+    expect(await db.lead.count({ where: { companyId: { in: companyIds } } })).toBe(before);
+  });
+
+  it("a mail dated before the draft was sent, or 60+ days after, matches nothing (Vanda #203-4)", async () => {
+    const before = await db.lead.count({ where: { companyId: { in: companyIds } } });
+    const r = await run.runReplyIntake(1, [
+      mailFrom("late@pelda-kft.hu", "it-late@x", "Thu, 12 Nov 2026 09:30:00 +0100"),
+      mailFrom("old@pelda-kft.hu", "it-old@x", "Thu, 12 Nov 2026 09:30:00 +0100"),
+    ]);
+    expect(r).toMatchObject({ unmatched: 2, replies: 0 });
     expect(await db.lead.count({ where: { companyId: { in: companyIds } } })).toBe(before);
   });
 
