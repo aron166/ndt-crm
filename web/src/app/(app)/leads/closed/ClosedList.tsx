@@ -38,7 +38,7 @@ export async function ClosedList({ page, total }: { page: number; total: number 
             <span className={s.muted} style={{ width: 150 }}>{personName || "-"}</span>
             <span className={s.muted} style={{ width: 90 }}>{formatRelativeTime(l.closedAt ?? l.convertedAt)}</span>
             {l.convertedDealId ? (
-              <Link href="/deals" className={s.link} style={{ width: 150 }}>Nyert {"->"} Deal #{l.convertedDealId}</Link>
+              <span className={s.muted} style={{ width: 150 }}>Nyert {"->"} Deal #{l.convertedDealId}</span>
             ) : (
               <span className={s.muted} style={{ width: 150 }}>
                 {LEAD_OUTCOME_LABEL[l.outcome as LeadOutcome] ?? l.outcome}

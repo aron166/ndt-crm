@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { CheckCircle2, Globe } from "lucide-react";
 import { lostReasonLabel } from "@/lib/leads/lifecycle";
 import { LEAD_OUTCOMES, LEAD_OUTCOME_LABEL, callTypeLabel, type LeadOutcome } from "@/lib/leads/outcomes";
@@ -64,7 +63,7 @@ export function Details(p: {
                 {LEAD_OUTCOMES.map((o) => <option key={o} value={o}>{LEAD_OUTCOME_LABEL[o]}</option>)}
               </select>
             </label>
-            {p.converted && <Link href="/deals" className={s.link}><CheckCircle2 size={14} />{`Deal #${p.converted}`}</Link>}
+            {p.converted && <span className={s.link} style={{ color: "var(--ui-text)" }}><CheckCircle2 size={14} />{`Deal #${p.converted}`}</span>}
             {p.website && <a href={p.website} target="_blank" rel="noopener noreferrer" className={s.link}><Globe size={14} />{p.website}</a>}
           </div>
         </div>
