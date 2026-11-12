@@ -313,6 +313,38 @@ describe("member loads and undo are session only with an operator role (Kai, Van
     expect(await undoBatch(SESSION, "bp", "b1", false)).toMatchObject({ ok: true });
     expect(d.campaign.update.mock.calls[0][0].data).toMatchObject({ status: "draft", approvedHash: null });
   });
+  describe("prospects:write key (scopes)", () => {
+    const KEY = { ...APP, scopes: ["prospects:write" as const] };
+    const READ = { ...APP, scopes: ["read" as const] };
+    const LEGACY = { ...APP, scopes: null };
+    it("a key writes and undoes only batches named after its own app slug (Vanda #197-3)", async () => {
+      d.campaignMember.findMany.mockResolvedValue([]);
+      d.campaignMember.deleteMany.mockResolvedValue({ count: 0 });
+      const own = `${KEY.appSlug}-2026-11-12`;
+      expect(await undoBatch(KEY, "bp", "human-batch", false)).toMatchObject({ status: 403 });
+      expect(await addMembers(KEY, "bp", { dry_run: false, batch: "human-batch", rows })).toMatchObject({ status: 403 });
+      expect(await undoBatch(KEY, "bp", own, false)).toMatchObject({ ok: true });
+    });
+    it("addMembers apply: prospects:write proceeds, legacy and read-only get 403, session operator unchanged", async () => {
+      d.company.create.mockResolvedValue({ id: 70 });
+      expect(await addMembers(KEY, "bp", { dry_run: false, batch: "corvid-b1", rows })).toMatchObject({ ok: true, dry_run: false, added: 1 });
+      d.$transaction.mockClear();
+      expect(await addMembers(LEGACY, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
+      expect(await addMembers(READ, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
+      expect(d.$transaction).not.toHaveBeenCalled();
+      d.user.findFirst.mockResolvedValue({ role: "admin" });
+      expect(await addMembers(SESSION, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ ok: true, added: 1 });
+    });
+    it("undoBatch apply: prospects:write proceeds, legacy and read-only get 403, session operator unchanged", async () => {
+      d.campaignMember.findMany.mockResolvedValue([]);
+      d.campaignMember.deleteMany.mockResolvedValue({ count: 0 });
+      expect(await undoBatch(KEY, "bp", "corvid-b1", false)).toMatchObject({ ok: true, dry_run: false });
+      expect(await undoBatch(LEGACY, "bp", "b1", false)).toMatchObject({ status: 403 });
+      expect(await undoBatch(READ, "bp", "b1", false)).toMatchObject({ status: 403 });
+      d.user.findFirst.mockResolvedValue({ role: "admin" });
+      expect(await undoBatch(SESSION, "bp", "b1", false)).toMatchObject({ ok: true });
+    });
+  });
   it("a content-only campaign takes no members", async () => {
     d.campaign.findFirst.mockResolvedValue({ ...SEQ, kind: "organic" });
     expect(await addMembers(APP, "bp", { dry_run: true, batch: "b1", rows })).toMatchObject({ status: 409 });

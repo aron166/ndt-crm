@@ -18,6 +18,11 @@ describe("campaignCtx", () => {
     const r = await campaignCtx(withKey());
     expect(r).toEqual({ ctx: { tenantId: 1, userId: null, appSlug: "corvid" } });
   });
+  it("forwards the key's scopes into ctx", async () => {
+    (validateAppKey as M).mockResolvedValue({ keyId: 1, tenantId: 1, appSlug: "corvid", scopes: ["prospects:write"] });
+    const r = await campaignCtx(withKey());
+    expect(r).toMatchObject({ ctx: { scopes: ["prospects:write"] } });
+  });
   it("a session-only route ignores the key and needs a CRM user", async () => {
     (getActor as M).mockResolvedValue({ userId: null });
     const r = await campaignCtx(withKey(), { sessionOnly: true });
