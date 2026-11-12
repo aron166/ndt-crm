@@ -411,6 +411,17 @@ describe("one reply path (C2): a reply logged in the hub stops the outreach like
     expect(startLeadLifecycle).toHaveBeenCalledTimes(1);
   });
 
+  it("the answered touch is the REPLYING person's, never a colleague's", async () => {
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "reply_positive" }, NOW);
+    expect(d.emailDraft.findFirst.mock.calls[0][0].where).toMatchObject({ companyId: 7, campaign: "bp", status: "sent", personId: 8 });
+  });
+
+  it("a member with no person: the company's newest sent touch is the answered one", async () => {
+    d.campaignMember.findFirst.mockResolvedValue(member({ stepPosition: 1, personId: null, person: null }));
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "reply_positive" }, NOW);
+    expect(d.emailDraft.findFirst.mock.calls[0][0].where).not.toHaveProperty("personId");
+  });
+
   it("reply_negative stops the outreach too", async () => {
     await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "reply_negative" }, NOW);
     expect(d.emailDraft.updateMany.mock.calls[0][0]).toMatchObject({ data: { status: "replied", replyType: "no" } });
