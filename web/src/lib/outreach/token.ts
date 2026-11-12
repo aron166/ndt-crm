@@ -6,7 +6,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 function key(purpose: string): Buffer {
   const base = process.env.ENCRYPTION_KEY;
-  if (!base) throw new Error("ENCRYPTION_KEY missing");
+  // Same rule as lib/crypto.ts: a short or non-hex key would make the HMAC key guessable (Vanda #196-3).
+  if (!base || !/^[0-9a-f]{64}$/i.test(base)) throw new Error("ENCRYPTION_KEY missing or invalid");
   return createHmac("sha256", Buffer.from(base, "hex")).update(`outreach:${purpose}`).digest();
 }
 
