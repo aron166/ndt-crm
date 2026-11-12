@@ -22,7 +22,7 @@ import { leadListQuerySchema, leadSearchWhere, LEAD_API_SELECT } from "@/lib/lea
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, Idempotency-Key",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -73,6 +73,14 @@ export async function POST(request: Request) {
   } catch {
     return json({ error: "Invalid JSON" }, 400);
   }
+
+  // Idempotency-Key header or idempotency_key body field; two different values are a client bug.
+  const header = request.headers.get("idempotency-key")?.trim().toLowerCase();
+  const field = raw && typeof raw === "object" ? (raw as Record<string, unknown>).idempotency_key : undefined;
+  if (header && typeof field === "string" && field.trim() && field.trim().toLowerCase() !== header) {
+    return json({ error: "Idempotency-Key header and idempotency_key differ" }, 400);
+  }
+  if (header && raw && typeof raw === "object") raw = { ...(raw as object), idempotency_key: header };
 
   const parsed = leadIntakeSchema.safeParse(raw);
   if (!parsed.success) {
@@ -169,7 +177,7 @@ export async function POST(request: Request) {
       err instanceof Prisma.PrismaClientKnownRequestError &&
       err.code === "P2002" &&
       hitThreadKeyIndex &&
-      parsed.data.thread_key
+      (parsed.data.thread_key || parsed.data.idempotency_key)
     ) {
       // The recovery read is itself wrapped: we only got here because a
       // transaction failed, so the connection may be gone. An throw escaping
@@ -180,7 +188,10 @@ export async function POST(request: Request) {
         const winner = await db.lead.findFirst({
           where: {
             tenantId: key.tenantId,
-            threadKey: { in: [parsed.data.thread_key.trim().toLowerCase(), appThreadKey(key.appSlug, parsed.data.thread_key)] },
+            threadKey: { in: [
+              ...(parsed.data.thread_key ? [parsed.data.thread_key.trim().toLowerCase(), appThreadKey(key.appSlug, parsed.data.thread_key)] : []),
+              ...(parsed.data.idempotency_key ? [appThreadKey(key.appSlug, `idem~${parsed.data.idempotency_key}`)] : []),
+            ] },
           },
           select: { id: true, companyId: true },
         });

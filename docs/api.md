@@ -63,6 +63,8 @@ curl -X POST $CRM/api/leads \
 | `channel` | `cold_email · landing · linkedin · meta_ads · referral · import · manual` (default `landing`) |
 | `campaign` | free text tag |
 | `utm_*`, `referrer`, `landing_variant`, `lead_score`, `priority` | stored on `custom_fields` |
+| `gclid`, `fbclid`, `entry_path`, `submit_path`, `landing_route`, `last_touch_utm_{source,medium,campaign,content,term}`, `last_touch_referrer` | stored on `custom_fields`; `utm_*` stay the first touch; each bounded (200 to 500 chars) |
+| `idempotency_key` / header `Idempotency-Key` | optional, one value per submission (header and field must agree). A repeat from the same app returns `200 { deduped: true, leadId }` with the first lead: no second lead, intro e-mail, alert or automation. Stored app-namespaced in `leads.thread_key` |
 | `qualification` | optional `{ slug: answer }` — the locked qualification model, see below |
 | `question_set` | **optional** — which named question set the form asked (`rovid` \| `felmeres` \| whatever the tenant named). Recorded with the answers; never validated against our set list, never required |
 | `send_intro` | optional bool — send the termékismertető now (see below) |
