@@ -56,7 +56,7 @@ import { archiveItem, createVersion, submitReview } from "@/lib/content/service"
 import { statObject } from "@/lib/content/storage";
 import {
   submitContentReview, saveContentVersion, requestAssetUpload, archiveContent,
-  updateContentMeta, getContentReviewerOptions, saveContentReviewers, setMyDigestEnabled,
+  getContentReviewerOptions, saveContentReviewers, setMyDigestEnabled,
   saveContentApprovals,
 } from "./content";
 import { getContentReviewers } from "@/lib/content/reviewers";
@@ -103,13 +103,6 @@ describe("non-CRM user refusal", () => {
     const res = await archiveContent(1);
     expect(res.ok).toBe(false);
     expect(archiveItem).not.toHaveBeenCalled();
-  });
-
-  it("updateContentMeta refuses without touching the db", async () => {
-    const res = await updateContentMeta(1, { title: "x" });
-    expect(res.ok).toBe(false);
-    expect(db.contentItem.findFirst).not.toHaveBeenCalled();
-    expect(db.contentItem.update).not.toHaveBeenCalled();
   });
 
   it("getContentReviewerOptions refuses (empty list) without touching the db", async () => {

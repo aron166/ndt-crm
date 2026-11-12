@@ -100,24 +100,3 @@ export async function getTagsForEntity(type: TaggableType, id: number) {
   });
   return taggings.map((t) => t.tag);
 }
-
-export async function searchByTag(tagName: string) {
-  const denied = await requireCrmUser(TENANT_ID);
-  if (denied) throw new Error(denied);
-  const tag = await db.tag.findFirst({
-    where: { tenantId: TENANT_ID, name: { equals: tagName, mode: "insensitive" } },
-    include: { taggings: true },
-  });
-  if (!tag) return { companies: [], persons: [], tasks: [], deals: [] };
-
-  const ids = (type: TaggableType) =>
-    tag.taggings.filter((t) => t.taggableType === type).map((t) => t.taggableId);
-
-  const [companies, persons, tasks] = await Promise.all([
-    db.company.findMany({ where: { tenantId: TENANT_ID, id: { in: ids("company") } }, select: { id: true, name: true } }),
-    db.person.findMany({  where: { tenantId: TENANT_ID, id: { in: ids("person") } },  select: { id: true, firstName: true, lastName: true } }),
-    db.task.findMany({    where: { tenantId: TENANT_ID, id: { in: ids("task") } },    select: { id: true, title: true, status: true } }),
-  ]);
-
-  return { companies, persons, tasks, deals: [] };
-}

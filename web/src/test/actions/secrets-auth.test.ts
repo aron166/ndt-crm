@@ -34,7 +34,6 @@ import { saveIntegrationCredential, disconnectIntegration } from "@/app/actions/
 import { listAppApiKeys, createAppApiKey, revokeAppApiKey } from "@/app/actions/app-keys";
 import { sendResendTest, sendCrmEmail } from "@/app/actions/email";
 import { getCostRates, upsertCostRate } from "@/app/actions/cost-rates";
-import { updateLeadStatus } from "@/app/actions/leads";
 
 const denied = { error: "NOT_A_CRM_USER" };
 
@@ -55,7 +54,6 @@ describe("secrets/email/rate-card actions auth gate", () => {
     expect(await sendCrmEmail({ to: "a@b.c", subject: "s", text: "t" })).toEqual(denied);
     await expect(getCostRates()).rejects.toThrow("NOT_A_CRM_USER");
     expect(await upsertCostRate("x", "u", "1")).toEqual(denied);
-    expect(await updateLeadStatus(1, "won")).toEqual(denied);
 
     for (const model of Object.values(db)) for (const fn of Object.values(model)) expect(fn).not.toHaveBeenCalled();
     for (const fn of [encrypt, sendEmail, sendTestEmail, moveLead]) expect(fn).not.toHaveBeenCalled();

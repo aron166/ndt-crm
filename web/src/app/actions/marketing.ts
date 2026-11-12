@@ -4,7 +4,6 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
-import { createVersion } from "@/lib/content/service";
 import { parseMetrics } from "@/lib/content/metrics";
 
 // Legacy marketing actions (pre content-approval). Approve / reject / back to
@@ -32,41 +31,6 @@ async function loadItem(id: number) {
 function revalidate(id: number) {
   revalidatePath("/marketing");
   revalidatePath(`/marketing/${id}`);
-}
-
-/** Edit = a new version (spec decision 3); the title is item metadata. */
-export async function updateContent(id: number, title: string, body: string) {
-  const me = await requireUser();
-  if ("error" in me) return me;
-  const item = await loadItem(id);
-  if (!item) return { error: "Tartalom nem található" };
-  if (!item.currentVersionId) return { error: "A tartalomnak nincs verziója" };
-
-  const cleanTitle = title.trim();
-  const cleanBody = body.trim();
-  if (!cleanTitle) return { error: "A cím kötelező" };
-  if (!cleanBody) return { error: "A szöveg kötelező" };
-
-  let violations: { rule: string; message: string }[] = [];
-  // Version first: if it is refused (stale base, archived) nothing is saved.
-  if (cleanBody !== item.body) {
-    const res = await createVersion(
-      { tenantId: TENANT_ID, kind: "user", userId: me.userId },
-      id,
-      { body: cleanBody, basedOnVersionId: item.currentVersionId },
-    );
-    if (!res.ok) return { error: res.error };
-    // Surface a blocking-rule violation: the item just went back to the AI queue.
-    if (res.violations.length > 0) {
-      violations = res.violations;
-    }
-  }
-  if (cleanTitle !== item.title) {
-    await db.contentItem.update({ where: { id }, data: { title: cleanTitle } });
-    audit("content_item", id, "update", { title: item.title }, { title: cleanTitle });
-  }
-  revalidate(id);
-  return { success: true, violations };
 }
 
 /**
