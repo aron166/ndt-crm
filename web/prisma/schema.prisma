@@ -42,6 +42,7 @@ model Tenant {
   enrichmentRuns         EnrichmentRun[]
   enrichmentProposals    EnrichmentProposal[]
   appApiKeys             AppApiKey[]
+  emailProviderEvents    EmailProviderEvent[]
   leadStatuses           LeadStatus[]
   leadStatusTransitions  LeadStatusTransition[]
   leadStatusHistory      LeadStatusHistory[]
@@ -1615,6 +1616,7 @@ model EmailDraft {
   person          Person?         @relation(fields: [personId], references: [id], onDelete: SetNull)
   createdBy       User?           @relation("DraftCreator", fields: [createdById], references: [id], onDelete: SetNull)
   // SetNull: losing the template version must never delete the record of an email that left.
+  providerEvents  EmailProviderEvent[]
   templateVersion ContentVersion? @relation("DraftTemplate", fields: [templateVersionId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, companyId, campaign, step])
@@ -1757,4 +1759,28 @@ model LeadDocument {
   @@unique([quoteId, kind])
   @@index([tenantId, leadId])
   @@map("lead_documents")
+}
+
+/// One signed e-mail provider webhook event (Resend), stored once per provider event id, unknown types included (20261112030000).
+model EmailProviderEvent {
+  id                Int       @id @default(autoincrement())
+  tenantId          Int       @map("tenant_id")
+  provider          String // resend
+  eventId           String    @map("event_id") // svix-id
+  eventType         String    @map("event_type") // email.bounced, email.delivered, ... or anything new
+  providerMessageId String?   @map("provider_message_id") // data.email_id = email_drafts.provider_message_id
+  email             String? // first recipient, lowercased
+  draftId           Int?      @map("draft_id")
+  payload           Json
+  occurredAt        DateTime? @map("occurred_at")
+  receivedAt        DateTime  @default(now()) @map("received_at")
+  processedAt       DateTime? @map("processed_at")
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id])
+  draft  EmailDraft? @relation(fields: [draftId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, eventId])
+  @@index([tenantId, eventType])
+  @@index([providerMessageId])
+  @@map("email_provider_events")
 }
