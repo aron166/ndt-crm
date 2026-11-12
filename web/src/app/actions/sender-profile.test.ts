@@ -4,7 +4,8 @@ const getActor = vi.fn();
 vi.mock("@/lib/actor", () => ({ getActor: (...a: unknown[]) => getActor(...a), NOT_A_CRM_USER: "nem CRM felhasználó" }));
 const exec = vi.fn();
 vi.mock("@/lib/db", () => ({ db: { $executeRaw: (...a: unknown[]) => exec(...a) } }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+const revalidatePath = vi.hoisted(() => vi.fn());
+vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 
 import { saveSenderProfile } from "./sender-profile";
@@ -27,6 +28,12 @@ describe("saveSenderProfile", () => {
     expect(await saveSenderProfile({ name: " Nagy Péter ", phone: "06301234567" })).toEqual({ ok: true });
     const sql = exec.mock.calls[0];
     expect(sql.slice(1)).toEqual(["Nagy Péter", JSON.stringify("+36 30 123 4567"), 5, 1]);
+  });
+  it("revalidates the profile page and the campaign hub after saving", async () => {
+    getActor.mockResolvedValue({ userId: 5, email: "a@b.hu" });
+    await saveSenderProfile({ name: "A B", phone: "06301234567" });
+    expect(revalidatePath).toHaveBeenCalledWith("/settings/profile");
+    expect(revalidatePath).toHaveBeenCalledWith("/campaigns", "layout");
   });
   it("an empty phone removes the key instead of storing an empty string", async () => {
     getActor.mockResolvedValue({ userId: 5, email: "a@b.hu" });

@@ -166,7 +166,7 @@ export async function setCampaignOutreach(id: number, input: {
 
   const campaign = await db.campaign.findFirst({
     where: { id, tenantId: TENANT_ID },
-    select: { id: true, senderUserId: true, currentWave: true },
+    select: { id: true, status: true, senderUserId: true, currentWave: true },
   });
   if (!campaign) return { error: "Kampány nem található" };
 
@@ -174,6 +174,11 @@ export async function setCampaignOutreach(id: number, input: {
   if (!parsed.success) return { error: "Érvénytelen adat" };
   const senderError = await checkSender(parsed.data.senderUserId);
   if (senderError) return { error: senderError };
+  // The sender's name and phone are in every mail but not in the approval hash: after approval a
+  // change would send under another person's name unreviewed. Draft only.
+  if (parsed.data.senderUserId !== undefined && parsed.data.senderUserId !== campaign.senderUserId && campaign.status !== "draft") {
+    return { error: "Jóváhagyás után a feladó nem módosítható. Állítsd vissza a kampányt piszkozatra, majd válts feladót." };
+  }
 
   const data: { senderUserId?: number | null; currentWave?: number | null } = {};
   if (parsed.data.senderUserId !== undefined) data.senderUserId = parsed.data.senderUserId;

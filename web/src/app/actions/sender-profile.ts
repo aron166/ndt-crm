@@ -32,5 +32,6 @@ export async function saveSenderProfile(input: { name: string; phone: string }) 
   audit("user", userId, "update", null, { name: p.name, phone: p.phone });
   revalidatePath("/campaigns", "layout");
   revalidatePath("/settings");
+  revalidatePath("/settings/profile");
   return { ok: true as const };
 }
