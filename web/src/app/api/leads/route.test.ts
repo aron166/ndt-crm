@@ -11,7 +11,8 @@ vi.mock("@/lib/leads/form-alert", () => ({ sendFormAlert: (...a: unknown[]) => s
 vi.mock("@/lib/leads/intake-notify", () => ({ sendAutoReply: (...a: unknown[]) => side.reply(...a), sendLeadPing: (...a: unknown[]) => side.ping(...a) }));
 vi.mock("@/lib/leads/intro", () => ({ sendIntroMaterial: (...a: unknown[]) => side.intro(...a) }));
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: (...a: unknown[]) => side.auto(...a) }));
-vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
+const reportErrorMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/report-error", () => ({ reportError: reportErrorMock }));
 
 import { Prisma } from "@prisma/client";
 import { POST, OPTIONS } from "./route";
@@ -20,7 +21,7 @@ const body = { company_name: "Minta Kft.", contact_email: "a@minta.hu", send_int
 const post = (b: unknown, h: Record<string, string> = {}) =>
   POST(new Request("http://x/api/leads", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer k", ...h }, body: JSON.stringify(b) }));
 
-beforeEach(() => { ingest.mockReset(); dbm.$executeRaw.mockReset(); dbm.lead.findFirst.mockReset(); Object.values(side).forEach((f) => f.mockReset()); });
+beforeEach(() => { reportErrorMock.mockReset(); ingest.mockReset(); dbm.$executeRaw.mockReset(); dbm.lead.findFirst.mockReset(); Object.values(side).forEach((f) => f.mockReset()); });
 
 describe("POST /api/leads Idempotency-Key", () => {
   it("the header reaches ingest as idempotency_key; CORS allows the header", async () => {
@@ -110,5 +111,23 @@ describe("Idempotency-Key: unique-index race (simulated at the route; the index 
     expect(await r.json()).toMatchObject({ ok: true, leadId: 77, deduped: true });
     expect(dbm.lead.findFirst.mock.calls[0][0].where).toMatchObject({ tenantId: 1, threadKey: { in: ["app~betonscan_landing~idem~k"] } });
     expect(fired()).toEqual([]);
+  });
+});
+
+describe("Idempotency-Key: a failed stamp never fails the request", () => {
+  it("stamp write throws on a first post: still 201, effects ran exactly once, failure logged without personal data", async () => {
+    ingest.mockResolvedValue({ leadId: 6, deduped: false, companyId: 1, personId: 2, tier: null });
+    dbm.$executeRaw.mockRejectedValue(new Error("db down a@minta.hu"));
+    const r = await post({ ...body, channel: "landing" }, { "Idempotency-Key": "k" });
+    expect(r.status).toBe(201);
+    for (const f of Object.values(side)) expect(f).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith("api.leads.effects_stamp", expect.anything(), { leadId: 6 });
+  });
+  it("stamp write throws during a recovery: still the deduped 200", async () => {
+    ingest.mockResolvedValue(dup(120));
+    dbm.$executeRaw.mockRejectedValue(new Error("x"));
+    const r = await post(body, { "Idempotency-Key": "k" });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ deduped: true, effectsRecovered: true });
   });
 });

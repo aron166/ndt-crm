@@ -149,9 +149,15 @@ export async function POST(request: Request) {
         },
       });
       if (parsed.data.idempotency_key) {
-        await db.$executeRaw`
-          UPDATE "leads" SET "custom_fields" = jsonb_set(COALESCE("custom_fields", '{}'::jsonb), ARRAY['effects_done_at'], to_jsonb(${new Date().toISOString()}::text), true)
-           WHERE "id" = ${result.leadId} AND "tenant_id" = ${key.tenantId}`;
+        // A failed stamp must not turn a finished request into a 500: the landing would retry and
+        // the intro would go out again after 60 s. Worst case the effects re-run once on a retry.
+        try {
+          await db.$executeRaw`
+            UPDATE "leads" SET "custom_fields" = jsonb_set(COALESCE("custom_fields", '{}'::jsonb), ARRAY['effects_done_at'], to_jsonb(${new Date().toISOString()}::text), true)
+             WHERE "id" = ${result.leadId} AND "tenant_id" = ${key.tenantId}`;
+        } catch (stampErr) {
+          reportError("api.leads.effects_stamp", stampErr, { leadId: result.leadId });
+        }
       }
       return intro;
     };
