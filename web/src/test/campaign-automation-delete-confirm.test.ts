@@ -7,6 +7,6 @@ const src = readFileSync(path.resolve(__dirname, "../app/(app)/campaigns/[slug]/
 // /automations asks before deleting a rule; the campaign page must ask with the same text.
 describe("campaign page automation delete", () => {
   it("confirms before deleteAutomation, same text as /automations", () => {
-    expect(src).toMatch(/confirm\("Biztosan törlöd ezt a szabályt\?"\)[^;]*deleteAutomation/s);
+    expect(src).toMatch(/confirm\("Biztosan törlöd ezt a szabályt\?"\)[^;]*deleteAutomation/);
   });
 });
