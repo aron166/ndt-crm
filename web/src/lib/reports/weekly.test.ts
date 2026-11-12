@@ -108,3 +108,29 @@ describe("previousBudapestWeek", () => {
     expect(w.to.toISOString()).toBe("2026-10-25T23:00:00.000Z");
   });
 });
+
+describe("getWeeklyReport revenue", () => {
+  // The report issues its raw queries in this order; the revenue rows are the eighth.
+  async function run(revenueRows: unknown[]) {
+    const { db } = await import("@/lib/db");
+    const q = vi.fn();
+    (db as unknown as { $queryRaw: unknown }).$queryRaw = q;
+    for (let i = 0; i < 7; i++) q.mockResolvedValueOnce(i === 3 ? [{ booked: 0, scheduled: 0, held: 0 }] : []);
+    q.mockResolvedValueOnce(revenueRows);
+    const { getWeeklyReport, lastDays } = await import("./weekly");
+    return getWeeklyReport(1, lastDays(7));
+  }
+  it("zero deals: empty revenue, not an error", async () => {
+    const r = await run([]);
+    expect(r.revenue.total).toMatchObject({ won: 0, wonValue: 0, converted: 0 });
+    expect(r.revenue.byChannel).toEqual([]);
+  });
+  it("won deals in the window are joined to channel, campaign and segment", async () => {
+    const r = await run([
+      { converted: true, won: true, value: "500000", currency: "HUF", channel: "cold_email", source: "web", campaign: "bp", segment: "gc" },
+    ]);
+    expect(r.revenue.total).toMatchObject({ won: 1, wonValue: 500000 });
+    expect(r.revenue.byCampaign[0]).toMatchObject({ key: "bp", wonValue: 500000 });
+    expect(r.revenue.bySegment[0]).toMatchObject({ key: "A", wonValue: 500000 });
+  });
+});

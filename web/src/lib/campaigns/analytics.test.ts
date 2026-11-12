@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregate, isBooked } from "./analytics";
+import { aggregate, isBooked, revenueBreakdown, type RevenueRow } from "./analytics";
 
 describe("campaign analytics aggregate", () => {
   const members = [
@@ -46,5 +46,41 @@ describe("campaign analytics aggregate", () => {
     expect(isBooked({ id: 1, status: "discovery_booked", outcome: "open" })).toBe(true);
     expect(isBooked({ id: 1, status: "won", outcome: "won" })).toBe(true);
     expect(isBooked({ id: 1, status: "recall", outcome: "open" })).toBe(false);
+  });
+});
+
+describe("revenueBreakdown", () => {
+  const row = (o: Partial<RevenueRow>): RevenueRow => ({ converted: false, won: false, value: null, currency: null, channel: null, source: null, campaign: null, segment: null, ...o });
+
+  it("zero rows (production has zero deals): all zeros, no breakdown rows", () => {
+    expect(revenueBreakdown([])).toEqual({ total: { leads: 0, converted: 0, convertedValue: 0, won: 0, wonValue: 0, otherCurrency: 0 }, bySegment: [], byChannel: [], bySource: [], byCampaign: [] });
+  });
+  it("leads that never converted add nothing but their count", () => {
+    const r = revenueBreakdown([row({ channel: "landing" }), row({ channel: "landing" })]);
+    expect(r.total).toMatchObject({ leads: 2, converted: 0, won: 0, wonValue: 0 });
+    expect(r.byChannel).toEqual([{ key: "landing", leads: 2, converted: 0, convertedValue: 0, won: 0, wonValue: 0, otherCurrency: 0 }]);
+  });
+  it("sums converted value and won value per channel, source, campaign and mailed segment", () => {
+    const r = revenueBreakdown([
+      row({ converted: true, won: true, value: 400000, currency: "HUF", channel: "cold_email", source: "web", campaign: "bp", segment: "gc" }),
+      row({ converted: true, won: false, value: 250000, currency: "HUF", channel: "cold_email", source: "web", campaign: "bp", segment: "contractor" }),
+      row({ converted: true, won: true, value: 100000, currency: "HUF", channel: "landing", source: "web", campaign: null, segment: "drillers" }),
+      row({ channel: "landing", segment: "nonsense" }),
+    ]);
+    expect(r.total).toMatchObject({ leads: 4, converted: 3, convertedValue: 750000, won: 2, wonValue: 500000 });
+    expect(r.byChannel.find((x) => x.key === "cold_email")).toMatchObject({ converted: 2, convertedValue: 650000, won: 1, wonValue: 400000 });
+    expect(r.bySource).toHaveLength(1);
+    expect(r.byCampaign.map((x) => x.key)).toEqual(["bp", null]);
+    // raw launch-list segments map to the mailed keys A..G; an unmappable one stays unknown (null)
+    expect(r.bySegment.find((x) => x.key === "A")).toMatchObject({ converted: 2, wonValue: 400000 });
+    expect(r.bySegment.find((x) => x.key === "D")).toMatchObject({ wonValue: 100000 });
+    expect(r.bySegment.find((x) => x.key === null)).toMatchObject({ leads: 1, converted: 0 });
+  });
+  it("a won lead with no deal value counts as won, adds 0; a foreign currency is counted aside, never summed into HUF", () => {
+    const r = revenueBreakdown([
+      row({ converted: true, won: true, value: null, currency: "HUF" }),
+      row({ converted: true, won: true, value: 900, currency: "EUR" }),
+    ]);
+    expect(r.total).toMatchObject({ won: 2, wonValue: 0, convertedValue: 0, otherCurrency: 1 });
   });
 });
