@@ -70,6 +70,7 @@ beforeEach(() => {
   d.lead.create.mockResolvedValue({ id: 300 });
   d.interaction.create.mockResolvedValue({ id: 600 });
   d.emailDraft.updateMany.mockResolvedValue({ count: 0 });
+  d.campaignMember.findMany.mockResolvedValue([]);
 });
 
 describe("recordOutcome: promotion without an SLA task flood", () => {

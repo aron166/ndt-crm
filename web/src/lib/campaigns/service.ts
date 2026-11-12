@@ -825,14 +825,16 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
     // A reply logged here stops the outreach exactly like /outreach and the IMAP intake (C2):
     // the newest sent touch of this campaign is the answered one.
     if (input.outcome === "reply_positive" || input.outcome === "reply_negative") {
+      // The replying person's own touch; the company's newest only when the member has no person.
       const answered = await tx.emailDraft.findFirst({
-        where: { tenantId, companyId: m.companyId, campaign: c.slug, status: "sent" },
+        where: { tenantId, companyId: m.companyId, campaign: c.slug, status: "sent", ...(m.personId != null ? { personId: m.personId } : {}) },
         orderBy: [{ sentAt: "desc" }, { step: "desc" }],
         select: { id: true },
       });
       // Hub "positive" covers interested, question, forwarded: left for a person to classify.
       await stopTouchesAfterReply(tx, tenantId, m.companyId,
-        answered ? { draftId: answered.id, replyType: input.outcome === "reply_negative" ? "no" : null } : null);
+        answered ? { draftId: answered.id, replyType: input.outcome === "reply_negative" ? "no" : null } : null,
+        { campaign: c.slug, leadId, actorUserId: ctx.userId, actorAgentId: ctx.userId == null ? ctx.appSlug ?? null : null, now });
     }
     const suppressAddr = normalizeEmail(input.email ?? m.person?.email ?? null);
     if (plan.suppress && suppressAddr) {

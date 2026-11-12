@@ -36,6 +36,12 @@ export interface LeadTx {
     findFirst(args: Prisma.EmailDraftFindFirstArgs): Promise<{ id: number; companyId: number; campaign: string } | null>;
     updateMany(args: Prisma.EmailDraftUpdateManyArgs): Promise<{ count: number }>;
   };
+  /** Optional for narrow test fakes: the reply stop marks other campaigns' members (stop-touches.ts). */
+  campaignMember?: {
+    findMany(args: Prisma.CampaignMemberFindManyArgs): Promise<{ id: number; campaignId: number; stepPosition: number; state: string }[]>;
+    updateMany(args: Prisma.CampaignMemberUpdateManyArgs): Promise<{ count: number }>;
+  };
+  campaignEvent?: { create(args: Prisma.CampaignEventCreateArgs): Promise<unknown> };
   leadStatus: {
     findFirst(args: Prisma.LeadStatusFindFirstArgs): Promise<{ key: string } | null>;
   };
@@ -382,7 +388,8 @@ export async function ingestLead(
     // would survive the flip (Vanda, #89). The shared rule also stops the company's other
     // campaigns (C2, 2026-11-12). Only a SENT draft can be replied to: a forged key cannot
     // promote an email that never went out.
-    await stopTouchesAfterReply(tx, tenantId, draft.companyId, { draftId: draft.id, replyType: input.reply_type ?? null });
+    await stopTouchesAfterReply(tx, tenantId, draft.companyId, { draftId: draft.id, replyType: input.reply_type ?? null },
+      { campaign: draft.campaign, leadId: lead.id, actorAgentId: sourceApp });
   }
 
   // 6. Emit an app_events row so the ecosystem hub sees the submission.
