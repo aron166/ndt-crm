@@ -1615,8 +1615,8 @@ model EmailDraft {
   company         Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   person          Person?         @relation(fields: [personId], references: [id], onDelete: SetNull)
   createdBy       User?           @relation("DraftCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  // SetNull: losing the template version must never delete the record of an email that left.
   providerEvents  EmailProviderEvent[]
+  // SetNull: losing the template version must never delete the record of an email that left.
   templateVersion ContentVersion? @relation("DraftTemplate", fields: [templateVersionId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, companyId, campaign, step])
