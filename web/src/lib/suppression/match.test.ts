@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSuppressed, parseSuppressionTarget, normalizeDomain, normalizeEmail } from "./match";
+import { isSuppressed, parseSuppressionTarget, normalizeDomain, normalizeEmail, suppressionKey } from "./match";
 
 const set = { emails: new Set(["nem@ceg.hu"]), domains: new Set(["tilos.hu"]) };
 
@@ -53,5 +53,30 @@ describe("parseSuppressionTarget", () => {
     expect(parseSuppressionTarget("@ceg.hu")).toEqual({ domain: "ceg.hu" });
     expect(parseSuppressionTarget("a b@c.hu")).toBeNull();
     expect(parseSuppressionTarget("a@b@c.hu")).toBeNull();
+  });
+});
+
+describe("folded address matching", () => {
+  const fold = (e: string[], d: string[] = []) => ({ emails: new Set(e.map(suppressionKey)), domains: new Set(d) });
+  it("folds gmail dots and plus tags", () => {
+    const s = fold(["name@gmail.com"]);
+    for (const a of ["name+x@gmail.com", "n.a.m.e@gmail.com", "N.Ame+promo@GoogleMail.com"]) expect(isSuppressed(a, s)).toBe(true);
+  });
+  it("strips plus tags on every domain", () => {
+    expect(isSuppressed("info@ceg.hu", fold(["info+news@ceg.hu"]))).toBe(true);
+    expect(isSuppressed("info+news@ceg.hu", fold(["info@ceg.hu"]))).toBe(true);
+  });
+  it("does not fold dots outside gmail", () => {
+    const s = fold(["anna.kiss@ceg.hu"]);
+    expect(isSuppressed("annakiss@ceg.hu", s)).toBe(false);
+    expect(isSuppressed("anna.kovacs@ceg.hu", s)).toBe(false);
+  });
+  it("edge cases", () => {
+    const s = fold(["name@gmail.com"], ["tilos.hu"]);
+    expect(isSuppressed("", s)).toBe(false);
+    expect(isSuppressed(null, s)).toBe(false);
+    expect(suppressionKey("nodomain")).toBe("nodomain");
+    expect(suppressionKey("+x@ceg.hu")).toBe("+x@ceg.hu");
+    expect(isSuppressed("a+b@iroda.tilos.hu", s)).toBe(true);
   });
 });
