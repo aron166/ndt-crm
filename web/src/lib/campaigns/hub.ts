@@ -124,6 +124,7 @@ export async function campaignPage(tenantId: number, slug: string, userId: numbe
     members: Object.fromEntries(counts.map((x) => [x.state, x._count._all])) as Record<string, number>,
     batches,
     stats: stats[0]?.stats ?? null,
+    revenue: stats[0]?.revenue ?? null,
     previewHash,
     variants,
     isAron: aron != null && aron === userId,

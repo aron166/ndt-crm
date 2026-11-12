@@ -13,6 +13,7 @@ vi.mock("@/lib/reports/weekly", async () => {
 import { GET } from "./route";
 import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { getWeeklyReport } from "@/lib/reports/weekly";
+import { emptyRevenue } from "@/lib/campaigns/analytics";
 
 const KEY = { keyId: 3, tenantId: 7, appSlug: "reporter" };
 const req = (qs = "") => new Request(`http://x/api/reports/weekly${qs}`);
@@ -36,6 +37,7 @@ const REPORT = {
   stageTransitions: [{ from: "new", to: "contacted", count: 3 }],
   suppression: { added: 4, draftsCancelled: 1 },
   topCompanies: [{ companyId: 9, name: "Acme", touches: 6, lastTouchAt: new Date("2026-10-06T10:00:00Z") }],
+  revenue: emptyRevenue(),
 };
 
 beforeEach(() => {

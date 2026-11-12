@@ -9,6 +9,7 @@ vi.mock("./weekly", () => ({ getWeeklyReport: vi.fn(), previousBudapestWeek: vi.
 
 import { buildWeeklyReportEmail, isWeeklyReportTime } from "./weekly-email";
 import type { WeeklyReport } from "./weekly";
+import { emptyRevenue } from "@/lib/campaigns/analytics";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 
 const statuses: LeadStatusDef[] = [
@@ -27,7 +28,7 @@ const empty: WeeklyReport = {
   demos: { booked: 0, scheduled: 0, held: 0 },
   stageTransitions: [],
   suppression: { added: 0, draftsCancelled: 0 },
-  topCompanies: [],
+  topCompanies: [], revenue: emptyRevenue(),
 };
 
 const full: WeeklyReport = {
@@ -41,6 +42,7 @@ const full: WeeklyReport = {
   stageTransitions: [{ from: "new", to: "call_1", count: 6 }],
   suppression: { added: 1, draftsCancelled: 2 },
   topCompanies: [{ companyId: 1, name: "Acme Kft", touches: 8, lastTouchAt: new Date() }],
+  revenue: emptyRevenue(),
 };
 
 const build = (report: WeeklyReport) =>

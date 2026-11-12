@@ -69,7 +69,7 @@ describe("revenueBreakdown", () => {
     ]);
     expect(r.total).toMatchObject({ leads: 4, converted: 3, convertedValue: 750000, won: 2, wonValue: 500000 });
     expect(r.byChannel.find((x) => x.key === "cold_email")).toMatchObject({ converted: 2, convertedValue: 650000, won: 1, wonValue: 400000 });
-    expect(r.bySource).toHaveLength(1);
+    expect(r.bySource.map((x) => x.key)).toEqual(["web", null]);
     expect(r.byCampaign.map((x) => x.key)).toEqual(["bp", null]);
     // raw launch-list segments map to the mailed keys A..G; an unmappable one stays unknown (null)
     expect(r.bySegment.find((x) => x.key === "A")).toMatchObject({ converted: 2, wonValue: 400000 });

@@ -59,7 +59,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
       />
 
       {d.stats && !contentOnly && c.status !== "draft" && (
-        <RunningStrip title="Futás" rows={[{ campaign: { slug: c.slug, name: c.name, kind: c.kind }, stats: d.stats }]} />
+        <RunningStrip title="Futás" rows={[{ campaign: { slug: c.slug, name: c.name, kind: c.kind }, stats: d.stats, revenue: d.revenue ?? undefined }]} />
       )}
 
       {tab === "launch" && (

@@ -6,7 +6,8 @@ import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { callOutcomeLabel } from "@/lib/leads/outcomes";
 import { getWeeklyReport, lastDays, type WeeklyReport } from "@/lib/reports/weekly";
 import { monthUsage } from "@/lib/assistant/cap";
-import { REPORT_UI, formatMinutesOrDash } from "@/lib/reports/labels";
+import { REPORT_UI, formatMinutesOrDash, revenueLines } from "@/lib/reports/labels";
+import { formatHUF } from "@/lib/utils";
 import { PageHeader } from "@/components/astryx/PageHeader";
 import k from "@/components/astryx/page.module.css";
 import s from "./weekly.module.css";
@@ -95,6 +96,14 @@ function Window({ title, r, statuses }: { title: string; r: WeeklyReport; status
           head={[REPORT_UI.transition, REPORT_UI.count]}
           rows={r.stageTransitions.map((x) => [`${x.from ? leadStatusLabel(x.from, statuses) : "-"} -> ${leadStatusLabel(x.to, statuses)}`, x.count])}
         />
+      </Panel>
+
+      <Panel title={REPORT_UI.revenue}>
+        <Table
+          head={[REPORT_UI.source, REPORT_UI.revenueWon, REPORT_UI.revenueWonValue, REPORT_UI.revenueConverted, REPORT_UI.revenueConvertedValue]}
+          rows={revenueLines(r.revenue).map((x) => [x.label, x.won, formatHUF(x.wonValue), x.converted, formatHUF(x.convertedValue)])}
+        />
+        {r.revenue.total.otherCurrency > 0 && <p className={k.muted}>{REPORT_UI.revenueOtherCurrency(r.revenue.total.otherCurrency)}</p>}
       </Panel>
 
       <Panel title={REPORT_UI.suppression}>
