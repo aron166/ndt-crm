@@ -448,6 +448,8 @@ describe("one reply path (C2): a reply logged in the hub stops the outreach like
   it("a call outcome touches no draft", async () => {
     await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "no_answer" }, NOW);
     expect(d.emailDraft.updateMany).not.toHaveBeenCalled();
+  });
+});
 
 describe("one call-outcome writer (C1): the campaign path", () => {
   it("a logged call carries the user and completes the linked lead's open call tasks, and is audited", async () => {
