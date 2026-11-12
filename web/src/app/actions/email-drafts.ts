@@ -11,6 +11,8 @@ import { sendEmail } from "@/lib/integrations/resend";
 import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
+import { unsubscribeHeaders } from "@/lib/outreach/unsubscribe";
+import { draftSendKey } from "@/lib/outreach/send-key";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import {
   type DraftStatus,
@@ -338,6 +340,15 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
 
   if (await isAddressSuppressed(TENANT_ID, to)) return { ok: false, error: SUPPRESSED_ERROR };
 
+  // Fail closed: no signed unsubscribe link, no send. Before the claim so the row stays sendable.
+  let headers: Record<string, string>;
+  try {
+    headers = unsubscribeHeaders(TENANT_ID, to, id);
+  } catch (err) {
+    reportError("outreach.sendDraft.unsubscribeHeaders", err, { draftId: id });
+    return { ok: false, error: "A leiratkozási link nem készíthető el (hiányzó kulcs), a levél nem ment el" };
+  }
+
   // Claim it. Nothing below this line may run twice for one row.
   const claim = await db.emailDraft.updateMany({
     where: { id, tenantId: TENANT_ID, status: { in: CLAIMABLE_STATUSES } },
@@ -361,6 +372,8 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
       replyTo: settings.replyTo,
       companyId: row.companyId,
       personId: row.personId,
+      headers,
+      idempotencyKey: draftSendKey(id, to, row.subject, text),
     });
   } catch (err) {
     // sendEmail catches its own transport errors, so reaching here means
@@ -385,6 +398,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
             status: "sent",
             sentAt,
             sentVia: "resend",
+            toEmail: to, // the address it actually went to; webhooks and replies match on it
             providerMessageId: result.id,
             threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
             lastError: result.warning ?? null,
