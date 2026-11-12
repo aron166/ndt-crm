@@ -10,6 +10,11 @@ export type Classified =
   | { kind: "reply"; messageId: string; from: string; inReplyTo: string[]; snippet: string }
   | { kind: "ignore"; messageId: string; reason: "own_domain" | "no_from" | "bulk" };
 
+export const FREE_MAIL = new Set([
+  "gmail.com", "googlemail.com", "freemail.hu", "citromail.hu", "outlook.com", "hotmail.com", "live.com",
+  "yahoo.com", "icloud.com", "t-online.hu", "invitel.hu", "vipmail.hu", "indamail.hu",
+]);
+
 /** Lowercase and strip accents (NFD, drop combining marks), so ő and ű fold too. */
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -38,6 +43,24 @@ function htmlText(h: string): string {
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
+/** Recipient of the first block in the message/delivery-status part with Action failed and Status 5.x.x. shortcut: reads the part as plain text, so a base64 part is never a bounce; upgrade if a real MTA does that. */
+function hardDsnRecipient(raw: Buffer): string | null {
+  const text = raw.toString("utf8");
+  const at = text.search(/^content-type:\s*message\/delivery-status/im);
+  if (at < 0) return null;
+  const rest = text.slice(at);
+  const start = rest.search(/\r?\n\r?\n/);
+  if (start < 0) return null;
+  const end = rest.indexOf("\n--", start);
+  for (const block of rest.slice(start, end < 0 ? undefined : end).split(/\r?\n\r?\n/)) {
+    const action = /^Action:\s*(\S+)/im.exec(block)?.[1].toLowerCase();
+    const status = /^Status:\s*(\d)\./im.exec(block)?.[1];
+    const rcpt = /^(?:Final|Original)-Recipient:\s*rfc822;\s*(\S+)/im.exec(block)?.[1];
+    if (action === "failed" && status === "5" && rcpt) return rcpt.toLowerCase();
+  }
+  return null;
+}
+
 const header = (p: ParsedMail, name: string): string => {
   const v = p.headers.get(name);
   return typeof v === "string" ? v : "";
@@ -56,9 +79,15 @@ export function classifyMail(parsed: ParsedMail, raw: Buffer, ourDomains: string
   if (reportType === null || isDsn) {
     const f = fold(from);
     if (isDsn || f.startsWith("mailer-daemon") || f.startsWith("postmaster") || BOUNCE_SUBJECT.some((k) => foldedSubject.includes(k))) {
+      // Only a confirmed hard bounce suppresses; a delay, a 4.x.x or a forged mail is stored only.
+      if (isDsn) {
+        const recipient = hardDsnRecipient(raw);
+        return recipient ? { kind: "bounce", messageId, recipient } : { kind: "auto", messageId };
+      }
       const failed = header(parsed, "x-failed-recipients").split(",")[0].trim().toLowerCase();
-      const m = /^(?:Final|Original)-Recipient:\s*rfc822;\s*(\S+)/im.exec(raw.toString("utf8"));
-      return { kind: "bounce", messageId, recipient: failed || m?.[1].toLowerCase() || null };
+      return failed && /\b5\.\d{1,3}\.\d{1,3}\b/.test(parsed.text ?? "")
+        ? { kind: "bounce", messageId, recipient: failed }
+        : { kind: "auto", messageId };
     }
   }
 
