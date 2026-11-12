@@ -90,9 +90,14 @@ async function needsOperator(ctx: CampaignCtx): Promise<Fail | null> {
   return u && OPERATOR_ROLES.includes(u.role) ? null : fail(403, "Ehhez admin vagy manager szerep kell");
 }
 
-/** Apply/undo of a member load: a session operator, or an app key holding prospects:write. */
-async function needsProspectWriter(ctx: CampaignCtx): Promise<Fail | null> {
-  if (ctx.userId == null && ctx.scopes?.includes("prospects:write")) return null;
+/**
+ * Apply/undo of a member load: a session operator, or an app key holding prospects:write. A key only touches
+ * batches named `<its app slug>-...`, so it can never undo a load a person made (Vanda #197-3).
+ */
+async function needsProspectWriter(ctx: CampaignCtx, batch: string): Promise<Fail | null> {
+  if (ctx.userId == null && ctx.scopes?.includes("prospects:write")) {
+    return ctx.appSlug && batch.startsWith(`${ctx.appSlug}-`) ? null : fail(403, `Egy app kulcs csak a saját betöltését írhatja és vonhatja vissza (batch: ${ctx.appSlug ?? "app"}-...)`);
+  }
   return needsOperator(ctx);
 }
 
@@ -374,7 +379,7 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
   if (!c) return fail(404, "Kampány nem található");
   if (audienceOf(c.audience).source === "leads_by_stage") return fail(409, "Ennek a kampánynak a közönsége leadek szakasz szerint; prospekt lista nem tölthető be");
   if (!input.dry_run) {
-    const s = await needsProspectWriter(ctx);
+    const s = await needsProspectWriter(ctx, input.batch);
     if (s) return s;
   }
   if (!MEMBER_KINDS.includes(c.kind as CampaignKind)) return fail(409, "Ez a kampánytípus csak tartalom, tagokat nem kap");
@@ -497,7 +502,7 @@ export async function undoBatch(ctx: CampaignCtx, slug: string, batch: string, d
   const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true } });
   if (!c) return fail(404, "Kampány nem található");
   if (!dryRun) {
-    const s = await needsProspectWriter(ctx);
+    const s = await needsProspectWriter(ctx, batch);
     if (s) return s;
   }
   const tenantId = ctx.tenantId;

@@ -327,7 +327,7 @@ describe("member loads and undo are session only with an operator role (Kai, Van
     });
     it("addMembers apply: prospects:write proceeds, legacy and read-only get 403, session operator unchanged", async () => {
       d.company.create.mockResolvedValue({ id: 70 });
-      expect(await addMembers(KEY, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ ok: true, dry_run: false, added: 1 });
+      expect(await addMembers(KEY, "bp", { dry_run: false, batch: "corvid-b1", rows })).toMatchObject({ ok: true, dry_run: false, added: 1 });
       d.$transaction.mockClear();
       expect(await addMembers(LEGACY, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
       expect(await addMembers(READ, "bp", { dry_run: false, batch: "b1", rows })).toMatchObject({ status: 403 });
@@ -338,7 +338,7 @@ describe("member loads and undo are session only with an operator role (Kai, Van
     it("undoBatch apply: prospects:write proceeds, legacy and read-only get 403, session operator unchanged", async () => {
       d.campaignMember.findMany.mockResolvedValue([]);
       d.campaignMember.deleteMany.mockResolvedValue({ count: 0 });
-      expect(await undoBatch(KEY, "bp", "b1", false)).toMatchObject({ ok: true, dry_run: false });
+      expect(await undoBatch(KEY, "bp", "corvid-b1", false)).toMatchObject({ ok: true, dry_run: false });
       expect(await undoBatch(LEGACY, "bp", "b1", false)).toMatchObject({ status: 403 });
       expect(await undoBatch(READ, "bp", "b1", false)).toMatchObject({ status: 403 });
       d.user.findFirst.mockResolvedValue({ role: "admin" });

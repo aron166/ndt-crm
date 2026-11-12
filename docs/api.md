@@ -27,7 +27,7 @@ An empty or all-unknown list is a key that may do nothing.
 | Scope | Opens |
 |---|---|
 | `leads:write` | `POST /api/leads`, `POST /api/events` |
-| `prospects:write` | `POST` and `DELETE /api/campaigns/:slug/members`: apply (`dry_run: false`) and undo a prospect load. A write on a running campaign still sends it back to draft for re-approval. |
+| `prospects:write` | `POST` and `DELETE /api/campaigns/:slug/members`: apply (`dry_run: false`) and undo a prospect load. A write on a running campaign still sends it back to draft for re-approval. The batch id must start with `<app slug>-` (a key never undoes a person's load). A scoped key without this scope cannot dry-run these routes either. |
 | `read` | every other `GET` / `HEAD` (including `GET /api/leads`, personal data) |
 
 Every other route (content, outcomes, PATCH and so on) is for legacy keys only.

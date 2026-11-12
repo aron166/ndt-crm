@@ -3,4 +3,4 @@
 -- scopes reaches only the routes those scopes name (lib/app-key-auth.ts). One nullable column, no data change.
 -- Rollback (every key returns to legacy behaviour):
 --   ALTER TABLE "app_api_keys" DROP COLUMN "scopes";
-ALTER TABLE "app_api_keys" ADD COLUMN "scopes" TEXT;
+ALTER TABLE "app_api_keys" ADD COLUMN IF NOT EXISTS "scopes" TEXT;
