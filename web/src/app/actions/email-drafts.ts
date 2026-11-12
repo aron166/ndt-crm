@@ -2,6 +2,7 @@
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { setTenantSettings } from "@/lib/tenant-settings";
 import { gateDraft, gateOn, templatesForCampaigns } from "@/lib/outreach/template";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
@@ -197,9 +198,9 @@ export async function getOutreachSettings(): Promise<OutreachSettings> {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Read/merge/write tenants.settings — same pattern as
- * saveQualificationQuestions in actions/leads.ts. Never clobbers sibling keys
- * (qualificationQuestions, introMaterialUrl, …).
+ * The /outreach panel's two keys of tenants.settings, each by its own jsonb_set
+ * (setTenantSettings), so a concurrent save from /leads/setup, /marketing or the
+ * IMAP intake cannot be reverted by this one (inventory 4.F).
  */
 export async function saveOutreachSettings(input: {
   replyTo: string;
@@ -210,18 +211,9 @@ export async function saveOutreachSettings(input: {
   if (replyTo && !EMAIL_RE.test(replyTo)) return { ok: false, error: "Érvénytelen válaszcím" };
   const footer = input.footer.trim();
 
-  const before = await db.tenant.findUnique({ where: { id: TENANT_ID }, select: { settings: true } });
-  const beforeSettings = (before?.settings ?? {}) as Record<string, unknown>;
-  const settings = {
-    ...beforeSettings,
+  const beforeSettings = await setTenantSettings(TENANT_ID, {
     outreachReplyTo: replyTo || null,
     outreachFooter: footer || null,
-  };
-  await db.tenant.update({
-    where: { id: TENANT_ID },
-    // Prisma's InputJsonValue rejects a plain Record without an index
-    // signature — the value IS plain JSON, so the double cast is the whole story.
-    data: { settings: settings as unknown as Prisma.InputJsonValue },
   });
   await audit(
     "tenant",
