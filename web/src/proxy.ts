@@ -35,6 +35,7 @@ export function isServiceApiPath(pathname: string): boolean {
     pathname === "/api/conversations" ||
     pathname === "/api/leads" ||
     pathname === "/api/suppressions" ||
+    pathname === "/api/outreach/unsubscribe" || // signed link, recipients have no session
     pathname.startsWith("/api/leads/") ||
     pathname === "/api/content" ||
     // Content approval loop (app key): queue, live, claim, versions. Anchored —

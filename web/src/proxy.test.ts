@@ -45,6 +45,7 @@ describe("isServiceApiPath", () => {
     "/api/campaigns/bp/analytics",
     "/api/reports/campaigns",
     "/api/campaigns/bp/lead-audience", // item 4: an agent may dry-run a lead load
+    "/api/outreach/unsubscribe", // signed link, recipients have no session
     "/api/specification-requests", // Vanda #192-1: the agent polls with an app key, no cookie
   ];
   for (const path of bypassed) {
@@ -81,6 +82,8 @@ describe("isServiceApiPath", () => {
     "/api/campaigns/bp/steps",
     "/api/campaigns/bp/members/x",
     "/api/campaigns/a.b",
+    "/api/outreach/unsubscribe/x", // anchored
+    "/api/outreach/drafts/1",
   ];
   for (const path of sessionGated) {
     it(`stays behind the session gate: ${path}`, () => {
