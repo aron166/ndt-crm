@@ -5,6 +5,7 @@
 
 import { db } from "@/lib/db";
 import { localDay } from "@/lib/booking/time";
+import { segmentOf } from "./email-preview";
 
 export const REPLY_OUTCOMES: readonly string[] = ["reply_positive", "reply_negative", "unsubscribe"];
 export const PROMOTING_OUTCOMES: readonly string[] = ["interested", "wants", "reply_positive"];
@@ -65,6 +66,54 @@ export function aggregate(members: readonly AggMember[], events: readonly AggEve
   };
 }
 
+// ── Revenue: converted deal value joined to campaign, channel, source and segment ─────────────
+/** One lead with its converted deal (if any). `segment` is the member's raw launch-list segment. */
+export interface RevenueRow {
+  converted: boolean; won: boolean; value: number | string | null; currency: string | null;
+  channel: string | null; source: string | null; campaign: string | null; segment: string | null;
+}
+export interface RevenueCell { leads: number; converted: number; convertedValue: number; won: number; wonValue: number; otherCurrency: number }
+export interface RevenueKeyed extends RevenueCell { key: string | null }
+export interface Revenue { total: RevenueCell; bySegment: RevenueKeyed[]; byChannel: RevenueKeyed[]; bySource: RevenueKeyed[]; byCampaign: RevenueKeyed[] }
+
+const emptyCell = (): RevenueCell => ({ leads: 0, converted: 0, convertedValue: 0, won: 0, wonValue: 0, otherCurrency: 0 });
+export const emptyRevenue = (): Revenue => ({ total: emptyCell(), bySegment: [], byChannel: [], bySource: [], byCampaign: [] });
+
+/**
+ * Pure. Converted = the lead became a deal; won = the lead's outcome is won. Value is the deal's value.
+ * shortcut: only HUF is summed; a deal in another currency is counted in otherCurrency and left out of
+ * the sums, upgrade when a second currency actually appears in deals.
+ */
+export function revenueBreakdown(rows: readonly RevenueRow[]): Revenue {
+  const add = (c: RevenueCell, r: RevenueRow) => {
+    c.leads++;
+    const foreign = r.currency != null && r.currency !== "HUF";
+    const v = foreign ? 0 : Number(r.value ?? 0) || 0;
+    if (r.converted) { c.converted++; c.convertedValue += v; }
+    if (r.won) { c.won++; c.wonValue += v; }
+    if (foreign && (r.converted || r.won)) c.otherCurrency++;
+  };
+  const by = (key: (r: RevenueRow) => string | null): RevenueKeyed[] => {
+    const m = new Map<string | null, RevenueKeyed>();
+    for (const r of rows) {
+      const k = key(r);
+      const c = m.get(k) ?? { key: k, ...emptyCell() };
+      add(c, r);
+      m.set(k, c);
+    }
+    return [...m.values()].sort((a, b) => b.wonValue - a.wonValue || b.leads - a.leads);
+  };
+  const total = emptyCell();
+  for (const r of rows) add(total, r);
+  return {
+    total,
+    bySegment: by((r) => segmentOf({ segment: r.segment })),
+    byChannel: by((r) => r.channel),
+    bySource: by((r) => r.source),
+    byCampaign: by((r) => r.campaign),
+  };
+}
+
 /** Stats for one campaign, or for every running one when `slug` is omitted (the analytics strip). */
 export async function campaignAnalytics(tenantId: number, opts: { slug?: string; from?: Date; to?: Date } = {}) {
   const campaigns = await db.campaign.findMany({
@@ -76,13 +125,23 @@ export async function campaignAnalytics(tenantId: number, opts: { slug?: string;
   const ids = campaigns.map((c) => c.id);
   const at = opts.from || opts.to ? { ...(opts.from ? { gte: opts.from } : {}), ...(opts.to ? { lt: opts.to } : {}) } : undefined;
   const [members, events] = await Promise.all([
-    db.campaignMember.findMany({ where: { tenantId, campaignId: { in: ids } }, select: { id: true, campaignId: true, state: true, leadId: true } }),
+    db.campaignMember.findMany({ where: { tenantId, campaignId: { in: ids } }, select: { id: true, campaignId: true, state: true, leadId: true, segment: true } }),
     db.campaignEvent.findMany({ where: { tenantId, campaignId: { in: ids }, ...(at ? { at } : {}) }, select: { campaignId: true, memberId: true, stepPosition: true, outcome: true, at: true } }),
   ]);
   const leadIds = members.map((m) => m.leadId).filter((v): v is number => v != null);
-  const leads = leadIds.length ? await db.lead.findMany({ where: { tenantId, id: { in: leadIds } }, select: { id: true, status: true, outcome: true } }) : [];
-  return campaigns.map((c) => ({
-    campaign: c,
-    stats: aggregate(members.filter((m) => m.campaignId === c.id), events.filter((e) => e.campaignId === c.id), leads),
-  }));
+  const leads = leadIds.length ? await db.lead.findMany({ where: { tenantId, id: { in: leadIds } }, select: { id: true, status: true, outcome: true, channel: true, source: true, convertedDealId: true } }) : [];
+  const dealIds = leads.map((l) => l.convertedDealId).filter((v): v is number => v != null);
+  const deals = dealIds.length ? await db.deal.findMany({ where: { tenantId, id: { in: dealIds } }, select: { id: true, value: true, currency: true } }) : [];
+  return campaigns.map((c) => {
+    const mine = members.filter((m) => m.campaignId === c.id);
+    const seen = new Set<number>(); // one lead counts once per campaign, even if two members point at it
+    const revenueRows: RevenueRow[] = mine.flatMap((m) => {
+      const l = leads.find((x) => x.id === m.leadId);
+      if (!l || seen.has(l.id)) return [];
+      seen.add(l.id);
+      const d = deals.find((x) => x.id === l.convertedDealId);
+      return [{ converted: l.convertedDealId != null, won: l.outcome === "won", value: d?.value != null ? d.value.toString() : null, currency: d?.currency ?? null, channel: l.channel, source: l.source, campaign: c.slug, segment: m.segment }];
+    });
+    return { campaign: c, stats: aggregate(mine, events.filter((e) => e.campaignId === c.id), leads), revenue: revenueBreakdown(revenueRows) };
+  });
 }

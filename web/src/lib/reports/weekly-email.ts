@@ -6,7 +6,8 @@ import { callOutcomeLabel } from "@/lib/leads/outcomes";
 import { leadStatusLabel, type LeadStatusDef } from "@/lib/leads/statuses";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { firstName } from "@/lib/content/digest";
-import { REPORT_UI, formatMinutesOrDash } from "./labels";
+import { REPORT_UI, formatMinutesOrDash, revenueLines, revenueNote } from "./labels";
+import { formatHUF } from "@/lib/utils";
 import { getWeeklyReport, previousBudapestWeek, type WeeklyReport } from "./weekly";
 
 /**
@@ -61,6 +62,7 @@ export function buildWeeklyReportEmail(input: {
       `- ${U.demosHeld}: ${r.demos.held}`,
     ]),
     ...section(U.stageTransitions, transitions),
+    ...section(U.revenue, revenueLines(r.revenue).map((x) => `- ${x.label}: ${U.revenueWon} ${x.won} (${formatHUF(x.wonValue)}), ${U.revenueConverted} ${x.converted} (${formatHUF(x.convertedValue)})`).concat(revenueNote(r.revenue) ? [`- ${revenueNote(r.revenue)}`] : [])),
     ...section(U.suppression, [
       `- ${U.suppressionAdded}: ${r.suppression.added}`,
       `- ${U.suppressionCancelled}: ${r.suppression.draftsCancelled}`,

@@ -69,6 +69,24 @@ describe("Futó kampányok", () => {
     await userEvent.click(screen.getByRole("button", { name: "Nap szerint" }));
     expect(screen.getByText("2026-11-16")).toBeTruthy();
   });
+  it("Bevétel view: zero deals says so; a won deal shows its value per segment", async () => {
+    const cell = { leads: 0, converted: 0, convertedValue: 0, won: 0, wonValue: 0, otherCurrency: 0 };
+    const none = { total: cell, bySegment: [], byChannel: [], bySource: [], byCampaign: [] };
+    const row = { campaign: { slug: "bp", name: "Budapest indulás", kind: "sequence" }, stats };
+    const { unmount } = render(<RunningStrip rows={[{ ...row, revenue: none }]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Bevétel" }));
+    expect(screen.getByText("Még nincs deallé vált lead ebben az időszakban.")).toBeTruthy();
+    unmount();
+    const won = { ...cell, leads: 3, converted: 1, convertedValue: 500000, won: 1, wonValue: 500000 };
+    const { unmount: unmount2 } = render(<RunningStrip rows={[{ ...row, revenue: { ...none, total: won, bySegment: [{ key: "A", ...won }] } }]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Bevétel" }));
+    expect(screen.getByText(/^Szegmens: A/)).toBeTruthy();
+    expect(screen.getAllByText(/500\s?000/).length).toBeGreaterThan(0);
+    unmount2();
+    render(<RunningStrip rows={[{ ...row, revenue: { ...none, total: { ...won, otherCurrency: 2 }, byChannel: [{ key: "landing", ...won }] } }]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Bevétel" }));
+    expect(screen.getByText(/2 deal más pénznemben/)).toBeTruthy();
+  });
   it("says so when nothing runs", () => {
     render(<RunningStrip rows={[]} />);
     expect(screen.getByText("Nincs futó kampány.")).toBeTruthy();

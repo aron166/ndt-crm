@@ -8,11 +8,13 @@ import Link from "next/link";
 import k from "@/components/astryx/page.module.css";
 import s from "@/app/(app)/campaigns/campaigns.module.css";
 import { kindLabel, isContentOnly } from "@/lib/campaigns/labels";
-import type { CampaignStatsV2 } from "@/lib/campaigns/analytics";
+import type { CampaignStatsV2, Revenue } from "@/lib/campaigns/analytics";
+import { REPORT_UI, revenueLines, revenueNote } from "@/lib/reports/labels";
+import { formatHUF } from "@/lib/utils";
 
-export interface StripRow { campaign: { slug: string; name: string; kind: string | null }; stats: CampaignStatsV2 }
+export interface StripRow { campaign: { slug: string; name: string; kind: string | null }; stats: CampaignStatsV2; revenue?: Revenue }
 
-const VIEWS = [{ key: "total", label: "Összesen" }, { key: "step", label: "Lépés szerint" }, { key: "day", label: "Nap szerint" }] as const;
+const VIEWS = [{ key: "total", label: "Összesen" }, { key: "step", label: "Lépés szerint" }, { key: "day", label: "Nap szerint" }, { key: "revenue", label: "Bevétel" }] as const;
 type View = (typeof VIEWS)[number]["key"];
 
 export function RunningStrip({ rows, title = "Futó kampányok" }: { rows: StripRow[]; title?: string }) {
@@ -36,7 +38,9 @@ export function RunningStrip({ rows, title = "Futó kampányok" }: { rows: Strip
         <div className={k.tableWrap}>
           <table className={k.table}>
             <thead>
-              {view === "total" ? (
+              {view === "revenue" ? (
+                <tr><th>Kampány</th><th>Bontás</th><th>{REPORT_UI.revenueWon}</th><th>{REPORT_UI.revenueWonValue}</th><th>{REPORT_UI.revenueConverted}</th><th>{REPORT_UI.revenueConvertedValue}</th></tr>
+              ) : view === "total" ? (
                 <tr><th>Kampány</th><th>Közönség</th><th>Érintve</th><th>Válaszolt</th><th>Lead lett</th><th>Foglalt</th></tr>
               ) : (
                 <tr><th>Kampány</th><th>{view === "step" ? "Lépés" : "Nap"}</th><th>Érintés</th><th>Válasz</th><th>Lead lett</th></tr>
@@ -46,6 +50,21 @@ export function RunningStrip({ rows, title = "Futó kampányok" }: { rows: Strip
               {rows.flatMap((r) => {
                 const name = <Link href={`/campaigns/${r.campaign.slug}`} className={k.strong}>{r.campaign.name}</Link>;
                 const kind = <span className={k.muted}> {kindLabel(r.campaign.kind).toLowerCase()}</span>;
+                if (view === "revenue") {
+                  const lines = r.revenue ? revenueLines(r.revenue) : [];
+                  if (lines.length === 0) return [<tr key={r.campaign.slug}><td>{name}{kind}</td><td colSpan={5} className={k.muted}>{REPORT_UI.revenueNone}</td></tr>];
+                  const note = revenueNote(r.revenue!);
+                  return [...lines.map((x, i) => (
+                    <tr key={`${r.campaign.slug}-${x.label}`}>
+                      <td>{i === 0 ? <>{name}{kind}</> : null}</td>
+                      <td>{x.label}</td>
+                      <td className={k.num}>{x.won}</td>
+                      <td className={k.num}>{formatHUF(x.wonValue)}</td>
+                      <td className={k.num}>{x.converted}</td>
+                      <td className={k.num}>{formatHUF(x.convertedValue)}</td>
+                    </tr>
+                  )), ...(note ? [<tr key={`${r.campaign.slug}-note`}><td /><td colSpan={5} className={k.muted}>{note}</td></tr>] : [])];
+                }
                 if (view === "total") {
                   const na = isContentOnly(r.campaign.kind);
                   return [(

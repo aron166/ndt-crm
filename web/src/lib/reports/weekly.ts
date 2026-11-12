@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
+import { revenueBreakdown, type Revenue, type RevenueRow } from "@/lib/campaigns/analytics";
 
 /**
  * Weekly sales-engine report (growth playbook M7). Pure read, tenant-scoped,
@@ -24,6 +25,9 @@ import { CALL_OUTCOMES } from "@/lib/leads/outcomes";
  * - suppression hit: a suppression added in the window, or an email draft the
  *   suppression list cancelled (audit reason `suppressed`). Sends blocked inside
  *   sendEmail are not persisted anywhere, so they are not counted.
+ * - revenue: converted = converted_at in the window; won = outcome won with closed_at in the window, with the
+ *   deal's value, joined to channel, source, campaign (the lead tag, else the hub campaign of its
+ *   member) and the member's segment. Pure grouping in campaigns/analytics revenueBreakdown.
  * - company touched: any non-superseded interaction linked to the company.
  */
 
@@ -144,12 +148,28 @@ export interface WeeklyReport {
   stageTransitions: { from: string | null; to: string; count: number }[];
   suppression: { added: number; draftsCancelled: number };
   topCompanies: { companyId: number; name: string; touches: number; lastTouchAt: Date }[];
+  revenue: Revenue;
 }
 
 const sum = (rows: { count: number }[]) => rows.reduce((a, r) => a + r.count, 0);
 
+export interface RawRevenue extends Omit<RevenueRow, "converted" | "won"> { outcome: string; convertedAt: Date | null; closedAt: Date | null }
+
+/**
+ * Flags scoped to [from, to): converted = converted_at inside, won = outcome won AND closed_at inside.
+ * A lead converted last week and won this week is "won" now, not "converted" now, so a week's figures
+ * do not change when the report is re-run later. Rows that are neither are dropped.
+ */
+export function windowRevenueRows(raw: readonly RawRevenue[], { from, to }: ReportWindow): RevenueRow[] {
+  const inside = (d: Date | null) => d != null && d.getTime() >= from.getTime() && d.getTime() < to.getTime();
+  return raw.flatMap(({ outcome, convertedAt, closedAt, ...r }) => {
+    const converted = inside(convertedAt), won = outcome === "won" && inside(closedAt);
+    return converted || won ? [{ ...r, converted, won }] : [];
+  });
+}
+
 export async function getWeeklyReport(tenantId: number, { from, to }: ReportWindow): Promise<WeeklyReport> {
-  const [bySource, tierARows, outcomes, demoRows, transitions, suppressionRows, companies] = await Promise.all([
+  const [bySource, tierARows, outcomes, demoRows, transitions, suppressionRows, companies, revenueRows] = await Promise.all([
     db.$queryRaw<{ source: string | null; tier: string | null; count: number }[]>`
       SELECT COALESCE(l."channel", l."source") AS "source", l."tier", COUNT(*)::int AS "count"
         FROM "leads" l
@@ -231,6 +251,20 @@ export async function getWeeklyReport(tenantId: number, { from, to }: ReportWind
        GROUP BY c."id", c."name"
        ORDER BY 3 DESC, 4 DESC
        LIMIT 10`,
+
+    db.$queryRaw<RawRevenue[]>`
+      SELECT l."outcome", l."converted_at" AS "convertedAt", l."closed_at" AS "closedAt",
+             d."value"::float AS "value", d."currency", l."channel", l."source",
+             COALESCE(l."campaign", m."slug") AS "campaign", m."segment"
+        FROM "leads" l
+        LEFT JOIN "deals" d ON d."id" = l."converted_deal_id" AND d."tenant_id" = l."tenant_id"
+        LEFT JOIN LATERAL (
+          SELECT cm."segment", c."slug" FROM "campaign_members" cm JOIN "campaigns" c ON c."id" = cm."campaign_id"
+           WHERE cm."lead_id" = l."id" AND cm."tenant_id" = l."tenant_id" ORDER BY cm."id" LIMIT 1
+        ) m ON true
+       WHERE l."tenant_id" = ${tenantId}
+         AND ((l."converted_at" >= ${from} AND l."converted_at" < ${to})
+           OR (l."outcome" = 'won' AND l."closed_at" >= ${from} AND l."closed_at" < ${to}))`,
   ]);
 
   return {
@@ -245,5 +279,6 @@ export async function getWeeklyReport(tenantId: number, { from, to }: ReportWind
     stageTransitions: transitions,
     suppression: suppressionRows[0] ?? { added: 0, draftsCancelled: 0 },
     topCompanies: companies,
+    revenue: revenueBreakdown(windowRevenueRows(revenueRows, { from, to })),
   };
 }

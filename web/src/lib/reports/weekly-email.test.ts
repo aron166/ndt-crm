@@ -9,6 +9,7 @@ vi.mock("./weekly", () => ({ getWeeklyReport: vi.fn(), previousBudapestWeek: vi.
 
 import { buildWeeklyReportEmail, isWeeklyReportTime } from "./weekly-email";
 import type { WeeklyReport } from "./weekly";
+import { emptyRevenue } from "@/lib/campaigns/analytics";
 import type { LeadStatusDef } from "@/lib/leads/statuses";
 
 const statuses: LeadStatusDef[] = [
@@ -27,7 +28,7 @@ const empty: WeeklyReport = {
   demos: { booked: 0, scheduled: 0, held: 0 },
   stageTransitions: [],
   suppression: { added: 0, draftsCancelled: 0 },
-  topCompanies: [],
+  topCompanies: [], revenue: emptyRevenue(),
 };
 
 const full: WeeklyReport = {
@@ -41,6 +42,7 @@ const full: WeeklyReport = {
   stageTransitions: [{ from: "new", to: "call_1", count: 6 }],
   suppression: { added: 1, draftsCancelled: 2 },
   topCompanies: [{ companyId: 1, name: "Acme Kft", touches: 8, lastTouchAt: new Date() }],
+  revenue: emptyRevenue(),
 };
 
 const build = (report: WeeklyReport) =>
@@ -59,6 +61,13 @@ describe("buildWeeklyReportEmail", () => {
     expect(text).toContain("Acme Kft: 8");
     expect(text).toContain("Foglalt demó: 3");
     expect(text.trimEnd().endsWith("Élő riport (utolsó 7 és 28 nap, nem csak a fenti hét): https://x.test/reports/weekly")).toBe(true);
+  });
+
+  it("revenue section lists won value and says when deals in another currency are left out", () => {
+    const cell = { leads: 1, converted: 1, convertedValue: 500000, won: 1, wonValue: 500000, otherCurrency: 2 };
+    const { text } = build({ ...full, revenue: { total: cell, bySegment: [], byChannel: [{ key: "landing", ...cell }], bySource: [], byCampaign: [] } });
+    expect(text).toContain("Csatorna: landing: Nyert 1");
+    expect(text).toContain("2 deal más pénznemben: nincs az összegekben.");
   });
 
   it("an all-empty week still builds, with empty markers", () => {
