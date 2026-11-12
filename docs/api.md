@@ -18,6 +18,20 @@ The Supabase service-role key is **not** accepted anywhere.
 - Writes are audited (`audit_log`, actor = the key's app slug) and, where a human
   would have left a trace, append an `interactions` row.
 
+### Key scopes
+
+`app_api_keys.scopes` is a space-separated list. `NULL` = legacy key: no restriction,
+exactly as before. A scoped key outside its scopes gets `401` (key not valid for this route).
+An empty or all-unknown list is a key that may do nothing.
+
+| Scope | Opens |
+|---|---|
+| `leads:write` | `POST /api/leads`, `POST /api/events` |
+| `prospects:write` | `POST` and `DELETE /api/campaigns/:slug/members`: apply (`dry_run: false`) and undo a prospect load. A write on a running campaign still sends it back to draft for re-approval. |
+| `read` | every other `GET` / `HEAD` (including `GET /api/leads`, personal data) |
+
+Every other route (content, outcomes, PATCH and so on) is for legacy keys only.
+
 ```bash
 export CRM=https://ndt-crm.vercel.app
 export KEY=helm_xxxxxxxx

@@ -314,8 +314,8 @@ describe("member loads and undo are session only with an operator role (Kai, Van
     expect(d.campaign.update.mock.calls[0][0].data).toMatchObject({ status: "draft", approvedHash: null });
   });
   describe("prospects:write key (scopes)", () => {
-    const KEY = { ...APP, scopes: ["prospects:write"] };
-    const READ = { ...APP, scopes: ["read"] };
+    const KEY = { ...APP, scopes: ["prospects:write" as const] };
+    const READ = { ...APP, scopes: ["read" as const] };
     const LEGACY = { ...APP, scopes: null };
     it("addMembers apply: prospects:write proceeds, legacy and read-only get 403, session operator unchanged", async () => {
       d.company.create.mockResolvedValue({ id: 70 });

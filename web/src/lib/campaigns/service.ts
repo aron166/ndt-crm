@@ -11,6 +11,7 @@ import { getLeadStatuses } from "@/lib/leads/queries";
 import { OUTBOUND_ACTION_TYPES } from "@/lib/automations/types";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import type { AppKeyScope } from "@/lib/app-key-auth";
 import { audit, type AuditOptions } from "@/lib/audit";
 import { reportError } from "@/lib/report-error";
 import { resolveDemoHost } from "@/lib/booking/queries";
@@ -42,6 +43,8 @@ export interface CampaignCtx {
   userId: number | null;
   /** App slug when the caller is an app key. */
   appSlug?: string;
+  /** App key scopes (null = legacy key). */
+  scopes?: AppKeyScope[] | null;
 }
 
 export type Fail = { error: string; status: 400 | 403 | 404 | 409 };
@@ -85,6 +88,12 @@ async function needsOperator(ctx: CampaignCtx): Promise<Fail | null> {
   if (s) return s;
   const u = await db.user.findFirst({ where: { id: ctx.userId!, tenantId: ctx.tenantId }, select: { role: true } });
   return u && OPERATOR_ROLES.includes(u.role) ? null : fail(403, "Ehhez admin vagy manager szerep kell");
+}
+
+/** Apply/undo of a member load: a session operator, or an app key holding prospects:write. */
+async function needsProspectWriter(ctx: CampaignCtx): Promise<Fail | null> {
+  if (ctx.userId == null && ctx.scopes?.includes("prospects:write")) return null;
+  return needsOperator(ctx);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -365,7 +374,7 @@ export async function addMembers(ctx: CampaignCtx, slug: string, input: { dry_ru
   if (!c) return fail(404, "Kampány nem található");
   if (audienceOf(c.audience).source === "leads_by_stage") return fail(409, "Ennek a kampánynak a közönsége leadek szakasz szerint; prospekt lista nem tölthető be");
   if (!input.dry_run) {
-    const s = await needsOperator(ctx);
+    const s = await needsProspectWriter(ctx);
     if (s) return s;
   }
   if (!MEMBER_KINDS.includes(c.kind as CampaignKind)) return fail(409, "Ez a kampánytípus csak tartalom, tagokat nem kap");
@@ -488,7 +497,7 @@ export async function undoBatch(ctx: CampaignCtx, slug: string, batch: string, d
   const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true } });
   if (!c) return fail(404, "Kampány nem található");
   if (!dryRun) {
-    const s = await needsOperator(ctx);
+    const s = await needsProspectWriter(ctx);
     if (s) return s;
   }
   const tenantId = ctx.tenantId;

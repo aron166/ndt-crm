@@ -26,7 +26,7 @@ export async function campaignCtx(request: Request, opts: { sessionOnly?: boolea
     const key = await validateAppKey(request);
     if (!key) return { res: json({ error: "Unauthorized" }, 401) };
     if (!rateLimit(key.keyId)) return { res: json({ error: "Rate limit exceeded (30 req/min)" }, 429) };
-    return { ctx: { tenantId: key.tenantId, userId: null, appSlug: key.appSlug } };
+    return { ctx: { tenantId: key.tenantId, userId: null, appSlug: key.appSlug, scopes: key.scopes } };
   }
   const { userId } = await getActor(SESSION_TENANT_ID);
   if (userId == null) return { res: json({ error: NOT_A_CRM_USER }, 403) };
