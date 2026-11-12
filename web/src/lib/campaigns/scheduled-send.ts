@@ -14,7 +14,7 @@ import { bounceStopped, inboxFresh, inSendWindow, warmupCap } from "./schedule-g
 // minutes, which spreads the sends. Docs: docs/api.md "Scheduled sending".
 
 const MAILBOX_LOCK = 72120512; // pg_advisory_xact_lock(key1, tenantId): every campaign of the one sending mailbox serializes
-const MAX_CANDIDATES = 20;
+const MAX_CANDIDATES = 5; // few: prepareDraftSend reads on its own connection while the lock is held (pool max 3, Vanda #200-5)
 const SCHEDULER = { userId: null, appSlug: "scheduler" } as const;
 
 type Result = { slug: string; sentDraftId: number | null; blocked: string[] };
@@ -76,6 +76,13 @@ async function runOne(
     db.emailDraft.count({ where: { tenantId, campaign: c.slug, sentVia: "resend", status: { in: ["sent", "replied"] } } }),
     db.campaignEvent.count({ where: { tenantId, campaignId: c.id, outcome: "bounce" } }),
   ]);
+  // Provider failures: three failed drafts within the hour stop the queue instead of turning one approved draft
+  // a tick into `failed` (Vanda #200-1). Real clock: updatedAt is written with it.
+  const failing = await db.emailDraft.count({ where: { tenantId, campaign: c.slug, status: "failed", updatedAt: { gte: new Date(Date.now() - 60 * 60_000) } } });
+  if (failing >= 3) {
+    blocked.push("send_failing");
+    await setCampaignStatus({ tenantId, ...SCHEDULER }, c.slug, "paused");
+  }
   if (bounceStopped(sent, bounced)) {
     blocked.push("bounce_stop");
     await setCampaignStatus({ tenantId, ...SCHEDULER }, c.slug, "paused");
@@ -103,7 +110,8 @@ async function runOne(
     const companyIds = [...new Set(drafts.map((d) => d.companyId))];
     const [members, replied] = await Promise.all([
       tx.campaignMember.findMany({ where: { tenantId, campaignId: c.id, companyId: { in: companyIds } }, select: { companyId: true, state: true, stepPosition: true } }),
-      tx.emailDraft.findMany({ where: { tenantId, campaign: c.slug, status: "replied", companyId: { in: companyIds } }, select: { companyId: true } }),
+      // A reply in ANY campaign ends cold e-mail to that company (Vanda #200-6).
+      tx.emailDraft.findMany({ where: { tenantId, status: "replied", companyId: { in: companyIds } }, select: { companyId: true } }),
     ]);
     const repliedCo = new Set(replied.map((r) => r.companyId));
     const skip = (d: EmailDraft, why: string) => (d.lastError === why ? null : tx.emailDraft.update({ where: { id: d.id }, data: { lastError: why } }));

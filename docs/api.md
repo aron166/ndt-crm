@@ -1232,6 +1232,7 @@ Per campaign (status `running`, member kind, switch on, in id order) at most ONE
 | `bounce_stop` | `bounce` events / sent (Resend, `sent` or `replied`) of the campaign >= 3%; the campaign is also set to `paused`, a human resumes it |
 | `cap_reached` | the mailbox warm-up cap (10 a day, +2 per earlier sending day, at most 35; it counts every Resend send of the tenant today, hand-sent ones and other campaigns included, from the campaign sender's warmupStartedOn) or the campaign's `daily_cap` is used up for the Budapest day |
 | `send_failed` | the provider refused; the draft is `failed` and needs a human |
+| `send_failing` | three drafts of this campaign failed at the provider within the last hour: the campaign is PAUSED so the approved queue is not burned through; a human resumes it |
 | `error` | unexpected error, reported |
 
 Concurrent calls serialize per sender (advisory lock), so the same draft is never sent twice. A candidate draft that cannot go (member no longer queued or on another step, the company replied, suppressed, no address) keeps its status and gets `last_error`. Only `approved` drafts are considered; up to 20 per call are looked at.

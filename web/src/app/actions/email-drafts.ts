@@ -307,6 +307,8 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   }
   const prep = await prepareDraftSend(TENANT_ID, row);
   if (!prep.ok) return prep;
+  // Before the claim: a throw here must not leave the row stuck in `sending` (Vanda #200-7).
+  const { userId } = await getActor(TENANT_ID);
 
   // Claim it. Nothing below this line may run twice for one row.
   const claim = await db.emailDraft.updateMany({
@@ -317,7 +319,6 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
     revalidatePath("/outreach");
     return { ok: false, error: "Ez a piszkozat épp küldés alatt van, vagy már elment" };
   }
-  const { userId } = await getActor(TENANT_ID);
   const result = await deliverClaimedDraft(TENANT_ID, row, prep, { userId });
   revalidatePath("/outreach");
   return result;
