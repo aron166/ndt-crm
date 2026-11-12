@@ -86,6 +86,11 @@ describe("processResendEvent", () => {
     expect(m.draftUpdate).toHaveBeenCalledWith({ where: { id: 7 }, data: { lastError: "Visszapattant (Suppressed)" } });
     expect(m.evUpdate).toHaveBeenCalledWith({ where: { id: 1 }, data: { processedAt: now } });
   });
+  it("a matched draft's own address is suppressed, not the payload's first recipient (Vanda #198-2)", async () => {
+    m.draftFind.mockResolvedValue({ ...draft, toEmail: "Real@Ceg.hu" });
+    await processResendEvent(1, "msg_r", evt("email.bounced", { to: ["other@x.hu", "real@ceg.hu"], bounce: { type: "Permanent" } }), now);
+    expect(m.optOut).toHaveBeenCalledWith(1, "real@ceg.hu", expect.objectContaining({ kind: "bounce", draftId: 7 }));
+  });
   it("Temporary bounce -> stored only", async () => {
     await processResendEvent(1, "msg_a", bounced("Temporary"), now);
     expect(m.evCreate).toHaveBeenCalled();
