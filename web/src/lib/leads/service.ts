@@ -19,6 +19,7 @@ import {
 import { computeTier } from "./tier";
 import { isMachineSale, machinePipelineIdFrom } from "./machine-sales";
 import { reportError } from "@/lib/report-error";
+import { LEAD_CALL_TO_CAMPAIGN_OUTCOME } from "@/lib/campaigns/rules";
 import { DEFAULT_BOOKING_MINUTES, conflictsFor } from "@/lib/booking/conflicts";
 import { loadBookings, resolveDemoHost } from "@/lib/booking/queries";
 
@@ -786,6 +787,19 @@ export async function logLeadCallOutcome(
       toStatus: plan.status,
       fields: eventFields(lead, { status: plan.status, callOutcome: input.outcome }),
     });
+  }
+
+  // The company's campaign members waiting for a call move too, so the campaign does not call
+  // again (C1). A correction does not: the call it corrects already moved them.
+  if (lead.companyId != null && input.supersedesInteractionId == null) {
+    try {
+      // Dynamic: campaigns/service imports this module.
+      const { advanceMembersForCall } = await import("@/lib/campaigns/service");
+      await advanceMembersForCall({ tenantId: ctx.tenantId, userId: ctx.userId, appSlug: ctx.actorAgentId ?? undefined },
+        lead.companyId, LEAD_CALL_TO_CAMPAIGN_OUTCOME[input.outcome], now);
+    } catch (err) {
+      reportError("leads.logLeadCallOutcome.campaignMembers", err, { leadId });
+    }
   }
 
   return {

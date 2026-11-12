@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { db } from "@/lib/db";
 import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
-import { changeLeadStatus } from "@/lib/leads/service";
+import { changeLeadStatus, completeOpenLeadCallTasks } from "@/lib/leads/service";
 import { runAutomations } from "@/lib/automations/engine";
 import { resolveDemoHost } from "@/lib/booking/queries";
 import { approvalHash, type StepDef } from "./rules";
-import { addMembers, approveCampaign, recordOutcome, setCampaignStatus, specifyCampaign, setSteps, undoBatch, updateCampaign } from "./service";
+import { addMembers, advanceMembersForCall, approveCampaign, recordOutcome, setCampaignStatus, specifyCampaign, setSteps, undoBatch, updateCampaign } from "./service";
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 import { audit } from "@/lib/audit";
@@ -13,7 +13,7 @@ vi.mock("@/lib/report-error", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/enrichment/recompute", () => ({ recomputeCloseness: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/automations/engine", () => ({ runAutomations: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/leads/lifecycle-sweep", () => ({ startLeadLifecycle: vi.fn().mockResolvedValue(undefined) }));
-vi.mock("@/lib/leads/service", () => ({ changeLeadStatus: vi.fn().mockResolvedValue({ success: true, changed: true }) }));
+vi.mock("@/lib/leads/service", () => ({ changeLeadStatus: vi.fn().mockResolvedValue({ success: true, changed: true }), completeOpenLeadCallTasks: vi.fn().mockResolvedValue(1) }));
 vi.mock("@/lib/booking/queries", () => ({ resolveDemoHost: vi.fn() }));
 vi.mock("@/lib/suppression", () => ({ loadSuppressionSet: vi.fn().mockResolvedValue({ emails: new Set(), domains: new Set() }) }));
 vi.mock("@/lib/content/service", () => ({ createItem: vi.fn().mockResolvedValue({ ok: true, itemId: 900, versionId: 1, existed: false, status: "in_review", ruleChecks: 0 }) }));
@@ -448,5 +448,88 @@ describe("one reply path (C2): a reply logged in the hub stops the outreach like
   it("a call outcome touches no draft", async () => {
     await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "no_answer" }, NOW);
     expect(d.emailDraft.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("one call-outcome writer (C1): the campaign path", () => {
+  it("a logged call carries the user and completes the linked lead's open call tasks, and is audited", async () => {
+    d.lead.findFirst.mockResolvedValue({ id: 250, status: "contacting" });
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "no_answer" }, NOW);
+    expect(d.interaction.create.mock.calls[0][0].data).toMatchObject({ userId: 5, leadId: 250, type: "call" });
+    expect(completeOpenLeadCallTasks).toHaveBeenCalledWith(expect.anything(), 250, 1, NOW);
+    expect(audit).toHaveBeenCalledWith("interaction", 600, "create", null, expect.objectContaining({ type: "call", outcome: "no_answer", leadId: 250 }), expect.anything());
+  });
+
+  it("no open lead: no task completion is attempted", async () => {
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "no_answer" }, NOW);
+    expect(completeOpenLeadCallTasks).not.toHaveBeenCalled();
+  });
+
+  it("callAlreadyLogged: member, event, campaign automations and audit happen; no second interaction, no lead move", async () => {
+    d.lead.findFirst.mockResolvedValue({ id: 250, status: "new" });
+    const r = await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "wants" }, NOW, { callAlreadyLogged: true });
+    expect(r).toMatchObject({ ok: true, member: { state: "promoted" }, interaction_id: null });
+    expect(d.interaction.create).not.toHaveBeenCalled();
+    expect(d.company.updateMany).not.toHaveBeenCalled();
+    expect(changeLeadStatus).not.toHaveBeenCalled();
+    expect(d.lead.create).not.toHaveBeenCalled();
+    expect(completeOpenLeadCallTasks).not.toHaveBeenCalled();
+    expect(d.campaignMember.updateMany.mock.calls[0][0].data).toMatchObject({ state: "promoted", leadId: 250 });
+    expect(d.campaignEvent.create.mock.calls[0][0].data).toMatchObject({ outcome: "wants", leadId: 250 });
+    const types = (runAutomations as M).mock.calls.map((c) => c[0].type);
+    expect(types).toContain("campaign_call_outcome");
+    expect(audit).toHaveBeenCalledWith("campaign", 3, "update", expect.anything(), expect.objectContaining({ member: 44, outcome: "wants" }), expect.anything());
+  });
+
+  it("advanceMembersForCall advances every queued member of the company on a call step, skips the rest", async () => {
+    d.campaignMember.findMany.mockResolvedValue([
+      { id: 44, stepPosition: 2, personId: 8, campaign: { id: 3, slug: "bp", steps: STEPS } },
+      { id: 45, stepPosition: 1, campaign: { id: 4, slug: "email-first", steps: STEPS } },
+    ]);
+    const n = await advanceMembersForCall(SESSION, 7, "no_answer", NOW);
+    expect(n).toBe(1);
+    expect(d.campaignMember.findMany.mock.calls[0][0].where).toMatchObject({ tenantId: 1, companyId: 7, state: "queued", campaign: { status: { in: ["running", "paused"] } } });
+    expect(d.campaignMember.updateMany).toHaveBeenCalledTimes(1);
+    expect(d.interaction.create).not.toHaveBeenCalled();
+  });
+
+  it("advanceMembersForCall with no member does nothing", async () => {
+    d.campaignMember.findMany.mockResolvedValue([]);
+    expect(await advanceMembersForCall(SESSION, 7, "no_answer", NOW)).toBe(0);
+    expect(d.campaignMember.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("advanceMembersForCall: a member refused by the rules is reported, never thrown", async () => {
+    d.campaignMember.findMany.mockResolvedValue([{ id: 44, stepPosition: 2, campaign: { id: 3, slug: "bp", steps: STEPS } }]);
+    d.campaignMember.updateMany.mockResolvedValue({ count: 0 });
+    expect(await advanceMembersForCall(SESSION, 7, "no_answer", NOW)).toBe(0);
+  });
+});
+
+describe("a /calls tap that promotes (C1, Vanda #205-c): outbound actions only with the campaign switch", () => {
+  const OUT = ["send_email", "webhook_out"];
+  for (const on of [false, true]) {
+    it(`outbound_automations ${on}: every automation of an "interested" promotion ${on ? "may run" : "skips"} send_email and webhook_out`, async () => {
+      d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", ownerUserId: 9, outboundAutomations: on, steps: STEPS });
+      const r = await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "interested" }, NOW);
+      expect(r).toMatchObject({ ok: true, lead: { created: true } });
+      const events = (runAutomations as M).mock.calls.map((c) => c[0]);
+      expect(events.map((e) => e.type)).toEqual(["lead_created", "campaign_call_outcome", "campaign_member_promoted"]);
+      for (const e of events) expect(e.skipActionTypes).toEqual(on ? [] : OUT);
+    });
+  }
+  it("advanced from the lead path (callAlreadyLogged), switch off: campaign automations skip outbound actions too", async () => {
+    d.lead.findFirst.mockResolvedValue({ id: 250, status: "new" });
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "wants" }, NOW, { callAlreadyLogged: true });
+    for (const c of (runAutomations as M).mock.calls) expect(c[0].skipActionTypes).toEqual(OUT);
+  });
+});
+
+describe("findOpenLead: the one open-lead lookup", () => {
+  it("open, not converted, newest first, tenant scoped", async () => {
+    const { findOpenLead } = await import("./service");
+    d.lead.findFirst.mockResolvedValue({ id: 9, status: "new" });
+    expect(await findOpenLead(db, 1, 7)).toEqual({ id: 9, status: "new" });
+    expect(d.lead.findFirst.mock.calls[0][0]).toMatchObject({ where: { tenantId: 1, companyId: 7, outcome: "open", convertedDealId: null }, orderBy: { createdAt: "desc" } });
   });
 });

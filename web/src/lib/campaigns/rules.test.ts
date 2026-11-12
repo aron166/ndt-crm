@@ -242,3 +242,15 @@ describe("campaign automation events per outcome (item 5)", () => {
     expect(campaignAutomationEvents("note_only", { promoted: false, stepFrom: 2, stepTo: 2, done: false })).toEqual([]);
   });
 });
+
+describe("LEAD_CALL_TO_CAMPAIGN_OUTCOME: a lead-page call advances a campaign member with an explicit key", () => {
+  it("maps every lead call outcome to a campaign call key", async () => {
+    const { LEAD_CALL_TO_CAMPAIGN_OUTCOME, CALL_OUTCOME_KEYS } = await import("./rules");
+    const { CALL_OUTCOMES } = await import("@/lib/leads/outcomes");
+    expect(LEAD_CALL_TO_CAMPAIGN_OUTCOME).toEqual({
+      no_answer: "no_answer", wrong_number: "bad_number", not_interested: "not_interested",
+      disqualified: "not_interested", callback_requested: "interested", meeting_booked: "wants",
+    });
+    for (const o of CALL_OUTCOMES) expect(CALL_OUTCOME_KEYS).toContain(LEAD_CALL_TO_CAMPAIGN_OUTCOME[o.key]);
+  });
+});
