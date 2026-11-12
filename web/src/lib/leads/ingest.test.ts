@@ -354,6 +354,14 @@ describe("ingestLead — cold-email reply intake (thread_key)", () => {
     });
   });
 
+  it("a reply cancels queued touches to that company in EVERY campaign, not only the answered one (C2)", async () => {
+    const { tx, draftUpdates } = makeTx({ draft: { id: 5, companyId: 42, campaign: "BirdsView Q4" } });
+    await ingestLead(reply(), ctx, tx);
+    const cancel = draftUpdates[1] as { where: Record<string, unknown>; data: unknown };
+    expect(cancel).toMatchObject({ where: { tenantId: 1, companyId: 42, status: { in: ["draft", "approved", "failed"] } }, data: { status: "cancelled" } });
+    expect(cancel.where).not.toHaveProperty("campaign");
+  });
+
   it("stores the thread key on the lead so the next run can find it", async () => {
     const { tx, lastLeadData } = makeTx({ draft: { id: 5, companyId: 42, campaign: "BirdsView Q4" } });
     await ingestLead(reply(), ctx, tx);
