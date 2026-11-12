@@ -11,6 +11,7 @@ import { bestOnDay, proposeRouteSlots, type RouteSlotsInput } from "./route-slot
 import { addDays, addWorkingDays, atLocal, localDay } from "./time";
 import { straightLineSource, type DriveTimeSource, type Place } from "./travel";
 import { resolveDemoHost } from "./queries";
+import { sendBookingConfirmation } from "./confirmation";
 import type { BundleHint, Flag, Machine, PlacementResult, RankedSlot, RouteStop } from "./route-types";
 
 /**
@@ -437,5 +438,7 @@ export async function createBooking(ctx: BookingCtx, raw: unknown, auditOpts: Au
     title, startsAt: input.startsAt.toISOString(), bookingKind: input.kind, leadId: lead.id,
     siteSettlementId: input.settlementId, equipmentId: machineId, overrideReason: overridden ? input.overrideReason : null,
   }, auditOpts);
+  // Off unless the tenant switched it on; the booking is already written, so a failure here changes nothing.
+  try { await sendBookingConfirmation(ctx.tenantId, task.id); } catch { /* never fails the booking */ }
   return { success: true, taskId: task.id, machineId, overridden, check };
 }

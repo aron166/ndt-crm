@@ -13,7 +13,7 @@ const ev = (startsAt: string, minutes: number) => ({
   uid: "booking-task-50@helm-crm", startsAt: new Date(startsAt), minutes, summary: "Demó: Teszt Kft", location: "Debrecen", description: "x",
   organizer: { name: "Nagy Péter", email: "peter@example.test" }, now: new Date("2026-11-20T09:00:00Z"),
 });
-const line = (ics: string, prefix: string) => ics.split("\r\n").find((l) => l.startsWith(prefix));
+const line = (ics: string, prefix: string) => ics.split("\r\n").find((l) => l.startsWith(prefix + ";TZID") || (prefix !== "DTSTART" && l.startsWith(prefix)));
 
 describe("buildIcs: Europe/Budapest wall time and daylight saving", () => {
   it("winter (CET): 10:00 local is written as 10:00 with the TZID", () => {
