@@ -1,0 +1,20 @@
+From: Kiss Anna <anna@pelda-kft.hu>
+To: Aron <aron@ndt.hu>
+Subject: Read: Ajanlat
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <receipt-1@mail.pelda-kft.hu>
+MIME-Version: 1.0
+Content-Type: multipart/report; report-type=disposition-notification; boundary="BND"
+
+--BND
+Content-Type: text/plain; charset=UTF-8
+
+Your message was displayed.
+
+--BND
+Content-Type: message/disposition-notification
+
+Final-Recipient: rfc822; anna@pelda-kft.hu
+Disposition: manual-action/MDN-sent-manually; displayed
+
+--BND--
