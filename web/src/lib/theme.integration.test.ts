@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
 /**
  * The one claim in this feature that a unit test cannot make: that the
- * `jsonb_set` in actions/theme.ts MERGES the theme into users.settings rather
+ * `jsonb_set` statement below MERGES the theme into users.settings rather
  * than replacing the bag. Everything else about the setting is pure.
  *
  * Same guard and harness as content/service.integration.test.ts: skipped
@@ -29,9 +29,8 @@ describe.skipIf(!enabled)("theme setting (integration)", () => {
   let parseTheme: (typeof import("./theme"))["parseTheme"];
   let userId: number;
 
-  // The statement under test, character for character as actions/theme.ts
-  // runs it. Importing the server action itself would drag in next/cache and
-  // the auth stack; the SQL is the part that can be silently wrong.
+  // The statement under test, a private copy (the server action that
+  // ran it was removed as dead code, so this now checks only the SQL pattern, not app code).
   async function writeTheme(id: number, theme: string) {
     return db.$executeRaw`
       UPDATE "users"
