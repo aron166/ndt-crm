@@ -25,6 +25,7 @@ import { startLeadLifecycle } from "@/lib/leads/lifecycle-sweep";
 import { changeLeadStatus } from "@/lib/leads/service";
 import { runAutomations } from "@/lib/automations/engine";
 import { recomputeCloseness } from "@/lib/enrichment/recompute";
+import { stopTouchesAfterReply } from "@/lib/outreach/stop-touches";
 import { nextStatusFor, outcomeMeta } from "@/lib/outreach/queue";
 import { createItem } from "@/lib/content/service";
 import type { ContentCategory } from "@/lib/content/types";
@@ -821,6 +822,18 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
         actorUserId: ctx.userId, actorAgentId: ctx.userId == null ? ctx.appSlug ?? null : null, at: now,
       },
     });
+    // A reply logged here stops the outreach exactly like /outreach and the IMAP intake (C2):
+    // the newest sent touch of this campaign is the answered one.
+    if (input.outcome === "reply_positive" || input.outcome === "reply_negative") {
+      const answered = await tx.emailDraft.findFirst({
+        where: { tenantId, companyId: m.companyId, campaign: c.slug, status: "sent" },
+        orderBy: [{ sentAt: "desc" }, { step: "desc" }],
+        select: { id: true },
+      });
+      // Hub "positive" covers interested, question, forwarded: left for a person to classify.
+      await stopTouchesAfterReply(tx, tenantId, m.companyId,
+        answered ? { draftId: answered.id, replyType: input.outcome === "reply_negative" ? "no" : null } : null);
+    }
     const suppressAddr = normalizeEmail(input.email ?? m.person?.email ?? null);
     if (plan.suppress && suppressAddr) {
       const email = suppressAddr;

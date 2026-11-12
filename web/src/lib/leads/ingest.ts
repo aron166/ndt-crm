@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { LeadIntake } from "./schema";
+import { stopTouchesAfterReply } from "@/lib/outreach/stop-touches";
 import { normalizeIntakeAnswers, withAnswers, effectiveAnswers } from "./qualification";
 import { computeTier, type LeadTier } from "./tier";
 import { w2FieldsFromAnswers } from "./lifecycle";
@@ -377,30 +378,11 @@ export async function ingestLead(
   // would mark both campaigns' emails replied off a single answer.
   // (Vanda, #89.)
   if (draft) {
-    await tx.emailDraft.updateMany({
-      where: { id: draft.id, tenantId, status: "sent" },
-      data: { status: "replied", repliedAt: new Date(), replyType: input.reply_type ?? null },
-    });
-
-    // A reply must STOP the sequence. Marking the answered draft `replied` did
-    // nothing to touches 2-4: they sit at `draft`/`approved` with no thread key,
-    // so they survived the flip and `canSend("approved")` is still true — a
-    // human would open /outreach and send cold touch 3 to someone who had
-    // already answered. They are cancelled here, scoped to this company and
-    // campaign. Note this deliberately does NOT widen the `replied` filter
-    // above: only a SENT draft can be replied to, and loosening that is the
-    // hole that lets a forged key promote an email that never went out.
-    // (Vanda, #89.)
-    await tx.emailDraft.updateMany({
-      where: {
-        tenantId,
-        companyId: draft.companyId,
-        campaign: draft.campaign,
-        // `failed` too: it is sendable by hand (MANUAL_SENDABLE_STATUSES).
-        status: { in: ["draft", "approved", "failed"] },
-      },
-      data: { status: "cancelled" },
-    });
+    // A reply must STOP the sequence: touches 2-4 sit at draft/approved with no thread key and
+    // would survive the flip (Vanda, #89). The shared rule also stops the company's other
+    // campaigns (C2, 2026-11-12). Only a SENT draft can be replied to: a forged key cannot
+    // promote an email that never went out.
+    await stopTouchesAfterReply(tx, tenantId, draft.companyId, { draftId: draft.id, replyType: input.reply_type ?? null });
   }
 
   // 6. Emit an app_events row so the ecosystem hub sees the submission.
