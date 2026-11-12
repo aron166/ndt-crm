@@ -13,7 +13,7 @@ import { bounceStopped, inboxFresh, inSendWindow, warmupCap } from "./schedule-g
 // `blocked` and sends nothing. At most ONE send per campaign per call: the clock calls every few
 // minutes, which spreads the sends. Docs: docs/api.md "Scheduled sending".
 
-const SENDER_LOCK = 72120512; // pg_advisory_xact_lock(key1, senderUserId): one sender's campaigns serialize
+const MAILBOX_LOCK = 72120512; // pg_advisory_xact_lock(key1, tenantId): every campaign of the one sending mailbox serializes
 const MAX_CANDIDATES = 20;
 const SCHEDULER = { userId: null, appSlug: "scheduler" } as const;
 
@@ -83,18 +83,20 @@ async function runOne(
   if (blocked.length || !sender) return { slug: c.slug, sentDraftId: null, blocked };
 
   const claimed = await db.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${SENDER_LOCK}::int, ${sender.id}::int)`;
+    // The warm-up protects the MAILBOX (the tenant's one Resend from-address), so every resend send counts: other
+    // campaigns, other senders, hand-sent clicks.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${MAILBOX_LOCK}::int, ${tenantId}::int)`;
     const start = atLocal(today, 0);
     const sentToday = { tenantId, OR: [{ status: { in: ["sent", "replied"] }, sentAt: { gte: start } }, { status: "sending", updatedAt: { gte: start } }] };
-    const [bySender, byCampaign, prior] = await Promise.all([
-      tx.emailDraft.count({ where: { ...sentToday, senderUserId: sender.id } }),
+    const [byMailbox, byCampaign, prior] = await Promise.all([
+      tx.emailDraft.count({ where: { ...sentToday, OR: [{ status: { in: ["sent", "replied"] }, sentVia: "resend", sentAt: { gte: start } }, { status: "sending", updatedAt: { gte: start } }] } }),
       tx.emailDraft.count({ where: { ...sentToday, campaign: c.slug } }),
       tx.$queryRaw<{ n: bigint }[]>`
         SELECT COUNT(DISTINCT (sent_at AT TIME ZONE 'Europe/Budapest')::date) AS n FROM email_drafts
-        WHERE tenant_id = ${tenantId} AND sender_user_id = ${sender.id} AND status IN ('sent', 'replied')
+        WHERE tenant_id = ${tenantId} AND sent_via = 'resend' AND status IN ('sent', 'replied')
           AND sent_at < ${start} AND (sent_at AT TIME ZONE 'Europe/Budapest')::date >= ${startedOn}::date`,
     ]);
-    const room = Math.min(warmupCap(startedOn, today.key, Number(prior[0]?.n ?? 0)) - bySender, c.dailyCap - byCampaign);
+    const room = Math.min(warmupCap(startedOn, today.key, Number(prior[0]?.n ?? 0)) - byMailbox, c.dailyCap - byCampaign);
     if (room <= 0) return "cap_reached" as const;
 
     const drafts = await tx.emailDraft.findMany({ where: { tenantId, campaign: c.slug, status: "approved" }, orderBy: { id: "asc" }, take: MAX_CANDIDATES });

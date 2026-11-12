@@ -1230,7 +1230,7 @@ Per campaign (status `running`, member kind, switch on, in id order) at most ONE
 | `sender_profile_incomplete` | the sender has no `users.name` or no `users.settings.phone` |
 | `warmup_not_started` | `users.settings.warmupStartedOn` (`YYYY-MM-DD`, Budapest) is missing, invalid or in the future |
 | `bounce_stop` | `bounce` events / sent (Resend, `sent` or `replied`) of the campaign >= 3%; the campaign is also set to `paused`, a human resumes it |
-| `cap_reached` | the sender's warm-up cap (10 a day, +2 per earlier sending day, at most 35) or the campaign's `daily_cap` is used up for the Budapest day |
+| `cap_reached` | the mailbox warm-up cap (10 a day, +2 per earlier sending day, at most 35; it counts every Resend send of the tenant today, hand-sent ones and other campaigns included, from the campaign sender's warmupStartedOn) or the campaign's `daily_cap` is used up for the Budapest day |
 | `send_failed` | the provider refused; the draft is `failed` and needs a human |
 | `error` | unexpected error, reported |
 
