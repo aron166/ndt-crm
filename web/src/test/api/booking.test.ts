@@ -23,6 +23,8 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("@/lib/audit", () => ({ audit }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+const sendConfirmation = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/booking/confirmation", () => ({ sendBookingConfirmation: sendConfirmation }));
 vi.mock("@/lib/actor", () => ({ getActor, NOT_A_CRM_USER: "NOT_A_CRM_USER" }));
 
 import { GET as settlementsGET } from "@/app/api/booking/settlements/route";
@@ -134,6 +136,19 @@ describe("bookings", () => {
     const res = await bookingsPOST(req("bookings", { ...impossible, settlementId: 1184, startsAt: "2026-11-26T10:00:00+01:00" }));
     expect(res.status).toBe(201);
     expect(db.task.create.mock.calls[0][0].data.overrideReason).toBeNull();
+  });
+
+  it("confirmation: asked for after the write; a failing confirmation never fails the booking", async () => {
+    db.task.findMany.mockResolvedValue([]);
+    sendConfirmation.mockReset().mockRejectedValue(new Error("resend down"));
+    const res = await bookingsPOST(req("bookings", { ...impossible, settlementId: 1184, startsAt: "2026-11-26T10:00:00+01:00" }));
+    expect(res.status).toBe(201);
+    expect(sendConfirmation).toHaveBeenCalledWith(1, 900);
+  });
+  it("confirmation: a refused booking asks for none", async () => {
+    sendConfirmation.mockReset();
+    expect((await bookingsPOST(req("bookings", impossible))).status).toBe(409);
+    expect(sendConfirmation).not.toHaveBeenCalled();
   });
 
   it("409 when the typed minutes are shorter than the kind needs, unless a reason is given", async () => {
