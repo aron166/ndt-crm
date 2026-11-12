@@ -12,6 +12,7 @@ import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { unsubscribeHeaders } from "@/lib/outreach/unsubscribe";
+import { draftSendKey } from "@/lib/outreach/send-key";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import {
   type DraftStatus,
@@ -372,7 +373,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
       companyId: row.companyId,
       personId: row.personId,
       headers,
-      idempotencyKey: `draft-${id}`,
+      idempotencyKey: draftSendKey(id, to, row.subject, text),
     });
   } catch (err) {
     // sendEmail catches its own transport errors, so reaching here means

@@ -8,6 +8,12 @@ const KEY = "ab".repeat(32);
 afterEach(() => vi.unstubAllEnvs());
 
 describe("outreach token", () => {
+  it("refuses a non-hex or short ENCRYPTION_KEY (Vanda #196-3)", () => {
+    vi.stubEnv("ENCRYPTION_KEY", "not-hex-at-all");
+    expect(() => signPayload("unsub", { t: 1 })).toThrow("ENCRYPTION_KEY");
+    vi.stubEnv("ENCRYPTION_KEY", "ab".repeat(16));
+    expect(() => signPayload("unsub", { t: 1 })).toThrow("ENCRYPTION_KEY");
+  });
   it("round-trips", () => {
     vi.stubEnv("ENCRYPTION_KEY", KEY);
     const { d, s } = signPayload("unsub", { t: 1, e: "a@b.hu" });

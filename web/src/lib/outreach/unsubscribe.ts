@@ -67,11 +67,12 @@ export async function applyOptOut(
   if (!campaign || !member || !OPEN_MEMBER_STATES.includes(member.state as never)) {
     return { suppressed: true, memberUpdated: false };
   }
+  // The suppression is written: a failing member step is reported, never turned into an error page (Vanda #196-5).
   const res = await recordOutcome(
     { tenantId, userId: null, appSlug: opts.agent },
     draft.campaign,
     { member_id: member.id, outcome: opts.kind === "bounce" ? "bounce" : "unsubscribe", email },
-  );
+  ).catch((err: unknown) => ({ error: err instanceof Error ? err.message : String(err) }));
   if ("error" in res) {
     reportError("outreach.applyOptOut", new Error(res.error), { tenantId, memberId: member.id });
     return { suppressed: true, memberUpdated: false };

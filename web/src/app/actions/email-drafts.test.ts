@@ -58,10 +58,17 @@ describe("sendDraft unsubscribe headers", () => {
     (db as unknown as { $transaction: ReturnType<typeof vi.fn> }).$transaction.mockImplementationOnce(async (fn: (tx: unknown) => unknown) => fn({ emailDraft: { update: txUpdate } }));
     expect(await sendDraft(12)).toEqual({ ok: true });
     const arg = send.mock.calls[0][0];
-    expect(arg.idempotencyKey).toBe("draft-12");
+    expect(arg.idempotencyKey).toMatch(/^draft-12-[0-9a-f]{16}$/);
     expect(arg.headers["List-Unsubscribe"]).toMatch(/^<.*\/api\/outreach\/unsubscribe\?d=.+&s=.+>$/);
     expect(arg.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
     expect(txUpdate.mock.calls[0][0].data.toEmail).toBe("Kinga@Ceg.hu");
+  });
+  it("an edited retry gets a different idempotency key (Vanda #196-1)", async () => {
+    (db as unknown as { $transaction: ReturnType<typeof vi.fn> }).$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn({ emailDraft: { update: vi.fn() } }));
+    await sendDraft(12);
+    m.emailDraft.findFirst.mockResolvedValue({ ...row, body: "B edited" });
+    await sendDraft(12);
+    expect(send.mock.calls[0][0].idempotencyKey).not.toBe(send.mock.calls[1][0].idempotencyKey);
   });
   it("refuses before the claim when ENCRYPTION_KEY is missing", async () => {
     vi.stubEnv("ENCRYPTION_KEY", "");
