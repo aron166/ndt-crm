@@ -833,8 +833,7 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
       });
       // Hub "positive" covers interested, question, forwarded: left for a person to classify.
       await stopTouchesAfterReply(tx, tenantId, m.companyId,
-        answered ? { draftId: answered.id, replyType: input.outcome === "reply_negative" ? "no" : null } : null,
-        { campaign: c.slug, leadId, actorUserId: ctx.userId, actorAgentId: ctx.userId == null ? ctx.appSlug ?? null : null, now });
+        answered ? { draftId: answered.id, replyType: input.outcome === "reply_negative" ? "no" : null } : null);
     }
     const suppressAddr = normalizeEmail(input.email ?? m.person?.email ?? null);
     if (plan.suppress && suppressAddr) {
