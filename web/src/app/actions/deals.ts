@@ -101,6 +101,12 @@ export async function updateDeal(id: number, formData: FormData) {
     select: { title: true, stageId: true, value: true, customFields: true },
   });
 
+  // Every check moveDealToStage makes (deal, tenant stage) is done before the first write,
+  // so a modal save is never left half-applied by a refused stage.
+  if (!before) return { error: "Deal nem található" };
+  const stageId = stageIdStr ? parseInt(stageIdStr) : null;
+  const stageMove = stageId != null && stageId !== before.stageId;
+
   await db.deal.updateMany({
     where: { id, tenantId: TENANT_ID },
     data: {
@@ -108,13 +114,19 @@ export async function updateDeal(id: number, formData: FormData) {
       value: valueStr ? parseFloat(valueStr) : null,
       expectedCloseDate: closeDate ? new Date(closeDate) : null,
       personId: personIdStr ? parseInt(personIdStr) : null,
-      stageId: stageIdStr ? parseInt(stageIdStr) : null,
+      // A real stage change goes through the board's path below; no stage = cleared, as before.
+      ...(stageMove ? {} : { stageId }),
       ...(Object.keys(customFields).length > 0 ? { customFields: { ...(before?.customFields as Record<string, string> ?? {}), ...customFields } } : {}),
       updatedAt: new Date(),
     },
   });
 
-  if (before) audit("deal", id, "update", { title: before.title }, { title });
+  audit("deal", id, "update", { title: before.title }, { title });
+  // "Fázis" in the modal = a drag on the board: stage clock, audit with the stages, deal_stage_changed.
+  if (stageMove && stageId != null) {
+    const moved = await moveDealToStage(TENANT_ID, id, stageId);
+    if ("error" in moved) return { error: moved.error };
+  }
   revalidatePath("/deals");
   return { success: true };
 }
