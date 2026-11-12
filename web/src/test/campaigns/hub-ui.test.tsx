@@ -78,10 +78,14 @@ describe("Futó kampányok", () => {
     expect(screen.getByText("Még nincs deallé vált lead ebben az időszakban.")).toBeTruthy();
     unmount();
     const won = { ...cell, leads: 3, converted: 1, convertedValue: 500000, won: 1, wonValue: 500000 };
-    render(<RunningStrip rows={[{ ...row, revenue: { ...none, total: won, bySegment: [{ key: "A", ...won }] } }]} />);
+    const { unmount: unmount2 } = render(<RunningStrip rows={[{ ...row, revenue: { ...none, total: won, bySegment: [{ key: "A", ...won }] } }]} />);
     await userEvent.click(screen.getByRole("button", { name: "Bevétel" }));
     expect(screen.getByText(/^Szegmens: A/)).toBeTruthy();
     expect(screen.getAllByText(/500\s?000/).length).toBeGreaterThan(0);
+    unmount2();
+    render(<RunningStrip rows={[{ ...row, revenue: { ...none, total: { ...won, otherCurrency: 2 }, byChannel: [{ key: "landing", ...won }] } }]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Bevétel" }));
+    expect(screen.getByText(/2 deal más pénznemben/)).toBeTruthy();
   });
   it("says so when nothing runs", () => {
     render(<RunningStrip rows={[]} />);

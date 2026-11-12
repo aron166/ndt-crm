@@ -125,9 +125,24 @@ describe("getWeeklyReport revenue", () => {
     expect(r.revenue.total).toMatchObject({ won: 0, wonValue: 0, converted: 0 });
     expect(r.revenue.byChannel).toEqual([]);
   });
+  const W = { from: new Date("2026-11-02T00:00:00Z"), to: new Date("2026-11-09T00:00:00Z") };
+  const raw = (o: Record<string, unknown>) => ({ outcome: "open", value: 100, currency: "HUF", channel: "landing", source: "web", campaign: null, segment: null, convertedAt: null, closedAt: null, ...o });
+  it("flags are scoped to the window: converted_at in [from, to), won = closed_at in [from, to)", async () => {
+    const { windowRevenueRows } = await import("./weekly");
+    const rows = windowRevenueRows([
+      raw({ convertedAt: W.from }),                                   // on the lower bound: converted
+      raw({ convertedAt: W.to }),                                     // on the upper bound: out
+      raw({ convertedAt: new Date("2026-10-30T00:00:00Z"), outcome: "won", closedAt: new Date("2026-11-03T00:00:00Z") }), // converted last week, won now
+      raw({ convertedAt: new Date("2026-11-03T00:00:00Z"), outcome: "won", closedAt: W.to }),                              // won exactly at the upper bound: not won this week
+      raw({ outcome: "won", closedAt: W.from }),                      // won on the lower bound
+      raw({ outcome: "lost", closedAt: new Date("2026-11-03T00:00:00Z") }), // closed but not won: nothing
+    ], W);
+    expect(rows.map((r) => [r.converted, r.won])).toEqual([[true, false], [false, true], [true, false], [false, true]]);
+    expect(rows).toHaveLength(4); // rows that are neither converted nor won in the window are dropped
+  });
   it("won deals in the window are joined to channel, campaign and segment", async () => {
     const r = await run([
-      { converted: true, won: true, value: "500000", currency: "HUF", channel: "cold_email", source: "web", campaign: "bp", segment: "gc" },
+      { outcome: "won", convertedAt: new Date(Date.now() - 3600_000), closedAt: new Date(Date.now() - 1800_000), value: "500000", currency: "HUF", channel: "cold_email", source: "web", campaign: "bp", segment: "gc" },
     ]);
     expect(r.revenue.total).toMatchObject({ won: 1, wonValue: 500000 });
     expect(r.revenue.byCampaign[0]).toMatchObject({ key: "bp", wonValue: 500000 });

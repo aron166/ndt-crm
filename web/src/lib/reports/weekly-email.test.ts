@@ -63,6 +63,13 @@ describe("buildWeeklyReportEmail", () => {
     expect(text.trimEnd().endsWith("Élő riport (utolsó 7 és 28 nap, nem csak a fenti hét): https://x.test/reports/weekly")).toBe(true);
   });
 
+  it("revenue section lists won value and says when deals in another currency are left out", () => {
+    const cell = { leads: 1, converted: 1, convertedValue: 500000, won: 1, wonValue: 500000, otherCurrency: 2 };
+    const { text } = build({ ...full, revenue: { total: cell, bySegment: [], byChannel: [{ key: "landing", ...cell }], bySource: [], byCampaign: [] } });
+    expect(text).toContain("Csatorna: landing: Nyert 1");
+    expect(text).toContain("2 deal más pénznemben: nincs az összegekben.");
+  });
+
   it("an all-empty week still builds, with empty markers", () => {
     const { subject, text } = build(empty);
     expect(subject).toBe("Heti riport: 0 lead, 0 hívás, 0 demó");
