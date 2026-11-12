@@ -1020,6 +1020,7 @@ approval pipeline: e-mail copy, call script, ad), a `daily_cap` (default 15) and
 | `GET /api/campaigns/:slug` | key or session |
 | `PATCH /api/campaigns/:slug` (name, cap, owner, dates, brief, `adopt_brief_proposal`) | **session only** |
 | `PATCH /api/campaigns/:slug` with `outbound_automations` | **session only, Áron only** |
+| `PATCH /api/campaigns/:slug` with `scheduled_sending: true` | **session only, Áron only** (turning it off: any session user) |
 | `PUT /api/campaigns/:slug/steps` | **session only** |
 | `POST /api/campaigns/:slug/lead-audience` with `dry_run: true` | key or session |
 | `POST /api/campaigns/:slug/lead-audience` with `dry_run: false`, `POST /api/campaigns/:slug/email-drafts` | **session only, role `admin` or `manager`** |
@@ -1211,6 +1212,29 @@ lead; an outbound rule that must never touch campaign leads takes the condition 
 byStep: [{ step, touched, replied, promoted }], byDay: [{ day, touches, replies, promoted }] } }`; the report route
 returns one per running campaign. Booked = the promoted lead is at `discovery_booked`, `demo_booked`, `demo_done`,
 `ordered` or won.
+
+### Scheduled sending: `GET|POST /api/cron/campaign-send`
+
+Sends the next due, already-approved `approved` e-mail draft of each campaign whose `scheduled_sending` switch is on. Auth: `Authorization: Bearer <CRON_SECRET>` (`401` otherwise, also when `CRON_SECRET` is unset); an external clock calls it every few minutes. Master switch: unless the env `SCHEDULED_SENDING=on`, it returns `200 { "ok": true, "disabled": true }` and does nothing.
+
+Per campaign (status `running`, member kind, switch on, in id order) at most ONE draft per call, through the same gated sender as the Outreach send button (template gate, footer, suppression, unsubscribe headers, idempotency key `draft-<id>`). Returns `{ ok: true, campaigns: [{ slug, sentDraftId, blocked: [] }] }`. A non-empty `blocked` means nothing was sent for that campaign:
+
+| `blocked` | Meaning |
+|---|---|
+| `outside_send_window` | not Mon-Fri 08:30-16:30 (end exclusive) Europe/Budapest |
+| `outside_campaign_dates` | outside `starts_on` .. `ends_on` |
+| `approval_changed` | `approved_hash` is empty or no longer matches members, steps, cap, audience, variants |
+| `no_footer` | `tenants.settings.outreachFooter` is empty |
+| `inbox_check_stale` | `tenants.settings.inboxCheckedAt` (ISO, written by the reply intake) is missing, older than 60 minutes, or more than 5 minutes ahead |
+| `sender_missing` | the campaign has no `sender_user_id`, or that user is not in the tenant |
+| `sender_profile_incomplete` | the sender has no `users.name` or no `users.settings.phone` |
+| `warmup_not_started` | `users.settings.warmupStartedOn` (`YYYY-MM-DD`, Budapest) is missing, invalid or in the future |
+| `bounce_stop` | `bounce` events / sent (Resend, `sent` or `replied`) of the campaign >= 3%; the campaign is also set to `paused`, a human resumes it |
+| `cap_reached` | the sender's warm-up cap (10 a day, +2 per earlier sending day, at most 35) or the campaign's `daily_cap` is used up for the Budapest day |
+| `send_failed` | the provider refused; the draft is `failed` and needs a human |
+| `error` | unexpected error, reported |
+
+Concurrent calls serialize per sender (advisory lock), so the same draft is never sent twice. A candidate draft that cannot go (member no longer queued or on another step, the company replied, suppressed, no address) keeps its status and gets `last_error`. Only `approved` drafts are considered; up to 20 per call are looked at.
 
 ### Connectors (not built)
 
