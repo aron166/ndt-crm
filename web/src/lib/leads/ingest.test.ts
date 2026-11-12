@@ -639,3 +639,25 @@ describe("ingestLead - attribution passthrough and idempotency_key", () => {
     expect((lastLeadData.value as { threadKey: string }).threadKey).toBe("app~betonscan_landing~thread-abc");
   });
 });
+
+describe("ingestLead - idempotency repeat reports what the route needs to recover effects", () => {
+  const landing = { tenantId: 1, appSlug: "betonscan_landing" };
+  const key = "app~betonscan_landing~idem~k-1";
+  const input = () => parse({ company_name: "Minta Kft.", contact_email: "a@minta.hu", channel: "landing", idempotency_key: "k-1" });
+  const created = new Date("2026-11-12T10:00:00Z");
+
+  it("unmarked: effectsDone false, with the lead's age and person", async () => {
+    const { tx } = makeTx({ lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: key, createdAt: created, customFields: { utm_source: "x" }, contact: { personId: 8 } } });
+    expect(await ingestLead(input(), landing, tx)).toMatchObject({ deduped: true, viaIdempotencyKey: true, leadCreatedAt: created, effectsDone: false, personId: 8 });
+  });
+  it("marked: effectsDone true", async () => {
+    const { tx } = makeTx({ lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: key, createdAt: created, customFields: { effects_done_at: "2026-11-12T10:00:03Z" } } });
+    expect(await ingestLead(input(), landing, tx)).toMatchObject({ deduped: true, viaIdempotencyKey: true, effectsDone: true });
+  });
+  it("a thread_key dedupe is not flagged as an idempotency repeat", async () => {
+    const { tx } = makeTx({ lead: { id: 900, companyId: 42, contactId: 7, tenantId: 1, threadKey: "app~growth~thread-abc" } });
+    const r = await ingestLead(parse({ company_name: "V", contact_email: "k@v.hu", channel: "cold_email", thread_key: "Thread-ABC" }), { tenantId: 1, appSlug: "growth" }, tx);
+    expect(r.deduped).toBe(true);
+    expect(r.viaIdempotencyKey).toBeUndefined();
+  });
+});
