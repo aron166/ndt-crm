@@ -45,7 +45,7 @@ describe("buildIcs: Europe/Budapest wall time and daylight saving", () => {
     expect(ics).toContain("RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU");
     expect(ics).toContain("RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU");
     expect(ics).toContain("DTSTAMP:20261120T090000Z");
-    expect(ics).toContain("DESCRIPTION:a\\, b\; c\\nd ");
+    expect(ics).toContain("DESCRIPTION:a\\, b\\; c\\nd ");
     expect(ics).toContain("METHOD:PUBLISH");
     expect(ics.split("\r\n").every((l) => Buffer.byteLength(l) <= 75)).toBe(true);
   });
@@ -60,6 +60,22 @@ const task = {
   assignedTo: { name: "Nagy Péter", email: "peter@example.test" },
 };
 
+describe("buildIcs: text escaping and parameter quoting", () => {
+  it("a company named 'A; B' has its semicolon backslash-escaped in SUMMARY and the booking mail", () => {
+    const ics = buildIcs({ ...ev("2026-11-26T09:00:00Z", 60), summary: "Demó: A; B, C" });
+    expect(ics).toContain("SUMMARY:Demó: A\\; B\\, C");
+    expect(ics).not.toContain("SUMMARY:Demó: A; B");
+  });
+  it("a backslash is doubled", () => {
+    expect(buildIcs({ ...ev("2026-11-26T09:00:00Z", 60), location: "a\\b" })).toContain("LOCATION:a\\\\b");
+  });
+  it("ORGANIZER CN is quoted when the name has a comma, colon or semicolon; inner quotes dropped; plain names stay bare", () => {
+    expect(buildIcs({ ...ev("2026-11-26T09:00:00Z", 60), organizer: { name: "Nagy, Péter: \"X\"; Y", email: "p@e.test" } }))
+      .toContain('ORGANIZER;CN="Nagy, Péter: X; Y":mailto:p@e.test');
+    expect(buildIcs(ev("2026-11-26T09:00:00Z", 60))).toContain("ORGANIZER;CN=Nagy Péter:mailto:peter@example.test");
+  });
+});
+
 describe("buildConfirmation", () => {
   it("names the Budapest time, place and host; says it is automatic; no banned words", () => {
     const c = buildConfirmation({ ...task, now: new Date("2026-11-20T09:00:00Z") });
@@ -71,6 +87,8 @@ describe("buildConfirmation", () => {
     expect(c.customer.text).toMatch(/automatikus/);
     for (const w of ["garancia", "engedély", "röntgen", "Ft", "—", "–"]) expect(c.customer.text + c.host.text).not.toContain(w);
     expect(c.host.text).toContain("Teszt Kft");
+    // the company name with a semicolon reaches the .ics escaped
+    expect(buildConfirmation({ ...task, company: { name: "A; B" }, now: new Date() }).ics).toContain("SUMMARY:Demó: A\\; B");
     expect(c.host.text).toContain("+36 30 111 2222");
   });
 });

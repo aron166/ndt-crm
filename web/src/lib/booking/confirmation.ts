@@ -23,7 +23,9 @@ function wall(d: Date): string {
   return `${l.y}${pad(l.m)}${pad(l.d)}T${pad(Math.floor(m / 60))}${pad(m % 60)}00`;
 }
 const utc = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-const esc = (t: string) => t.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+const esc = (t: string) => t.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+/** A parameter value (CN=): quoted when it holds , ; or :, double quotes dropped (RFC 5545 3.2). */
+const param = (v: string) => { const t = v.replace(/"/g, "").replace(/[\r\n]+/g, " "); return /[,;:]/.test(t) ? `"${t}"` : t; };
 
 /** Fold at 75 octets (RFC 5545 3.1), never inside a UTF-8 character; continuation lines start with a space. */
 function fold(l: string): string[] {
@@ -56,7 +58,7 @@ export function buildIcs(e: IcsEvent): string {
     `SUMMARY:${esc(e.summary)}`,
     ...(e.location ? [`LOCATION:${esc(e.location)}`] : []),
     ...(e.description ? [`DESCRIPTION:${esc(e.description)}`] : []),
-    ...(e.organizer ? [`ORGANIZER;CN=${esc(e.organizer.name)}:mailto:${e.organizer.email}`] : []),
+    ...(e.organizer ? [`ORGANIZER;CN=${param(e.organizer.name)}:mailto:${e.organizer.email}`] : []),
     "STATUS:CONFIRMED", "SEQUENCE:0", "END:VEVENT", "END:VCALENDAR",
   ];
   return lines.flatMap(fold).join("\r\n") + "\r\n";
