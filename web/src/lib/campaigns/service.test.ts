@@ -483,7 +483,7 @@ describe("one call-outcome writer (C1): the campaign path", () => {
 
   it("advanceMembersForCall advances every queued member of the company on a call step, skips the rest", async () => {
     d.campaignMember.findMany.mockResolvedValue([
-      { id: 44, stepPosition: 2, campaign: { id: 3, slug: "bp", steps: STEPS } },
+      { id: 44, stepPosition: 2, personId: 8, campaign: { id: 3, slug: "bp", steps: STEPS } },
       { id: 45, stepPosition: 1, campaign: { id: 4, slug: "email-first", steps: STEPS } },
     ]);
     const n = await advanceMembersForCall(SESSION, 7, "no_answer", NOW);
@@ -503,5 +503,33 @@ describe("one call-outcome writer (C1): the campaign path", () => {
     d.campaignMember.findMany.mockResolvedValue([{ id: 44, stepPosition: 2, campaign: { id: 3, slug: "bp", steps: STEPS } }]);
     d.campaignMember.updateMany.mockResolvedValue({ count: 0 });
     expect(await advanceMembersForCall(SESSION, 7, "no_answer", NOW)).toBe(0);
+  });
+});
+
+describe("a /calls tap that promotes (C1, Vanda #205-c): outbound actions only with the campaign switch", () => {
+  const OUT = ["send_email", "webhook_out"];
+  for (const on of [false, true]) {
+    it(`outbound_automations ${on}: every automation of an "interested" promotion ${on ? "may run" : "skips"} send_email and webhook_out`, async () => {
+      d.campaign.findFirst.mockResolvedValue({ id: 3, slug: "bp", status: "running", ownerUserId: 9, outboundAutomations: on, steps: STEPS });
+      const r = await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "interested" }, NOW);
+      expect(r).toMatchObject({ ok: true, lead: { created: true } });
+      const events = (runAutomations as M).mock.calls.map((c) => c[0]);
+      expect(events.map((e) => e.type)).toEqual(["lead_created", "campaign_call_outcome", "campaign_member_promoted"]);
+      for (const e of events) expect(e.skipActionTypes).toEqual(on ? [] : OUT);
+    });
+  }
+  it("advanced from the lead path (callAlreadyLogged), switch off: campaign automations skip outbound actions too", async () => {
+    d.lead.findFirst.mockResolvedValue({ id: 250, status: "new" });
+    await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "wants" }, NOW, { callAlreadyLogged: true });
+    for (const c of (runAutomations as M).mock.calls) expect(c[0].skipActionTypes).toEqual(OUT);
+  });
+});
+
+describe("findOpenLead: the one open-lead lookup", () => {
+  it("open, not converted, newest first, tenant scoped", async () => {
+    const { findOpenLead } = await import("./service");
+    d.lead.findFirst.mockResolvedValue({ id: 9, status: "new" });
+    expect(await findOpenLead(db, 1, 7)).toEqual({ id: 9, status: "new" });
+    expect(d.lead.findFirst.mock.calls[0][0]).toMatchObject({ where: { tenantId: 1, companyId: 7, outcome: "open", convertedDealId: null }, orderBy: { createdAt: "desc" } });
   });
 });

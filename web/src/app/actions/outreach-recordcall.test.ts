@@ -7,6 +7,7 @@ vi.mock("@/lib/enrichment/recompute", () => ({ recomputeCloseness: vi.fn().mockR
 vi.mock("@/lib/actor", () => ({ userLeadCtx: vi.fn(), requireCrmUser: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/leads/service", () => ({ completeOpenLeadCallTasks: vi.fn().mockResolvedValue(1) }));
 vi.mock("@/lib/campaigns/service", () => ({
+  findOpenLead: vi.fn(async (_t: unknown, tenantId: number, companyId: number) => (await import("@/lib/db")).db.lead.findFirst({ where: { tenantId, companyId } })),
   findCallableMembers: vi.fn(), recordOutcome: vi.fn(), advanceMembersForCall: vi.fn().mockResolvedValue(0),
 }));
 vi.mock("@/lib/db", () => {
@@ -53,7 +54,7 @@ describe("recordCall: one call-outcome writer", () => {
   });
 
   it("company in a campaign waiting for a call: goes through recordOutcome (member, event, promotion, automations), other campaigns advance without a second call log", async () => {
-    mk(findCallableMembers).mockResolvedValue([{ memberId: 44, campaignId: 3, slug: "bp" }, { memberId: 45, campaignId: 4, slug: "other" }]);
+    mk(findCallableMembers).mockResolvedValue([{ memberId: 44, campaignId: 3, slug: "bp", personId: 8 }, { memberId: 45, campaignId: 4, slug: "other", personId: 9 }]);
     mk(recordOutcome).mockResolvedValue({ ok: true, interaction_id: 601, lead: { id: 300, created: true }, member: { id: 44 } });
     const r = await recordCall({ companyId: 7, personId: 8, outcome: "interested", notes: "jó", durationSec: 65, followupDate: "2026-11-20" });
     expect(r).toMatchObject({ success: true, newStatus: "3", taskCreated: true });
@@ -64,12 +65,36 @@ describe("recordCall: one call-outcome writer", () => {
     expect(d.task.create.mock.calls[0][0].data).toMatchObject({ leadId: 300, companyId: 7, assignedToId: 5 });
   });
 
-  it("the campaign refuses the touch: the error comes back, nothing else is written", async () => {
-    mk(findCallableMembers).mockResolvedValue([{ memberId: 44, campaignId: 3, slug: "bp" }]);
+  it("a stale or raced member: the call is still logged (company branch), the member error is reported", async () => {
+    mk(findCallableMembers).mockResolvedValue([{ memberId: 44, campaignId: 3, slug: "bp", personId: 8 }]);
     mk(recordOutcome).mockResolvedValue({ error: "A tag időközben változott, frissíts", status: 409 });
-    expect(await recordCall({ companyId: 7, outcome: "no_answer" })).toEqual({ error: "A tag időközben változott, frissíts" });
-    expect(d.task.create).not.toHaveBeenCalled();
-    expect(advanceMembersForCall).not.toHaveBeenCalled();
+    d.lead.findFirst.mockResolvedValue({ id: 250 });
+    const r = await recordCall({ companyId: 7, personId: 8, outcome: "no_answer" });
+    expect(r).toMatchObject({ success: true, newStatus: "2", memberError: "A tag időközben változott, frissíts" });
+    expect(d.interaction.create.mock.calls[0][0].data).toMatchObject({ userId: 5, leadId: 250, personId: 8 });
+    expect(completeOpenLeadCallTasks).toHaveBeenCalled();
+    expect(advanceMembersForCall).toHaveBeenCalledWith({ tenantId: 1, userId: 5 }, 7, "no_answer", expect.any(Date), 3);
+  });
+
+  it("calling person B while the member is person A: the call is B's, the company's member still advances", async () => {
+    mk(findCallableMembers).mockResolvedValue([{ memberId: 44, campaignId: 3, slug: "bp", personId: 8 }]);
+    const r = await recordCall({ companyId: 7, personId: 9, outcome: "no_answer" });
+    expect(r).toMatchObject({ success: true });
+    expect(recordOutcome).not.toHaveBeenCalled();
+    expect(d.interaction.create.mock.calls[0][0].data).toMatchObject({ personId: 9 });
+    expect(advanceMembersForCall).toHaveBeenCalledWith({ tenantId: 1, userId: 5 }, 7, "no_answer", expect.any(Date), undefined);
+  });
+
+  it("the member that matches the called person gets the full touch", async () => {
+    mk(findCallableMembers).mockResolvedValue([
+      { memberId: 44, campaignId: 3, slug: "bp", personId: 8 },
+      { memberId: 45, campaignId: 4, slug: "other", personId: 9 },
+    ]);
+    mk(recordOutcome).mockResolvedValue({ ok: true, interaction_id: 601, lead: null, member: { id: 45 } });
+    await recordCall({ companyId: 7, personId: 9, outcome: "no_answer" });
+    expect(mk(recordOutcome).mock.calls[0][1]).toBe("other");
+    expect(advanceMembersForCall).toHaveBeenCalledWith({ tenantId: 1, userId: 5 }, 7, "no_answer", expect.any(Date), 4);
+    expect(d.interaction.create).not.toHaveBeenCalled();
   });
 
   it("no campaign, open lead: the call is the lead's (user, lead id), its open call tasks are done, the follow-up is the lead's next step", async () => {
@@ -92,7 +117,7 @@ describe("recordCall: one call-outcome writer", () => {
   });
 
   it("a bad follow-up date is refused before anything is written", async () => {
-    mk(findCallableMembers).mockResolvedValue([{ memberId: 44, campaignId: 3, slug: "bp" }]);
+    mk(findCallableMembers).mockResolvedValue([{ memberId: 44, campaignId: 3, slug: "bp", personId: 8 }]);
     expect(await recordCall({ companyId: 7, outcome: "no_answer", followupDate: "nope" })).toEqual({ error: "Érvénytelen visszahívási dátum" });
     expect(recordOutcome).not.toHaveBeenCalled();
     expect(d.interaction.create).not.toHaveBeenCalled();
