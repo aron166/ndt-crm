@@ -4,11 +4,12 @@ import { db } from "@/lib/db";
 import { NOT_FA } from "@/lib/companies/filters";
 import { requireCrmUser, userLeadCtx } from "@/lib/actor";
 import { completeOpenLeadCallTasks } from "@/lib/leads/service";
-import { advanceMembersForCall, findCallableMembers, recordOutcome } from "@/lib/campaigns/service";
+import { advanceMembersForCall, findCallableMembers, findOpenLead, recordOutcome } from "@/lib/campaigns/service";
 import type { CallOutcomeKey as CampaignCallOutcomeKey } from "@/lib/campaigns/rules";
 import { loadSuppressionSet, isSuppressed } from "@/lib/suppression";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
+import { reportError } from "@/lib/report-error";
 import {
   CALLABLE_STATUSES,
   nextStatusFor,
@@ -238,6 +239,8 @@ export interface RecordCallResult {
   success: true;
   newStatus: string | null; // the status the company moved to, or null if unchanged
   taskCreated: boolean;
+  /** The campaign refused the touch (stale or raced member); the call was logged anyway. */
+  memberError?: string;
 }
 
 /**
@@ -282,9 +285,16 @@ export async function recordCall(
   const personId = input.personId ?? null;
   const now = new Date();
   const campaignCtx = { tenantId: TENANT_ID, userId: ctx.userId };
-  let leadId: number | null;
+  let leadId: number | null = null;
 
-  const [first] = await findCallableMembers(TENANT_ID, company.id);
+  // The member of the CALLED person gets the full touch (no person picked: the first member).
+  // Calling someone else of the company logs the call on that person and still advances the
+  // company's members; a member that refuses (stale, raced) never loses the call: it is logged
+  // below and the member error is returned (Vanda #205-a, b).
+  const members = await findCallableMembers(TENANT_ID, company.id);
+  const first = members.find((m) => input.personId == null || m.personId === input.personId);
+  let memberError: string | undefined;
+  let logged = false;
   if (first) {
     const r = await recordOutcome(campaignCtx, first.slug, {
       member_id: first.memberId, outcome,
@@ -292,17 +302,21 @@ export async function recordCall(
       ...(input.durationSec ? { duration_sec: input.durationSec } : {}),
       ...(followupRaw ? { followup_date: followupRaw } : {}),
     }, now);
-    if ("error" in r) return { error: r.error };
-    leadId = r.lead?.id ?? (await openLeadOf(company.id))?.id ?? null;
-    await advanceMembersForCall(campaignCtx, company.id, outcome, now, first.campaignId);
-  } else {
+    if ("error" in r) {
+      memberError = r.error;
+      reportError("outreach.recordCall.member", new Error(r.error), { companyId: company.id, memberId: first.memberId });
+    } else {
+      logged = true;
+      leadId = r.lead?.id ?? (await findOpenLead(db, TENANT_ID, company.id))?.id ?? null;
+    }
+  }
+  if (!logged) {
     // A quick outcome tap needn't carry a typed note: fall back to the label so the
     // append-only log still says what happened. Append the call length when known.
     const base = input.notes?.trim() || meta.label;
     const dur = input.durationSec && input.durationSec > 0 ? Math.round(input.durationSec) : null;
     const notes = dur ? `${base} · ${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, "0")}` : base;
-    const lead = await openLeadOf(company.id);
-    leadId = lead?.id ?? null;
+    leadId = (await findOpenLead(db, TENANT_ID, company.id))?.id ?? null;
 
     // Core write is atomic: the call log, the lead's call tasks and the status/freshness move land together.
     const interaction = await db.$transaction(async (tx) => {
@@ -328,6 +342,8 @@ export async function recordCall(
     }
   }
 
+  if (members.length) await advanceMembersForCall(campaignCtx, company.id, outcome, now, first?.campaignId);
+
   // Follow-up task is a convenience on top: created after the call is safely
   // logged so it can never roll back the interaction.
   const task = followupDate
@@ -339,7 +355,7 @@ export async function recordCall(
         },
       })
     : null;
-  if (task && leadId != null && !first) {
+  if (task && leadId != null && !logged) {
     // Same as a plain callback on the lead page: the lead's next step is this call.
     await db.lead.updateMany({ where: { id: leadId, tenantId: TENANT_ID }, data: { nextAction: "Visszahívás", nextDue: followupDate } });
   }
@@ -354,13 +370,5 @@ export async function recordCall(
   revalidatePath("/calls");
   revalidatePath(`/companies/${company.id}`);
   if (leadId != null) revalidatePath(`/leads/${leadId}`);
-  return { success: true, newStatus, taskCreated: Boolean(task) };
-}
-
-function openLeadOf(companyId: number) {
-  return db.lead.findFirst({
-    where: { tenantId: TENANT_ID, companyId, outcome: "open", convertedDealId: null },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-  });
+  return { success: true, newStatus, taskCreated: Boolean(task), ...(memberError ? { memberError } : {}) };
 }

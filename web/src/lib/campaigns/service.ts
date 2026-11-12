@@ -740,11 +740,7 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
   const plan = planOutcome({ state: m.state as never, stepPosition: m.stepPosition, attempts: m.attempts, hasPhone, replied }, input.outcome, c.steps as StepDef[], today);
   if ("error" in plan) return fail(409, plan.error);
 
-  const existingLead = await db.lead.findFirst({
-    where: { tenantId, companyId: m.companyId, outcome: "open", convertedDealId: null },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, status: true },
-  });
+  const existingLead = await findOpenLead(db, tenantId, m.companyId);
   const ownerId = c.ownerUserId ?? (await resolveDemoHost(tenantId, "peter"));
   let followup: Date | null = null;
   if (input.followup_date) {
@@ -759,10 +755,7 @@ export async function recordOutcome(ctx: CampaignCtx, slug: string, input: Outco
     let lockedLead = existingLead;
     if (plan.promote) {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${m.companyId}::bigint)`;
-      lockedLead = await tx.lead.findFirst({
-        where: { tenantId, companyId: m.companyId, outcome: "open", convertedDealId: null },
-        orderBy: { createdAt: "desc" }, select: { id: true, status: true },
-      });
+      lockedLead = await findOpenLead(tx, tenantId, m.companyId);
     }
     let interactionId: number | null = null;
     if (plan.logCall && !opts.callAlreadyLogged) {
@@ -915,12 +908,21 @@ export async function findCallableMembers(tenantId: number, companyId: number, s
       tenantId, companyId, state: "queued", campaign: { status: { in: ["running", "paused"] } },
       ...(skipCampaignId != null ? { NOT: { campaignId: skipCampaignId } } : {}),
     },
-    select: { id: true, stepPosition: true, campaign: { select: { id: true, slug: true, steps: { select: { position: true, channel: true } } } } },
+    select: { id: true, stepPosition: true, personId: true, campaign: { select: { id: true, slug: true, steps: { select: { position: true, channel: true } } } } },
     orderBy: { id: "asc" },
   });
   return rows
     .filter((m) => m.campaign.steps.find((st) => st.position === m.stepPosition)?.channel === "call")
-    .map((m) => ({ memberId: m.id, campaignId: m.campaign.id, slug: m.campaign.slug }));
+    .map((m) => ({ memberId: m.id, campaignId: m.campaign.id, slug: m.campaign.slug, personId: m.personId }));
+}
+
+/** The company's open lead (open, not converted, newest): the one lookup the call and campaign paths share. */
+export function findOpenLead(client: { lead: Pick<typeof db.lead, "findFirst"> }, tenantId: number, companyId: number) {
+  return client.lead.findFirst({
+    where: { tenantId, companyId, outcome: "open", convertedDealId: null },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, status: true },
+  });
 }
 
 /**
