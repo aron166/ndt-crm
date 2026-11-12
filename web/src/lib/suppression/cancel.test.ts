@@ -46,4 +46,9 @@ describe("cancelQueuedDraftsFor", () => {
     db.emailDraft.findMany.mockResolvedValue([row(1, "a@tilos.hu"), row(2, "a@else.hu")]);
     expect(await cancelQueuedDraftsFor(1, { email: null, domain: "tilos.hu" })).toBe(1);
   });
+
+  it("cancels a draft to a plus-tagged variant of the suppressed address", async () => {
+    db.emailDraft.findMany.mockResolvedValue([row(1, "name+x@gmail.com")]);
+    expect(await cancelQueuedDraftsFor(1, { email: "name@gmail.com", domain: null })).toBe(1);
+  });
 });
