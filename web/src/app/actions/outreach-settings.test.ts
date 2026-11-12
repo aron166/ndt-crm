@@ -27,20 +27,20 @@ beforeEach(() => {
   d.tenant.findUnique.mockResolvedValue({ settings: { outreachReplyTo: "old@ceg.hu", scriptVariants: [{ key: "a" }] } });
 });
 
-/** The key and value of each jsonb_set the call ran. */
-const writes = () => d.$executeRaw.mock.calls.map((c) => ({ key: c[1], value: JSON.parse(c[2]) }));
+/** The patch of each settings update the call ran. */
+const writes = () => d.$executeRaw.mock.calls.map((c) => JSON.parse(c[1]));
 
-describe("saveOutreachSettings: own keys only, one jsonb_set each", () => {
+describe("saveOutreachSettings: own keys only, one statement", () => {
   it("never rewrites the whole settings blob", async () => {
     expect(await saveOutreachSettings({ replyTo: "uj@ceg.hu", footer: "Lábléc" })).toEqual({ ok: true });
     expect(d.tenant.update).not.toHaveBeenCalled();
-    expect(writes()).toEqual([{ key: "outreachReplyTo", value: "uj@ceg.hu" }, { key: "outreachFooter", value: "Lábléc" }]);
+    expect(writes()).toEqual([{ outreachReplyTo: "uj@ceg.hu", outreachFooter: "Lábléc" }]);
     expect(audit).toHaveBeenCalledWith("tenant", 1, "update", { outreachReplyTo: "old@ceg.hu", outreachFooter: null }, { outreachReplyTo: "uj@ceg.hu", outreachFooter: "Lábléc" });
   });
 
   it("empty fields clear the key to null", async () => {
     await saveOutreachSettings({ replyTo: " ", footer: "" });
-    expect(writes()).toEqual([{ key: "outreachReplyTo", value: null }, { key: "outreachFooter", value: null }]);
+    expect(writes()).toEqual([{ outreachReplyTo: null, outreachFooter: null }]);
   });
 
   it("a bad reply-to address writes nothing", async () => {

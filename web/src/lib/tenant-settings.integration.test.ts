@@ -25,6 +25,14 @@ describe.skipIf(!enabled)("setTenantSettings (integration)", () => {
     await db.$executeRaw`DELETE FROM tenants WHERE id = ${id}`;
   });
 
+  it("settings stored as JSON null (not SQL NULL) is patched, not failed", async () => {
+    await db.$executeRaw`UPDATE tenants SET settings = 'null'::jsonb WHERE id = ${id}`;
+    await setTenantSettings(id, { a: 1, b: "x" });
+    const [row] = await db.$queryRaw<{ settings: Record<string, unknown> }[]>`SELECT settings FROM tenants WHERE id = ${id}`;
+    expect(row.settings).toEqual({ a: 1, b: "x" });
+    await db.$executeRaw`UPDATE tenants SET settings = '{"keep":1}'::jsonb WHERE id = ${id}`;
+  });
+
   it("interleaved writers of different keys: every key survives, the neighbour is untouched", async () => {
     for (let round = 0; round < 20; round++) {
       await Promise.all([
