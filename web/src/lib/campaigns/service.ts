@@ -108,7 +108,7 @@ async function needsProspectWriter(ctx: CampaignCtx, batch: string): Promise<Fai
 const CAMPAIGN_SELECT = {
   id: true, slug: true, name: true, kind: true, status: true, dailyCap: true, ownerUserId: true, senderUserId: true,
   startsOn: true, endsOn: true, brief: true, briefProposal: true, audience: true, project: true,
-  approvedById: true, approvedAt: true, approvedHash: true, outboundAutomations: true, isArchived: true, createdAt: true,
+  approvedById: true, approvedAt: true, approvedHash: true, outboundAutomations: true, scheduledSending: true, isArchived: true, createdAt: true,
   steps: {
     orderBy: { position: "asc" as const },
     select: { position: true, channel: true, waitDays: true, audienceRule: true, contentItemId: true },
@@ -270,15 +270,18 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
 export async function updateCampaign(
   ctx: CampaignCtx,
   slug: string,
-  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean; outbound_automations?: boolean; audience?: { source: AudienceSource; stages?: string[] } },
+  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean; outbound_automations?: boolean; scheduled_sending?: boolean; audience?: { source: AudienceSource; stages?: string[] } },
 ) {
   const s = needsSession(ctx);
   if (s) return s;
-  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, status: true, dailyCap: true, briefProposal: true, outboundAutomations: true, audience: true } });
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, status: true, dailyCap: true, briefProposal: true, outboundAutomations: true, scheduledSending: true, audience: true } });
   if (!c) return fail(404, "Kampány nem található");
   if (c.status === "stopped" || c.status === "done") return fail(409, "Lezárt kampány nem módosítható");
   const outboundChanged = patch.outbound_automations !== undefined && patch.outbound_automations !== c.outboundAutomations;
   if (outboundChanged && !(await isAron(ctx))) return fail(403, "A kimenő automatizmusokat csak Áron kapcsolhatja");
+  // Not part of the approval hash: the switch only lets already-approved drafts go; turning it off is always safe.
+  const scheduledChanged = patch.scheduled_sending !== undefined && patch.scheduled_sending !== c.scheduledSending;
+  if (scheduledChanged && patch.scheduled_sending && !(await isAron(ctx))) return fail(403, "Az ütemezett küldést csak Áron kapcsolhatja be");
   if (patch.owner_user_id != null) {
     const u = await db.user.findFirst({ where: { id: patch.owner_user_id, tenantId: ctx.tenantId }, select: { id: true } });
     if (!u) return fail(400, "Ismeretlen felelős");
@@ -301,6 +304,7 @@ export async function updateCampaign(
     ...(patch.ends_on !== undefined ? { endsOn: patch.ends_on ? new Date(`${patch.ends_on}T00:00:00Z`) : null } : {}),
     ...(brief !== undefined ? { brief } : {}),
     ...(outboundChanged ? { outboundAutomations: patch.outbound_automations } : {}),
+    ...(scheduledChanged ? { scheduledSending: patch.scheduled_sending } : {}),
     ...(audience !== undefined ? { audience } : {}),
     ...(capChanged && c.status !== "draft" ? BACK_TO_DRAFT : {}),
   };
@@ -1000,6 +1004,18 @@ export async function loadLeadAudience(ctx: CampaignCtx, slug: string, input: { 
   return { ok: true as const, dry_run: false, summary };
 }
 
+/** The approval hash of a campaign as it stands now (same inputs as approveCampaign); compare with approvedHash. */
+export async function approvalHashNow(
+  tenantId: number,
+  c: { id: number; dailyCap: number; outboundAutomations: boolean; audience: Prisma.JsonValue | null; steps: { position: number; channel: string; waitDays: number; audienceRule: string; contentItemId: number | null }[] },
+) {
+  const [members, variants] = await Promise.all([
+    db.campaignMember.findMany({ where: { tenantId, campaignId: c.id }, select: { companyId: true } }),
+    campaignVariants(tenantId, c.id),
+  ]);
+  return approvalHash({ memberCompanyIds: members.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations, audience: audienceOf(c.audience), variants });
+}
+
 /**
  * The e-mail step's work for today: a DRAFT in the Outreach queue for each queued member on an
  * e-mail step whose wait is over, with the step's live asset as subject and body. Nothing is sent
@@ -1020,11 +1036,7 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   if (c.status !== "running") return fail(409, "Csak jóváhagyott, futó kampány e-mail lépése készít piszkozatot");
   // Drafted is what Áron approved: the approval hash over the same inputs as approveCampaign must still match,
   // so any drift (a variant restored or tagged after approval) waits for a re-approval (Vanda #195-1, r2-1).
-  const [hashMembers, hashVariants] = await Promise.all([
-    db.campaignMember.findMany({ where: { tenantId, campaignId: c.id }, select: { companyId: true } }),
-    campaignVariants(tenantId, c.id),
-  ]);
-  const hashNow = approvalHash({ memberCompanyIds: hashMembers.map((m) => m.companyId), steps: c.steps as (StepDef & { contentItemId: number | null })[], dailyCap: c.dailyCap, outboundAutomations: c.outboundAutomations, audience: audienceOf(c.audience), variants: hashVariants });
+  const hashNow = await approvalHashNow(tenantId, c);
   if (c.approvedHash == null || hashNow !== c.approvedHash) return fail(409, "A kampány változott a jóváhagyás óta (például egy szegmensváltozat); hagyd jóvá újra");
   // The cap is per day, not per click (Vanda #194-5).
   const madeToday = await db.emailDraft.count({ where: { tenantId, campaign: c.slug, createdAt: { gte: atLocal(localDay(now), 0) } } });

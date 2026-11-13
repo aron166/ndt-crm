@@ -31,6 +31,7 @@ describe("isServiceApiPath", () => {
     "/api/outreach/drafts",
     "/api/cron/automations",
     "/api/cron/reply-intake",
+    "/api/cron/campaign-send",
     "/api/cron/content-digest",
     "/api/cron/weekly-report",
     "/api/reports/weekly",

@@ -6,15 +6,10 @@ import { setTenantSettings } from "@/lib/tenant-settings";
 import { gateDraft, gateOn, templatesForCampaigns } from "@/lib/outreach/template";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
-import { reportError } from "@/lib/report-error";
-import { advanceOnSent, campaignSendBlock } from "@/lib/campaigns/service";
-import { sendEmail } from "@/lib/integrations/resend";
 import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
-import { unsubscribeHeaders } from "@/lib/outreach/unsubscribe";
-import { draftSendKey } from "@/lib/outreach/send-key";
-import { scheduleNextTouch } from "@/lib/outreach/schedule";
+import { deliverClaimedDraft, prepareDraftSend } from "@/lib/outreach/send-draft";
 import {
   type DraftStatus,
   isDraftStatus,
@@ -22,8 +17,6 @@ import {
   canEdit,
   canApprove,
   canSend,
-  threadKeyFor,
-  withFooter,
   CLAIMABLE_STATUSES,
 } from "@/lib/outreach/drafts";
 
@@ -312,34 +305,10 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   if (!canSend(row.status as DraftStatus)) {
     return { ok: false, error: "Ez a piszkozat nem küldhető ebben az állapotban" };
   }
-  // §6b: same template gate as the copy and the manual-send paths.
-  const gate = await gateDraft(TENANT_ID, row.campaign, row.step);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const blocked = await campaignSendBlock(TENANT_ID, row.campaign);
-  if (blocked) return { ok: false, error: blocked };
-
-  // The consent/unsubscribe line is not optional. Without this guard a tenant
-  // who never opened the settings panel cold-emails with no opt-out at all —
-  // the placeholder in the UI is an HTML attribute, not a stored value.
-  const settings = await getOutreachSettings();
-  const footer = settings.footer?.trim();
-  if (!footer) {
-    return { ok: false, error: "Hiányzik a leiratkozási lábléc: töltsd ki a beállításokban" };
-  }
-
-  const to = await resolveDraftRecipient(TENANT_ID, row);
-  if (!to) return { ok: false, error: "Ehhez a céghez nincs email cím" };
-
-  if (await isAddressSuppressed(TENANT_ID, to)) return { ok: false, error: SUPPRESSED_ERROR };
-
-  // Fail closed: no signed unsubscribe link, no send. Before the claim so the row stays sendable.
-  let headers: Record<string, string>;
-  try {
-    headers = unsubscribeHeaders(TENANT_ID, to, id);
-  } catch (err) {
-    reportError("outreach.sendDraft.unsubscribeHeaders", err, { draftId: id });
-    return { ok: false, error: "A leiratkozási link nem készíthető el (hiányzó kulcs), a levél nem ment el" };
-  }
+  const prep = await prepareDraftSend(TENANT_ID, row);
+  if (!prep.ok) return prep;
+  // Before the claim: a throw here must not leave the row stuck in `sending` (Vanda #200-7).
+  const { userId } = await getActor(TENANT_ID);
 
   // Claim it. Nothing below this line may run twice for one row.
   const claim = await db.emailDraft.updateMany({
@@ -350,77 +319,7 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
     revalidatePath("/outreach");
     return { ok: false, error: "Ez a piszkozat épp küldés alatt van, vagy már elment" };
   }
-  await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sending" });
-
-  const text = withFooter(row.body, footer);
-
-  let result: Awaited<ReturnType<typeof sendEmail>>;
-  try {
-    result = await sendEmail({
-      tenantId: TENANT_ID,
-      to,
-      subject: row.subject,
-      text,
-      replyTo: settings.replyTo,
-      companyId: row.companyId,
-      personId: row.personId,
-      headers,
-      idempotencyKey: draftSendKey(id, to, row.subject, text),
-    });
-  } catch (err) {
-    // sendEmail catches its own transport errors, so reaching here means
-    // something unexpected threw AFTER the claim. We cannot know whether the
-    // mail went out, so the row stays `sending` — terminal, not re-sendable.
-    reportError("outreach.sendDraft", err, { draftId: id, companyId: row.companyId });
-    await db.emailDraft.update({
-      where: { id },
-      data: { lastError: "Ismeretlen hiba küldés közben: ellenőrizd a Resend naplót" },
-    });
-    revalidatePath("/outreach");
-    return { ok: false, error: "Ismeretlen hiba küldés közben: ellenőrizd a Resend naplót" };
-  }
-
-  if (result.ok) {
-    const sentAt = new Date();
-    try {
-      await db.$transaction(async (tx) => {
-        await tx.emailDraft.update({
-          where: { id },
-          data: {
-            status: "sent",
-            sentAt,
-            sentVia: "resend",
-            toEmail: to, // the address it actually went to; webhooks and replies match on it
-            providerMessageId: result.id,
-            threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
-            lastError: result.warning ?? null,
-          },
-        });
-        // Same cadence as a hand-sent touch (campaign tracking).
-        await scheduleNextTouch(tx, row, sentAt);
-      });
-    } catch (err) {
-      // The mail DID go out; only the bookkeeping failed. Leave the row in
-      // `sending` (not re-sendable) with a note, same as the catch above.
-      reportError("outreach.sendDraft.record", err, { draftId: id, companyId: row.companyId });
-      await db.emailDraft.update({
-        where: { id },
-        data: { lastError: `Elküldve (${result.id}), de a rögzítés nem sikerült: ellenőrizd` },
-      }).catch(() => {});
-      revalidatePath("/outreach");
-      return { ok: false, error: "Elküldve, de a rögzítés nem sikerült: ellenőrizd a Resend naplót" };
-    }
-    await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sent", providerMessageId: result.id });
-    // A campaign e-mail step's draft went out: its member moves on in the sequence (item 4).
-    const { userId } = await getActor(TENANT_ID);
-    await advanceOnSent({ tenantId: TENANT_ID, userId }, row.campaign, row.companyId, row.step)
-      .catch((err) => reportError("outreach.sendDraft.campaignAdvance", err, { draftId: id }));
-    revalidatePath("/outreach");
-    return { ok: true };
-  }
-
-  await db.emailDraft.update({ where: { id }, data: { status: "failed", lastError: result.error } });
-  await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "failed", lastError: result.error });
+  const result = await deliverClaimedDraft(TENANT_ID, row, prep, { userId });
   revalidatePath("/outreach");
-  return { ok: false, error: result.error };
+  return result;
 }

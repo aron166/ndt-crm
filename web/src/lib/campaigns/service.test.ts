@@ -378,6 +378,31 @@ describe("a campaign promotion sends nothing by default (Vanda #188-8)", () => {
   });
 });
 
+describe("scheduled sending switch", () => {
+  beforeEach(() => {
+    (resolveDemoHost as M).mockResolvedValue(2);
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "running", dailyCap: 15, briefProposal: null, outboundAutomations: false, scheduledSending: false });
+  });
+  it("on needs Aron: another session gets 403, an app key 403", async () => {
+    expect(await updateCampaign(SESSION, "bp", { scheduled_sending: true })).toMatchObject({ status: 403, error: "Az ütemezett küldést csak Áron kapcsolhatja be" });
+    expect(await updateCampaign(APP, "bp", { scheduled_sending: true })).toMatchObject({ status: 403 });
+    expect(d.campaign.update).not.toHaveBeenCalled();
+  });
+  it("Aron turns it on without sending the campaign back to draft", async () => {
+    expect(await updateCampaign({ tenantId: 1, userId: 2 }, "bp", { scheduled_sending: true })).toMatchObject({ ok: true, status: "running" });
+    const data = d.campaign.update.mock.calls[0][0].data;
+    expect(data).toMatchObject({ scheduledSending: true });
+    expect(data).not.toHaveProperty("status");
+    expect(data).not.toHaveProperty("approvedHash");
+  });
+  it("any session user turns it off; an app key may not", async () => {
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "running", dailyCap: 15, briefProposal: null, outboundAutomations: false, scheduledSending: true });
+    expect(await updateCampaign(APP, "bp", { scheduled_sending: false })).toMatchObject({ status: 403 });
+    expect(await updateCampaign(SESSION, "bp", { scheduled_sending: false })).toMatchObject({ ok: true, status: "running" });
+    expect(d.campaign.update.mock.calls[0][0].data).toMatchObject({ scheduledSending: false });
+  });
+});
+
 describe("per-campaign automations (item 5)", () => {
   it("a touch raises its campaign events with the campaign id, outbound actions skipped while the switch is off", async () => {
     await recordOutcome(SESSION, "bp", { member_id: 44, outcome: "interested" }, NOW);

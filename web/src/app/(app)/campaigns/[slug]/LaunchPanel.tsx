@@ -16,7 +16,7 @@ import s from "../campaigns.module.css";
 
 export interface LaunchData {
   slug: string; status: string; dailyCap: number; startsOn: string | null; endsOn: string | null;
-  outboundAutomations: boolean; approvedAt: string | null; previewHash: string;
+  outboundAutomations: boolean; scheduledSending: boolean; approvedAt: string | null; previewHash: string;
   steps: StepRow[]; assets: AssetState[]; members: Record<string, number>;
   /** Segment variants of the e-mail steps (lib/campaigns/preview campaignVariants). */
   variants?: { step: number; segment: string; itemId: number; status: string }[];
@@ -124,6 +124,13 @@ export function LaunchPanel({ d, isAron }: { d: LaunchData; isAron: boolean }) {
             <label className={s.field}><span>Vége</span><input className={s.input} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
           </div>
           <p className={k.muted}>A lista minden reggel számolódik, előre nem készül feladat; a kezdés előtt és a vége után üres. Kimenő automatizmusok (e-mail, webhook) a promóciónál: {d.outboundAutomations ? "bekapcsolva" : "kikapcsolva"}.</p>
+          <p className={k.muted}>
+            Ütemezett küldés: {d.scheduledSending ? "bekapcsolva" : "kikapcsolva"}.{" "}
+            <button type="button" className={k.btn} disabled={busy || (!d.scheduledSending && !isAron)}
+              onClick={() => run(() => updateCampaignAction(d.slug, { scheduled_sending: !d.scheduledSending }), d.scheduledSending ? "Az ütemezett küldés kikapcsolva" : "Az ütemezett küldés bekapcsolva")}>
+              {d.scheduledSending ? "Kikapcsolás" : "Bekapcsolás"}
+            </button>
+          </p>
           {settingsChanged && (
             <button type="button" className={k.btn} disabled={busy}
               onClick={() => run(() => updateCampaignAction(d.slug, { daily_cap: cap, starts_on: from || null, ends_on: to || null }), d.status !== "draft" && cap !== d.dailyCap ? "Mentve; a kampány visszaállt piszkozatra" : "Mentve")}>

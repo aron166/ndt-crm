@@ -15,7 +15,7 @@ import { MemberLoad, loadCounts } from "@/app/(app)/campaigns/[slug]/MemberLoad"
 beforeEach(() => vi.clearAllMocks());
 
 const READY: LaunchData = {
-  slug: "bp", status: "draft", dailyCap: 15, startsOn: "2026-11-26", endsOn: null, outboundAutomations: false, approvedAt: null, previewHash: "a".repeat(64),
+  slug: "bp", status: "draft", dailyCap: 15, startsOn: "2026-11-26", endsOn: null, outboundAutomations: false, scheduledSending: false, approvedAt: null, previewHash: "a".repeat(64),
   steps: [
     { position: 1, channel: "email", waitDays: 0, audienceRule: "all", contentItemId: 5 },
     { position: 2, channel: "call", waitDays: 3, audienceRule: "no_reply", contentItemId: 6 },

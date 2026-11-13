@@ -81,6 +81,7 @@ export const patchSchema = z.object({
   brief: json_.optional(),
   adopt_brief_proposal: z.boolean().optional(),
   outbound_automations: z.boolean().optional(),
+  scheduled_sending: z.boolean().optional(),
   /** Who the campaign touches (item 4): prospects from a list, or open leads in chosen stages. */
   audience: z.object({ source: z.enum(AUDIENCE_SOURCES), stages: z.array(z.string().trim().min(1).max(40)).max(20).optional() }).optional(),
 }).refine((p) => Object.keys(p).length > 0, "empty patch");
