@@ -9,6 +9,7 @@ import { sendEmail } from "@/lib/integrations/resend";
 import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { unsubscribeHeaders } from "@/lib/outreach/unsubscribe";
+import { draftSendKey } from "@/lib/outreach/send-key";
 import { scheduleNextTouch } from "@/lib/outreach/schedule";
 import { threadKeyFor, withFooter } from "@/lib/outreach/drafts";
 
@@ -85,7 +86,7 @@ export async function deliverClaimedDraft(
       companyId: row.companyId,
       personId: row.personId,
       headers: prep.headers,
-      idempotencyKey: `draft-${id}`,
+      idempotencyKey: draftSendKey(id, prep.to, row.subject, prep.text),
     });
   } catch (err) {
     // sendEmail catches its own transport errors, so reaching here means

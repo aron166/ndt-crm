@@ -126,7 +126,7 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
     expect(sentCalls()).toBe(1);
     const d = await db.emailDraft.findUniqueOrThrow({ where: { id: c.draftIds[0] } });
     expect(d).toMatchObject({ status: "sent", sentVia: "resend", senderUserId: c.senderId });
-    expect(h.send.mock.calls[0][0]).toMatchObject({ idempotencyKey: `draft-${d.id}`, tenantId });
+    expect(h.send.mock.calls[0][0]).toMatchObject({ idempotencyKey: expect.stringMatching(new RegExp(`^draft-${d.id}-[0-9a-f]{16}$`)), tenantId });
     const m = await db.campaignMember.findUniqueOrThrow({ where: { id: c.members[0].id } });
     expect(m.state).not.toBe("queued");
     expect(m.lastOutcome).toBe("email_sent");
