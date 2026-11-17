@@ -192,7 +192,7 @@ export async function memberQuickView(tenantId: number, slug: string, memberId: 
 }
 export type QuickView = NonNullable<Awaited<ReturnType<typeof memberQuickView>>>;
 
-/** Launch-tab check: of the open members, how many would get a complete e-mail, and what is wrong with the rest. */
+/** Launch-tab lines for a missing sender or sender phone; a sender id whose user is not found counts as none. */
 export function senderGaps(senderUserId: number | null, sender: { name: string | null; phone: string | null }): string[] {
   const gaps: string[] = [];
   if (senderUserId == null || !sender.name) gaps.push("Nincs feladó kiválasztva");
@@ -200,6 +200,7 @@ export function senderGaps(senderUserId: number | null, sender: { name: string |
   return gaps;
 }
 
+/** Launch-tab check: of the open members, how many would get a complete e-mail, and what is wrong with the rest. */
 export async function campaignEmailCheck(tenantId: number, campaignId: number, senderUserId: number | null) {
   const [ctx, members] = await Promise.all([
     emailContext(tenantId, campaignId, senderUserId),
