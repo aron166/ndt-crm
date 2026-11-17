@@ -202,6 +202,8 @@ async function backup(dir) {
 
 const [mode, a1, a2] = process.argv.slice(2);
 try {
+  // Warm the pool (3 connections): a cold connect to prod takes 2-3 s, longer than a transaction's default 2 s wait.
+  await Promise.all([1, 2, 3].map(() => db.$queryRaw`SELECT 1`));
   if (mode === "backup") await backup(a1);
   else if (mode === "dry") await dryOrApply(a1, null, false);
   else if (mode === "apply") await dryOrApply(a1, a2, true);
