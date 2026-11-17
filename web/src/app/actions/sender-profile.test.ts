@@ -120,3 +120,36 @@ describe("a sender's phone or name is part of what was approved (AC6)", () => {
     expect(await saveSenderProfile({ name: "A B", phone: "06301234567" })).toEqual({ ok: true });
   });
 });
+
+describe("Vanda #216 findings", () => {
+  it("#216-1 a campaign approved between the check and the write: the write itself refuses, nothing slips past", async () => {
+    getActor.mockResolvedValue({ userId: 9, email: "p@b.hu" });
+    campaignFind.mockResolvedValueOnce(null).mockResolvedValue({ name: "Budapest indulás" });
+    exec.mockResolvedValue(0); // the UPDATE's NOT EXISTS guard saw the running campaign
+    const r = await saveSenderPhone({ userId: 9, phone: "06301234567" });
+    expect(r).toMatchObject({ error: expect.stringMatching(/piszkozat/) });
+    expect(exec.mock.calls[0][0].join("?")).toMatch(/NOT EXISTS[\s\S]*campaigns[\s\S]*running/);
+  });
+  it("#216-1 the profile page write carries the same guard", async () => {
+    getActor.mockResolvedValue({ userId: 5, email: "a@b.hu" });
+    campaignFind.mockResolvedValueOnce(null).mockResolvedValue({ name: "Fut" });
+    exec.mockResolvedValue(0);
+    expect(await saveSenderProfile({ name: "Más Név", phone: "" })).toMatchObject({ error: expect.stringMatching(/piszkozat/) });
+    expect(exec.mock.calls[0][0].join("?")).toMatch(/NOT EXISTS[\s\S]*campaigns/);
+  });
+  it("#216-2 the lock message names a path that exists (an edit sends the campaign back to draft)", async () => {
+    getActor.mockResolvedValue({ userId: 9, email: "p@b.hu" });
+    campaignFind.mockResolvedValue({ name: "Budapest indulás" });
+    const r = await saveSenderPhone({ userId: 9, phone: "06301234567" });
+    expect(r.error).toMatch(/napi keret/);
+    expect(r.error).not.toMatch(/Állítsa vissza/);
+  });
+  it("#216-3 malformed input is refused with a message, not thrown", async () => {
+    getActor.mockResolvedValue({ userId: 6, email: "a@b.hu" });
+    for (const bad of [{ userId: "x", phone: "1" }, { userId: Number.NaN, phone: "1" }, { userId: 9, phone: 5 }]) {
+      expect(await saveSenderPhone(bad as unknown as { userId: number; phone: string })).toMatchObject({ error: expect.any(String) });
+    }
+    expect(userFind).not.toHaveBeenCalled();
+    expect(exec).not.toHaveBeenCalled();
+  });
+});
