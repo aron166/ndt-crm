@@ -27,12 +27,17 @@ function normalizePhone(raw: string): string | null {
   return /^\+[1-9]\d{7,14}$/.test(d) ? raw.trim().replace(/\s+/g, " ") : null;
 }
 
+export function normalizeSenderPhone(raw: string): { ok: true; phone: string | null } | { ok: false; error: string } {
+  const r = raw.trim();
+  if (!r) return { ok: true, phone: null };
+  const phone = normalizePhone(r);
+  return phone ? { ok: true, phone } : { ok: false, error: BAD_PHONE };
+}
+
 export function normalizeSenderProfile(input: { name: string; phone: string }): SenderProfile {
   const name = input.name.trim();
   if (!name) return { ok: false, error: "A név kötelező" };
   if (name.length > 120) return { ok: false, error: "A név legfeljebb 120 karakter" };
-  const raw = input.phone.trim();
-  if (!raw) return { ok: true, name, phone: null };
-  const phone = normalizePhone(raw);
-  return phone ? { ok: true, name, phone } : { ok: false, error: BAD_PHONE };
+  const p = normalizeSenderPhone(input.phone);
+  return p.ok ? { ok: true, name, phone: p.phone } : p;
 }

@@ -137,3 +137,22 @@ describe("contact helpers", () => {
     expect(memberAddress({ companyId: 2, personId: null, person: null }, contacts)).toBeNull();
   });
 });
+
+describe("senderGaps: the launch check names a missing sender and phone (AC5)", () => {
+  it("lists both until both are set", async () => {
+    const { senderGaps } = await import("./preview");
+    expect(senderGaps(null, { name: null, phone: null })).toEqual(["Nincs feladó kiválasztva", "A feladónak nincs telefonszáma"]);
+    expect(senderGaps(5, { name: "Nagy Péter", phone: null })).toEqual(["A feladónak nincs telefonszáma"]);
+    expect(senderGaps(5, { name: "Nagy Péter", phone: "+36 30 123 4567" })).toEqual([]);
+  });
+  it("a sender id whose user is gone (or another tenant's) counts as no sender", async () => {
+    const { senderGaps } = await import("./preview");
+    expect(senderGaps(99, { name: null, phone: null })).toEqual(["Nincs feladó kiválasztva", "A feladónak nincs telefonszáma"]);
+  });
+  it("campaignEmailCheck returns them, read only", async () => {
+    d.user.findFirst.mockResolvedValue({ name: "Nagy Péter", settings: { theme: "dark" } });
+    const c = await campaignEmailCheck(T, 3, 5);
+    expect(c.senderGaps).toEqual(["A feladónak nincs telefonszáma"]);
+    assertReadOnlyAndScoped();
+  });
+});

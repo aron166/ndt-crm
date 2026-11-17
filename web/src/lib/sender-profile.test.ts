@@ -26,3 +26,17 @@ describe("normalizeSenderProfile", () => {
     expect(normalizeSenderProfile({ name: "x".repeat(121), phone: "" })).toMatchObject({ ok: false });
   });
 });
+
+describe("normalizeSenderPhone (hub phone field, AC3)", () => {
+  it("normalises a Hungarian number the same way the profile does", async () => {
+    const { normalizeSenderPhone } = await import("./sender-profile");
+    expect(normalizeSenderPhone("06301234567")).toEqual({ ok: true, phone: "+36 30 123 4567" });
+    expect(normalizeSenderPhone(" +36 1 234 5678 ")).toEqual({ ok: true, phone: "+36 1 234 5678" });
+  });
+  it("empty clears, garbage is refused", async () => {
+    const { normalizeSenderPhone } = await import("./sender-profile");
+    expect(normalizeSenderPhone("   ")).toEqual({ ok: true, phone: null });
+    expect(normalizeSenderPhone("123")).toMatchObject({ ok: false, error: expect.any(String) });
+    expect(normalizeSenderPhone("06 30 abc")).toMatchObject({ ok: false });
+  });
+});

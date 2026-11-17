@@ -192,6 +192,14 @@ export async function memberQuickView(tenantId: number, slug: string, memberId: 
 }
 export type QuickView = NonNullable<Awaited<ReturnType<typeof memberQuickView>>>;
 
+/** Launch-tab lines for a missing sender or sender phone; a sender id whose user is not found counts as none. */
+export function senderGaps(senderUserId: number | null, sender: { name: string | null; phone: string | null }): string[] {
+  const gaps: string[] = [];
+  if (senderUserId == null || !sender.name) gaps.push("Nincs feladó kiválasztva");
+  if (!sender.phone) gaps.push("A feladónak nincs telefonszáma");
+  return gaps;
+}
+
 /** Launch-tab check: of the open members, how many would get a complete e-mail, and what is wrong with the rest. */
 export async function campaignEmailCheck(tenantId: number, campaignId: number, senderUserId: number | null) {
   const [ctx, members] = await Promise.all([
@@ -220,6 +228,6 @@ export async function campaignEmailCheck(tenantId: number, campaignId: number, s
   }
   const notLive = [...new Set([...ctx.steps.map((s) => s.contentItemId), ...[...ctx.variants.values()].flat().map((v) => v.itemId)])]
     .filter((id): id is number => id != null).filter((id) => ctx.items.find((i) => i.id === id)?.status !== "live").length;
-  return { total: members.length, complete, unresolved, noAddress, noAsset, notLive, emailSteps: ctx.steps.length, sender: ctx.sender, rows };
+  return { total: members.length, complete, unresolved, noAddress, noAsset, notLive, emailSteps: ctx.steps.length, sender: ctx.sender, senderGaps: senderGaps(senderUserId, ctx.sender), rows };
 }
 export type EmailCheck = Awaited<ReturnType<typeof campaignEmailCheck>>;

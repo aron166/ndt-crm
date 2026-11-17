@@ -14,7 +14,8 @@ export function EmailCheck({ slug, c, campaignId, senderUserId, senders }: {
   return (
     <section className={k.section} aria-label="E-mail ellenőrzés">
       <h2 className={k.groupTitle}>Mi menne ki</h2>
-      <SenderPicker campaignId={campaignId} senderUserId={senderUserId} senders={senders} phone={c.sender.phone} />
+      <SenderPicker key={`${senderUserId ?? "none"}:${c.sender.phone ?? ""}`} campaignId={campaignId} senderUserId={senderUserId} senders={senders} phone={c.sender.phone} />
+      {c.senderGaps.map((g) => <p key={g} className={s.flag}>{g}</p>)}
       <p className={k.strong} style={{ margin: 0 }}>
         {c.complete} / {c.total} tagnak teljes az e-mailje; {c.unresolved} tagnál kitöltetlen mező van; {c.noAddress} tagnak nincs e-mail címe; {c.noAsset} tagnak nincs anyaga.
       </p>

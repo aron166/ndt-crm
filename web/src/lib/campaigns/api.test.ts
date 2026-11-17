@@ -36,3 +36,12 @@ describe("campaignCtx", () => {
     expect(getActor).not.toHaveBeenCalled();
   });
 });
+
+describe("patchSchema: the sender is not settable through the API (AC2)", () => {
+  it("a sender-only PATCH is rejected, the key is not carried through", async () => {
+    const { patchSchema } = await import("./api");
+    expect(patchSchema.safeParse({ sender_user_id: 2 }).success).toBe(false);
+    const mixed = patchSchema.safeParse({ name: "X", sender_user_id: 2 });
+    expect(mixed.success && "sender_user_id" in mixed.data).toBe(false);
+  });
+});
