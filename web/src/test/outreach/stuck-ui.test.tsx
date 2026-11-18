@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import OutreachQueue from "@/app/(app)/outreach/OutreachQueue";
-import { settleStuckDraftAction, type DraftListRow } from "@/app/actions/email-drafts";
+import { listDrafts, settleStuckDraftAction, type DraftListRow } from "@/app/actions/email-drafts";
 
 vi.mock("next/link", () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }));
 vi.mock("@/app/actions/outreach-campaigns", () => ({ setCampaignTarget: vi.fn(), markDraftReplied: vi.fn() }));
@@ -30,10 +30,12 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("stuck sending row", () => {
   it("shows both buttons after 10 minutes and each calls the action", async () => {
-    draw([mk(7, 11)]);
+    const r = mk(7, 11);
+    vi.mocked(listDrafts).mockResolvedValue({ drafts: [r], campaigns: ["bp"], truncated: false });
+    draw([r]);
     await userEvent.click(screen.getByRole("button", { name: SENT }));
     expect(settleStuckDraftAction).toHaveBeenCalledWith(7, "sent");
-    await userEvent.click(screen.getByRole("button", { name: "Nem ment el" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Nem ment el" }));
     expect(settleStuckDraftAction).toHaveBeenCalledWith(7, "not_sent");
   });
   it("shows neither for a recent sending row", () => {
