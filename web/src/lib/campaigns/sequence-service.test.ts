@@ -237,7 +237,7 @@ describe("Vanda #194 fixes", () => {
     expect(d.emailDraft.createMany).not.toHaveBeenCalled();
   });
   it("a lead audience: a company that replied in ANOTHER campaign gets no draft and its member stays (Kai, #218 r2)", async () => {
-    const audience = { source: "leads_by_stage", stages: ["new"] };
+    const audience = { source: "leads_by_stage" as const, stages: ["new"] };
     const c = { ...base, audience, outboundAutomations: false, approvedHash: approvalHash({ memberCompanyIds: [7, 9], steps: base.steps as Parameters<typeof approvalHash>[0]["steps"], dailyCap: 2, outboundAutomations: false, audience: { ...audience, route: "resend" } }) };
     d.campaign.findFirst.mockResolvedValue(c);
     d.campaignMember.findMany.mockResolvedValue([mem(1, 7, "a@x.example.test"), mem(2, 9, "b@x.example.test")]);
