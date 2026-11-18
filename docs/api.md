@@ -1234,6 +1234,13 @@ Per campaign (status `running`, member kind, switch on, in id order) at most ONE
 | `send_failed` | the provider refused; the draft is `failed` and needs a human |
 | `send_failing` | three drafts of this campaign failed at the provider within the last hour: the campaign is PAUSED so the approved queue is not burned through; a human resumes it |
 | `error` | unexpected error, reported |
+| `export_route` | the campaign's send route is `export`: the CSV goes to a cold-mail tool, the CRM never sends it |
+| `resend_prospect` | a prospect e-mail campaign on the `resend` route (Resend's acceptable use policy forbids cold outreach); approval refuses it too |
+| `mailbox_off` | route `mailbox` but `CAMPAIGN_SMTP_HOST`, `CAMPAIGN_SMTP_USER` or `CAMPAIGN_SMTP_PASS` is unset |
+| `mailbox_spacing` | route `mailbox`: a mailbox send is in flight, or the last one was less than 60-180 s ago (pseudo-random per draft) |
+| `mailbox_auth_failed` | the mailbox refused the SMTP login: the draft is back to `approved` (nothing sent), the campaign is `paused` |
+
+**Send routes** (2026-11-18, `PATCH /api/campaigns/{slug}` session only: `{ "send_route": "resend" | "mailbox" | "export" }`, stored as `campaigns.audience.route`, absent = `resend`, part of the approval hash when not `resend`, so a change sends a running campaign back to draft). A prospect e-mail campaign (member kind, `prospect_list` audience, an e-mail step) cannot be approved on `resend` (`409` with one sentence) and its drafts cannot be hand-sent through Resend either. Route `mailbox` sends through the Workspace mailbox over SMTP (`CAMPAIGN_SMTP_HOST`, `CAMPAIGN_SMTP_PORT` default 465, `CAMPAIGN_SMTP_USER`, `CAMPAIGN_SMTP_PASS` = app password), plain text, reply-to the tenant's `outreachReplyTo` else the mailbox, the same footer and unsubscribe headers; its cap is `CAMPAIGN_SMTP_DAILY_CAP` (default 30) per Budapest day over every mailbox send of the tenant, instead of the Resend warm-up; drafts sent this way have `sent_via = "mailbox"`. Route `export` is a CSV download in the launch tab (session operators) of queued members with an address (`email, first_name, last_name, company_name, opener, segment, tender, source_url`); "mark exported" sets them to `excluded` with `last_outcome = "exported"`.
 
 Concurrent calls serialize per sender (advisory lock), so the same draft is never sent twice. A candidate draft that cannot go (member no longer queued or on another step, the company replied, suppressed, no address) keeps its status and gets `last_error`. Only `approved` drafts are considered; up to 20 per call are looked at.
 
