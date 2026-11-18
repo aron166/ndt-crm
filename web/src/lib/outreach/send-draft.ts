@@ -79,6 +79,7 @@ export async function deliverClaimedDraft(
   await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sending" }, ao);
 
   const via = mailbox ? "mailbox" : "resend";
+  const unknownErr = "Ismeretlen hiba küldés közben: ellenőrizd " + (mailbox ? "a postafiók Elküldött mappáját" : "a Resend naplót");
   let result: Awaited<ReturnType<typeof sendEmail>> | Awaited<ReturnType<typeof sendViaMailbox>>;
   try {
     result = mailbox ? await sendViaMailbox(mailbox.cfg, {
@@ -109,9 +110,9 @@ export async function deliverClaimedDraft(
     reportError("outreach.sendDraft", err, { draftId: id, companyId: row.companyId });
     await db.emailDraft.update({
       where: { id },
-      data: { lastError: "Ismeretlen hiba küldés közben: ellenőrizd a Resend naplót" },
+      data: { lastError: unknownErr },
     });
-    return { ok: false, error: "Ismeretlen hiba küldés közben: ellenőrizd a Resend naplót" };
+    return { ok: false, error: unknownErr };
   }
 
   if (result.ok) {
@@ -141,7 +142,7 @@ export async function deliverClaimedDraft(
         where: { id },
         data: { lastError: `Elküldve (${result.id}), de a rögzítés nem sikerült: ellenőrizd` },
       }).catch(() => {});
-      return { ok: false, error: "Elküldve, de a rögzítés nem sikerült: ellenőrizd a Resend naplót" };
+      return { ok: false, error: "Elküldve, de a rögzítés nem sikerült: ellenőrizd " + (mailbox ? "a postafiók Elküldött mappáját" : "a Resend naplót") };
     }
     await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sent", providerMessageId: result.id }, ao);
     // A campaign e-mail step's draft went out: its member moves on in the sequence (item 4).
@@ -155,6 +156,13 @@ export async function deliverClaimedDraft(
     await db.emailDraft.update({ where: { id }, data: { status: "approved", sentVia: null, lastError: result.error } });
     await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "approved", lastError: result.error }, ao);
     return { ok: false, error: result.error, auth: true };
+  }
+  if ("uncertain" in result && result.uncertain) {
+    // The connection died after the data went over: we cannot know whether the mail left, so the
+    // row stays `sending` - terminal, not re-sendable by hand (a retry could double-send).
+    await db.emailDraft.update({ where: { id }, data: { lastError: result.error } });
+    await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "sending", lastError: result.error }, ao);
+    return { ok: false, error: result.error };
   }
   await db.emailDraft.update({ where: { id }, data: { status: "failed", lastError: result.error } });
   await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "failed", lastError: result.error }, ao);

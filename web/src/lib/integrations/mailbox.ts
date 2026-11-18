@@ -17,7 +17,9 @@ export function mailboxConfig(env: Record<string, string | undefined> = process.
 }
 
 export interface MailboxSendInput { tenantId: number; to: string; subject: string; text: string; replyTo?: string | null; fromName?: string | null; headers?: Record<string, string>; companyId?: number | null; personId?: number | null }
-export type MailboxSendResult = { ok: true; id: string; warning?: string } | { ok: false; error: string; auth: boolean };
+export type MailboxSendResult = { ok: true; id: string; warning?: string } | { ok: false; error: string; auth: boolean; uncertain?: boolean };
+
+const UNCERTAIN_ERROR = "A postafiók kapcsolata megszakadt küldés közben: lehet, hogy a levél elment, ellenőrizd az Elküldött mappát";
 
 export async function sendViaMailbox(
   cfg: MailboxConfig,
@@ -33,6 +35,14 @@ export async function sendViaMailbox(
   const displayName = input.fromName?.replace(/["<>\\\r\n]/g, "").trim() || null;
   const from = displayName ? `"${displayName}" <${cfg.user}>` : cfg.user;
 
+  // nodemailer reports any mid-session socket close as ECONNECTION/CONN, so the error cannot say how far
+  // the session got; watch the transaction log for the DATA command instead.
+  let dataStarted = false;
+  const noop = () => {};
+  const logger = {
+    level: noop, trace: noop, info: noop, warn: noop, error: noop, fatal: noop,
+    debug: (meta: { tnx?: string }, msg: unknown) => { if (meta?.tnx === "client" && msg === "DATA") dataStarted = true; },
+  };
   const transporter = nodemailer.createTransport({
     host: cfg.host,
     port: cfg.port,
@@ -41,6 +51,8 @@ export async function sendViaMailbox(
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 20000,
+    logger,
+    transactionLog: true,
     ...opts,
   });
   let id: string;
@@ -52,6 +64,10 @@ export async function sendViaMailbox(
   } catch (e) {
     const err = e as { code?: string; responseCode?: number };
     const auth = err.code === "EAUTH" || err.responseCode === 535 || err.responseCode === 534;
+    // The data may have been accepted before the socket died: the mail may have left.
+    const uncertain = !auth && dataStarted && err.responseCode === undefined
+      && ["ECONNECTION", "ETIMEDOUT", "ECONNRESET", "ESOCKET", "EPIPE"].includes(err.code ?? "");
+    if (uncertain) return { ok: false, auth: false, uncertain: true, error: UNCERTAIN_ERROR };
     return {
       ok: false,
       auth,
