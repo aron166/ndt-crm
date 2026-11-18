@@ -6,21 +6,26 @@ import k from "@/components/astryx/page.module.css";
 import type { EmailCheck as Check } from "@/lib/campaigns/preview";
 import s from "../campaigns.module.css";
 import { SenderPicker } from "./SenderPicker";
+import { RoutePicker } from "./RoutePicker";
+import { ExportPanel } from "./ExportPanel";
+import type { SendRoute } from "@/lib/campaigns/send-route";
 
-export function EmailCheck({ slug, c, campaignId, senderUserId, senders }: {
+export function EmailCheck({ slug, c, campaignId, senderUserId, senders, route, prospectEmail, mailbox, queued, status }: {
   slug: string; c: Check; campaignId: number; senderUserId: number | null; senders: { id: number; name: string }[];
+  route: SendRoute; prospectEmail: boolean; mailbox: { on: boolean; user: string | null; dailyCap: number | null }; queued: number; status: string;
 }) {
   if (c.emailSteps === 0) return null;
   return (
     <section className={k.section} aria-label="E-mail ellenőrzés">
       <h2 className={k.groupTitle}>Mi menne ki</h2>
       <SenderPicker key={`${senderUserId ?? "none"}:${c.sender.phone ?? ""}`} campaignId={campaignId} senderUserId={senderUserId} senders={senders} phone={c.sender.phone} />
+      <RoutePicker slug={slug} route={route} prospectEmail={prospectEmail} mailbox={mailbox} status={status} />
       {c.senderGaps.map((g) => <p key={g} className={s.flag}>{g}</p>)}
       <p className={k.strong} style={{ margin: 0 }}>
         {c.complete} / {c.total} tagnak teljes az e-mailje; {c.unresolved} tagnál kitöltetlen mező van; {c.noAddress} tagnak nincs e-mail címe; {c.noAsset} tagnak nincs anyaga.
       </p>
       {c.notLive > 0 && <p className={s.flag}>{c.notLive} anyag még javaslat: jóváhagyásig ezekből nem készül piszkozat.</p>}
-      {!c.sender.from && <p className={s.flag}>Nincs feladó (Resend integráció): nem menne ki semmi.</p>}
+      {route === "resend" && !c.sender.from && <p className={s.flag}>Nincs feladó (Resend integráció): nem menne ki semmi.</p>}
       {!c.sender.footer && <p className={s.flag}>Nincs leiratkozási lábléc: a küldés elutasítja.</p>}
       {c.rows.length > 0 && (
         <details>
@@ -41,6 +46,7 @@ export function EmailCheck({ slug, c, campaignId, senderUserId, senders }: {
           </div>
         </details>
       )}
+      {route === "export" && <ExportPanel slug={slug} queued={queued} />}
     </section>
   );
 }
