@@ -168,3 +168,44 @@ export async function deliverClaimedDraft(
   await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "failed", lastError: result.error }, ao);
   return { ok: false, error: result.error };
 }
+
+export const STUCK_AFTER_MS = 10 * 60_000;
+
+/**
+ * A human settles a draft left in `sending` (an uncertain send, Vanda #218 r2): "sent" after checking the Sent
+ * folder records it like a delivered send (member advances, next touch scheduled), "not_sent" returns it to
+ * approved. Only rows `sending` for over 10 minutes, so a send in flight is never touched. The caller checks the
+ * operator role; this scopes by tenant and claims the row with one conditional update.
+ */
+export async function settleStuckDraft(
+  tenantId: number,
+  id: number,
+  outcome: "sent" | "not_sent",
+  actor: { userId: number },
+  now: Date = new Date(),
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const row = await db.emailDraft.findFirst({ where: { id, tenantId } });
+  if (!row) return { ok: false, error: "Piszkozat nem található" };
+  const where = { id, tenantId, status: "sending", updatedAt: { lt: new Date(now.getTime() - STUCK_AFTER_MS) } };
+  if (outcome === "not_sent") {
+    const r = await db.emailDraft.updateMany({ where, data: { status: "approved", sentVia: null, lastError: "Kézzel visszaállítva: nem ment el" } });
+    if (r.count === 0) return { ok: false, error: "Ez a piszkozat nem ragadt küldés alatt (vagy még 10 percen belül van)" };
+    await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "approved", settledBy: actor.userId }, { tenantId });
+    return { ok: true };
+  }
+  const sentAt = now;
+  const done = await db.$transaction(async (tx) => {
+    const r = await tx.emailDraft.updateMany({
+      where,
+      data: { status: "sent", sentAt, sentVia: row.sentVia ?? "manual", threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId), lastError: "Kézzel jelölve elküldöttnek (Elküldöttek mappa)" },
+    });
+    if (r.count === 0) return false;
+    await scheduleNextTouch(tx, row, sentAt);
+    return true;
+  });
+  if (!done) return { ok: false, error: "Ez a piszkozat nem ragadt küldés alatt (vagy még 10 percen belül van)" };
+  await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "sent", settledBy: actor.userId }, { tenantId });
+  await advanceOnSent({ tenantId, userId: actor.userId }, row.campaign, row.companyId, row.step)
+    .catch((err) => reportError("outreach.settleStuck.campaignAdvance", err, { draftId: id }));
+  return { ok: true };
+}

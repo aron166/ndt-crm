@@ -9,7 +9,8 @@ import { audit } from "@/lib/audit";
 import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
-import { deliverClaimedDraft, prepareDraftSend } from "@/lib/outreach/send-draft";
+import { deliverClaimedDraft, prepareDraftSend, settleStuckDraft } from "@/lib/outreach/send-draft";
+import { OPERATOR_ROLES } from "@/lib/campaigns/service";
 import {
   type DraftStatus,
   isDraftStatus,
@@ -48,6 +49,8 @@ export interface DraftRow {
   providerMessageId: string | null;
   lastError: string | null;
   sentAt: string | null;
+  /** When the row last changed; a `sending` row older than 10 minutes can be settled by hand. */
+  updatedAt: string;
   createdAt: string;
   senderUserId: number | null;
   wave: number | null;
@@ -93,7 +96,7 @@ export async function listDrafts(
       select: {
         id: true, companyId: true, personId: true, campaign: true, step: true,
         subject: true, toEmail: true, status: true, threadKey: true,
-        providerMessageId: true, lastError: true, sentAt: true, createdAt: true,
+        providerMessageId: true, lastError: true, sentAt: true, createdAt: true, updatedAt: true,
         senderUserId: true, wave: true, dueAt: true, sentVia: true,
         externalThreadId: true, replyType: true, repliedAt: true,
         company: { select: { name: true } },
@@ -140,6 +143,7 @@ export async function listDrafts(
         providerMessageId: r.providerMessageId,
         lastError: r.lastError,
         sentAt: r.sentAt?.toISOString() ?? null,
+        updatedAt: r.updatedAt.toISOString(),
         createdAt: r.createdAt.toISOString(),
         senderUserId: r.senderUserId,
         wave: r.wave,
@@ -322,4 +326,20 @@ export async function sendDraft(id: number): Promise<{ ok: true } | { ok: false;
   const result = await deliverClaimedDraft(TENANT_ID, row, prep, { userId });
   revalidatePath("/outreach");
   return result;
+}
+
+/**
+ * A draft stuck in `sending` (the mailbox connection dropped after the data went over): an operator checks the
+ * mailbox's Sent folder and settles it. "sent" records it as sent, "not_sent" returns it to approved. Admin or
+ * manager only, tenant 1 (Vanda #218 r2).
+ */
+export async function settleStuckDraftAction(id: number, outcome: "sent" | "not_sent"): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await getActor(TENANT_ID);
+  if (userId == null) return DENIED;
+  if (!Number.isInteger(id) || id <= 0 || (outcome !== "sent" && outcome !== "not_sent")) return { ok: false, error: "Érvénytelen adat" };
+  const u = await db.user.findFirst({ where: { id: userId, tenantId: TENANT_ID }, select: { role: true } });
+  if (!u || !OPERATOR_ROLES.includes(u.role)) return { ok: false, error: "Ehhez admin vagy manager szerep kell" };
+  const r = await settleStuckDraft(TENANT_ID, id, outcome, { userId });
+  revalidatePath("/outreach");
+  return r;
 }
