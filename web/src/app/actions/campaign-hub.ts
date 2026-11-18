@@ -174,3 +174,24 @@ export async function memberQuickViewAction(slug: string, memberId: number): Pro
   const view = await memberQuickView(TENANT_ID, slug, memberId);
   return view ? { ok: true, view } : { error: "Tag nem található ebben a kampányban" };
 }
+
+/** Export route (2026-11-18): the queued members with an address as a cold-mail-tool CSV. Read only; operators (service). */
+export async function exportCampaignCsvAction(slug: string): Promise<{ ok: true; csv: string; memberIds: number[]; skippedNoEmail: number } | Err> {
+  const { userId } = await getActor(TENANT_ID);
+  if (userId == null) return { error: NOT_A_CRM_USER };
+  if (typeof slug !== "string") return { error: "Érvénytelen adat" };
+  const r = await svc.exportQueued({ tenantId: TENANT_ID, userId }, slug);
+  if ("error" in r) return { error: r.error };
+  return { ok: true, csv: r.csv, memberIds: r.memberIds, skippedNoEmail: r.skippedNoEmail };
+}
+
+/** Marks exported members so the hub never drafts or sends to them (state excluded, last outcome exported). Operators (service). */
+export async function markExportedAction(slug: string, memberIds: number[]): Promise<{ ok: true; marked: number } | Err> {
+  const { userId } = await getActor(TENANT_ID);
+  if (userId == null) return { error: NOT_A_CRM_USER };
+  if (typeof slug !== "string" || !Array.isArray(memberIds)) return { error: "Érvénytelen adat" };
+  const r = await svc.markExported({ tenantId: TENANT_ID, userId }, slug, memberIds);
+  if ("error" in r) return { error: r.error };
+  touch(slug);
+  return { ok: true, marked: r.marked };
+}

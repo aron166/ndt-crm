@@ -33,6 +33,8 @@ import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
   MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type CallOutcomeKey, type StepDef, type StepChannel, scriptItemFor, campaignAutomationEvents, type StepCondition, audienceOf, type AudienceSource, OPEN_MEMBER_STATES, startFor } from "./rules";
 import { closeSpecRequests } from "./spec-requests";
+import { isProspectEmail, routeRefusal, RESEND_PROSPECT_REFUSAL, SEND_ROUTES, type SendRoute } from "./send-route";
+import { toCsv, type ExportMember } from "./export-csv";
 export { requestSpecification } from "./spec-requests";
 import { planMembers, type MemberRow, type MembersPlan, reachFromContacts, isEmailAddress } from "./members";
 import { campaignVariants, emailContext, memberAddress, valuesFor } from "./preview";
@@ -270,7 +272,7 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
 export async function updateCampaign(
   ctx: CampaignCtx,
   slug: string,
-  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean; outbound_automations?: boolean; scheduled_sending?: boolean; audience?: { source: AudienceSource; stages?: string[] } },
+  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean; outbound_automations?: boolean; scheduled_sending?: boolean; audience?: { source: AudienceSource; stages?: string[] }; send_route?: SendRoute },
 ) {
   const s = needsSession(ctx);
   if (s) return s;
@@ -292,8 +294,17 @@ export async function updateCampaign(
     const known = new Set((await getLeadStatuses(ctx.tenantId)).map((x) => x.key));
     if (!patch.audience.stages?.length || patch.audience.stages.some((x) => !known.has(x) || x === "won" || x === "lost")) return fail(400, "Válassz legalább egy nyitott lead szakaszt");
   }
-  const audience = patch.audience ? { source: patch.audience.source, stages: patch.audience.source === "leads_by_stage" ? [...new Set(patch.audience.stages ?? [])] : [] } : undefined;
-  const audienceChanged = audience !== undefined && JSON.stringify(audience) !== JSON.stringify(audienceOf(c.audience));
+  // The send route rides in the audience JSON (no migration); an audience edit keeps it, a route edit keeps the audience.
+  if (patch.send_route !== undefined && !SEND_ROUTES.includes(patch.send_route)) return fail(400, "Ismeretlen küldési út");
+  const was = audienceOf(c.audience);
+  const audience = patch.audience || patch.send_route
+    ? {
+      source: patch.audience?.source ?? was.source,
+      stages: patch.audience ? (patch.audience.source === "leads_by_stage" ? [...new Set(patch.audience.stages ?? [])] : []) : was.stages,
+      route: patch.send_route ?? was.route,
+    }
+    : undefined;
+  const audienceChanged = audience !== undefined && JSON.stringify(audience) !== JSON.stringify(was);
   const capChanged = (patch.daily_cap !== undefined && patch.daily_cap !== c.dailyCap) || outboundChanged || audienceChanged;
   const brief = patch.adopt_brief_proposal ? ((c.briefProposal as Prisma.JsonObject | null)?.brief as Prisma.InputJsonValue | undefined) : patch.brief;
   const data: Prisma.CampaignUpdateInput = {
@@ -594,6 +605,9 @@ export async function approveCampaign(ctx: CampaignCtx, slug: string, expect?: {
   if (c.steps.length === 0) return fail(409, "Nincs lépés");
   const misfit = stepsFitKind(c.kind as CampaignKind, c.steps, audienceOf(c.audience).source);
   if (misfit) return fail(409, misfit);
+  const aud = audienceOf(c.audience);
+  const refusal = routeRefusal(aud.route, isProspectEmail({ kind: c.kind, audienceSource: aud.source, steps: c.steps }));
+  if (refusal) return fail(409, refusal);
   // An e-mail step needs its own live asset or segment variants, and every variant live: a proposal never launches.
   const variants = await campaignVariants(ctx.tenantId, c.id, tx);
   if (variants.some((v) => v.status !== "live")) return fail(409, "Egy szegmensváltozat még nincs jóváhagyva (élő)");
@@ -1110,8 +1124,62 @@ export async function advanceOnSent(ctx: CampaignCtx, campaignSlug: string, comp
  * Sending a draft of a member campaign needs that campaign running: one sent back to draft (an edit),
  * paused or stopped sends nothing from its queue (Vanda #194-2). Other campaign keys are untouched.
  */
-export async function campaignSendBlock(tenantId: number, slug: string): Promise<string | null> {
-  const c = await db.campaign.findFirst({ where: { tenantId, slug }, select: { kind: true, status: true } });
-  if (!c || !MEMBER_KINDS.includes(c.kind as CampaignKind) || c.status === "running") return null;
-  return `A kampány most nem fut (${c.status}); a piszkozata indítás után küldhető`;
+export async function campaignSendBlock(tenantId: number, slug: string, via: "resend" | "mailbox" = "resend"): Promise<string | null> {
+  const c = await db.campaign.findFirst({ where: { tenantId, slug }, select: { kind: true, status: true, audience: true, steps: { select: { channel: true } } } });
+  if (!c || !MEMBER_KINDS.includes(c.kind as CampaignKind)) return null;
+  if (c.status !== "running") return `A kampány most nem fut (${c.status}); a piszkozata indítás után küldhető`;
+  const aud = audienceOf(c.audience);
+  // Resend never carries cold outreach (its acceptable use policy): not the hand click, not the scheduler (2026-11-18).
+  if (via === "resend" && isProspectEmail({ kind: c.kind, audienceSource: aud.source, steps: c.steps })) return RESEND_PROSPECT_REFUSAL;
+  if (via === "mailbox" && aud.route !== "mailbox") return "Ez a kampány nem a postafiókon megy ki";
+  return null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Export route (2026-11-18): queued members to a CSV for a cold-mail tool, then marked so the hub never mails them.
+
+/** The queued members with an address, as the CSV a cold-mail tool imports. Read only. Operators only (personal data). */
+export async function exportQueued(ctx: CampaignCtx, slug: string) {
+  const op = await needsOperator(ctx);
+  if (op) return op;
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true } });
+  if (!c) return fail(404, "Kampány nem található");
+  const members = await db.campaignMember.findMany({
+    where: { tenantId: ctx.tenantId, campaignId: c.id, state: "queued", company: { deletedAt: null } },
+    orderBy: [{ priority: "asc" }, { id: "asc" }],
+    select: {
+      id: true, companyId: true, personId: true, why: true, segment: true, contactSource: true, source: true,
+      person: { select: { email: true, firstName: true, lastName: true } }, company: { select: { name: true } },
+    },
+  });
+  const contacts = members.length ? await db.contact.findMany({
+    where: { tenantId: ctx.tenantId, endedAt: null, companyId: { in: members.map((m) => m.companyId) } },
+    select: { companyId: true, personId: true, email: true, person: { select: { email: true } } },
+  }) : [];
+  const rows: ExportMember[] = [];
+  const memberIds: number[] = [];
+  for (const m of members) {
+    const email = memberAddress(m, contacts);
+    if (!email) continue;
+    memberIds.push(m.id);
+    rows.push({ email, firstName: m.person?.firstName ?? null, lastName: m.person?.lastName ?? null, company: m.company.name, why: m.why, segment: m.segment, contactSource: m.contactSource, source: m.source });
+  }
+  audit("campaign", c.id, "update", null, { exported: memberIds.length }, auditOpts(ctx));
+  return { ok: true as const, csv: toCsv(rows), memberIds, skippedNoEmail: members.length - memberIds.length };
+}
+
+/** Marks exported members: excluded with last_outcome "exported", so no draft and no send reaches them. Only still-queued members of this campaign. */
+export async function markExported(ctx: CampaignCtx, slug: string, memberIds: number[]) {
+  const op = await needsOperator(ctx);
+  if (op) return op;
+  if (!Array.isArray(memberIds) || memberIds.length > 5000 || memberIds.some((id) => !Number.isInteger(id) || id <= 0)) return fail(400, "Érvénytelen tagok");
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true } });
+  if (!c) return fail(404, "Kampány nem található");
+  const now = new Date();
+  const { count } = await db.campaignMember.updateMany({
+    where: { tenantId: ctx.tenantId, campaignId: c.id, id: { in: memberIds }, state: "queued" },
+    data: { state: "excluded", lastOutcome: "exported", lastTouchedAt: now, stateChangedAt: now },
+  });
+  audit("campaign", c.id, "update", null, { markedExported: count }, auditOpts(ctx));
+  return { ok: true as const, marked: count };
 }

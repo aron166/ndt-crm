@@ -6,6 +6,7 @@ import { reportError } from "@/lib/report-error";
 import { gateDraft } from "@/lib/outreach/template";
 import { advanceOnSent, campaignSendBlock } from "@/lib/campaigns/service";
 import { sendEmail } from "@/lib/integrations/resend";
+import { sendViaMailbox, type MailboxConfig } from "@/lib/integrations/mailbox";
 import { isAddressSuppressed, SUPPRESSED_ERROR } from "@/lib/suppression";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { unsubscribeHeaders } from "@/lib/outreach/unsubscribe";
@@ -24,11 +25,11 @@ export type Prepared =
   | { ok: false; error: string };
 
 /** Every refusal that leaves the row sendable: template gate, campaign running, footer, recipient, suppression, unsubscribe link. */
-export async function prepareDraftSend(tenantId: number, row: EmailDraft): Promise<Prepared> {
+export async function prepareDraftSend(tenantId: number, row: EmailDraft, via: "resend" | "mailbox" = "resend"): Promise<Prepared> {
   // §6b: same template gate as the copy and the manual-send paths.
   const gate = await gateDraft(tenantId, row.campaign, row.step);
   if (!gate.ok) return { ok: false, error: gate.error };
-  const blocked = await campaignSendBlock(tenantId, row.campaign);
+  const blocked = await campaignSendBlock(tenantId, row.campaign, via);
   if (blocked) return { ok: false, error: blocked };
 
   // The consent/unsubscribe line is not optional. Without this guard a tenant
@@ -70,14 +71,27 @@ export async function deliverClaimedDraft(
   row: EmailDraft,
   prep: Extract<Prepared, { ok: true }>,
   actor: { userId: number | null; appSlug?: string },
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  /** The Workspace mailbox route (scheduler only, 2026-11-18); omitted = Resend. */
+  mailbox?: { cfg: MailboxConfig; fromName: string | null },
+): Promise<{ ok: true } | { ok: false; error: string; auth?: boolean }> {
   const id = row.id;
   const ao = actor.userId != null ? undefined : { tenantId, actor: "agent" as const, actorAgentId: actor.appSlug ?? "app" };
   await audit(AUDIT_TYPE, id, "update", { status: row.status }, { status: "sending" }, ao);
 
-  let result: Awaited<ReturnType<typeof sendEmail>>;
+  const via = mailbox ? "mailbox" : "resend";
+  let result: Awaited<ReturnType<typeof sendEmail>> | Awaited<ReturnType<typeof sendViaMailbox>>;
   try {
-    result = await sendEmail({
+    result = mailbox ? await sendViaMailbox(mailbox.cfg, {
+      tenantId,
+      to: prep.to,
+      subject: row.subject,
+      text: prep.text,
+      replyTo: prep.replyTo,
+      fromName: mailbox.fromName,
+      companyId: row.companyId,
+      personId: row.personId,
+      headers: prep.headers,
+    }) : await sendEmail({
       tenantId,
       to: prep.to,
       subject: row.subject,
@@ -109,7 +123,7 @@ export async function deliverClaimedDraft(
           data: {
             status: "sent",
             sentAt,
-            sentVia: "resend",
+            sentVia: via,
             toEmail: prep.to, // the address it actually went to; webhooks and replies match on it
             providerMessageId: result.id,
             threadKey: row.threadKey ?? threadKeyFor(row.campaign, row.companyId),
@@ -136,6 +150,12 @@ export async function deliverClaimedDraft(
     return { ok: true };
   }
 
+  if ("auth" in result && result.auth) {
+    // The mailbox refused the login: nothing left, so the draft goes back to approved, not failed or sent (the caller pauses).
+    await db.emailDraft.update({ where: { id }, data: { status: "approved", sentVia: null, lastError: result.error } });
+    await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "approved", lastError: result.error }, ao);
+    return { ok: false, error: result.error, auth: true };
+  }
   await db.emailDraft.update({ where: { id }, data: { status: "failed", lastError: result.error } });
   await audit(AUDIT_TYPE, id, "update", { status: "sending" }, { status: "failed", lastError: result.error }, ao);
   return { ok: false, error: result.error };

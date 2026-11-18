@@ -3,13 +3,15 @@ export const EXPORT_COLUMNS = ["email", "first_name", "last_name", "company_name
 export interface ExportMember { email: string; firstName: string | null; lastName: string | null; company: string; why: string | null; segment: string | null; contactSource: string | null; source: string | null }
 
 const URL_RE = /https?:\/\/[^\s"']+/;
+// A member load with no person name stores "-" (service.addMembers): a company mailbox, so the tool gets an empty name.
+const name = (v: string | null) => (v == null || v.trim() === "-" ? "" : v.trim());
 
 export function exportRow(m: ExportMember): Record<(typeof EXPORT_COLUMNS)[number], string> {
   const tag = /^\[(high|mid)\] /.exec(m.why ?? "");
   return {
     email: m.email,
-    first_name: m.firstName ?? "",
-    last_name: m.lastName ?? "",
+    first_name: name(m.firstName),
+    last_name: name(m.lastName),
     company_name: m.company,
     opener: tag ? m.why!.slice(tag[0].length).trim() : "",
     segment: m.segment ?? "",
