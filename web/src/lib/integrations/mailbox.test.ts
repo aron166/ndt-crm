@@ -103,6 +103,14 @@ describe("sendViaMailbox", () => {
     await new Promise<void>((r) => srv.close(() => r()));
     const res = await sendViaMailbox(cfgFor(port), input, opts);
     expect(res).toMatchObject({ ok: false, auth: false });
+    expect((res as { uncertain?: boolean }).uncertain).toBeFalsy();
+  });
+
+  it("socket dropped after DATA: uncertain, not auth", async () => {
+    fake = await startFakeSmtp({ dropAfterData: true });
+    const res = await sendViaMailbox(cfgFor(fake.port), input, opts);
+    expect(res).toMatchObject({ ok: false, auth: false, uncertain: true });
+    expect((res as { error: string }).error).toContain("Elküldött mappát");
   });
 
   it("suppressed address is refused before reaching the server", async () => {

@@ -8,7 +8,7 @@ export interface FakeSmtp {
 }
 
 /** Minimal SMTP server on 127.0.0.1 for tests. No STARTTLS, no real network. */
-export async function startFakeSmtp(opts: { rejectAuth?: boolean } = {}): Promise<FakeSmtp> {
+export async function startFakeSmtp(opts: { rejectAuth?: boolean; dropAfterData?: boolean } = {}): Promise<FakeSmtp> {
   const messages: FakeSmtp["messages"] = [];
   const authUsers: string[] = [];
   const sockets = new Set<net.Socket>();
@@ -37,6 +37,7 @@ export async function startFakeSmtp(opts: { rejectAuth?: boolean } = {}): Promis
           messages.push({ ...cur, data: dataLines.join("\r\n") });
           dataLines = [];
           mode = "cmd";
+          if (opts.dropAfterData) return void sock.destroy(); // accepted the data, never says 250
           sock.write("250 2.0.0 queued\r\n");
         } else {
           dataLines.push(line.startsWith("..") ? line.slice(1) : line);
