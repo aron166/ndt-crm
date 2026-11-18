@@ -28,6 +28,7 @@ vi.mock("@/lib/db", () => {
 });
 
 import { setSteps, updateCampaign, recordOutcome, loadLeadAudience, draftEmailStep, advanceOnSent, campaignSendBlock } from "./service";
+import { RESEND_PROSPECT_REFUSAL } from "./send-route";
 import { approvalHash } from "./rules";
 
 type M = ReturnType<typeof vi.fn>;
@@ -251,8 +252,11 @@ describe("Vanda #194 fixes", () => {
   it("2: a draft of a member campaign that is not running cannot be sent; other keys are untouched", async () => {
     d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "draft" });
     expect(await campaignSendBlock(1, "bp")).toMatch(/nem fut/);
-    d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "running" });
+    d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "running", audience: { source: "leads_by_stage", stages: ["new"] }, steps: [{ channel: "email" }] });
     expect(await campaignSendBlock(1, "bp")).toBeNull();
+    // A prospect list never goes through Resend, by hand or by the clock (2026-11-18).
+    d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "running", audience: null, steps: [{ channel: "email" }] });
+    expect(await campaignSendBlock(1, "bp")).toBe(RESEND_PROSPECT_REFUSAL);
     d.campaign.findFirst.mockResolvedValueOnce(null);
     expect(await campaignSendBlock(1, "corvid-betonscan-w1")).toBeNull();
     d.campaign.findFirst.mockResolvedValueOnce({ kind: null, status: "draft" });
