@@ -136,6 +136,7 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
     await db.campaign.deleteMany({ where: w }); // cascades members, steps, events
     await db.contentItem.deleteMany({ where: w });
     await db.interaction.deleteMany({ where: w });
+    await db.lead.deleteMany({ where: w });
     await db.suppression.deleteMany({ where: w });
     await db.contact.deleteMany({ where: w });
     await db.person.deleteMany({ where: w });
@@ -441,5 +442,71 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
     const ctx = { tenantId, userId: u.id };
     expect(await svc.exportQueued(ctx, c.slug)).toMatchObject({ status: 403 });
     expect(await svc.markExported(ctx, c.slug, [c.members[0].id])).toMatchObject({ status: 403 });
+  });
+
+  // Export exclusions: the export lists only members the send path could e-mail today.
+  const exportOnly = async (c: Awaited<ReturnType<typeof mk>>, keep: number) => {
+    const ex = await svc.exportQueued(aronCtx, c.slug);
+    if (!("ok" in ex)) throw new Error(ex.error);
+    expect(ex.memberIds).toEqual([c.members[keep].id]);
+    expect(ex.csv.replace(/^\uFEFF/, "").split(/\r?\n/).filter(Boolean)).toHaveLength(2);
+    expect((ex as { excluded?: number }).excluded).toBe(1);
+  };
+
+  it("X1: export leaves out a suppressed address", async () => {
+    const c = await mk({ route: "mailbox", n: 2 });
+    const addr = `f${seq}-0@firm.example.test`;
+    await db.suppression.create({ data: { tenantId, email: addr, requestedAt: new Date("2026-11-01") } });
+    await exportOnly(c, 1);
+  });
+
+  it("X2: export leaves out a company with an open lead", async () => {
+    const c = await mk({ route: "mailbox", n: 2 });
+    await db.lead.create({ data: { tenantId, companyId: c.members[0].companyId, outcome: "open", convertedDealId: null } });
+    await exportOnly(c, 1);
+  });
+
+  it("X3: export leaves out a company that replied", async () => {
+    const c = await mk({ route: "mailbox", n: 2 });
+    await db.emailDraft.create({ data: { tenantId, companyId: c.members[0].companyId, campaign: `${tag}-other`, step: 1, subject: "s", body: "b", status: "replied", sentVia: "resend", sentAt: new Date("2026-10-01T10:00:00Z") } });
+    await exportOnly(c, 1);
+  });
+
+  it("X4: export leaves out a member not yet eligible", async () => {
+    const c = await mk({ route: "mailbox", n: 2 });
+    await db.campaignMember.update({ where: { id: c.members[0].id }, data: { nextEligibleOn: new Date("2026-11-20") } });
+    await exportOnly(c, 1);
+  });
+
+  it("X5: export leaves out a member on a call step", async () => {
+    const c = await mk({ route: "mailbox", n: 2, kind: "sequence" });
+    await db.campaignStep.create({ data: { tenantId, campaignId: c.id, position: 2, channel: "call", waitDays: 2 } });
+    await db.campaignMember.update({ where: { id: c.members[0].id }, data: { stepPosition: 2 } });
+    await exportOnly(c, 1);
+  });
+
+  it("A: a prospect campaign already running on Resend with the schedule on sends nothing after deploy and keeps its queue", async () => {
+    const c = await mk({ route: "resend" });
+    await db.campaign.update({ where: { id: c.id }, data: { audience: null as never } });
+    const row = await db.campaign.findUniqueOrThrow({
+      where: { id: c.id },
+      select: { id: true, dailyCap: true, outboundAutomations: true, audience: true, steps: { select: { position: true, channel: true, waitDays: true, audienceRule: true, contentItemId: true } } },
+    });
+    await db.campaign.update({ where: { id: c.id }, data: { approvedHash: await svc.approvalHashNow(tenantId, row) } });
+    expect((await go(c.slug))?.blocked).toContain("resend_prospect");
+    expect(sentCalls()).toBe(0);
+    expect(mboxCalls()).toBe(0);
+    for (const id of c.draftIds) expect(await status(id)).toBe("approved");
+    const ms = await db.campaignMember.findMany({ where: { campaignId: c.id } });
+    for (const m of ms) expect(m.state).toBe("queued");
+    expect((await db.campaign.findUniqueOrThrow({ where: { id: c.id } })).status).toBe("running");
+  });
+
+  it("B: the hand send on a mailbox-route prospect campaign is refused", async () => {
+    const { prepareDraftSend } = await import("@/lib/outreach/send-draft");
+    const c = await mk({ route: "mailbox", n: 1 });
+    const draft = await db.emailDraft.findUniqueOrThrow({ where: { id: c.draftIds[0] } });
+    expect(await prepareDraftSend(tenantId, draft)).toEqual({ ok: false, error: RESEND_PROSPECT_REFUSAL });
+    expect(await status(c.draftIds[0])).toBe("approved");
   });
 });
