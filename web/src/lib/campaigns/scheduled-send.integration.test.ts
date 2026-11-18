@@ -18,7 +18,7 @@ vi.mock("@/lib/integrations/resend", () => ({
 }));
 vi.mock("@/lib/integrations/mailbox", () => ({
   mailboxConfig: () => h.cfg,
-  sendViaMailbox: (...a: unknown[]) => h.mbox(...a),
+  sendViaMailbox: (...a: unknown[]) => (h.mbox as (...x: unknown[]) => unknown)(...a),
 }));
 h.mbox = vi.fn(async () => ({ ok: true, id: `<mb_${++h.n}@test>` }));
 
@@ -88,16 +88,21 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
     return { id: c.id, slug: c.slug, senderId: sender.id, draftIds, members };
   }
 
+  // The clock (Date only) stands at the tick, so sentAt written by the sender is the tick's time: the mailbox cap and
+  // spacing compare it with `now`.
   const go = async (slug: string, now = NOW) => {
+    vi.setSystemTime(now);
     const r = await run(now, { tenantId });
     return r.campaigns.find((x) => x.slug === slug);
   };
-  const goAll = async (now = NOW) => (await run(now, { tenantId })).campaigns;
+  const goAll = async (now = NOW) => { vi.setSystemTime(now); return (await run(now, { tenantId })).campaigns; };
   const mboxCalls = () => h.mbox.mock.calls.length;
   const sentCalls = () => h.send.mock.calls.length;
   const status = async (id: number) => (await db.emailDraft.findUniqueOrThrow({ where: { id } })).status;
 
   beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     process.env.DATABASE_URL = CONNECTION;
     process.env.ENCRYPTION_KEY = "ab".repeat(32);
     ({ db } = await import("@/lib/db"));
@@ -124,6 +129,7 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
   });
 
   afterAll(async () => {
+    vi.useRealTimers();
     if (!db) return;
     const w = { tenantId };
     await db.emailDraft.deleteMany({ where: w });
@@ -369,6 +375,7 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
     const m = await mk({ route: "mailbox" });
     h.cfg = null;
     expect((await go(m.slug))?.blocked).toContain("mailbox_off");
+    await db.campaign.update({ where: { id: m.id }, data: { scheduledSending: false } }); // else it sends once the config is back
     h.cfg = { ...DEFAULT_CFG };
     const e = await mk({ route: "export" });
     expect((await go(e.slug))?.blocked).toContain("export_route");

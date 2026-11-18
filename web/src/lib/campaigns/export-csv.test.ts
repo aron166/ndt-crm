@@ -31,6 +31,8 @@ describe("export csv", () => {
     expect(r.first_name).toBe("");
     expect(r.last_name).toBe("");
     expect(r.segment).toBe("");
+    // A load with no person name stores "-" (322 of 528 live member persons on 2026-11-18).
+    expect(exportRow({ ...M, firstName: "-", lastName: " - " })).toMatchObject({ first_name: "", last_name: "" });
   });
   it("neutralises formula injection", () => {
     expect(toCsv([{ ...M, company: '=HYPERLINK("http://x")' }])).toContain(`"'=HYPERLINK(""http://x"")"`);
