@@ -427,6 +427,10 @@ describe.skipIf(!enabled)("scheduled sending (integration)", () => {
     if (!("ok" in ex)) throw new Error(ex.error);
     const line = ex.csv.replace(/^﻿/, "").split(/\r?\n/).filter(Boolean).find((l) => l.includes("info@"));
     expect(line).toMatch(/^"?info@[^",]+"?,,,/);
+    // The audit names the campaign and exactly who left in the file (Vanda #218-4).
+    const { audit } = await import("@/lib/audit");
+    expect(audit).toHaveBeenCalledWith("campaign", c.id, "update", null,
+      { exported: { campaignId: c.id, memberIds: ex.memberIds, csvSha256: expect.stringMatching(/^[0-9a-f]{64}$/) } }, expect.anything());
   });
 
   it("the hand send path refuses a running prospect campaign on Resend", async () => {
