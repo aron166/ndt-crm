@@ -5,6 +5,7 @@ import { changeLeadStatus, completeOpenLeadCallTasks } from "@/lib/leads/service
 import { runAutomations } from "@/lib/automations/engine";
 import { resolveDemoHost } from "@/lib/booking/queries";
 import { approvalHash, type StepDef } from "./rules";
+import { RESEND_PROSPECT_REFUSAL } from "./send-route";
 import { addMembers, advanceMembersForCall, approveCampaign, recordOutcome, setCampaignStatus, specifyCampaign, setSteps, undoBatch, updateCampaign } from "./service";
 
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
@@ -159,7 +160,8 @@ describe("only Áron launches", () => {
   });
   it("segment variants: a proposal variant blocks the launch; all variants live launch an e-mail step with no own asset, and join the hash", async () => {
     const step = { position: 1, channel: "email", waitDays: 0, contentItemId: null, contentItem: null };
-    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "cold_email", dailyCap: 15, outboundAutomations: false, steps: [step] });
+    // A prospect e-mail campaign launches on the mailbox route only (Resend refuses cold outreach, 2026-11-18).
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "cold_email", dailyCap: 15, outboundAutomations: false, audience: { route: "mailbox" }, steps: [step] });
     d.contentItem.findMany.mockResolvedValue([{ id: 60, status: "in_review", sourceMeta: { campaignStep: 1, segment: "A" } }]);
     expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp")).toMatchObject({ status: 409, error: expect.stringMatching(/szegmensváltozat/) });
     d.contentItem.findMany.mockResolvedValue([{ id: 60, status: "live", sourceMeta: { campaignStep: 1, segment: "A" } }]);
@@ -168,6 +170,12 @@ describe("only Áron launches", () => {
     const plain = approvalHash({ memberCompanyIds: [7], steps: [step as StepDef & { contentItemId: null }], dailyCap: 15 });
     expect((r as { approved_hash: string }).approved_hash).not.toBe(plain);
     expect(approvalHash({ memberCompanyIds: [7], steps: [step as StepDef & { contentItemId: null }], dailyCap: 15, variants: [] })).toBe(plain);
+  });
+  it("a prospect e-mail campaign on Resend is refused with the one-sentence reason (2026-11-18)", async () => {
+    const step = { position: 1, channel: "email", waitDays: 0, contentItemId: 5, contentItem: { status: "live" } };
+    d.campaign.findFirst.mockResolvedValue({ id: 3, status: "draft", kind: "cold_email", dailyCap: 15, outboundAutomations: false, audience: null, steps: [step] });
+    expect(await approveCampaign({ tenantId: 1, userId: 2 }, "bp")).toEqual({ status: 409, error: RESEND_PROSPECT_REFUSAL });
+    expect(d.campaign.updateMany).not.toHaveBeenCalled();
   });
   it("an app key can never approve", async () => {
     expect(await approveCampaign(APP, "bp")).toMatchObject({ status: 403 });

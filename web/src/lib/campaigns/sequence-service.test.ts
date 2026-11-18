@@ -28,6 +28,7 @@ vi.mock("@/lib/db", () => {
 });
 
 import { setSteps, updateCampaign, recordOutcome, loadLeadAudience, draftEmailStep, advanceOnSent, campaignSendBlock } from "./service";
+import { RESEND_PROSPECT_REFUSAL } from "./send-route";
 import { approvalHash } from "./rules";
 
 type M = ReturnType<typeof vi.fn>;
@@ -235,6 +236,19 @@ describe("Vanda #194 fixes", () => {
     expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 0 });
     expect(d.emailDraft.createMany).not.toHaveBeenCalled();
   });
+  it("a lead audience: a company that replied in ANOTHER campaign gets no draft and its member stays (Kai, #218 r2)", async () => {
+    const audience = { source: "leads_by_stage" as const, stages: ["new"] };
+    const c = { ...base, audience, outboundAutomations: false, approvedHash: approvalHash({ memberCompanyIds: [7, 9], steps: base.steps as Parameters<typeof approvalHash>[0]["steps"], dailyCap: 2, outboundAutomations: false, audience: { ...audience, route: "resend" } }) };
+    d.campaign.findFirst.mockResolvedValue(c);
+    d.campaignMember.findMany.mockResolvedValue([mem(1, 7, "a@x.example.test"), mem(2, 9, "b@x.example.test")]);
+    d.lead.findMany.mockResolvedValue([{ companyId: 7 }, { companyId: 9 }]); // both open leads: the stage audience
+    // This campaign has no draft for either; company 7 replied in another campaign (the any-campaign query has no `campaign`).
+    d.emailDraft.findMany.mockImplementation(async ({ where }: { where: { campaign?: string; status?: string } }) =>
+      where.status === "replied" && where.campaign === undefined ? [{ companyId: 7 }] : []);
+    expect(await draftEmailStep(SESSION, "bp", NOW)).toMatchObject({ drafted: 1 });
+    expect(d.emailDraft.createMany.mock.calls[0][0].data.map((x: { companyId: number }) => x.companyId)).toEqual([9]);
+    expect(d.campaignMember.updateMany).not.toHaveBeenCalled();
+  });
   it("4: the address may sit on the company's contact", async () => {
     d.campaign.findFirst.mockResolvedValue(running([{ companyId: 7 }]));
     d.campaignMember.findMany.mockResolvedValue([mem(1, 7, null)]);
@@ -251,8 +265,11 @@ describe("Vanda #194 fixes", () => {
   it("2: a draft of a member campaign that is not running cannot be sent; other keys are untouched", async () => {
     d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "draft" });
     expect(await campaignSendBlock(1, "bp")).toMatch(/nem fut/);
-    d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "running" });
+    d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "running", audience: { source: "leads_by_stage", stages: ["new"] }, steps: [{ channel: "email" }] });
     expect(await campaignSendBlock(1, "bp")).toBeNull();
+    // A prospect list never goes through Resend, by hand or by the clock (2026-11-18).
+    d.campaign.findFirst.mockResolvedValueOnce({ kind: "sequence", status: "running", audience: null, steps: [{ channel: "email" }] });
+    expect(await campaignSendBlock(1, "bp")).toBe(RESEND_PROSPECT_REFUSAL);
     d.campaign.findFirst.mockResolvedValueOnce(null);
     expect(await campaignSendBlock(1, "corvid-betonscan-w1")).toBeNull();
     d.campaign.findFirst.mockResolvedValueOnce({ kind: null, status: "draft" });

@@ -22,6 +22,8 @@ import { memberRows } from "@/lib/campaigns/hub";
 import { CampaignAutomations } from "./CampaignAutomations";
 import { AudiencePanel } from "./AudiencePanel";
 import { audienceOf } from "@/lib/campaigns/rules";
+import { isProspectEmail } from "@/lib/campaigns/send-route";
+import { mailboxConfig } from "@/lib/integrations/mailbox";
 import { db } from "@/lib/db";
 import { getLeadStatuses } from "@/lib/leads/queries";
 import { CAMPAIGN_TRIGGERS } from "@/lib/automations/types";
@@ -49,6 +51,10 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   const tab = tabs.some((t) => t.key === rawTab) ? rawTab! : "overview";
   const brief = (c.brief ?? {}) as Record<string, unknown>;
   const aud = audienceOf(c.audience);
+  const route = aud.route;
+  const prospectEmail = isProspectEmail({ kind: c.kind, audienceSource: aud.source, steps: c.steps });
+  const mb = mailboxConfig();
+  const mailbox = { on: mb != null, user: mb?.user ?? null, dailyCap: mb?.dailyCap ?? null }; // never pass mb.pass to a client component
 
   return (
     <div className="mount">
@@ -67,10 +73,11 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         <LaunchPanel isAron={d.isAron} d={{
           slug: c.slug, status: c.status, dailyCap: c.dailyCap, startsOn: ymd(c.startsOn), endsOn: ymd(c.endsOn),
           outboundAutomations: c.outboundAutomations, scheduledSending: c.scheduledSending, previewHash: d.previewHash, approvedAt: c.approvedAt ? c.approvedAt.toISOString() : null,
-          steps: c.steps, assets: d.assets, members: d.members, variants: d.variants,
+          steps: c.steps, assets: d.assets, members: d.members, variants: d.variants, route, prospectEmail,
         }} />
       )}
-      {tab === "launch" && <EmailCheck slug={c.slug} c={await campaignEmailCheck(TENANT_ID, c.id, c.senderUserId)} campaignId={c.id} senderUserId={c.senderUserId} senders={await listSenders()} />}
+      {tab === "launch" && <EmailCheck slug={c.slug} c={await campaignEmailCheck(TENANT_ID, c.id, c.senderUserId)} campaignId={c.id} senderUserId={c.senderUserId} senders={await listSenders()}
+        route={route} prospectEmail={prospectEmail} mailbox={mailbox} queued={d.members.queued ?? 0} status={c.status} />}
       {tab === "automations" && await automationsTab(c.id, c.outboundAutomations)}
       {tab === "members" && (
         <MemberList slug={c.slug} rows={await memberRows(TENANT_ID, c.id)} openId={Number(rawMember) > 0 ? Number(rawMember) : null} />

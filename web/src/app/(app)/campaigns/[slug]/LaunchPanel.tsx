@@ -11,6 +11,7 @@ import { stepLine } from "@/lib/campaigns/labels";
 import type { AssetState } from "@/lib/campaigns/hub";
 import { approveCampaignAction, setCampaignStatusAction, updateCampaignAction } from "@/app/actions/campaign-hub";
 import { assetStateLabel } from "@/lib/campaigns/labels";
+import { ROUTE_LABELS, routeRefusal, type SendRoute } from "@/lib/campaigns/send-route";
 import type { StepRow } from "./StepsSection";
 import s from "../campaigns.module.css";
 
@@ -20,12 +21,18 @@ export interface LaunchData {
   steps: StepRow[]; assets: AssetState[]; members: Record<string, number>;
   /** Segment variants of the e-mail steps (lib/campaigns/preview campaignVariants). */
   variants?: { step: number; segment: string; itemId: number; status: string }[];
+  /** How the e-mails leave; absent means Resend (a pre-route campaign). */
+  route?: SendRoute;
+  /** True for cold e-mail on a prospect list (Resend refuses it). */
+  prospectEmail?: boolean;
 }
 
 /** What still blocks a launch, in the service's order (approveCampaign is the final word). */
-export function launchBlockers(d: Pick<LaunchData, "status" | "steps" | "assets" | "members" | "variants">): string[] {
+export function launchBlockers(d: Pick<LaunchData, "status" | "steps" | "assets" | "members" | "variants" | "route" | "prospectEmail">): string[] {
   const out: string[] = [];
   if (d.status !== "draft" && d.status !== "paused") out.push(d.status === "running" ? "A kampány már fut" : "Lezárt kampány");
+  const refusal = routeRefusal(d.route ?? "resend", d.prospectEmail === true);
+  if (refusal) out.push(refusal);
   if (d.steps.length === 0) out.push("Nincs lépés");
   const byId = new Map(d.assets.map((a) => [a.id, a]));
   for (const st of d.steps) {
@@ -140,7 +147,7 @@ export function LaunchPanel({ d, isAron }: { d: LaunchData; isAron: boolean }) {
         </section>
         <section className={k.section} aria-label="Jóváhagyás">
           <p className={s.confirm}>
-            Ezt hagyod jóvá: {total} cég ({d.members.queued ?? 0} elérhető), {d.steps.length} lépés, napi {d.dailyCap}{assetsLine ? `, ${assetsLine}` : ""}. Bármely módosítás után a kampány visszaáll piszkozatra.
+            Ezt hagyod jóvá: {total} cég ({d.members.queued ?? 0} elérhető), {d.steps.length} lépés, napi {d.dailyCap}{assetsLine ? `, ${assetsLine}` : ""}, küldési út: {ROUTE_LABELS[d.route ?? "resend"]}. Bármely módosítás után a kampány visszaáll piszkozatra.
           </p>
           {blockers.length > 0 && <ul className={`${k.muted} ${s.blockers}`}>{blockers.map((b) => <li key={b}>{b}</li>)}</ul>}
           {live ? (

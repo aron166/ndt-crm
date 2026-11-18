@@ -15,6 +15,7 @@ import {
   approveDraft,
   approveAll,
   sendDraft,
+  settleStuckDraftAction,
   getDraftBody,
   saveOutreachSettings,
   type DraftListRow,
@@ -29,6 +30,9 @@ import k from "@/components/astryx/page.module.css";
 import s from "./outreach.module.css";
 
 type Sender = { id: number; name: string };
+
+// Mirrors STUCK_AFTER_MS in lib/outreach/send-draft (server-only, not importable in a client file).
+const STUCK_AFTER_MS = 10 * 60_000;
 
 // ⚠️ PLACEHOLDER consent line. Áron owes the real wording — this one is a
 // starting point, not legal text, and it goes out on every send once saved.
@@ -90,6 +94,7 @@ export default function OutreachQueue({
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [drafted, setDrafted] = useState<Record<number, { subject: string; body: string }>>({});
   const [bodyLoading, setBodyLoading] = useState<Record<number, boolean>>({});
+  const [loadedAt] = useState(() => Date.now()); // render-pure clock for the stuck-send check
   const [busyId, setBusyId] = useState<number | null>(null);
   const [approvingAll, setApprovingAll] = useState(false);
   const [rowError, setRowError] = useState<Record<number, string>>({});
@@ -196,6 +201,15 @@ export default function OutreachQueue({
       return;
     }
     patchRow(row.id, { status: "sent", lastError: null });
+  }
+
+  async function onSettle(row: DraftListRow, outcome: "sent" | "not_sent") {
+    setBusyId(row.id);
+    setRowError((e) => ({ ...e, [row.id]: "" }));
+    const res = await settleStuckDraftAction(row.id, outcome);
+    setBusyId(null);
+    if (!res.ok) setRowError((e) => ({ ...e, [row.id]: res.error }));
+    await refetchCurrent(); // the server knows the real status
   }
 
   async function onApproveAll() {
@@ -512,6 +526,23 @@ export default function OutreachQueue({
                   <div className={`${s.draftNote} ${k.muted}`}>
                     <Link href={`/leads/${rowInfo[row.id].leadId}`} className={k.link}>Lead létrehozva</Link>
                   </div>
+                )}
+
+                {row.status === "sending" && loadedAt - Date.parse(row.updatedAt) > STUCK_AFTER_MS && (
+                  <>
+                    <div className={`${s.draftNote} ${k.muted}`}>Megszakadt küldés: nézd meg a postafiók Elküldöttek mappáját.</div>
+                    {!expanded && rowError[row.id] && (
+                      <div className={`${s.draftNote} ${k.muted}`} style={{ color: "var(--ui-danger-text)" }}>{rowError[row.id]}</div>
+                    )}
+                    <div className={s.btnRow}>
+                      <button onClick={() => onSettle(row, "sent")} disabled={busy} className={k.btn}>
+                        Elment (megnéztem az Elküldöttek mappát)
+                      </button>
+                      <button onClick={() => onSettle(row, "not_sent")} disabled={busy} className={k.btn}>
+                        Nem ment el
+                      </button>
+                    </div>
+                  </>
                 )}
 
                 {expanded && (

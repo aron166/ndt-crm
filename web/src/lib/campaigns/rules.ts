@@ -6,6 +6,7 @@
 
 import type { CallOutcomeKey as LeadCallOutcomeKey } from "@/lib/leads/outcomes";
 import { createHash } from "node:crypto";
+import { routeOf, type SendRoute } from "./send-route";
 import { addWorkingDays, localDay, type LocalDay } from "@/lib/booking/time";
 
 export const CAMPAIGN_KINDS = ["content", "ad", "organic", "cold_call", "cold_email", "sequence"] as const;
@@ -62,10 +63,11 @@ export function nextApplicable(steps: readonly StepDef[], position: number, h: M
 }
 
 /** The audience a campaign row names (campaigns.audience JSON); anything else is a prospect list. */
-export function audienceOf(raw: unknown): { source: AudienceSource; stages: string[] } {
+export function audienceOf(raw: unknown): { source: AudienceSource; stages: string[]; route: SendRoute } {
   const a = (raw ?? {}) as { source?: unknown; stages?: unknown };
-  if (a.source === "leads_by_stage" && Array.isArray(a.stages)) return { source: "leads_by_stage", stages: a.stages.filter((s): s is string => typeof s === "string") };
-  return { source: "prospect_list", stages: [] };
+  const route = routeOf(raw);
+  if (a.source === "leads_by_stage" && Array.isArray(a.stages)) return { source: "leads_by_stage", stages: a.stages.filter((s): s is string => typeof s === "string"), route };
+  return { source: "prospect_list", stages: [], route };
 }
 
 /** After a mid-run edit a member keeps its place in line; one past the new end is done. */
@@ -344,7 +346,7 @@ export function approvalHash(input: {
   /** Whether promoted leads may fire send_email / webhook_out rules; omitted = false. */
   outboundAutomations?: boolean;
   /** Who is touched; only a leads-by-stage audience joins the payload (Vanda #194-7). */
-  audience?: { source: AudienceSource; stages: string[] };
+  audience?: { source: AudienceSource; stages: string[]; route?: SendRoute };
   /** Segment variants of the e-mail steps (content items tagged campaignStep + segment). */
   variants?: readonly { step: number; segment: string; itemId: number }[];
 }): string {
@@ -357,6 +359,8 @@ export function approvalHash(input: {
     // Only in the payload when on, so every hash computed before this flag existed still matches.
     ...(input.outboundAutomations ? { o: 1 } : {}),
     ...(input.audience?.source === "leads_by_stage" ? { a: [...input.audience.stages].sort() } : {}),
+    // The send route Áron approves (2026-11-18); only when not Resend, so every earlier hash still matches.
+    ...(input.audience?.route && input.audience.route !== "resend" ? { r: input.audience.route } : {}),
     // Only when a step has variants, so every earlier hash still matches.
     ...(input.variants?.length ? { v: input.variants.map((x) => [x.step, x.segment, x.itemId]).sort((a, b) => String(a).localeCompare(String(b))) } : {}),
   });

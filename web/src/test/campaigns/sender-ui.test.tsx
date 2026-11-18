@@ -43,17 +43,19 @@ describe("SenderPicker in the hub", () => {
   });
 });
 
+const ROUTE = { route: "resend" as const, prospectEmail: false, mailbox: { on: false, user: null, dailyCap: null }, queued: 0, status: "draft" };
+
 describe("EmailCheck lists the sender gaps (AC5)", () => {
   const base: Check = { total: 1, complete: 0, unresolved: 1, noAddress: 0, noAsset: 0, notLive: 0, emailSteps: 1, rows: [],
     sender: { name: null, phone: null, from: "x@y.hu", replyTo: null, footer: "f" },
     senderGaps: ["Nincs feladó kiválasztva", "A feladónak nincs telefonszáma"] };
   it("shows each gap", () => {
-    render(<EmailCheck slug="bp" c={base} campaignId={2} senderUserId={null} senders={[]} />);
+    render(<EmailCheck slug="bp" c={base} campaignId={2} senderUserId={null} senders={[]} {...ROUTE} />);
     expect(screen.getByText("Nincs feladó kiválasztva")).toBeTruthy();
     expect(screen.getByText("A feladónak nincs telefonszáma")).toBeTruthy();
   });
   it("shows none when both are set", () => {
-    render(<EmailCheck slug="bp" c={{ ...base, sender: { ...base.sender, name: "N P", phone: "+36 30 123 4567" }, senderGaps: [] }} campaignId={2} senderUserId={9} senders={SENDERS} />);
+    render(<EmailCheck slug="bp" c={{ ...base, sender: { ...base.sender, name: "N P", phone: "+36 30 123 4567" }, senderGaps: [] }} campaignId={2} senderUserId={9} senders={SENDERS} {...ROUTE} />);
     expect(screen.queryByText("Nincs feladó kiválasztva")).toBeNull();
     expect(screen.queryByText("A feladónak nincs telefonszáma")).toBeNull();
   });

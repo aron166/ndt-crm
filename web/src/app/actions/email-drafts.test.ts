@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { db } from "@/lib/db";
-import { getDraftBody, sendDraft } from "./email-drafts";
+import { getDraftBody, sendDraft, settleStuckDraftAction } from "./email-drafts";
+import { getActor } from "@/lib/actor";
 import { sendEmail } from "@/lib/integrations/resend";
 import { resolveDraftRecipient } from "@/lib/outreach/recipient";
 import { SUPPRESSED_ERROR } from "@/lib/suppression";
@@ -16,6 +17,7 @@ vi.mock("@/lib/db", () => ({
     emailDraft: { findFirst: vi.fn(), updateMany: vi.fn(), update: vi.fn(), count: vi.fn() },
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ emailDraft: { update: vi.fn() } })),
     tenant: { findUnique: vi.fn() },
+    user: { findFirst: vi.fn() },
     contact: { findFirst: vi.fn() },
     suppression: { findMany: vi.fn() },
     contentItem: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -23,7 +25,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/lib/outreach/template", () => ({ gateDraft: vi.fn().mockResolvedValue({ ok: true }), gateOn: vi.fn(), templatesForCampaigns: vi.fn() }));
-vi.mock("@/lib/campaigns/service", () => ({ campaignSendBlock: vi.fn().mockResolvedValue(null), advanceOnSent: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/campaigns/service", () => ({ OPERATOR_ROLES: ["admin", "manager"], campaignSendBlock: vi.fn().mockResolvedValue(null), advanceOnSent: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/outreach/recipient", async (orig) => { const a = await orig<typeof import("@/lib/outreach/recipient")>(); return { ...a, resolveDraftRecipient: vi.fn(a.resolveDraftRecipient) }; });
 vi.mock("@/lib/outreach/schedule", () => ({ scheduleNextTouch: vi.fn() }));
 
@@ -76,5 +78,31 @@ describe("sendDraft unsubscribe headers", () => {
     expect(r.ok).toBe(false);
     expect(m.emailDraft.updateMany).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("settleStuckDraftAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.emailDraft.findFirst.mockResolvedValue({ id: 7, tenantId: 1, status: "sending", campaign: "bp", step: 1, companyId: 4, sentVia: "mailbox" });
+    m.emailDraft.updateMany.mockResolvedValue({ count: 1 });
+  });
+  it("refuses a non-CRM user", async () => {
+    (getActor as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ userId: null });
+    expect((await settleStuckDraftAction(7, "sent")).ok).toBe(false);
+    expect(m.emailDraft.updateMany).not.toHaveBeenCalled();
+  });
+  it("refuses role member", async () => {
+    m.user.findFirst.mockResolvedValue({ role: "member" });
+    expect(await settleStuckDraftAction(7, "not_sent")).toEqual({ ok: false, error: "Ehhez admin vagy manager szerep kell" });
+    expect(m.emailDraft.updateMany).not.toHaveBeenCalled();
+  });
+  it("rejects an invalid outcome", async () => {
+    expect(await settleStuckDraftAction(7, "x" as never)).toEqual({ ok: false, error: "Érvénytelen adat" });
+  });
+  it("admin + not_sent reaches the update", async () => {
+    m.user.findFirst.mockResolvedValue({ role: "admin" });
+    expect(await settleStuckDraftAction(7, "not_sent")).toEqual({ ok: true });
+    expect(m.emailDraft.updateMany).toHaveBeenCalled();
   });
 });

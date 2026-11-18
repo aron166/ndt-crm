@@ -138,7 +138,19 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 
   if (input.skipLog) return { ok: true, id };
 
-  // Append-only interaction log (never blocks the send result).
+  const warning = await logOutboundEmail({
+    tenantId, subject, text: input.text, companyId: input.companyId, personId: input.personId,
+    source: "resend", providerId: id,
+  });
+  return { ok: true, id, ...(warning ? { warning } : {}) };
+}
+
+/** Append-only interaction log for a sent email (never blocks the send result). Returns a warning when logging failed. */
+export async function logOutboundEmail(input: {
+  tenantId: number; subject: string; text: string; companyId?: number | null; personId?: number | null;
+  source: "resend" | "mailbox"; providerId: string;
+}): Promise<string | undefined> {
+  const { tenantId, subject, source, providerId } = input;
   const companyId = input.companyId ?? null;
   const personId = input.personId ?? null;
   try {
@@ -155,7 +167,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       },
     });
     audit("interaction", interaction.id, "create", null,
-      { type: "email", direction: "outbound", companyId, personId, source: "resend" }, { tenantId });
+      { type: "email", direction: "outbound", companyId, personId, source }, { tenantId });
     await recomputeCloseness({ tenantId, companyId, personId });
     if (companyId) {
       await db.company.updateMany({
@@ -166,9 +178,9 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   } catch (err) {
     // The email was sent, so this is not a failure, but a hole in the
     // append-only trail must be observable, never silent.
-    reportError("resend.log", err, { companyId, personId, resendId: id });
-    return { ok: true, id, warning: "Az email elment, de az utólagos CRM-naplózás nem sikerült." };
+    if (source === "resend") reportError("resend.log", err, { companyId, personId, resendId: providerId });
+    else reportError("mailbox.log", err, { companyId, personId, messageId: providerId });
+    return "Az email elment, de az utólagos CRM-naplózás nem sikerült.";
   }
-
-  return { ok: true, id };
+  return undefined;
 }

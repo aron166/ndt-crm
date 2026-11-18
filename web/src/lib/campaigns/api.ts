@@ -8,6 +8,7 @@ import { validateAppKey, rateLimit } from "@/lib/app-key-auth";
 import { getActor, NOT_A_CRM_USER } from "@/lib/actor";
 import { CONTENT_CATEGORIES } from "@/lib/content/types";
 import { AUDIENCE_RULES, AUDIENCE_SOURCES, CAMPAIGN_KINDS, DAILY_CAP_MAX, OUTCOME_KEYS, STEP_CHANNELS } from "./rules";
+import { SEND_ROUTES } from "./send-route";
 import type { CampaignCtx, Fail } from "./service";
 
 // Single tenant for sessions today (decisions.md #12); app keys carry their own tenant.
@@ -84,6 +85,8 @@ export const patchSchema = z.object({
   scheduled_sending: z.boolean().optional(),
   /** Who the campaign touches (item 4): prospects from a list, or open leads in chosen stages. */
   audience: z.object({ source: z.enum(AUDIENCE_SOURCES), stages: z.array(z.string().trim().min(1).max(40)).max(20).optional() }).optional(),
+  /** How the e-mails leave (2026-11-18): resend, the Workspace mailbox, or a CSV export for a cold-mail tool. */
+  send_route: z.enum(SEND_ROUTES).optional(),
 }).refine((p) => Object.keys(p).length > 0, "empty patch");
 
 export const specifySchema = z.object({

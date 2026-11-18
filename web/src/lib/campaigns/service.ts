@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // Campaigns slice 1: the DB side. Rules live in ./rules.ts (pure, tested); this file loads,
 // checks tenant and permission, and writes. Every function takes the tenant from its ctx and
 // scopes every query by it. Who may call what is decided here, not in the routes:
@@ -33,6 +34,8 @@ import {
   approvalHash, canApprove, canSetStatus, inWindow, isForwardMove, planOutcome, selectDailyList, stepsFitKind,
   MEMBER_KINDS, type CampaignKind, type CampaignStatus, type OutcomeKey, type CallOutcomeKey, type StepDef, type StepChannel, scriptItemFor, campaignAutomationEvents, type StepCondition, audienceOf, type AudienceSource, OPEN_MEMBER_STATES, startFor } from "./rules";
 import { closeSpecRequests } from "./spec-requests";
+import { isProspectEmail, routeRefusal, RESEND_PROSPECT_REFUSAL, SEND_ROUTES, type SendRoute } from "./send-route";
+import { toCsv, type ExportMember } from "./export-csv";
 export { requestSpecification } from "./spec-requests";
 import { planMembers, type MemberRow, type MembersPlan, reachFromContacts, isEmailAddress } from "./members";
 import { campaignVariants, emailContext, memberAddress, valuesFor } from "./preview";
@@ -270,7 +273,7 @@ export async function setSteps(ctx: CampaignCtx, slug: string, steps: StepInput[
 export async function updateCampaign(
   ctx: CampaignCtx,
   slug: string,
-  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean; outbound_automations?: boolean; scheduled_sending?: boolean; audience?: { source: AudienceSource; stages?: string[] } },
+  patch: { name?: string; daily_cap?: number; owner_user_id?: number | null; starts_on?: string | null; ends_on?: string | null; brief?: Prisma.InputJsonValue; adopt_brief_proposal?: boolean; outbound_automations?: boolean; scheduled_sending?: boolean; audience?: { source: AudienceSource; stages?: string[] }; send_route?: SendRoute },
 ) {
   const s = needsSession(ctx);
   if (s) return s;
@@ -292,8 +295,17 @@ export async function updateCampaign(
     const known = new Set((await getLeadStatuses(ctx.tenantId)).map((x) => x.key));
     if (!patch.audience.stages?.length || patch.audience.stages.some((x) => !known.has(x) || x === "won" || x === "lost")) return fail(400, "Válassz legalább egy nyitott lead szakaszt");
   }
-  const audience = patch.audience ? { source: patch.audience.source, stages: patch.audience.source === "leads_by_stage" ? [...new Set(patch.audience.stages ?? [])] : [] } : undefined;
-  const audienceChanged = audience !== undefined && JSON.stringify(audience) !== JSON.stringify(audienceOf(c.audience));
+  // The send route rides in the audience JSON (no migration); an audience edit keeps it, a route edit keeps the audience.
+  if (patch.send_route !== undefined && !SEND_ROUTES.includes(patch.send_route)) return fail(400, "Ismeretlen küldési út");
+  const was = audienceOf(c.audience);
+  const audience = patch.audience || patch.send_route
+    ? {
+      source: patch.audience?.source ?? was.source,
+      stages: patch.audience ? (patch.audience.source === "leads_by_stage" ? [...new Set(patch.audience.stages ?? [])] : []) : was.stages,
+      route: patch.send_route ?? was.route,
+    }
+    : undefined;
+  const audienceChanged = audience !== undefined && JSON.stringify(audience) !== JSON.stringify(was);
   const capChanged = (patch.daily_cap !== undefined && patch.daily_cap !== c.dailyCap) || outboundChanged || audienceChanged;
   const brief = patch.adopt_brief_proposal ? ((c.briefProposal as Prisma.JsonObject | null)?.brief as Prisma.InputJsonValue | undefined) : patch.brief;
   const data: Prisma.CampaignUpdateInput = {
@@ -594,6 +606,9 @@ export async function approveCampaign(ctx: CampaignCtx, slug: string, expect?: {
   if (c.steps.length === 0) return fail(409, "Nincs lépés");
   const misfit = stepsFitKind(c.kind as CampaignKind, c.steps, audienceOf(c.audience).source);
   if (misfit) return fail(409, misfit);
+  const aud = audienceOf(c.audience);
+  const refusal = routeRefusal(aud.route, isProspectEmail({ kind: c.kind, audienceSource: aud.source, steps: c.steps }));
+  if (refusal) return fail(409, refusal);
   // An e-mail step needs its own live asset or segment variants, and every variant live: a proposal never launches.
   const variants = await campaignVariants(ctx.tenantId, c.id, tx);
   if (variants.some((v) => v.status !== "live")) return fail(409, "Egy szegmensváltozat még nincs jóváhagyva (élő)");
@@ -1044,40 +1059,19 @@ export async function draftEmailStep(ctx: CampaignCtx, slug: string, now: Date =
   const today = localDay(now).key;
   const ymdKey = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
   if (!inWindow(ymdKey(c.startsOn), ymdKey(c.endsOn), today)) return { ok: true as const, drafted: 0, noAddress: 0, noAsset: 0, unresolved: 0 };
-  const emailSteps = new Map(c.steps.filter((x) => x.channel === "email").map((x) => [x.position, x]));
-  const members = (await db.campaignMember.findMany({
-    where: { tenantId, campaignId: c.id, state: "queued", stepPosition: { in: [...emailSteps.keys()] }, company: { deletedAt: null } },
-    orderBy: [{ priority: "asc" }, { id: "asc" }],
-    select: {
-      id: true, companyId: true, personId: true, stepPosition: true, nextEligibleOn: true, segment: true, lane: true, city: true,
-      person: { select: { email: true, firstName: true, lastName: true } }, company: { select: { name: true, city: true } },
-    },
-  })).filter((m) => m.nextEligibleOn == null || m.nextEligibleOn.toISOString().slice(0, 10) <= today);
   // The same context and render as the preview: what Áron saw is what is drafted (live versions only).
-  const ec = await emailContext(tenantId, c.id, c.senderUserId);
-  const companyIds = members.map((m) => m.companyId);
-  const [done, leads, contacts] = await Promise.all([
-    db.emailDraft.findMany({ where: { tenantId, campaign: c.slug, companyId: { in: companyIds } }, select: { companyId: true, step: true, status: true } }),
-    db.lead.findMany({ where: { tenantId, outcome: "open", convertedDealId: null, companyId: { in: companyIds } }, select: { companyId: true } }),
-    db.contact.findMany({ where: { tenantId, endedAt: null, companyId: { in: companyIds } }, select: { companyId: true, personId: true, email: true, person: { select: { email: true } } } }),
-  ]);
-  const seen = new Set(done.map((x) => `${x.companyId}:${x.step}`));
-  // A reply on any touch of this campaign, or (prospects) an open lead, ends the cold e-mails; a stage audience needs its lead open (Vanda #194-1).
-  const repliedCo = new Set(done.filter((x) => x.status === "replied").map((x) => x.companyId));
-  const openLead = new Set(leads.map((l) => l.companyId));
-  const leadsAudience = audienceOf(c.audience).source === "leads_by_stage";
+  const [{ members, seen }, ec] = await Promise.all([emailReachable(tenantId, c, today), emailContext(tenantId, c.id, c.senderUserId)]);
   let noAddress = 0, noAsset = 0, unresolved = 0;
   const data: Prisma.EmailDraftCreateManyInput[] = [];
   for (const m of members) {
     if (data.length >= room) break;
-    if (seen.has(`${m.companyId}:${m.stepPosition}`) || repliedCo.has(m.companyId)) continue;
-    if (leadsAudience ? !openLead.has(m.companyId) : openLead.has(m.companyId)) continue;
+    if (seen.has(`${m.companyId}:${m.stepPosition}`)) continue;
     const segment = segmentOf(m);
     const step = ec.steps.find((x) => x.position === m.stepPosition);
     const itemId = step ? pickAsset(step, ec.variants.get(m.stepPosition) ?? [], segment, true) : null;
     const asset = itemId != null ? ec.items.find((i) => i.id === itemId && i.status === "live" && i.liveVersion) : undefined;
     if (!asset) { noAsset++; continue; }
-    const to = memberAddress(m, contacts);
+    const to = m.address;
     if (!to) { noAddress++; continue; }
     const r = renderEmail({ subject: asset.title, body: asset.liveVersion!.body }, valuesFor(m, segment, ec));
     const subject = renderedText(r.subject);
@@ -1110,8 +1104,92 @@ export async function advanceOnSent(ctx: CampaignCtx, campaignSlug: string, comp
  * Sending a draft of a member campaign needs that campaign running: one sent back to draft (an edit),
  * paused or stopped sends nothing from its queue (Vanda #194-2). Other campaign keys are untouched.
  */
-export async function campaignSendBlock(tenantId: number, slug: string): Promise<string | null> {
-  const c = await db.campaign.findFirst({ where: { tenantId, slug }, select: { kind: true, status: true } });
-  if (!c || !MEMBER_KINDS.includes(c.kind as CampaignKind) || c.status === "running") return null;
-  return `A kampány most nem fut (${c.status}); a piszkozata indítás után küldhető`;
+export async function campaignSendBlock(tenantId: number, slug: string, via: "resend" | "mailbox" = "resend"): Promise<string | null> {
+  const c = await db.campaign.findFirst({ where: { tenantId, slug }, select: { kind: true, status: true, audience: true, steps: { select: { channel: true } } } });
+  if (!c || !MEMBER_KINDS.includes(c.kind as CampaignKind)) return null;
+  if (c.status !== "running") return `A kampány most nem fut (${c.status}); a piszkozata indítás után küldhető`;
+  const aud = audienceOf(c.audience);
+  // Resend never carries cold outreach (its acceptable use policy): not the hand click, not the scheduler (2026-11-18).
+  if (via === "resend" && isProspectEmail({ kind: c.kind, audienceSource: aud.source, steps: c.steps })) return RESEND_PROSPECT_REFUSAL;
+  if (via === "mailbox" && aud.route !== "mailbox") return "Ez a kampány nem a postafiókon megy ki";
+  return null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Export route (2026-11-18): queued members to a CSV for a cold-mail tool, then marked so the hub never mails them.
+
+/** The queued members with an address, as the CSV a cold-mail tool imports. Read only. Operators only (personal data). */
+export async function exportQueued(ctx: CampaignCtx, slug: string, now: Date = new Date()) {
+  const op = await needsOperator(ctx);
+  if (op) return op;
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true, slug: true, audience: true, steps: { select: { position: true, channel: true } } } });
+  if (!c) return fail(404, "Kampány nem található");
+  // Exactly who the e-mail step could reach today (Vanda #218-1): the tool must not mail anyone the CRM would not.
+  const { members, excluded } = await emailReachable(ctx.tenantId, c, localDay(now).key);
+  const rows: ExportMember[] = [];
+  const memberIds: number[] = [];
+  for (const m of members) {
+    if (!m.address) continue;
+    memberIds.push(m.id);
+    rows.push({ email: m.address, firstName: m.person?.firstName ?? null, lastName: m.person?.lastName ?? null, company: m.company.name, why: m.why, segment: m.segment, contactSource: m.contactSource, source: m.source });
+  }
+  const csv = toCsv(rows);
+  audit("campaign", c.id, "update", null, { exported: { campaignId: c.id, memberIds, csvSha256: createHash("sha256").update(csv).digest("hex") } }, auditOpts(ctx));
+  return { ok: true as const, csv, memberIds, skippedNoEmail: members.length - memberIds.length, excluded };
+}
+
+/**
+ * The queued members an e-mail step may reach on `today` (Budapest key): on an e-mail step, eligible by date, the
+ * company never replied (any campaign), a prospect has no open lead (a stage audience needs one), and the address is
+ * not suppressed. `address` null = no address (callers count it). One filter for drafting and the export (Vanda #218-1).
+ */
+async function emailReachable(tenantId: number, c: { id: number; slug: string; audience: Prisma.JsonValue | null; steps: { position: number; channel: string }[] }, today: string) {
+  const emailSteps = c.steps.filter((x) => x.channel === "email").map((x) => x.position);
+  const all = await db.campaignMember.findMany({
+    where: { tenantId, campaignId: c.id, state: "queued", company: { deletedAt: null } },
+    orderBy: [{ priority: "asc" }, { id: "asc" }],
+    select: {
+      id: true, companyId: true, personId: true, stepPosition: true, nextEligibleOn: true, segment: true, lane: true, city: true,
+      why: true, source: true, contactSource: true,
+      person: { select: { email: true, firstName: true, lastName: true } }, company: { select: { name: true, city: true } },
+    },
+  });
+  const queued = all.filter((m) => emailSteps.includes(m.stepPosition) && (m.nextEligibleOn == null || m.nextEligibleOn.toISOString().slice(0, 10) <= today));
+  const companyIds = queued.map((m) => m.companyId);
+  const [done, replied, leads, contacts, suppressed] = await Promise.all([
+    db.emailDraft.findMany({ where: { tenantId, campaign: c.slug, companyId: { in: companyIds } }, select: { companyId: true, step: true } }),
+    // A reply in ANY campaign ends cold e-mail to that company (as the scheduler, Vanda #200-6).
+    db.emailDraft.findMany({ where: { tenantId, status: "replied", companyId: { in: companyIds } }, select: { companyId: true } }),
+    db.lead.findMany({ where: { tenantId, outcome: "open", convertedDealId: null, companyId: { in: companyIds } }, select: { companyId: true } }),
+    db.contact.findMany({ where: { tenantId, endedAt: null, companyId: { in: companyIds } }, select: { companyId: true, personId: true, email: true, person: { select: { email: true } } } }),
+    loadSuppressionSet(tenantId),
+  ]);
+  const repliedCo = new Set(replied.map((x) => x.companyId));
+  const openLead = new Set(leads.map((l) => l.companyId));
+  const leadsAudience = audienceOf(c.audience).source === "leads_by_stage";
+  const members = [];
+  for (const m of queued) {
+    const address = memberAddress(m, contacts);
+    // A prospect with an open lead belongs to sales; a stage audience needs its lead open (Vanda #194-1).
+    const out = repliedCo.has(m.companyId) || (leadsAudience ? !openLead.has(m.companyId) : openLead.has(m.companyId)) || (address != null && isSuppressed(address, suppressed));
+    if (!out) members.push({ ...m, address });
+  }
+  // Not-yet-eligible and off-e-mail-step members count as left out too.
+  return { members, seen: new Set(done.map((x) => `${x.companyId}:${x.step}`)), excluded: all.length - members.length };
+}
+
+/** Marks exported members: excluded with last_outcome "exported", so no draft and no send reaches them. Only still-queued members of this campaign. */
+export async function markExported(ctx: CampaignCtx, slug: string, memberIds: number[]) {
+  const op = await needsOperator(ctx);
+  if (op) return op;
+  if (!Array.isArray(memberIds) || memberIds.length > 5000 || memberIds.some((id) => !Number.isInteger(id) || id <= 0)) return fail(400, "Érvénytelen tagok");
+  const c = await db.campaign.findFirst({ where: { tenantId: ctx.tenantId, slug }, select: { id: true } });
+  if (!c) return fail(404, "Kampány nem található");
+  const now = new Date();
+  const { count } = await db.campaignMember.updateMany({
+    where: { tenantId: ctx.tenantId, campaignId: c.id, id: { in: memberIds }, state: "queued" },
+    data: { state: "excluded", lastOutcome: "exported", lastTouchedAt: now, stateChangedAt: now },
+  });
+  audit("campaign", c.id, "update", null, { markedExported: count }, auditOpts(ctx));
+  return { ok: true as const, marked: count };
 }
